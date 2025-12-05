@@ -7,10 +7,9 @@ use axum::{routing::post, Extension, Router};
 use lru::LruCache;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
+use sui_sdk::{SuiClient, SUI_COIN_TYPE};
 use tokio::sync::Mutex;
 use tracing::info;
-
-use sui_sdk::{SuiClient, SUI_COIN_TYPE};
 
 use crate::{
     errors::{Error, Error::MissingMetadata},

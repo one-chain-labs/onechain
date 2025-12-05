@@ -1,12 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use chrono::{DateTime, Utc};
-use config::{DownloadFeedConfigs, UploadFeedConfig, UploadParameters};
-use metrics::OracleMetrics;
-use mysten_metrics::monitored_scope;
-use once_cell::sync::OnceCell;
-use prometheus::Registry;
 use std::{
     collections::HashMap,
     ops::Add,
@@ -14,6 +8,13 @@ use std::{
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
+
+use chrono::{DateTime, Utc};
+use config::{DownloadFeedConfigs, UploadFeedConfig, UploadParameters};
+use metrics::OracleMetrics;
+use mysten_metrics::monitored_scope;
+use once_cell::sync::OnceCell;
+use prometheus::Registry;
 use sui_json_rpc_types::{
     SuiObjectDataOptions,
     SuiTransactionBlockEffects,
@@ -21,9 +22,9 @@ use sui_json_rpc_types::{
     SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
 };
-use sui_sdk::{apis::ReadApi, rpc_types::SuiObjectResponse, SuiClient};
+use sui_sdk::{apis::ReadApi, rpc_types::SuiObjectResponse, wallet_context::WalletContext, SuiClient};
 use sui_types::{
-    base_types::SuiAddress,
+    base_types::{random_object_ref, ObjectID, ObjectRef, SuiAddress},
     error::UserInputError,
     object::{Object, Owner},
     parse_sui_type_tag,
@@ -33,9 +34,6 @@ use sui_types::{
     Identifier,
 };
 use tap::tap::TapFallible;
-
-use sui_sdk::wallet_context::WalletContext;
-use sui_types::base_types::{random_object_ref, ObjectID, ObjectRef};
 use tracing::{debug, error, info, warn};
 pub mod config;
 mod metrics;

@@ -15,41 +15,26 @@ use crate::{
         *,
     },
     editions::Edition,
-    expansion,
-    hlir,
-    interface_generator,
-    naming,
-    parser::{self, comments::*, *},
+    expansion, hlir, interface_generator, naming,
+    parser::{self, *},
     shared::{
         files::{FilesSourceText, MappedFiles},
-        CompilationEnv,
-        Flags,
-        IndexedPhysicalPackagePath,
-        IndexedVfsPackagePath,
-        NamedAddressMap,
-        NamedAddressMaps,
-        NumericalAddress,
-        PackageConfig,
-        PackagePaths,
-        SaveFlag,
-        SaveHook,
+        CompilationEnv, Flags, IndexedPhysicalPackagePath, IndexedVfsPackagePath, NamedAddressMap,
+        NamedAddressMaps, NumericalAddress, PackageConfig, PackagePaths, SaveFlag, SaveHook,
     },
     to_bytecode,
     typing::{self, visitor::TypingVisitorObj},
     unit_test,
 };
 use move_command_line_common::files::{
-    extension_equals,
-    find_filenames_and_keep_specified,
-    MOVE_COMPILED_EXTENSION,
-    MOVE_EXTENSION,
+    extension_equals, find_filenames_and_keep_specified, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
     SOURCE_MAP_EXTENSION,
 };
 use move_core_types::language_storage::ModuleId as CompiledModuleId;
 use move_proc_macros::growing_stack;
 use move_symbol_pool::Symbol;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -83,6 +68,8 @@ pub struct Compiler {
     vfs_root: Option<VfsPath>,
     /// Hooks to save the ASTs
     save_hooks: Vec<SaveHook>,
+    // Files to fully compile (as opposed to omitting function bodies)
+    files_to_compile: Option<BTreeSet<PathBuf>>,
 }
 
 pub struct SteppedCompiler<const P: Pass> {
@@ -115,7 +102,6 @@ enum PassResult {
 #[derive(Clone)]
 pub struct FullyCompiledProgram {
     pub files: MappedFiles,
-    pub comments: CommentMap,
     pub parser: parser::ast::Program,
     pub expansion: expansion::ast::Program,
     pub naming: naming::ast::Program,
@@ -149,7 +135,12 @@ impl Compiler {
             mut find_move_files: impl FnMut(&Path) -> bool,
         ) -> anyhow::Result<Vec<IndexedPhysicalPackagePath>> {
             let mut idx_paths = vec![];
-            for PackagePaths { name, paths, named_address_map } in all_pkgs {
+            for PackagePaths {
+                name,
+                paths,
+                named_address_map,
+            } in all_pkgs
+            {
                 let name = if let Some((name, config)) = name {
                     let prev = package_configs.insert(name, config);
                     anyhow::ensure!(prev.is_none(), "Duplicate package entry for '{name}'");
@@ -157,8 +148,12 @@ impl Compiler {
                 } else {
                     None
                 };
-                let idx =
-                    maps.insert(named_address_map.into_iter().map(|(k, v)| (k.into(), v)).collect::<NamedAddressMap>());
+                let idx = maps.insert(
+                    named_address_map
+                        .into_iter()
+                        .map(|(k, v)| (k.into(), v))
+                        .collect::<NamedAddressMap>(),
+                );
                 let paths: Vec<Symbol> = if vfs_root.is_none() {
                     let paths: Vec<_> = paths.into_iter().map(|p| p.into()).collect();
                     let paths: Vec<_> = paths.iter().map(|p| p.as_str()).collect();
@@ -179,11 +174,16 @@ impl Compiler {
         }
         let mut maps = NamedAddressMaps::new();
         let mut package_configs = BTreeMap::new();
-        let targets = indexed_scopes(&mut maps, &mut package_configs, &vfs_root, targets, |path| {
-            extension_equals(path, MOVE_EXTENSION)
-        })?;
+        let targets = indexed_scopes(
+            &mut maps,
+            &mut package_configs,
+            &vfs_root,
+            targets,
+            |path| extension_equals(path, MOVE_EXTENSION),
+        )?;
         let deps = indexed_scopes(&mut maps, &mut package_configs, &vfs_root, deps, |path| {
-            extension_equals(path, MOVE_EXTENSION) || extension_equals(path, MOVE_COMPILED_EXTENSION)
+            extension_equals(path, MOVE_EXTENSION)
+                || extension_equals(path, MOVE_COMPILED_EXTENSION)
         })?;
 
         Ok(Self {
@@ -201,6 +201,7 @@ impl Compiler {
             default_config: None,
             vfs_root,
             save_hooks: vec![],
+            files_to_compile: None,
         })
     }
 
@@ -210,8 +211,16 @@ impl Compiler {
         deps: Vec<Paths>,
         named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
     ) -> Self {
-        let targets = vec![PackagePaths { name: None, paths: targets, named_address_map: named_address_map.clone() }];
-        let deps = vec![PackagePaths { name: None, paths: deps, named_address_map }];
+        let targets = vec![PackagePaths {
+            name: None,
+            paths: targets,
+            named_address_map: named_address_map.clone(),
+        }];
+        let deps = vec![PackagePaths {
+            name: None,
+            paths: deps,
+            named_address_map,
+        }];
         Self::from_package_paths(vfs_root, targets, deps).unwrap()
     }
 
@@ -244,7 +253,10 @@ impl Compiler {
         self
     }
 
-    pub fn set_pre_compiled_lib_opt(mut self, pre_compiled_lib: Option<Arc<FullyCompiledProgram>>) -> Self {
+    pub fn set_pre_compiled_lib_opt(
+        mut self,
+        pre_compiled_lib: Option<Arc<FullyCompiledProgram>>,
+    ) -> Self {
         assert!(self.pre_compiled_lib.is_none());
         self.pre_compiled_lib = pre_compiled_lib;
         self
@@ -277,8 +289,13 @@ impl Compiler {
 
     /// `prefix` is None for the default 'allow'.
     /// Some(prefix) for a custom set of warnings, e.g. 'allow(lint(_))'.
-    pub fn add_custom_known_filters(mut self, prefix: Option<impl Into<Symbol>>, filters: Vec<WarningFilter>) -> Self {
-        self.known_warning_filters.push((prefix.map(|s| s.into()), filters));
+    pub fn add_custom_known_filters(
+        mut self,
+        prefix: Option<impl Into<Symbol>>,
+        filters: Vec<WarningFilter>,
+    ) -> Self {
+        self.known_warning_filters
+            .push((prefix.map(|s| s.into()), filters));
         self
     }
 
@@ -294,9 +311,18 @@ impl Compiler {
         self
     }
 
+    pub fn set_files_to_compile(mut self, files: Option<BTreeSet<PathBuf>>) -> Self {
+        assert!(self.files_to_compile.is_none());
+        self.files_to_compile = files;
+        self
+    }
+
     pub fn run<const TARGET: Pass>(
         self,
-    ) -> anyhow::Result<(MappedFiles, Result<(CommentMap, SteppedCompiler<TARGET>), (Pass, Diagnostics)>)> {
+    ) -> anyhow::Result<(
+        MappedFiles,
+        Result<SteppedCompiler<TARGET>, (Pass, Diagnostics)>,
+    )> {
         let Self {
             maps,
             targets,
@@ -312,6 +338,7 @@ impl Compiler {
             default_config,
             vfs_root,
             save_hooks,
+            files_to_compile,
         } = self;
         let vfs_root = match vfs_root {
             Some(p) => p,
@@ -341,7 +368,11 @@ impl Compiler {
 
         for path in targets.iter().chain(&deps) {
             if !path.path.is_file().unwrap_or(false) {
-                debug_assert!(false, "Specified path is not a file: {}", path.path.as_str());
+                debug_assert!(
+                    false,
+                    "Specified path is not a file: {}",
+                    path.path.as_str()
+                );
                 anyhow::bail!(
                     "Specified path is not a file: {}.\
                     If vfs_root is set, all specified paths must be files",
@@ -350,14 +381,25 @@ impl Compiler {
             }
         }
 
-        generate_interface_files_for_deps(&mut deps, interface_files_dir_opt, &compiled_module_named_address_mapping)?;
-        let mut compilation_env =
-            CompilationEnv::new(flags, visitors, save_hooks, warning_filter, package_configs, default_config);
+        generate_interface_files_for_deps(
+            &mut deps,
+            interface_files_dir_opt,
+            &compiled_module_named_address_mapping,
+        )?;
+        let mut compilation_env = CompilationEnv::new(
+            flags,
+            visitors,
+            save_hooks,
+            warning_filter,
+            package_configs,
+            default_config,
+            files_to_compile,
+        );
         for (prefix, filters) in known_warning_filters {
             compilation_env.add_custom_known_filters(prefix, filters)?;
         }
 
-        let (source_text, pprog, comments) = parse_program(&compilation_env, maps, targets, deps)?;
+        let (source_text, pprog) = parse_program(&compilation_env, maps, targets, deps)?;
 
         for (fhash, (fname, contents)) in &source_text {
             // TODO better support for bytecode interface file paths
@@ -369,8 +411,7 @@ impl Compiler {
 
         let res: Result<_, (Pass, Diagnostics)> =
             SteppedCompiler::new_at_parser(compilation_env, pre_compiled_lib, pprog)
-                .run::<TARGET>()
-                .map(|compiler| (comments, compiler));
+                .run::<TARGET>();
 
         Ok((mapped_files, res))
     }
@@ -385,7 +426,9 @@ impl Compiler {
             if pass < PASS_CFGIR {
                 // errors occurred that prevented migration, remove any migration diagnostics
                 // Only report blocking errors since those are stopping migration
-                diags.retain(|d| !d.is_migration() && d.info().severity() >= Severity::NonblockingError);
+                diags.retain(|d| {
+                    !d.is_migration() && d.info().severity() >= Severity::NonblockingError
+                });
                 return Ok((files, Err(diags)));
             }
             let res = match generate_migration_diff(&files, &diags) {
@@ -413,9 +456,18 @@ impl Compiler {
         Ok(files)
     }
 
-    pub fn build(self) -> anyhow::Result<(MappedFiles, Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics>)> {
+    pub fn build(
+        self,
+    ) -> anyhow::Result<(
+        MappedFiles,
+        Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics>,
+    )> {
         let (files, res) = self.run::<PASS_COMPILATION>()?;
-        Ok((files, res.map(|(_comments, stepped)| stepped.into_compiled_units()).map_err(|(_pass, diags)| diags)))
+        Ok((
+            files,
+            res.map(|stepped| stepped.into_compiled_units())
+                .map_err(|(_pass, diags)| diags),
+        ))
     }
 
     pub fn build_and_report(self) -> anyhow::Result<(MappedFiles, Vec<AnnotatedCompiledUnit>)> {
@@ -431,12 +483,31 @@ impl<const P: Pass> SteppedCompiler<P> {
         assert!(P > EMPTY_COMPILER);
         assert!(self.program.is_some());
         assert!(self.program.as_ref().unwrap().equivalent_pass() == P);
-        assert!(P <= PASS_COMPILATION, "Invalid pass for run_to. Initial pass is too large.");
-        assert!(P <= TARGET, "Invalid pass for run_to. Target pass precedes the current pass");
-        let Self { compilation_env, pre_compiled_lib, program } = self;
-        let new_prog = run(&compilation_env, pre_compiled_lib.clone(), program.unwrap(), TARGET)?;
+        assert!(
+            P <= PASS_COMPILATION,
+            "Invalid pass for run_to. Initial pass is too large."
+        );
+        assert!(
+            P <= TARGET,
+            "Invalid pass for run_to. Target pass precedes the current pass"
+        );
+        let Self {
+            compilation_env,
+            pre_compiled_lib,
+            program,
+        } = self;
+        let new_prog = run(
+            &compilation_env,
+            pre_compiled_lib.clone(),
+            program.unwrap(),
+            TARGET,
+        )?;
         assert!(new_prog.equivalent_pass() == TARGET);
-        Ok(SteppedCompiler { compilation_env, pre_compiled_lib, program: Some(new_prog) })
+        Ok(SteppedCompiler {
+            compilation_env,
+            pre_compiled_lib,
+            program: Some(new_prog),
+        })
     }
 
     pub fn compilation_env(&self) -> &CompilationEnv {
@@ -535,7 +606,13 @@ macro_rules! ast_stepped_compilers {
 
 ast_stepped_compilers!(
     (PASS_PARSER, parser, Parser, at_parser, new_at_parser),
-    (PASS_EXPANSION, expansion, Expansion, at_expansion, new_at_expansion),
+    (
+        PASS_EXPANSION,
+        expansion,
+        Expansion,
+        at_expansion,
+        new_at_expansion
+    ),
     (PASS_NAMING, naming, Naming, at_naming, new_at_naming),
     (PASS_TYPING, typing, Typing, at_typing, new_at_typing),
     (PASS_HLIR, hlir, HLIR, at_hlir, new_at_hlir),
@@ -544,7 +621,11 @@ ast_stepped_compilers!(
 
 impl SteppedCompiler<PASS_COMPILATION> {
     pub fn into_compiled_units(self) -> (Vec<AnnotatedCompiledUnit>, Diagnostics) {
-        let Self { compilation_env: _, pre_compiled_lib: _, program } = self;
+        let Self {
+            compilation_env: _,
+            pre_compiled_lib: _,
+            program,
+        } = self;
         match program {
             Some(PassResult::Compilation(units, warnings)) => (units, warnings),
             _ => panic!(),
@@ -569,14 +650,17 @@ pub fn construct_pre_compiled_lib<Paths: Into<Symbol>, NamedAddress: Into<Symbol
         SaveFlag::HLIR,
         SaveFlag::CFGIR,
     ]);
-    let (files, pprog_and_comments_res) =
-        Compiler::from_package_paths(vfs_root, targets, Vec::<PackagePaths<Paths, NamedAddress>>::new())?
-            .set_interface_files_dir_opt(interface_files_dir_opt)
-            .set_flags(flags)
-            .add_save_hook(&hook)
-            .run::<PASS_PARSER>()?;
+    let (files, pprog_and_comments_res) = Compiler::from_package_paths(
+        vfs_root,
+        targets,
+        Vec::<PackagePaths<Paths, NamedAddress>>::new(),
+    )?
+    .set_interface_files_dir_opt(interface_files_dir_opt)
+    .set_flags(flags)
+    .add_save_hook(&hook)
+    .run::<PASS_PARSER>()?;
 
-    let (comments, stepped) = match pprog_and_comments_res {
+    let stepped = match pprog_and_comments_res {
         Err((_pass, errors)) => return Ok(Err((files, errors))),
         Ok(res) => res,
     };
@@ -588,7 +672,6 @@ pub fn construct_pre_compiled_lib<Paths: Into<Symbol>, NamedAddress: Into<Symbol
         Err((_pass, errors)) => Ok(Err((files, errors))),
         Ok(PassResult::Compilation(compiled, _)) => Ok(Ok(FullyCompiledProgram {
             files,
-            comments,
             parser: hook.take_parser_ast(),
             expansion: hook.take_expansion_ast(),
             naming: hook.take_naming_ast(),
@@ -624,7 +707,10 @@ macro_rules! file_path {
 
 /// Runs the bytecode verifier on the compiled units
 /// Fails if the bytecode verifier errors
-pub fn sanity_check_compiled_units(files: FilesSourceText, compiled_units: &[AnnotatedCompiledUnit]) {
+pub fn sanity_check_compiled_units(
+    files: FilesSourceText,
+    compiled_units: &[AnnotatedCompiledUnit],
+) {
     let ice_errors = compiled_unit::verify_units(compiled_units);
     if !ice_errors.is_empty() {
         report_diagnostics(&files.into(), ice_errors)
@@ -667,7 +753,11 @@ pub fn output_compiled_units(
     let digit_width = num_digits(compiled_units.len());
     for (idx, unit) in compiled_units.into_iter().enumerate() {
         let unit = unit.into_compiled_unit();
-        let mut path = dir_path!(out_dir, MODULE_SUB_DIR, format!("{}_{}", format_idx(idx, digit_width), unit.name()));
+        let mut path = dir_path!(
+            out_dir,
+            MODULE_SUB_DIR,
+            format!("{}_{}", format_idx(idx, digit_width), unit.name())
+        );
         emit_unit!(path, unit);
     }
 
@@ -682,7 +772,8 @@ fn generate_interface_files_for_deps(
     interface_files_dir_opt: Option<String>,
     module_to_named_address: &BTreeMap<CompiledModuleId, String>,
 ) -> anyhow::Result<()> {
-    let interface_files_paths = generate_interface_files(deps, interface_files_dir_opt, module_to_named_address, true)?;
+    let interface_files_paths =
+        generate_interface_files(deps, interface_files_dir_opt, module_to_named_address, true)?;
     deps.extend(interface_files_paths);
     // Remove bytecode files
     deps.retain(|p| !p.path.as_str().ends_with(MOVE_COMPILED_EXTENSION));
@@ -700,7 +791,11 @@ pub fn generate_interface_files(
     let mv_files: Vec<_> = mv_file_locations
         .iter()
         .filter(|s| {
-            let is_file = s.path.metadata().map(|d| d.file_type == VfsFileType::File).unwrap_or(false);
+            let is_file = s
+                .path
+                .metadata()
+                .map(|d| d.file_type == VfsFileType::File)
+                .unwrap_or(false);
             is_file && has_compiled_module_magic_number(&s.path)
         })
         .cloned()
@@ -709,7 +804,8 @@ pub fn generate_interface_files(
         return Ok(vec![]);
     }
 
-    let interface_files_dir = interface_files_dir_opt.unwrap_or_else(|| DEFAULT_OUTPUT_DIR.to_string());
+    let interface_files_dir =
+        interface_files_dir_opt.unwrap_or_else(|| DEFAULT_OUTPUT_DIR.to_string());
     let interface_sub_dir = dir_path!(interface_files_dir, MOVE_COMPILED_INTERFACES_DIR);
     let all_addr_dir = if separate_by_hash {
         use std::{
@@ -740,17 +836,31 @@ pub fn generate_interface_files(
     // generation is still read from the "regular" virtual file system, that is `vfs`)
     let deps_out_vfs = VfsPath::new(MemoryFS::new());
     let mut result = vec![];
-    for IndexedVfsPackagePath { package, path, named_address_map } in mv_files {
-        let (id, interface_contents) = interface_generator::write_file_to_string(module_to_named_address, &path)?;
+    for IndexedVfsPackagePath {
+        package,
+        path,
+        named_address_map,
+    } in mv_files
+    {
+        let (id, interface_contents) =
+            interface_generator::write_file_to_string(module_to_named_address, &path)?;
         let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address()));
         let file_path = Symbol::from(
-            file_path!(addr_dir.clone(), format!("{}", id.name()), MOVE_EXTENSION).to_string_lossy().to_string(),
+            file_path!(addr_dir.clone(), format!("{}", id.name()), MOVE_EXTENSION)
+                .to_string_lossy()
+                .to_string(),
         );
         let vfs_path = deps_out_vfs.join(file_path)?;
         vfs_path.parent().create_dir_all()?;
-        vfs_path.create_file()?.write_all(interface_contents.as_bytes())?;
+        vfs_path
+            .create_file()?
+            .write_all(interface_contents.as_bytes())?;
 
-        result.push(IndexedVfsPackagePath { package, path: vfs_path, named_address_map });
+        result.push(IndexedVfsPackagePath {
+            package,
+            path: vfs_path,
+            named_address_map,
+        });
     }
 
     Ok(result)
@@ -771,12 +881,12 @@ fn has_compiled_module_magic_number(path: &VfsPath) -> bool {
 }
 
 pub fn move_check_for_errors(
-    comments_and_compiler_res: Result<(CommentMap, SteppedCompiler<PASS_PARSER>), (Pass, Diagnostics)>,
+    comments_and_compiler_res: Result<SteppedCompiler<PASS_PARSER>, (Pass, Diagnostics)>,
 ) -> Diagnostics {
     fn try_impl(
-        comments_and_compiler_res: Result<(CommentMap, SteppedCompiler<PASS_PARSER>), (Pass, Diagnostics)>,
+        comments_and_compiler_res: Result<SteppedCompiler<PASS_PARSER>, (Pass, Diagnostics)>,
     ) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), (Pass, Diagnostics)> {
-        let (_, compiler) = comments_and_compiler_res?;
+        let compiler = comments_and_compiler_res?;
 
         let (compiler, cfgir) = compiler.run::<PASS_CFGIR>()?.into_ast();
         let compilation_env = compiler.compilation_env();
@@ -855,8 +965,13 @@ fn run(
     ) -> Result<PassResult, (Pass, Diagnostics)> {
         cur.save(compilation_env);
         let cur_pass = cur.equivalent_pass();
-        compilation_env.check_diags_at_or_above_severity(Severity::Bug).map_err(|diags| (cur_pass, diags))?;
-        assert!(until <= PASS_COMPILATION, "Invalid pass for run_to. Target is greater than maximum pass");
+        compilation_env
+            .check_diags_at_or_above_severity(Severity::Bug)
+            .map_err(|diags| (cur_pass, diags))?;
+        assert!(
+            until <= PASS_COMPILATION,
+            "Invalid pass for run_to. Target is greater than maximum pass"
+        );
         if cur.equivalent_pass() >= until {
             return Ok(cur);
         }
@@ -864,37 +979,74 @@ fn run(
         match cur {
             PassResult::Parser(prog) => {
                 let eprog = {
-                    let prog = unit_test::filter_test_members::program(compilation_env, pre_compiled_lib.clone(), prog);
+                    let prog = unit_test::filter_test_members::program(
+                        compilation_env,
+                        pre_compiled_lib.clone(),
+                        prog,
+                    );
                     let prog = verification_attribute_filter::program(compilation_env, prog);
                     expansion::translate::program(compilation_env, pre_compiled_lib.clone(), prog)
                 };
-                rec(compilation_env, pre_compiled_lib, PassResult::Expansion(eprog), until)
+                rec(
+                    compilation_env,
+                    pre_compiled_lib,
+                    PassResult::Expansion(eprog),
+                    until,
+                )
             }
             PassResult::Expansion(eprog) => {
-                let nprog = naming::translate::program(compilation_env, pre_compiled_lib.clone(), eprog);
-                rec(compilation_env, pre_compiled_lib, PassResult::Naming(nprog), until)
+                let nprog =
+                    naming::translate::program(compilation_env, pre_compiled_lib.clone(), eprog);
+                rec(
+                    compilation_env,
+                    pre_compiled_lib,
+                    PassResult::Naming(nprog),
+                    until,
+                )
             }
             PassResult::Naming(nprog) => {
-                let tprog = typing::translate::program(compilation_env, pre_compiled_lib.clone(), nprog);
-                rec(compilation_env, pre_compiled_lib, PassResult::Typing(tprog), until)
+                let tprog =
+                    typing::translate::program(compilation_env, pre_compiled_lib.clone(), nprog);
+                rec(
+                    compilation_env,
+                    pre_compiled_lib,
+                    PassResult::Typing(tprog),
+                    until,
+                )
             }
             PassResult::Typing(tprog) => {
                 compilation_env
                     .check_diags_at_or_above_severity(Severity::BlockingError)
                     .map_err(|diags| (cur_pass, diags))?;
-                let hprog = hlir::translate::program(compilation_env, pre_compiled_lib.clone(), tprog);
-                rec(compilation_env, pre_compiled_lib, PassResult::HLIR(hprog), until)
+                let hprog =
+                    hlir::translate::program(compilation_env, pre_compiled_lib.clone(), tprog);
+                rec(
+                    compilation_env,
+                    pre_compiled_lib,
+                    PassResult::HLIR(hprog),
+                    until,
+                )
             }
             PassResult::HLIR(hprog) => {
-                let cprog = cfgir::translate::program(compilation_env, pre_compiled_lib.clone(), hprog);
-                rec(compilation_env, pre_compiled_lib, PassResult::CFGIR(cprog), until)
+                let cprog =
+                    cfgir::translate::program(compilation_env, pre_compiled_lib.clone(), hprog);
+                rec(
+                    compilation_env,
+                    pre_compiled_lib,
+                    PassResult::CFGIR(cprog),
+                    until,
+                )
             }
             PassResult::CFGIR(cprog) => {
                 // Don't generate bytecode if there are any errors
                 compilation_env
                     .check_diags_at_or_above_severity(Severity::NonblockingError)
                     .map_err(|diags| (cur_pass, diags))?;
-                let compiled_units = to_bytecode::translate::program(compilation_env, pre_compiled_lib.clone(), cprog);
+                let compiled_units = to_bytecode::translate::program(
+                    compilation_env,
+                    pre_compiled_lib.clone(),
+                    cprog,
+                );
                 // Report any errors from bytecode generation
                 compilation_env
                     .check_diags_at_or_above_severity(Severity::NonblockingError)

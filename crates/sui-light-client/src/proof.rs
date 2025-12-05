@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-
 use serde::{Deserialize, Serialize};
 use sui_types::{
     base_types::ObjectRef,

@@ -1,12 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::authority_per_epoch_store::AuthorityPerEpochStore,
-    authority_aggregator::AuthorityAggregator,
-    authority_client::AuthorityAPI,
-    execution_cache::TransactionCacheRead,
-};
+#[cfg(any(msim, test))]
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::{cmp::min, ops::Add, sync::Arc, time::Duration};
+
 use arc_swap::ArcSwap;
 use mysten_metrics::LATENCY_SEC_BUCKETS;
 use prometheus::{
@@ -16,15 +14,19 @@ use prometheus::{
     IntCounter,
     Registry,
 };
-#[cfg(any(msim, test))]
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
-use std::{cmp::min, ops::Add, sync::Arc, time::Duration};
 use sui_types::{
     base_types::{AuthorityName, TransactionDigest},
     transaction::VerifiedSignedTransaction,
 };
 use tokio::{select, time::Instant};
 use tracing::{debug, error, trace};
+
+use crate::{
+    authority::authority_per_epoch_store::AuthorityPerEpochStore,
+    authority_aggregator::AuthorityAggregator,
+    authority_client::AuthorityAPI,
+    execution_cache::TransactionCacheRead,
+};
 
 struct ValidatorTxFinalizerMetrics {
     num_finalization_attempts: IntCounter,
@@ -249,14 +251,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
-        authority_aggregator::{AuthorityAggregator, AuthorityAggregatorBuilder},
-        authority_client::AuthorityAPI,
-        validator_tx_finalizer::ValidatorTxFinalizer,
-    };
-    use arc_swap::ArcSwap;
-    use async_trait::async_trait;
     use std::{
         cmp::min,
         collections::BTreeMap,
@@ -268,6 +262,9 @@ mod tests {
             Arc,
         },
     };
+
+    use arc_swap::ArcSwap;
+    use async_trait::async_trait;
     use sui_macros::sim_test;
     use sui_swarm_config::network_config_builder::ConfigBuilder;
     use sui_test_transaction_builder::TestTransactionBuilder;
@@ -303,6 +300,13 @@ mod tests {
             VerifiedTransaction,
         },
         utils::to_sender_signed_transaction,
+    };
+
+    use crate::{
+        authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
+        authority_aggregator::{AuthorityAggregator, AuthorityAggregatorBuilder},
+        authority_client::AuthorityAPI,
+        validator_tx_finalizer::ValidatorTxFinalizer,
     };
 
     #[derive(Clone)]
@@ -508,7 +512,7 @@ mod tests {
             ConfigBuilder::new_with_temp_dir().committee_size(NonZeroUsize::new(COMMITTEE_SIZE).unwrap()).build();
         let (auth_agg, _) = AuthorityAggregatorBuilder::from_network_config(&network_config).build_network_clients();
         let auth_agg = Arc::new(auth_agg);
-        let finalizers = (0..COMMITTEE_SIZE)
+        let finalizers = (0 .. COMMITTEE_SIZE)
             .map(|idx| {
                 ValidatorTxFinalizer::new_for_testing(
                     Arc::new(ArcSwap::new(auth_agg.clone())),
@@ -517,7 +521,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let config = finalizers[0].config.clone();
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let tx_digest = TransactionDigest::random();
             let mut delays: Vec<_> = finalizers
                 .iter()
@@ -550,7 +554,7 @@ mod tests {
             .with_objects(iter::once(gas_object))
             .build();
         let mut authority_states = vec![];
-        for idx in 0..4 {
+        for idx in 0 .. 4 {
             let state = TestAuthorityBuilder::new().with_network_config(&network_config, idx).build().await;
             authority_states.push(state);
         }
@@ -578,7 +582,7 @@ mod tests {
         let gas_object_ref = state.get_object(&gas_object_id).await.unwrap().compute_object_reference();
         let tx_data =
             TestTransactionBuilder::new(sender, gas_object_ref, state.reference_gas_price_for_testing().unwrap())
-                .transfer_oct(None, sender)
+                .transfer_sui(None, sender)
                 .build();
         let tx = to_sender_signed_transaction(tx_data, keypair);
         let response = clients.get(&state.name).unwrap().handle_transaction(tx.clone(), None).await.unwrap();

@@ -2,10 +2,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use sui_macros::sim_test;
 use sui_types::SUI_RANDOMNESS_STATE_OBJECT_ID;
 use test_cluster::TestClusterBuilder;
-
-use sui_macros::sim_test;
 
 #[sim_test]
 async fn test_create_randomness_state_object() {

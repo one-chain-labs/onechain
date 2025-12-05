@@ -11,17 +11,10 @@ use crate::{
     diagnostics::{
         codes::{DiagnosticsID, Severity},
         warning_filters::{
-            FilterName,
-            FilterPrefix,
-            WarningFilter,
-            WarningFiltersBuilder,
-            WarningFiltersScope,
-            WarningFiltersTable,
-            FILTER_ALL,
+            FilterName, FilterPrefix, WarningFilter, WarningFiltersBuilder, WarningFiltersScope,
+            WarningFiltersTable, FILTER_ALL,
         },
-        DiagnosticReporter,
-        Diagnostics,
-        DiagnosticsFormat,
+        DiagnosticReporter, Diagnostics, DiagnosticsFormat,
     },
     editions::{check_feature_or_error, feature_edition_error_msg, Edition, FeatureGate, Flavor},
     expansion::ast as E,
@@ -47,12 +40,10 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     hash::Hash,
+    path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering as AtomicOrdering},
-        Arc,
-        Mutex,
-        OnceLock,
-        RwLock,
+        Arc, Mutex, OnceLock, RwLock,
     },
 };
 use vfs::{VfsError, VfsPath};
@@ -75,14 +66,8 @@ pub use ast_debug::AstDebug;
 //**************************************************************************************************
 
 pub use move_core_types::parsing::parser::{
-    parse_address_number as parse_address,
-    parse_u128,
-    parse_u16,
-    parse_u256,
-    parse_u32,
-    parse_u64,
-    parse_u8,
-    NumberFormat,
+    parse_address_number as parse_address, parse_u128, parse_u16, parse_u256, parse_u32, parse_u64,
+    parse_u8, NumberFormat,
 };
 
 //**************************************************************************************************
@@ -102,7 +87,8 @@ pub fn parse_named_address(s: &str) -> anyhow::Result<(String, NumericalAddress)
         );
     }
     let name = before_after[0].parse()?;
-    let addr = NumericalAddress::parse_str(before_after[1]).map_err(|err| anyhow::format_err!("{}", err))?;
+    let addr = NumericalAddress::parse_str(before_after[1])
+        .map_err(|err| anyhow::format_err!("{}", err))?;
 
     Ok((name, addr))
 }
@@ -152,16 +138,31 @@ impl TName for Name {
 // Graphs
 //**************************************************************************************************
 
-pub fn shortest_cycle<'a, T: Ord + Hash>(dependency_graph: &DiGraphMap<&'a T, ()>, start: &'a T) -> Vec<&'a T> {
-    let shortest_path = dependency_graph.neighbors(start).fold(None, |shortest_path, neighbor| {
-        let path_opt = petgraph_astar(dependency_graph, neighbor, |finish| finish == start, |_e| 1, |_| 0);
-        match (shortest_path, path_opt) {
-            (p, None) | (None, p) => p,
-            (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
-                Some(if cur_len < acc_len { (cur_len, cur_path) } else { (acc_len, acc_path) })
+pub fn shortest_cycle<'a, T: Ord + Hash>(
+    dependency_graph: &DiGraphMap<&'a T, ()>,
+    start: &'a T,
+) -> Vec<&'a T> {
+    let shortest_path = dependency_graph
+        .neighbors(start)
+        .fold(None, |shortest_path, neighbor| {
+            let path_opt = petgraph_astar(
+                dependency_graph,
+                neighbor,
+                |finish| finish == start,
+                |_e| 1,
+                |_| 0,
+            );
+            match (shortest_path, path_opt) {
+                (p, None) | (None, p) => p,
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
+                    Some(if cur_len < acc_len {
+                        (cur_len, cur_path)
+                    } else {
+                        (acc_len, acc_path)
+                    })
+                }
             }
-        }
-    });
+        });
     let (_, mut path) = shortest_path.unwrap();
     path.insert(0, start);
     path
@@ -230,6 +231,8 @@ pub struct CompilationEnv {
     mapped_files: MappedFiles,
     save_hooks: Vec<SaveHook>,
     ide_information: RwLock<IDEInfo>,
+    // Files to fully compile (as opposed to omitting function bodies)
+    files_to_compile: Option<BTreeSet<PathBuf>>,
 }
 
 impl CompilationEnv {
@@ -240,9 +243,14 @@ impl CompilationEnv {
         warning_filters: Option<WarningFiltersBuilder>,
         package_configs: BTreeMap<Symbol, PackageConfig>,
         default_config: Option<PackageConfig>,
+        files_to_compile: Option<BTreeSet<PathBuf>>,
     ) -> Self {
-        visitors.extend([sui_mode::id_leak::IDLeakVerifier.visitor(), sui_mode::typing::SuiTypeChecks.visitor()]);
-        let mut known_filters_: BTreeMap<FilterName, BTreeSet<WarningFilter>> = WarningFilter::compiler_known_filters();
+        visitors.extend([
+            sui_mode::id_leak::IDLeakVerifier.visitor(),
+            sui_mode::typing::SuiTypeChecks.visitor(),
+        ]);
+        let mut known_filters_: BTreeMap<FilterName, BTreeSet<WarningFilter>> =
+            WarningFilter::compiler_known_filters();
         if flags.ide_mode() {
             known_filters_.extend(WarningFilter::ide_known_filters());
         }
@@ -254,7 +262,13 @@ impl CompilationEnv {
             .flat_map(|(attr, all_filters)| {
                 all_filters.iter().flat_map(|(name, filters)| {
                     filters.iter().filter_map(|v| {
-                        if let WarningFilter::Code { prefix, category, code, .. } = v {
+                        if let WarningFilter::Code {
+                            prefix,
+                            category,
+                            code,
+                            ..
+                        } = v
+                        {
                             Some(((*prefix, *category, *code), (*attr, *name)))
                         } else {
                             None
@@ -293,10 +307,16 @@ impl CompilationEnv {
             mapped_files: MappedFiles::empty(),
             save_hooks,
             ide_information: RwLock::new(IDEInfo::new()),
+            files_to_compile,
         }
     }
 
-    pub fn add_source_file(&mut self, file_hash: FileHash, file_name: FileName, source_text: Arc<str>) {
+    pub fn add_source_file(
+        &mut self,
+        file_hash: FileHash,
+        file_name: FileName,
+        source_text: Arc<str>,
+    ) {
         self.mapped_files.add(file_hash, file_name, source_text)
     }
 
@@ -328,11 +348,17 @@ impl CompilationEnv {
     }
 
     pub fn count_diags_at_or_above_severity(&self, threshold: Severity) -> usize {
-        self.diags.read().unwrap().count_diags_at_or_above_severity(threshold)
+        self.diags
+            .read()
+            .unwrap()
+            .count_diags_at_or_above_severity(threshold)
     }
 
     pub fn has_diags_at_or_above_severity(&self, threshold: Severity) -> bool {
-        self.diags.read().unwrap().max_severity_at_or_above_severity(threshold)
+        self.diags
+            .read()
+            .unwrap()
+            .max_severity_at_or_above_severity(threshold)
     }
 
     pub fn check_diags_at_or_above_severity(&self, threshold: Severity) -> Result<(), Diagnostics> {
@@ -387,12 +413,18 @@ impl CompilationEnv {
                     };
                     (prefix, Symbol::from(n))
                 }
-                WarningFilter::Code { prefix, category, code, name } => {
+                WarningFilter::Code {
+                    prefix,
+                    category,
+                    code,
+                    name,
+                } => {
                     let Some(n) = name else {
                         anyhow::bail!("A known Code warning filter must have a name specified");
                     };
                     let n = Symbol::from(n);
-                    self.known_filter_names.insert((prefix, category, code), (attr_name, n));
+                    self.known_filter_names
+                        .insert((prefix, category, code), (attr_name, n));
                     (prefix, n)
                 }
             };
@@ -414,6 +446,10 @@ impl CompilationEnv {
         &self.visitors
     }
 
+    pub fn files_to_compile(&self) -> Option<&BTreeSet<PathBuf>> {
+        self.files_to_compile.as_ref()
+    }
+
     // Logs an error if the feature isn't supported. Returns `false` if the feature is not
     // supported, and `true` otherwise.
     pub fn check_feature(
@@ -427,7 +463,11 @@ impl CompilationEnv {
     }
 
     // Returns an error string if if the feature isn't supported, or None otherwise.
-    pub fn feature_edition_error_msg(&self, feature: FeatureGate, package: Option<Symbol>) -> Option<String> {
+    pub fn feature_edition_error_msg(
+        &self,
+        feature: FeatureGate,
+        package: Option<Symbol>,
+    ) -> Option<String> {
         feature_edition_error_msg(self.package_config(package).edition, feature)
     }
 
@@ -440,12 +480,17 @@ impl CompilationEnv {
     }
 
     pub fn package_config(&self, package: Option<Symbol>) -> &PackageConfig {
-        package.and_then(|p| self.package_configs.get(&p)).unwrap_or(&self.default_config)
+        package
+            .and_then(|p| self.package_configs.get(&p))
+            .unwrap_or(&self.default_config)
     }
 
     pub fn package_configs(&self) -> impl Iterator<Item = (Option<Symbol>, &PackageConfig)> {
-        std::iter::once((None, &self.default_config))
-            .chain(self.package_configs.iter().map(|(n, config)| (Some(*n), config)))
+        std::iter::once((None, &self.default_config)).chain(
+            self.package_configs
+                .iter()
+                .map(|(n, config)| (Some(*n), config)),
+        )
     }
 
     pub fn set_primitive_type_definers(&self, m: BTreeMap<N::BuiltinTypeName_, E::ModuleIdent>) {
@@ -536,7 +581,11 @@ impl Counter {
 //**************************************************************************************************
 
 pub fn format_delim<T: fmt::Display, I: IntoIterator<Item = T>>(items: I, delim: &str) -> String {
-    items.into_iter().map(|item| format!("{}", item)).collect::<Vec<_>>().join(delim)
+    items
+        .into_iter()
+        .map(|item| format!("{}", item))
+        .collect::<Vec<_>>()
+        .join(delim)
 }
 
 pub fn format_comma<T: fmt::Display, I: IntoIterator<Item = T>>(items: I) -> String {
@@ -634,31 +683,52 @@ impl Flags {
     }
 
     pub fn set_keep_testing_functions(self, value: bool) -> Self {
-        Self { keep_testing_functions: value, ..self }
+        Self {
+            keep_testing_functions: value,
+            ..self
+        }
     }
 
     pub fn set_sources_shadow_deps(self, sources_shadow_deps: bool) -> Self {
-        Self { shadow: sources_shadow_deps, ..self }
+        Self {
+            shadow: sources_shadow_deps,
+            ..self
+        }
     }
 
     pub fn set_warnings_are_errors(self, value: bool) -> Self {
-        Self { warnings_are_errors: value, ..self }
+        Self {
+            warnings_are_errors: value,
+            ..self
+        }
     }
 
     pub fn set_silence_warnings(self, value: bool) -> Self {
-        Self { silence_warnings: value, ..self }
+        Self {
+            silence_warnings: value,
+            ..self
+        }
     }
 
     pub fn set_json_errors(self, value: bool) -> Self {
-        Self { json_errors: value, ..self }
+        Self {
+            json_errors: value,
+            ..self
+        }
     }
 
     pub fn set_ide_test_mode(self, value: bool) -> Self {
-        Self { ide_test_mode: value, ..self }
+        Self {
+            ide_test_mode: value,
+            ..self
+        }
     }
 
     pub fn set_ide_mode(self, value: bool) -> Self {
-        Self { ide_mode: value, ..self }
+        Self {
+            ide_mode: value,
+            ..self
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -738,7 +808,11 @@ pub struct Visitors {
 impl Visitors {
     pub fn new(passes: Vec<cli::compiler::Visitor>) -> Self {
         use cli::compiler::Visitor;
-        let mut vs = Visitors { typing: vec![], abs_int: vec![], cfgir: vec![] };
+        let mut vs = Visitors {
+            typing: vec![],
+            abs_int: vec![],
+            cfgir: vec![],
+        };
         for pass in passes {
             match pass {
                 Visitor::AbsIntVisitor(f) => vs.abs_int.push(f),
@@ -903,7 +977,10 @@ impl SaveHook {
 
     pub fn take_hlir_ast(&self) -> H::Program {
         let mut r = self.0.lock().unwrap();
-        assert!(r.flags.contains(&SaveFlag::HLIR), "HLIR AST not saved. Please set the flag when creating the SaveHook");
+        assert!(
+            r.flags.contains(&SaveFlag::HLIR),
+            "HLIR AST not saved. Please set the flag when creating the SaveHook"
+        );
         r.hlir.take().unwrap()
     }
 
@@ -967,7 +1044,6 @@ impl SaveHook {
 ///
 /// Examples of usage can be found in `expansion/`, `naming/`, `typing/`, and `hlir/`, in their
 /// respective `translation.rs` implementations.
-
 macro_rules! process_binops {
     ($optype:ty,
      $valtype:ty,
@@ -1048,8 +1124,16 @@ pub fn vfs_path_from_str(path: String, vfs_path: &VfsPath) -> Result<VfsPath, Vf
 
 impl IndexedPhysicalPackagePath {
     pub fn to_vfs_path(self, vfs_root: &VfsPath) -> Result<IndexedVfsPackagePath, VfsError> {
-        let IndexedPhysicalPackagePath { package, path, named_address_map } = self;
+        let IndexedPhysicalPackagePath {
+            package,
+            path,
+            named_address_map,
+        } = self;
 
-        Ok(IndexedVfsPackagePath { package, path: vfs_path_from_str(path.to_string(), vfs_root)?, named_address_map })
+        Ok(IndexedVfsPackagePath {
+            package,
+            path: vfs_path_from_str(path.to_string(), vfs_root)?,
+            named_address_map,
+        })
     }
 }

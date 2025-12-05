@@ -5,16 +5,15 @@ pub mod indexer;
 pub mod models;
 pub mod schema;
 
-use dotenvy::dotenv;
-use std::env;
+use std::{env, time::Duration};
 
 use diesel::{ConnectionError, ConnectionResult};
 use diesel_async::{
     pooled_connection::{bb8::Pool, AsyncDieselConnectionManager, ManagerConfig},
     AsyncPgConnection,
 };
+use dotenvy::dotenv;
 use futures_util::{future::BoxFuture, FutureExt};
-use std::time::Duration;
 
 pub type PgConnectionPool = diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
 pub type PgPoolConnection<'a> = diesel_async::pooled_connection::bb8::PooledConnection<'a, AsyncPgConnection>;

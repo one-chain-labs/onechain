@@ -10,7 +10,6 @@ use move_core_types::{
     resolver::ModuleResolver,
 };
 use serde::{Deserialize, Serialize};
-
 use sui_json_rpc_types::{
     BalanceChange,
     SuiArgument,

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-
 use sui_json_rpc_types::{DelegatedStake, SuiCommittee, ValidatorApys};
 use sui_open_rpc_macros::open_rpc;
 use sui_types::{
@@ -16,7 +15,7 @@ use sui_types::{
 pub trait GovernanceReadApi {
     /// Return one or more [DelegatedStake]. If a Stake was withdrawn its status will be Unstaked.
     #[method(name = "getStakesByIds")]
-    async fn get_stakes_by_ids(&self, staked_oct_ids: Vec<ObjectID>) -> RpcResult<Vec<DelegatedStake>>;
+    async fn get_stakes_by_ids(&self, staked_sui_ids: Vec<ObjectID>) -> RpcResult<Vec<DelegatedStake>>;
 
     /// Return all [DelegatedStake].
     #[method(name = "getStakes")]

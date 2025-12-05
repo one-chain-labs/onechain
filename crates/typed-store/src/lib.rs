@@ -10,10 +10,8 @@ pub mod traits;
 pub use traits::Map;
 pub mod metrics;
 pub mod rocks;
-pub use typed_store_error::TypedStoreError;
-pub mod sally;
-pub mod test_db;
 pub use metrics::DBMetrics;
+pub use typed_store_error::TypedStoreError;
 
 pub type StoreError = typed_store_error::TypedStoreError;
 
@@ -33,7 +31,7 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// The definer of the struct can specify the default options for each table using annotations
 /// We can also supply column family options on the default ones
 /// A user defined function of signature () -> Options can be provided for each table
-/// If a an override function is not specified, the default in `typed_store::rocks::default_db_options` is used
+/// If an override function is not specified, the default in `typed_store::rocks::default_db_options` is used
 /// ```
 /// use typed_store::rocks::DBOptions;
 /// use typed_store::rocks::DBMap;
@@ -76,7 +74,7 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// config.table1.options.create_if_missing(true);
 /// config.table1.options.set_write_buffer_size(123456);
 ///
-/// let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").keep();
+/// let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
 ///
 /// // We can then open the DB with the configs
 /// let _ = Tables::open_tables_read_write(primary_path, MetricConf::default(), None, Some(config.build()));
@@ -122,7 +120,7 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// #[tokio::main]
 /// async fn main() -> Result<(), Error> {
 ///
-/// use typed_store::rocks::MetricConf;let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").keep();
+/// use typed_store::rocks::MetricConf;let primary_path = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
 /// let _ = Tables::open_tables_read_write(primary_path.clone(), typed_store::rocks::MetricConf::default(), None, None);
 ///
 /// // Get the read only handle
@@ -148,5 +146,3 @@ pub type StoreError = typed_store_error::TypedStoreError;
 /// //     bad_field: u32,
 /// // #}
 pub use typed_store_derive::DBMapUtils;
-
-pub use typed_store_derive::SallyDB;

@@ -1,21 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    state_sync::{
-        Builder,
-        GetCheckpointSummaryRequest,
-        PeerStateSyncInfo,
-        StateSync,
-        StateSyncMessage,
-        UnstartedStateSync,
-    },
-    utils::build_network,
-};
+use std::{collections::HashMap, num::NonZeroUsize, time::Duration};
+
 use anemo::{PeerId, Request};
 use anyhow::anyhow;
 use prometheus::Registry;
-use std::{collections::HashMap, num::NonZeroUsize, time::Duration};
 use sui_archival::{reader::ArchiveReaderBalancer, writer::ArchiveWriter};
 use sui_config::{
     node::ArchiveReaderConfig,
@@ -29,6 +19,18 @@ use sui_types::{
 };
 use tempfile::tempdir;
 use tokio::time::{timeout, Instant};
+
+use crate::{
+    state_sync::{
+        Builder,
+        GetCheckpointSummaryRequest,
+        PeerStateSyncInfo,
+        StateSync,
+        StateSyncMessage,
+        UnstartedStateSync,
+    },
+    utils::build_network,
+};
 
 #[tokio::test]
 async fn server_push_checkpoint() {
@@ -194,7 +196,7 @@ async fn test_state_sync_using_archive() -> anyhow::Result<()> {
     // build mock data
     let (ordered_checkpoints, _, sequence_number_to_digest, checkpoints) = committee.make_empty_checkpoints(100, None);
     // Initialize archive store with all checkpoints
-    let temp_dir = tempdir()?.keep();
+    let temp_dir = tempdir()?.into_path();
     let local_path = temp_dir.join("local_dir");
     let remote_path = temp_dir.join("remote_dir");
     let local_store_config = ObjectStoreConfig {
@@ -226,7 +228,7 @@ async fn test_state_sync_using_archive() -> anyhow::Result<()> {
     // We ensure that only a part of the data exists in the archive store (and no new checkpoints after
     // sequence number >= 50 are written to the archive store). This is to test the fact that a node
     // can download latest checkpoints from a peer and back fill missing older data from archive
-    for checkpoint in &ordered_checkpoints[0..50] {
+    for checkpoint in &ordered_checkpoints[0 .. 50] {
         test_store.inner_mut().insert_checkpoint(checkpoint);
     }
     let kill = archive_writer.start(test_store).await?;
@@ -238,7 +240,7 @@ async fn test_state_sync_using_archive() -> anyhow::Result<()> {
     // We will delete all checkpoints older than this checkpoint on Node 2
     let oldest_checkpoint_to_keep: u64 = 10;
     let archive_readers = ArchiveReaderBalancer::new(vec![archive_reader_config], &Registry::default())?;
-    let archive_reader = archive_readers.pick_one_random(0..u64::MAX).await.unwrap();
+    let archive_reader = archive_readers.pick_one_random(0 .. u64::MAX).await.unwrap();
     loop {
         archive_reader.sync_manifest_once().await?;
         if let Ok(latest_available_checkpoint_in_archive) = archive_reader.latest_available_checkpoint().await {
@@ -284,7 +286,7 @@ async fn test_state_sync_using_archive() -> anyhow::Result<()> {
     // Prune first 10 checkpoint contents from Node 2
     {
         let mut store = event_loop_2.store.inner_mut();
-        for checkpoint in &ordered_checkpoints[0..(oldest_checkpoint_to_keep as usize)] {
+        for checkpoint in &ordered_checkpoints[0 .. (oldest_checkpoint_to_keep as usize)] {
             store.delete_checkpoint_content_test_only(checkpoint.sequence_number)?;
         }
         // Now Node 2 has deleted checkpoint contents from range [0, 10) on local store
@@ -407,7 +409,7 @@ async fn sync_with_checkpoints_being_inserted() {
     }
 
     timeout(Duration::from_secs(1), async {
-        for checkpoint in &ordered_checkpoints[2..] {
+        for checkpoint in &ordered_checkpoints[2 ..] {
             assert_eq!(subscriber_1.recv().await.unwrap().data(), checkpoint.data());
             assert_eq!(subscriber_2.recv().await.unwrap().data(), checkpoint.data());
         }
@@ -526,7 +528,7 @@ async fn sync_with_checkpoints_watermark() {
 
     // Peer 1 has all the checkpoint contents, but not Peer 2
     timeout(Duration::from_secs(1), async {
-        for (checkpoint, contents) in ordered_checkpoints[2..].iter().zip(contents.clone().into_iter().skip(2)) {
+        for (checkpoint, contents) in ordered_checkpoints[2 ..].iter().zip(contents.clone().into_iter().skip(2)) {
             assert_eq!(subscriber_1.recv().await.unwrap().data(), checkpoint.data());
             let content_digest = contents.into_checkpoint_contents_digest();
             store_1.get_full_checkpoint_contents(&content_digest).unwrap();
@@ -592,7 +594,7 @@ async fn sync_with_checkpoints_watermark() {
     // Peer 2 and Peer 3 will know about this change by `get_checkpoint_availability`
     // Soon we expect them to have all checkpoints's content.
     timeout(Duration::from_secs(6), async {
-        for (checkpoint, contents) in ordered_checkpoints[2..].iter().zip(contents.clone().into_iter().skip(2)) {
+        for (checkpoint, contents) in ordered_checkpoints[2 ..].iter().zip(contents.clone().into_iter().skip(2)) {
             assert_eq!(subscriber_2.recv().await.unwrap().data(), checkpoint.data());
             assert_eq!(subscriber_3.recv().await.unwrap().data(), checkpoint.data());
             let content_digest = contents.into_checkpoint_contents_digest();
@@ -634,7 +636,7 @@ async fn sync_with_checkpoints_watermark() {
 
     // Peer 4 syncs everything with Peer 3
     timeout(Duration::from_secs(3), async {
-        for (checkpoint, contents) in ordered_checkpoints[1..].iter().zip(contents.clone().into_iter().skip(1)) {
+        for (checkpoint, contents) in ordered_checkpoints[1 ..].iter().zip(contents.clone().into_iter().skip(1)) {
             assert_eq!(subscriber_4.recv().await.unwrap().data(), checkpoint.data());
             let content_digest = contents.into_checkpoint_contents_digest();
             store_4.get_full_checkpoint_contents(&content_digest).unwrap();

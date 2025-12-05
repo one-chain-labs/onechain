@@ -7,6 +7,7 @@
 //! 2. When Fullnode crashes and restarts, the pending transaction will be loaded and retried.
 
 use std::path::PathBuf;
+
 use sui_types::{
     base_types::TransactionDigest,
     crypto::EmptySignInfo,
@@ -81,10 +82,12 @@ impl WritePathPendingTransactionLog {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use anyhow;
     use std::collections::HashSet;
+
+    use anyhow;
     use sui_types::utils::create_fake_transaction;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_pending_tx_log_basic() -> anyhow::Result<()> {
@@ -107,7 +110,7 @@ mod tests {
         pending_txes.finish_transaction(&tx_digest).unwrap();
 
         // Test writing and finishing more transactions
-        let txes: Vec<_> = (0..10).map(|_| VerifiedTransaction::new_unchecked(create_fake_transaction())).collect();
+        let txes: Vec<_> = (0 .. 10).map(|_| VerifiedTransaction::new_unchecked(create_fake_transaction())).collect();
         for tx in txes.iter().take(10) {
             assert!(pending_txes.write_pending_transaction_maybe(tx).await.unwrap());
         }

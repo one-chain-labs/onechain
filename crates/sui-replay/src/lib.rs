@@ -1,30 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{cmp::max, env, io::BufRead, path::PathBuf, str::FromStr};
+
 use async_recursion::async_recursion;
 use clap::Parser;
 use config::ReplayableNetworkConfigSet;
 use fuzz::{ReplayFuzzer, ReplayFuzzerConfig};
 use fuzz_mutations::base_fuzzers;
-use std::cmp::max;
+use move_vm_config::runtime::get_default_output_filepath;
+use sui_config::node::ExpensiveSafetyCheckConfig;
+use sui_protocol_config::Chain;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber},
-    digests::{get_mainnet_chain_identifier, get_testnet_chain_identifier},
+    digests::{get_mainnet_chain_identifier, get_testnet_chain_identifier, TransactionDigest},
     message_envelope::Message,
 };
-use tracing::warn;
+use tracing::{error, info, warn};
 use transaction_provider::{FuzzStartPoint, TransactionSource};
 
 use crate::{
     config::get_rpc_url,
     replay::{ExecutionSandboxState, LocalExec, ProtocolVersionSummary},
 };
-use move_vm_config::runtime::get_default_output_filepath;
-use std::{env, io::BufRead, path::PathBuf, str::FromStr};
-use sui_config::node::ExpensiveSafetyCheckConfig;
-use sui_protocol_config::Chain;
-use sui_types::digests::TransactionDigest;
-use tracing::{error, info};
 
 pub mod batch_replay;
 pub mod config;
@@ -422,7 +420,7 @@ pub async fn execute_replay_command(
                 start, end, max_tasks, checkpoints_per_task
             );
 
-            let range: Vec<_> = (start..=end).collect();
+            let range: Vec<_> = (start ..= end).collect();
             for (task_count, checkpoints) in range.chunks(checkpoints_per_task).enumerate() {
                 let checkpoints = checkpoints.to_vec();
                 let rpc_url = rpc_url.clone();

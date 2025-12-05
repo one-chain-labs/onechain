@@ -327,7 +327,11 @@ mod tests {
         for n in 0..=s.len() {
             let sym = Symbol::from(&s[..n]);
             assert_eq!(sym.len(), n);
-            let expected_tag = if n <= MAX_INLINE_LEN { Tag::Inlined } else { Tag::Dynamic };
+            let expected_tag = if n <= MAX_INLINE_LEN {
+                Tag::Inlined
+            } else {
+                Tag::Dynamic
+            };
             assert_eq!(sym.tag(), expected_tag)
         }
     }
@@ -385,7 +389,9 @@ mod tests {
         let mut entries = STATIC_SYMBOL_IDX.entries().collect::<Vec<_>>();
         entries.sort_by_key(|(_, idx)| *idx);
         assert_eq!(entries.len(), STATIC_SYMBOLS.len());
-        for ((map_s, map_idx), (sym_idx, sym_s)) in entries.iter().zip(STATIC_SYMBOLS.iter().enumerate()) {
+        for ((map_s, map_idx), (sym_idx, sym_s)) in
+            entries.iter().zip(STATIC_SYMBOLS.iter().enumerate())
+        {
             let map_s = *map_s;
             let map_idx = **map_idx as usize;
             assert_eq!(map_idx, sym_idx);

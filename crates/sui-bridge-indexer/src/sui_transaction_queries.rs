@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::time::Duration;
+
+use sui_bridge::retry_with_max_elapsed_time;
 use sui_json_rpc_types::{SuiTransactionBlockResponseOptions, SuiTransactionBlockResponseQuery, TransactionFilter};
 use sui_sdk::SuiClient;
 use sui_types::{digests::TransactionDigest, SUI_BRIDGE_OBJECT_ID};
-
-use sui_bridge::retry_with_max_elapsed_time;
 use tracing::{error, info};
 
 use crate::types::RetrievedTransaction;

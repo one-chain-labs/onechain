@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{fs, path::Path};
+
 use anyhow::{Context, Result};
 use fastcrypto::{
     encoding::{Base64, Encoding},
     hash::HashFunction,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{fs, path::Path};
 use sui_types::{
     authenticator_state::{get_authenticator_state, AuthenticatorStateInner},
     base_types::{ObjectID, SuiAddress},
@@ -400,7 +401,7 @@ impl GenesisCeremonyParameters {
 
     fn default_initial_stake_subsidy_distribution_amount() -> u64 {
         // 1M Sui
-        1_000_000 * sui_types::gas_coin::MIST_PER_OCT
+        1_000_000 * sui_types::gas_coin::MIST_PER_SUI
     }
 
     fn default_stake_subsidy_period_length() -> u64 {

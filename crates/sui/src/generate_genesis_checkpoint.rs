@@ -23,18 +23,16 @@ async fn main() {
 
     let mut builder = Builder::new();
     let mut keys = Vec::new();
-    for i in 0..2 {
+    for i in 0 .. 2 {
         let key: AuthorityKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let worker_key: NetworkKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let account_key: AccountKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
         let network_key: NetworkKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
-        let addr = SuiAddress::from(account_key.public());
         let validator = ValidatorInfo {
             name: format!("Validator {}", i),
             protocol_key: key.public().into(),
             worker_key: worker_key.public().clone(),
-            account_address: addr,
-            revenue_receiving_address: addr,
+            account_address: SuiAddress::from(account_key.public()),
             network_key: network_key.public().clone(),
             gas_price: sui_config::node::DEFAULT_VALIDATOR_GAS_PRICE,
             commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,

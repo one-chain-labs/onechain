@@ -1,13 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Reducer, Worker, MAX_CHECKPOINTS_IN_PROGRESS};
-use anyhow::Result;
-use futures::StreamExt;
 use std::collections::HashMap;
+
+use anyhow::Result;
+use async_trait::async_trait;
+use futures::StreamExt;
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+
+use crate::{Reducer, Worker, MAX_CHECKPOINTS_IN_PROGRESS};
 
 pub(crate) async fn reduce<W: Worker>(
     task_name: String,
@@ -29,7 +32,7 @@ pub(crate) async fn reduce<W: Worker>(
         while let Some(message) = unprocessed.remove(&current_checkpoint_number) {
             if let Some(ref reducer) = reducer {
                 if reducer.should_close_batch(&batch, Some(&message)) {
-                    reducer.commit(std::mem::take(&mut batch)).await?;
+                    commit_with_retry(reducer, std::mem::take(&mut batch)).await?;
                     batch = vec![message];
                     progress_update = Some(current_checkpoint_number);
                 } else {
@@ -41,7 +44,7 @@ pub(crate) async fn reduce<W: Worker>(
         match reducer {
             Some(ref reducer) => {
                 if reducer.should_close_batch(&batch, None) {
-                    reducer.commit(std::mem::take(&mut batch)).await?;
+                    commit_with_retry(reducer, std::mem::take(&mut batch)).await?;
                     progress_update = Some(current_checkpoint_number);
                 }
             }
@@ -53,4 +56,25 @@ pub(crate) async fn reduce<W: Worker>(
         }
     }
     Ok(())
+}
+
+async fn commit_with_retry<R: Send + Sync + Clone>(reducer: &dyn Reducer<R>, batch: Vec<R>) -> Result<()> {
+    let backoff = backoff::ExponentialBackoff::default();
+    backoff::future::retry(backoff, || async {
+        reducer.commit(batch.clone()).await.map_err(|err| {
+            eprintln!("transient reducer error {:?}", err);
+            backoff::Error::transient(err)
+        })
+    })
+    .await
+}
+
+#[async_trait]
+impl<R> Reducer<R> for Box<dyn Reducer<R>>
+where
+    R: Send + Sync + Clone,
+{
+    async fn commit(&self, batch: Vec<R>) -> Result<()> {
+        self.as_ref().commit(batch).await
+    }
 }

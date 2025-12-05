@@ -1,18 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-
 use move_core_types::{
+    account_address::AccountAddress,
     annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     ident_str,
+    identifier::Identifier,
     language_storage::StructTag,
 };
-
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sui_json_rpc_types::SuiMoveStruct;
-
 use sui_types::{
     base_types::ObjectID,
     gas_coin::GasCoin,
@@ -69,7 +67,7 @@ impl TestEvent {
     fn layout() -> MoveStructLayout {
         MoveStructLayout {
             type_: Self::type_(),
-            fields: Box::new(vec![
+            fields: vec![
                 MoveFieldLayout::new(ident_str!("creator").to_owned(), MoveTypeLayout::Address),
                 MoveFieldLayout::new(
                     ident_str!("name").to_owned(),
@@ -83,7 +81,7 @@ impl TestEvent {
                     ident_str!("coins").to_owned(),
                     MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Struct(Box::new(GasCoin::layout())))),
                 ),
-            ]),
+            ],
         }
     }
 }
@@ -114,10 +112,10 @@ impl UTF8String {
     fn layout() -> MoveStructLayout {
         MoveStructLayout {
             type_: Self::type_(),
-            fields: Box::new(vec![MoveFieldLayout::new(
+            fields: vec![MoveFieldLayout::new(
                 ident_str!("bytes").to_owned(),
                 MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-            )]),
+            )],
         }
     }
 }

@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt::{Display, Formatter, Result};
+
 use move_core_types::language_storage::StructTag;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::fmt::{Display, Formatter, Result};
 use sui_types::{
     base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     object::Owner,

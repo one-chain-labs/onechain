@@ -1,18 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data_fetcher::{DataFetcher, RemoteFetcher},
-    types::{ReplayEngineError, MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD},
-};
 use std::{
     collections::VecDeque,
     fmt::{Debug, Formatter},
     str::FromStr,
 };
+
 use sui_sdk::SuiClientBuilder;
 use sui_types::digests::TransactionDigest;
 use tracing::info;
+
+use crate::{
+    data_fetcher::{DataFetcher, RemoteFetcher},
+    types::{ReplayEngineError, MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD},
+};
 
 const VALID_CHECKPOINT_START: u64 = 1;
 

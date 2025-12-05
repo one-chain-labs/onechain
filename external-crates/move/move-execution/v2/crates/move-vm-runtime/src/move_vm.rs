@@ -5,22 +5,16 @@
 use std::sync::Arc;
 
 use crate::{
-    data_cache::TransactionDataCache,
-    native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction,
-    runtime::VMRuntime,
-    session::Session,
+    data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction, runtime::VMRuntime, session::Session,
 };
 use move_binary_format::{
     errors::{Location, VMResult},
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::ModuleId,
-    metadata::Metadata,
-    resolver::MoveResolver,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    metadata::Metadata, resolver::MoveResolver,
 };
 use move_vm_config::runtime::VMConfig;
 
@@ -39,7 +33,10 @@ impl MoveVM {
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
     ) -> VMResult<Self> {
-        Ok(Self { runtime: VMRuntime::new(natives, vm_config).map_err(|err| err.finish(Location::Undefined))? })
+        Ok(Self {
+            runtime: VMRuntime::new(natives, vm_config)
+                .map_err(|err| err.finish(Location::Undefined))?,
+        })
     }
 
     pub fn config(&self) -> &VMConfig {
@@ -74,8 +71,15 @@ impl MoveVM {
     }
 
     /// Load a module into VM's code cache
-    pub fn load_module<S: MoveResolver>(&self, module_id: &ModuleId, remote: S) -> VMResult<Arc<CompiledModule>> {
-        self.runtime.loader().load_module(module_id, &TransactionDataCache::new(remote)).map(|(compiled, _)| compiled)
+    pub fn load_module<S: MoveResolver>(
+        &self,
+        module_id: &ModuleId,
+        remote: S,
+    ) -> VMResult<Arc<CompiledModule>> {
+        self.runtime
+            .loader()
+            .load_module(module_id, &TransactionDataCache::new(remote))
+            .map(|(compiled, _)| compiled)
     }
 
     /// Attempts to discover metadata in a given module with given key. Availability

@@ -82,7 +82,9 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn get_full_key_(&self, key: &K::Key) -> Option<K> {
-        self.0.get_key_value(key).map(|(k, (loc, _))| K::add_loc(*loc, k.clone()))
+        self.0
+            .get_key_value(key)
+            .map(|(k, (loc, _))| K::add_loc(*loc, k.clone()))
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
@@ -187,7 +189,8 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn key_cloned_iter(&self) -> impl Iterator<Item = (K, &V)> {
-        self.into_iter().map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
+        self.into_iter()
+            .map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
     }
 
     pub fn iter_mut(&mut self) -> IterMut<K, V> {
@@ -195,17 +198,22 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn key_cloned_iter_mut(&mut self) -> impl Iterator<Item = (K, &mut V)> {
-        self.into_iter().map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
+        self.into_iter()
+            .map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
     }
 
     pub fn maybe_from_opt_iter(
         iter: impl Iterator<Item = Option<(K, V)>>,
     ) -> Option<Result<UniqueMap<K, V>, (K::Key, K::Loc, K::Loc)>> {
         // TODO remove collect in favor of more efficient impl
-        Some(Self::maybe_from_iter(iter.collect::<Option<Vec<_>>>()?.into_iter()))
+        Some(Self::maybe_from_iter(
+            iter.collect::<Option<Vec<_>>>()?.into_iter(),
+        ))
     }
 
-    pub fn maybe_from_iter(iter: impl Iterator<Item = (K, V)>) -> Result<UniqueMap<K, V>, (K::Key, K::Loc, K::Loc)> {
+    pub fn maybe_from_iter(
+        iter: impl Iterator<Item = (K, V)>,
+    ) -> Result<UniqueMap<K, V>, (K::Key, K::Loc, K::Loc)> {
         let mut m = Self::new();
         for (k, v) in iter {
             if let Err((k, old_loc)) = m.add(k, v) {
@@ -225,7 +233,8 @@ where
     V: Sync,
 {
     pub fn key_cloned_par_iter(&self) -> impl ParallelIterator<Item = (K, &V)> {
-        self.par_iter().map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
+        self.par_iter()
+            .map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
     }
 }
 
@@ -237,7 +246,8 @@ where
     V: Sync + Send,
 {
     pub fn key_cloned_par_iter_mut(&mut self) -> impl ParallelIterator<Item = (K, &mut V)> {
-        IntoParallelRefMutIterator::par_iter_mut(self).map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
+        IntoParallelRefMutIterator::par_iter_mut(self)
+            .map(|(loc, k_, v)| (K::add_loc(loc, k_.clone()), v))
     }
 }
 
@@ -289,7 +299,8 @@ where
 
 impl<K: TName, V: PartialEq> PartialEq for UniqueMap<K, V> {
     fn eq(&self, other: &UniqueMap<K, V>) -> bool {
-        self.iter().all(|(_, k_, v1)| other.get_(k_).map(|v2| v1 == v2).unwrap_or(false))
+        self.iter()
+            .all(|(_, k_, v1)| other.get_(k_).map(|v2| v1 == v2).unwrap_or(false))
             && other.iter().all(|(_, k_, _)| self.contains_key_(k_))
     }
 }
@@ -347,7 +358,10 @@ impl<K: TName, V> Default for UniqueMap<K, V> {
 //**************************************************************************************************
 
 pub struct IntoIter<K: TName, V>(
-    std::iter::Map<std::collections::btree_map::IntoIter<K::Key, (K::Loc, V)>, fn((K::Key, (K::Loc, V))) -> (K, V)>,
+    std::iter::Map<
+        std::collections::btree_map::IntoIter<K::Key, (K::Loc, V)>,
+        fn((K::Key, (K::Loc, V))) -> (K, V),
+    >,
     usize,
 );
 
@@ -367,8 +381,8 @@ impl<K: TName, V> Iterator for IntoIter<K, V> {
 }
 
 impl<K: TName, V> IntoIterator for UniqueMap<K, V> {
-    type IntoIter = IntoIter<K, V>;
     type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         let len = self.len();
@@ -391,11 +405,11 @@ where
     K::Loc: Send,
     V: Send,
 {
-    type Item = (K, V);
     type Iter = rayon::iter::Map<
         rayon::collections::btree_map::IntoIter<K::Key, (K::Loc, V)>,
         fn((K::Key, (K::Loc, V))) -> (K, V),
     >;
+    type Item = (K, V);
 
     fn into_par_iter(self) -> Self::Iter {
         self.0.into_par_iter().map(|(k_, loc_v)| {
@@ -435,8 +449,8 @@ impl<'a, K: TName, V> Iterator for Iter<'a, K, V> {
 }
 
 impl<'a, K: TName, V> IntoIterator for &'a UniqueMap<K, V> {
-    type IntoIter = Iter<'a, K, V>;
     type Item = (K::Loc, &'a K::Key, &'a V);
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         let fix = |(k_, loc_v): (&'a K::Key, &'a (K::Loc, V))| -> (K::Loc, &'a K::Key, &'a V) {
@@ -455,11 +469,11 @@ where
     K::Loc: Send + Sync + 'a,
     V: Sync + 'a,
 {
-    type Item = (K::Loc, &'a K::Key, &'a V);
     type Iter = rayon::iter::Map<
         rayon::collections::btree_map::Iter<'a, K::Key, (K::Loc, V)>,
         fn((&'a K::Key, &'a (K::Loc, V))) -> (K::Loc, &'a K::Key, &'a V),
     >;
+    type Item = (K::Loc, &'a K::Key, &'a V);
 
     fn par_iter(&'a self) -> Self::Iter {
         let fix = |(k_, loc_v): (&'a K::Key, &'a (K::Loc, V))| -> (K::Loc, &'a K::Key, &'a V) {
@@ -495,16 +509,17 @@ impl<'a, K: TName, V> Iterator for IterMut<'a, K, V> {
 }
 
 impl<'a, K: TName, V> IntoIterator for &'a mut UniqueMap<K, V> {
-    type IntoIter = IterMut<'a, K, V>;
     type Item = (K::Loc, &'a K::Key, &'a mut V);
+    type IntoIter = IterMut<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         let len = self.len();
-        let fix = |(k_, loc_v): (&'a K::Key, &'a mut (K::Loc, V))| -> (K::Loc, &'a K::Key, &'a mut V) {
-            let loc = loc_v.0;
-            let v = &mut loc_v.1;
-            (loc, k_, v)
-        };
+        let fix =
+            |(k_, loc_v): (&'a K::Key, &'a mut (K::Loc, V))| -> (K::Loc, &'a K::Key, &'a mut V) {
+                let loc = loc_v.0;
+                let v = &mut loc_v.1;
+                (loc, k_, v)
+            };
         IterMut(self.0.iter_mut().map(fix), len)
     }
 }
@@ -516,18 +531,19 @@ where
     K::Loc: Send + Sync + 'a,
     V: Sync + Send + 'a,
 {
-    type Item = (K::Loc, &'a K::Key, &'a mut V);
     type Iter = rayon::iter::Map<
         rayon::collections::btree_map::IterMut<'a, K::Key, (K::Loc, V)>,
         fn((&'a K::Key, &'a mut (K::Loc, V))) -> (K::Loc, &'a K::Key, &'a mut V),
     >;
+    type Item = (K::Loc, &'a K::Key, &'a mut V);
 
     fn par_iter_mut(&'a mut self) -> Self::Iter {
-        let fix = |(k_, loc_v): (&'a K::Key, &'a mut (K::Loc, V))| -> (K::Loc, &'a K::Key, &'a mut V) {
-            let loc = loc_v.0;
-            let v = &mut loc_v.1;
-            (loc, k_, v)
-        };
+        let fix =
+            |(k_, loc_v): (&'a K::Key, &'a mut (K::Loc, V))| -> (K::Loc, &'a K::Key, &'a mut V) {
+                let loc = loc_v.0;
+                let v = &mut loc_v.1;
+                (loc, k_, v)
+            };
         self.0.par_iter_mut().map(fix)
     }
 }

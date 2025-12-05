@@ -1,23 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    operations::Operations,
-    types::{ConstructionMetadata, OperationStatus, OperationType},
-    CoinMetadataCache,
-};
-use anyhow::anyhow;
-use move_core_types::{identifier::Identifier, language_storage::StructTag};
-use rand::seq::{IteratorRandom, SliceRandom};
-use serde_json::json;
-use shared_crypto::intent::Intent;
-use signature::rand_core::OsRng;
 use std::{
     collections::{BTreeMap, HashMap},
     num::NonZeroUsize,
     path::PathBuf,
     str::FromStr,
 };
+
+use anyhow::anyhow;
+use move_core_types::{identifier::Identifier, language_storage::StructTag};
+use rand::seq::{IteratorRandom, SliceRandom};
+use serde_json::json;
+use shared_crypto::intent::Intent;
+use signature::rand_core::OsRng;
 use sui_json_rpc_types::{
     ObjectChange,
     SuiObjectDataOptions,
@@ -61,6 +57,12 @@ use sui_types::{
 };
 use test_cluster::TestClusterBuilder;
 
+use crate::{
+    operations::Operations,
+    types::{ConstructionMetadata, OperationStatus, OperationType},
+    CoinMetadataCache,
+};
+
 #[tokio::test]
 async fn test_transfer_sui() {
     let network = TestClusterBuilder::new().build().await;
@@ -74,7 +76,7 @@ async fn test_transfer_sui() {
     let recipient = get_random_address(&addresses, vec![sender]);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_oct(recipient, Some(50000));
+        builder.transfer_sui(recipient, Some(50000));
         builder.finish()
     };
     test_transaction(
@@ -104,7 +106,7 @@ async fn test_transfer_sui_whole_coin() {
     let recipient = get_random_address(&addresses, vec![sender]);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_oct(recipient, None);
+        builder.transfer_sui(recipient, None);
         builder.finish()
     };
     test_transaction(
@@ -347,7 +349,7 @@ async fn test_pay_sui_multiple_coin_same_recipient() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_oct(vec![recipient1, recipient1, recipient1], vec![100000, 100000, 100000]).unwrap();
+        builder.pay_sui(vec![recipient1, recipient1, recipient1], vec![100000, 100000, 100000]).unwrap();
         builder.finish()
     };
     test_transaction(
@@ -380,7 +382,7 @@ async fn test_pay_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_oct(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
+        builder.pay_sui(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
         builder.finish()
     };
     test_transaction(
@@ -413,7 +415,7 @@ async fn test_failed_pay_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_oct(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
+        builder.pay_sui(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
         builder.finish()
     };
     test_transaction(&client, keystore, vec![], sender, pt, vec![coin1, coin2], 2000000, rgp, true).await;
@@ -486,7 +488,7 @@ async fn test_pay_all_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_all_oct(recipient);
+        builder.pay_all_sui(recipient);
         builder.finish()
     };
     test_transaction(

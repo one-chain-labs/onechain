@@ -3,15 +3,14 @@
 
 use anyhow::Result;
 use fastcrypto::traits::EncodeDecodeBase64;
-use tokio::sync::Mutex;
-
 use sui_data_ingestion_core::Worker;
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
 use sui_types::{
     effects::TransactionEffectsAPI,
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
     messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSummary},
     transaction::TransactionDataAPI,
 };
+use tokio::sync::Mutex;
 
 use crate::{handlers::AnalyticsHandler, tables::CheckpointEntry, FileType};
 

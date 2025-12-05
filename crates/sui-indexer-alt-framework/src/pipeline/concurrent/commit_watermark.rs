@@ -7,6 +7,7 @@ use std::{
     sync::Arc,
 };
 
+use sui_pg_db::Db;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -15,14 +16,12 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
-use crate::{
-    db::Db,
-    metrics::IndexerMetrics,
-    pipeline::{CommitterConfig, WatermarkPart, LOUD_WATERMARK_UPDATE_INTERVAL, WARN_PENDING_WATERMARKS},
-    watermarks::CommitterWatermark,
-};
-
 use super::Handler;
+use crate::{
+    metrics::{CheckpointLagMetricReporter, IndexerMetrics},
+    models::watermarks::CommitterWatermark,
+    pipeline::{logging::WatermarkLogger, CommitterConfig, WatermarkPart, WARN_PENDING_WATERMARKS},
+};
 
 /// The watermark task is responsible for keeping track of a pipeline's out-of-order commits and
 /// updating its row in the `watermarks` table when a continuous run of checkpoints have landed
@@ -77,7 +76,13 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
 
         // The watermark task will periodically output a log message at a higher log level to
         // demonstrate that the pipeline is making progress.
-        let mut next_loud_watermark_update = watermark.checkpoint_hi_inclusive + LOUD_WATERMARK_UPDATE_INTERVAL;
+        let mut logger = WatermarkLogger::new("concurrent_committer", &watermark);
+
+        let checkpoint_lag_reporter = CheckpointLagMetricReporter::new_for_pipeline::<H>(
+            &metrics.watermarked_checkpoint_timestamp_lag,
+            &metrics.latest_watermarked_checkpoint_timestamp_lag_ms,
+            &metrics.watermark_checkpoint_in_db,
+        );
 
         info!(pipeline = H::NAME, ?watermark, "Starting commit watermark");
 
@@ -197,57 +202,32 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
                                 );
                             }
 
-                            Ok(updated) => {
+                            Ok(true) => {
                                 let elapsed = guard.stop_and_record();
 
-                                if updated {
-                                    metrics
-                                        .watermark_epoch_in_db
-                                        .with_label_values(&[H::NAME])
-                                        .set(watermark.epoch_hi_inclusive);
+                                logger.log::<H>(&watermark, elapsed);
 
-                                    metrics
-                                        .watermark_checkpoint_in_db
-                                        .with_label_values(&[H::NAME])
-                                        .set(watermark.checkpoint_hi_inclusive);
+                                checkpoint_lag_reporter.report_lag(
+                                    watermark.checkpoint_hi_inclusive as u64,
+                                    watermark.timestamp_ms_hi_inclusive as u64,
+                                );
 
-                                    metrics
-                                        .watermark_transaction_in_db
-                                        .with_label_values(&[H::NAME])
-                                        .set(watermark.tx_hi);
+                                metrics
+                                    .watermark_epoch_in_db
+                                    .with_label_values(&[H::NAME])
+                                    .set(watermark.epoch_hi_inclusive);
 
-                                    metrics
-                                        .watermark_timestamp_in_db_ms
-                                        .with_label_values(&[H::NAME])
-                                        .set(watermark.timestamp_ms_hi_inclusive);
-                                }
+                                metrics
+                                    .watermark_transaction_in_db
+                                    .with_label_values(&[H::NAME])
+                                    .set(watermark.tx_hi);
 
-                                if watermark.checkpoint_hi_inclusive > next_loud_watermark_update {
-                                    next_loud_watermark_update = watermark.checkpoint_hi_inclusive + LOUD_WATERMARK_UPDATE_INTERVAL;
-
-                                    info!(
-                                        pipeline = H::NAME,
-                                        epoch = watermark.epoch_hi_inclusive,
-                                        checkpoint = watermark.checkpoint_hi_inclusive,
-                                        transaction = watermark.tx_hi,
-                                        timestamp = %watermark.timestamp(),
-                                        updated,
-                                        elapsed_ms = elapsed * 1000.0,
-                                        "Watermark",
-                                    );
-                                } else {
-                                    debug!(
-                                        pipeline = H::NAME,
-                                        epoch = watermark.epoch_hi_inclusive,
-                                        checkpoint = watermark.checkpoint_hi_inclusive,
-                                        transaction = watermark.tx_hi,
-                                        timestamp = %watermark.timestamp(),
-                                        updated,
-                                        elapsed_ms = elapsed * 1000.0,
-                                        "Watermark",
-                                    );
-                                }
+                                metrics
+                                    .watermark_timestamp_in_db_ms
+                                    .with_label_values(&[H::NAME])
+                                    .set(watermark.timestamp_ms_hi_inclusive);
                             }
+                            Ok(false) => {}
                         }
                     }
 

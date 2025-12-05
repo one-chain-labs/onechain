@@ -138,7 +138,7 @@ impl<C: NetworkClient> RoundProber<C> {
         let mut highest_accepted_rounds = vec![vec![0; self.context.committee.size()]; self.context.committee.size()];
 
         let blocks = self.dag_state.read().get_last_cached_block_per_authority(Round::MAX);
-        let local_highest_accepted_rounds = blocks.into_iter().map(|block| block.round()).collect::<Vec<_>>();
+        let local_highest_accepted_rounds = blocks.into_iter().map(|(block, _)| block.round()).collect::<Vec<_>>();
         let last_proposed_round = local_highest_accepted_rounds[own_index];
 
         // For our own index, the highest received & accepted round is our last
@@ -152,6 +152,7 @@ impl<C: NetworkClient> RoundProber<C> {
             tokio::select! {
                 result = requests.next() => {
                     let Some((peer, result)) = result else { break };
+                    let peer_name = &self.context.committee.authority(peer).hostname;
                     match result {
                         Ok(Ok((received, accepted))) => {
                             if received.len() == self.context.committee.size()
@@ -159,7 +160,7 @@ impl<C: NetworkClient> RoundProber<C> {
                                 highest_received_rounds[peer] = received;
                             } else {
                                 node_metrics.round_prober_request_errors.with_label_values(&["invalid_received_rounds"]).inc();
-                                tracing::warn!("Received invalid number of received rounds from peer {}", peer);
+                                tracing::warn!("Received invalid number of received rounds from peer {}", peer_name);
                             }
 
                             if self
@@ -170,7 +171,7 @@ impl<C: NetworkClient> RoundProber<C> {
                                         highest_accepted_rounds[peer] = accepted;
                                     } else {
                                         node_metrics.round_prober_request_errors.with_label_values(&["invalid_accepted_rounds"]).inc();
-                                        tracing::warn!("Received invalid number of accepted rounds from peer {}", peer);
+                                        tracing::warn!("Received invalid number of accepted rounds from peer {}", peer_name);
                                     }
                                 }
 
@@ -187,11 +188,11 @@ impl<C: NetworkClient> RoundProber<C> {
                         // own probing failures and actual propagation issues.
                         Ok(Err(err)) => {
                             node_metrics.round_prober_request_errors.with_label_values(&["failed_fetch"]).inc();
-                            tracing::warn!("Failed to get latest rounds from peer {}: {:?}", peer, err);
+                            tracing::debug!("Failed to get latest rounds from peer {}: {:?}", peer_name, err);
                         },
                         Err(_) => {
                             node_metrics.round_prober_request_errors.with_label_values(&["timeout"]).inc();
-                            tracing::warn!("Timeout while getting latest rounds from peer {}", peer);
+                            tracing::debug!("Timeout while getting latest rounds from peer {}", peer_name);
                         },
                     }
                 }
@@ -320,7 +321,7 @@ mod test {
     use super::QuorumRound;
     use crate::{
         block::BlockRef,
-        commit::CommitRange,
+        commit::{CertifiedCommits, CommitRange},
         context::Context,
         core_thread::{CoreError, CoreThreadDispatcher},
         dag_state::DagState,
@@ -366,6 +367,14 @@ mod test {
     #[async_trait]
     impl CoreThreadDispatcher for FakeThreadDispatcher {
         async fn add_blocks(&self, _blocks: Vec<VerifiedBlock>) -> Result<BTreeSet<BlockRef>, CoreError> {
+            unimplemented!()
+        }
+
+        async fn check_block_refs(&self, _block_refs: Vec<BlockRef>) -> Result<BTreeSet<BlockRef>, CoreError> {
+            unimplemented!()
+        }
+
+        async fn add_certified_commits(&self, _commits: CertifiedCommits) -> Result<BTreeSet<BlockRef>, CoreError> {
             unimplemented!()
         }
 
@@ -514,7 +523,7 @@ mod test {
             RoundProber::new(context.clone(), core_thread_dispatcher.clone(), dag_state.clone(), network_client.clone());
 
         // Create test blocks for each authority with incrementing rounds starting at 110
-        let blocks = (0..NUM_AUTHORITIES)
+        let blocks = (0 .. NUM_AUTHORITIES)
             .map(|authority| {
                 let round = 110 + (authority as u32 * 10);
                 VerifiedBlock::new_for_test(TestBlock::new(round, authority as u32).build())

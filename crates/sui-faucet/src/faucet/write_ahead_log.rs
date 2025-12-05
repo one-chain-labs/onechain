@@ -8,15 +8,14 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress},
     transaction::TransactionData,
 };
+use tracing::info;
 use typed_store::{
     rocks::DBMap,
     traits::{TableSummary, TypedStoreDebug},
+    DBMapUtils,
     Map,
     TypedStoreError,
 };
-
-use tracing::info;
-use typed_store::DBMapUtils;
 use uuid::Uuid;
 
 /// Persistent log of transactions paying out sui from the faucet, keyed by the coin serving the
@@ -238,7 +237,7 @@ mod tests {
         let recv = SuiAddress::random_for_testing_only();
         (
             recv,
-            TransactionData::new_pay_oct(
+            TransactionData::new_pay_sui(
                 send,
                 vec![coin],
                 vec![recv],

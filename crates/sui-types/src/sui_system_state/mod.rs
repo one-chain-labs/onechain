@@ -1,6 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt;
+
+use anyhow::Result;
+use enum_dispatch::enum_dispatch;
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
+
+use self::{
+    sui_system_state_inner_v1::{SuiSystemStateInnerV1, ValidatorV1},
+    sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
+};
 use crate::{
     base_types::ObjectID,
     committee::CommitteeWithNetworkMetadata,
@@ -17,17 +29,6 @@ use crate::{
     MoveTypeTagTrait,
     SUI_SYSTEM_ADDRESS,
     SUI_SYSTEM_STATE_OBJECT_ID,
-};
-use anyhow::Result;
-use enum_dispatch::enum_dispatch;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::fmt;
-use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
-
-use self::{
-    sui_system_state_inner_v1::{SuiSystemStateInnerV1, ValidatorV1},
-    sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
 };
 
 pub mod epoch_start_sui_system_state;
@@ -48,7 +49,7 @@ use self::simtest_sui_system_state_inner::{
 
 const SUI_SYSTEM_STATE_WRAPPER_STRUCT_NAME: &IdentStr = ident_str!("SuiSystemState");
 
-pub const SUI_SYSTEM_MODULE_NAME: &IdentStr = ident_str!("one_system");
+pub const SUI_SYSTEM_MODULE_NAME: &IdentStr = ident_str!("sui_system");
 pub const ADVANCE_EPOCH_FUNCTION_NAME: &IdentStr = ident_str!("advance_epoch");
 pub const ADVANCE_EPOCH_SAFE_MODE_FUNCTION_NAME: &IdentStr = ident_str!("advance_epoch_safe_mode");
 
@@ -59,7 +60,7 @@ pub const SUI_SYSTEM_STATE_SIM_TEST_SHALLOW_V2: u64 = 18446744073709551606; // u
 #[cfg(msim)]
 pub const SUI_SYSTEM_STATE_SIM_TEST_DEEP_V2: u64 = 18446744073709551607; // u64::MAX - 8
 
-/// Rust version of the Move one::one_system::SuiSystemState type
+/// Rust version of the Move sui::sui_system::SuiSystemState type
 /// This repreents the object with 0x5 ID.
 /// In Rust, this type should be rarely used since it's just a thin
 /// wrapper used to access the inner object.
@@ -355,7 +356,7 @@ where
     ValidatorType: Serialize + DeserializeOwned,
 {
     let mut validators = vec![];
-    for i in 0..table_size {
+    for i in 0 .. table_size {
         let validator: ValidatorType = get_dynamic_field_from_store(&object_store, table_id, &i).map_err(|err| {
             SuiError::SuiSystemStateReadError(format!("Failed to load validator from table: {:?}", err))
         })?;
@@ -405,11 +406,13 @@ pub struct AdvanceEpochParams {
 
 #[cfg(msim)]
 pub mod advance_epoch_result_injection {
+    use std::cell::RefCell;
+
     use crate::{
         committee::EpochId,
         error::{ExecutionError, ExecutionErrorKind},
+        execution::ResultWithTimings,
     };
-    use std::cell::RefCell;
 
     thread_local! {
         /// Override the result of advance_epoch in the range [start, end).
@@ -424,12 +427,25 @@ pub mod advance_epoch_result_injection {
     /// This function is used to modify the result of advance_epoch transaction for testing.
     /// If the override is set, the result will be an execution error, otherwise the original result will be returned.
     pub fn maybe_modify_result(
+        result: ResultWithTimings<(), ExecutionError>,
+        current_epoch: EpochId,
+    ) -> ResultWithTimings<(), ExecutionError> {
+        if let Some((start, end)) = OVERRIDE.with(|o| *o.borrow()) {
+            if current_epoch >= start && current_epoch < end {
+                return Err((ExecutionError::new(ExecutionErrorKind::FunctionNotFound, None), vec![]));
+            }
+        }
+        result
+    }
+
+    // For old execution versions that don't report timings
+    pub fn maybe_modify_result_legacy(
         result: Result<(), ExecutionError>,
         current_epoch: EpochId,
     ) -> Result<(), ExecutionError> {
         if let Some((start, end)) = OVERRIDE.with(|o| *o.borrow()) {
             if current_epoch >= start && current_epoch < end {
-                return Err::<(), ExecutionError>(ExecutionError::new(ExecutionErrorKind::FunctionNotFound, None));
+                return Err(ExecutionError::new(ExecutionErrorKind::FunctionNotFound, None));
             }
         }
         result

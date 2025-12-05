@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::code, metrics::Metrics};
+use std::{fmt::Write, net::SocketAddr, sync::Arc};
+
 use async_graphql::{
     extensions::{
         Extension,
@@ -22,9 +23,10 @@ use async_graphql::{
     Variables,
 };
 use async_graphql_value::ConstValue;
-use std::{fmt::Write, net::SocketAddr, sync::Arc};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+use crate::{error::code, metrics::Metrics};
 
 #[derive(Clone, Debug)]
 pub struct LoggerConfig {
@@ -78,14 +80,15 @@ impl Extension for LoggerExtension {
         next: NextParseQuery<'_>,
     ) -> ServerResult<ExecutableDocument> {
         let document = next.run(ctx, query, variables).await?;
-        let is_schema =
-            document.operations.iter().filter(|(_, operation)| operation.node.ty == OperationType::Query).any(
-                |(_, operation)| {
-                    operation.node.selection_set.node.items.iter().any(
+        let is_schema = document
+            .operations
+            .iter()
+            .filter(|(_, operation)| operation.node.ty == OperationType::Query)
+            .any(|(_, operation)| {
+                operation.node.selection_set.node.items.iter().any(
                     |selection| matches!(&selection.node, Selection::Field(field) if field.node.name.node == "__schema"),
                 )
-                },
-            );
+            });
         let query_id: &Uuid = ctx.data_unchecked();
         let session_id: &SocketAddr = ctx.data_unchecked();
         if !is_schema && self.config.log_request_query {

@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{helper::ObjectChecker, TestCaseImpl, TestContext};
 use async_trait::async_trait;
 use jsonrpsee::rpc_params;
 use sui_json_rpc_types::{SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse};
@@ -11,6 +10,8 @@ use sui_types::{
     sui_serde::BigInt,
 };
 use tracing::{debug, info};
+
+use crate::{helper::ObjectChecker, TestCaseImpl, TestContext};
 
 pub struct CoinMergeSplitTest;
 

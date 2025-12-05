@@ -3,7 +3,6 @@
 
 use std::sync::Arc;
 
-use crate::{database::ConnectionPool, schema::objects};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use diesel::{ExpressionMethods, QueryDsl};
@@ -11,6 +10,8 @@ use diesel_async::RunQueryDsl;
 use move_core_types::account_address::AccountAddress;
 use sui_package_resolver::{error::Error as PackageResolverError, Package, PackageStore};
 use sui_types::object::Object;
+
+use crate::{database::ConnectionPool, schema::objects};
 
 /// A package resolver that reads packages from the database.
 #[derive(Clone)]

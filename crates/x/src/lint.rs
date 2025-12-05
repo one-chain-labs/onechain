@@ -70,6 +70,8 @@ pub fn run(args: Args) -> crate::Result<()> {
             // as the opentelemetry crates.
             "prost".to_owned(),
             "tonic".to_owned(),
+            // jsonrpsee uses an older version of http-body
+            "http-body".to_owned(),
         ],
     };
 

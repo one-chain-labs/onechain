@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use axum::extract::rejection::JsonRejection;
 use std::fmt::Debug;
 
 use axum::{
+    extract::rejection::JsonRejection,
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
@@ -12,16 +12,13 @@ use axum::{
 use fastcrypto::error::FastCryptoError;
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
-
+use strum::{EnumProperty, IntoEnumIterator};
+use strum_macros::{Display, EnumDiscriminants, EnumIter};
 use sui_types::error::SuiError;
-
-use crate::types::{BlockHash, OperationType, PublicKey, SuiEnv};
-use strum::EnumProperty;
-use strum_macros::{Display, EnumDiscriminants};
 use thiserror::Error;
 use typed_store::TypedStoreError;
+
+use crate::types::{BlockHash, OperationType, PublicKey, SuiEnv};
 
 /// Sui-Rosetta specific error types.
 /// This contains all the errors returns by the sui-rosetta server.
@@ -103,7 +100,7 @@ impl ErrorType {
         // Safe to unwrap
         let error_code = ErrorType::iter().position(|e| &e == self).unwrap();
         let message = format!("{self}").replace('-', " ");
-        let message = message[0..1].to_uppercase() + &message[1..];
+        let message = message[0 .. 1].to_uppercase() + &message[1 ..];
 
         json![{
             "code": error_code,

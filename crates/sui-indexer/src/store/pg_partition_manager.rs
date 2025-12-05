@@ -1,15 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
+
 use diesel::{
     sql_types::{BigInt, VarChar},
     QueryableByName,
 };
 use diesel_async::scoped_futures::ScopedFutureExt;
-use std::{
-    collections::{BTreeMap, HashMap},
-    time::Duration,
-};
 use tracing::{error, info};
 
 use crate::{

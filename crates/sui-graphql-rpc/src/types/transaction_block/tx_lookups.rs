@@ -50,6 +50,11 @@
 //! candidate transactions. By limiting the size of the candidate set, we bound the work done in
 //! the worse case (whereas otherwise, the worst case would grow with the history of the chain).
 
+use std::fmt::Write;
+
+use diesel::{CombineDsl, ExpressionMethods, QueryDsl};
+use sui_indexer::schema::checkpoints;
+
 use super::{Cursor, TransactionBlockFilter};
 use crate::{
     data::{pg::bytea_literal, Conn, DbConnection},
@@ -65,9 +70,6 @@ use crate::{
         type_filter::{FqNameFilter, ModuleFilter},
     },
 };
-use diesel::{CombineDsl, ExpressionMethods, QueryDsl};
-use std::fmt::Write;
-use sui_indexer::schema::checkpoints;
 
 /// Bounds on transaction sequence number, imposed by filters, cursors, and the scan limit. The
 /// outermost bounds are determined by the checkpoint filters. These get translated into bounds in

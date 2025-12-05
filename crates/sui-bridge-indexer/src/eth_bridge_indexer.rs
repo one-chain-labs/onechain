@@ -10,27 +10,26 @@ use ethers::{
     providers::{Http, Middleware, Provider, StreamExt, Ws},
     types::{Address as EthAddress, Block, Filter, Log, H256},
 };
+use mysten_metrics::spawn_monitored_task;
 use prometheus::IntGauge;
 use sui_bridge::{
+    abi::{EthBridgeCommitteeEvents, EthBridgeConfigEvents, EthBridgeEvent, EthBridgeLimiterEvents, EthSuiBridgeEvents},
     error::BridgeError,
     eth_client::EthClient,
     eth_syncer::EthSyncer,
     metered_eth_provider::MeteredEthHttpProvier,
+    metrics::BridgeMetrics,
     retry_with_max_elapsed_time,
+    types::{EthEvent, RawEthLog},
 };
-use sui_indexer_builder::Task;
+use sui_indexer_builder::{
+    indexer_builder::{DataMapper, DataSender, Datasource},
+    metrics::IndexerMetricProvider,
+    Task,
+};
 use tap::tap::TapFallible;
 use tokio::{select, task::JoinHandle};
 use tracing::{info, warn};
-
-use mysten_metrics::spawn_monitored_task;
-use sui_bridge::abi::{
-    EthBridgeCommitteeEvents,
-    EthBridgeConfigEvents,
-    EthBridgeEvent,
-    EthBridgeLimiterEvents,
-    EthSuiBridgeEvents,
-};
 
 use crate::{
     metrics::BridgeIndexerMetrics,
@@ -41,14 +40,6 @@ use crate::{
     TokenTransfer,
     TokenTransferData,
     TokenTransferStatus,
-};
-use sui_bridge::{
-    metrics::BridgeMetrics,
-    types::{EthEvent, RawEthLog},
-};
-use sui_indexer_builder::{
-    indexer_builder::{DataMapper, DataSender, Datasource},
-    metrics::IndexerMetricProvider,
 };
 
 #[derive(Debug)]

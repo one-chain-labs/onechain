@@ -4,7 +4,7 @@
 module reviews_rating::dashboard;
 
 use std::string::String;
-use one::dynamic_field as df;
+use sui::dynamic_field as df;
 
 /// Dashboard is a collection of services
 public struct Dashboard has key, store {

@@ -7,9 +7,8 @@ use move_core_types::{annotated_value as A, language_storage::TypeTag};
 use serde::{Deserialize, Serialize};
 use sui_types::{base_types::MoveObjectType, type_input::TypeInput};
 
-use crate::{data::package_resolver::PackageResolver, error::Error};
-
 use super::open_move_type::MoveAbility;
+use crate::{data::package_resolver::PackageResolver, error::Error};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct MoveType {
@@ -320,9 +319,9 @@ pub(crate) fn unexpected_signer_error() -> Error {
 mod tests {
     use std::str::FromStr;
 
-    use super::*;
-
     use expect_test::expect;
+
+    use super::*;
 
     fn signature(repr: impl Into<String>) -> Result<MoveTypeSignature, Error> {
         let tag = TypeTag::from_str(repr.into().as_str()).unwrap();

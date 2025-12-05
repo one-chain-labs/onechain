@@ -7,17 +7,8 @@ submit transactions to validators for finality, and proactively executes
 finalized transactions locally, when possible.
 */
 
-use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
-    authority_aggregator::AuthorityAggregator,
-    authority_client::{AuthorityAPI, NetworkAuthorityClient},
-    quorum_driver::{
-        reconfig_observer::{OnsiteReconfigObserver, ReconfigObserver},
-        QuorumDriverHandler,
-        QuorumDriverHandlerBuilder,
-        QuorumDriverMetrics,
-    },
-};
+use std::{net::SocketAddr, ops::Deref, path::Path, sync::Arc, time::Duration};
+
 use futures::{
     future::{select, Either, Future},
     FutureExt,
@@ -40,7 +31,6 @@ use prometheus::{
     Histogram,
     Registry,
 };
-use std::{net::SocketAddr, ops::Deref, path::Path, sync::Arc, time::Duration};
 use sui_storage::write_path_pending_tx_log::WritePathPendingTransactionLog;
 use sui_types::{
     base_types::TransactionDigest,
@@ -66,6 +56,18 @@ use tokio::{
     time::timeout,
 };
 use tracing::{debug, error, error_span, info, instrument, warn, Instrument};
+
+use crate::{
+    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
+    authority_aggregator::AuthorityAggregator,
+    authority_client::{AuthorityAPI, NetworkAuthorityClient},
+    quorum_driver::{
+        reconfig_observer::{OnsiteReconfigObserver, ReconfigObserver},
+        QuorumDriverHandler,
+        QuorumDriverHandlerBuilder,
+        QuorumDriverMetrics,
+    },
+};
 
 // How long to wait for local execution (including parents) before a timeout
 // is returned to client.

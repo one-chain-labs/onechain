@@ -1,21 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    genesis_config::{ValidatorGenesisConfig, ValidatorGenesisConfigBuilder},
-    network_config::NetworkConfig,
-};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
+
 use fastcrypto::{
     encoding::{Encoding, Hex},
     traits::KeyPair,
 };
-use narwhal_config::{NetworkAdminServerParameters, PrometheusMetricsParameters};
-use std::{net::SocketAddr, path::PathBuf, time::Duration};
 use sui_config::{
     local_ip_utils,
     node::{
         default_enable_index_processing,
         default_end_of_epoch_broadcast_channel_capacity,
+        default_local_execution_time_cache_size,
+        default_local_execution_time_channel_capacity,
         default_zklogin_oauth_providers,
         AuthorityKeyPairWithPath,
         AuthorityOverloadConfig,
@@ -44,6 +42,11 @@ use sui_types::{
     multiaddr::Multiaddr,
     supported_protocol_versions::SupportedProtocolVersions,
     traffic_control::{PolicyConfig, RemoteFirewallConfig},
+};
+
+use crate::{
+    genesis_config::{ValidatorGenesisConfig, ValidatorGenesisConfigBuilder},
+    network_config::NetworkConfig,
 };
 
 /// This builder contains information that's not included in ValidatorGenesisConfig for building
@@ -133,29 +136,19 @@ impl ValidatorConfigBuilder {
 
     pub fn build(self, validator: ValidatorGenesisConfig, genesis: sui_config::genesis::Genesis) -> NodeConfig {
         let key_path = get_key_path(&validator.key_pair);
-        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().keep());
+        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().into_path());
         let db_path = config_directory.join(AUTHORITIES_DB_NAME).join(key_path.clone());
 
         let network_address = validator.network_address;
-        let consensus_address = validator.consensus_address;
         let consensus_db_path = config_directory.join(CONSENSUS_DB_NAME).join(key_path);
         let localhost = local_ip_utils::localhost_for_testing();
         let consensus_config = ConsensusConfig {
-            address: consensus_address,
             db_path: consensus_db_path,
             db_retention_epochs: None,
             db_pruner_period_secs: None,
             max_pending_transactions: None,
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
-            narwhal_config: narwhal_config::Parameters {
-                network_admin_server: NetworkAdminServerParameters {
-                    primary_network_admin_server_port: local_ip_utils::get_available_port(&localhost),
-                    worker_network_admin_server_base_port: local_ip_utils::get_available_port(&localhost),
-                },
-                prometheus_metrics: PrometheusMetricsParameters { socket_addr: validator.narwhal_metrics_address },
-                ..Default::default()
-            },
             parameters: Default::default(),
         };
 
@@ -201,7 +194,6 @@ impl ValidatorConfigBuilder {
             metrics: None,
             supported_protocol_versions: self.supported_protocol_versions,
             db_checkpoint_config: Default::default(),
-            indirect_objects_threshold: usize::MAX,
             // By default, expensive checks will be enabled in debug build, but not in release build.
             expensive_safety_check_config: ExpensiveSafetyCheckConfig::default(),
             name_service_package_address: None,
@@ -216,12 +208,7 @@ impl ValidatorConfigBuilder {
             indexer_max_subscriptions: Default::default(),
             transaction_kv_store_read_config: Default::default(),
             transaction_kv_store_write_config: None,
-            enable_experimental_rest_api: true,
-            rpc: Some(sui_rpc_api::Config {
-                enable_unstable_apis: Some(true),
-                enable_indexing: Some(true),
-                ..Default::default()
-            }),
+            rpc: Some(sui_rpc_api::Config { ..Default::default() }),
             jwk_fetch_interval_seconds: self.jwk_fetch_interval.map(|i| i.as_secs()).unwrap_or(3600),
             zklogin_oauth_providers: default_zklogin_oauth_providers(),
             authority_overload_config: self.authority_overload_config.unwrap_or_default(),
@@ -235,6 +222,8 @@ impl ValidatorConfigBuilder {
             enable_validator_tx_finalizer: true,
             verifier_signing_config: VerifierSigningConfig::default(),
             enable_db_write_stall: None,
+            local_execution_time_channel_capacity: default_local_execution_time_channel_capacity(),
+            local_execution_time_cache_size: default_local_execution_time_cache_size(),
         }
     }
 
@@ -394,7 +383,7 @@ impl FullnodeConfigBuilder {
         let ip = validator_config.network_address.to_socket_addr().unwrap().ip().to_string();
 
         let key_path = get_key_path(&validator_config.key_pair);
-        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().keep());
+        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().into_path());
 
         let p2p_config = {
             let seed_peers = network_config
@@ -461,7 +450,6 @@ impl FullnodeConfigBuilder {
             metrics: None,
             supported_protocol_versions: self.supported_protocol_versions,
             db_checkpoint_config: self.db_checkpoint_config.unwrap_or_default(),
-            indirect_objects_threshold: usize::MAX,
             expensive_safety_check_config: self
                 .expensive_safety_check_config
                 .unwrap_or_else(ExpensiveSafetyCheckConfig::new_enable_all),
@@ -477,12 +465,7 @@ impl FullnodeConfigBuilder {
             indexer_max_subscriptions: Default::default(),
             transaction_kv_store_read_config: Default::default(),
             transaction_kv_store_write_config: Default::default(),
-            enable_experimental_rest_api: true,
-            rpc: Some(sui_rpc_api::Config {
-                enable_unstable_apis: Some(true),
-                enable_indexing: Some(true),
-                ..Default::default()
-            }),
+            rpc: Some(sui_rpc_api::Config { enable_indexing: Some(true), ..Default::default() }),
             // note: not used by fullnodes.
             jwk_fetch_interval_seconds: 3600,
             zklogin_oauth_providers: default_zklogin_oauth_providers(),
@@ -498,6 +481,8 @@ impl FullnodeConfigBuilder {
             enable_validator_tx_finalizer: false,
             verifier_signing_config: VerifierSigningConfig::default(),
             enable_db_write_stall: None,
+            local_execution_time_channel_capacity: default_local_execution_time_channel_capacity(),
+            local_execution_time_cache_size: default_local_execution_time_cache_size(),
         }
     }
 }

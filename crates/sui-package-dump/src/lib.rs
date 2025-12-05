@@ -115,7 +115,7 @@ async fn fetch_packages(
         .await
         .with_context(|| "Failed to fetch page 1 of packages.")?;
 
-    for i in 2.. {
+    for i in 2 .. {
         if !page_info.has_next_page {
             break;
         }

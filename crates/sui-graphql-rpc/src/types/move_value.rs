@@ -12,13 +12,12 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use sui_types::object::bounded_visitor::BoundedVisitor;
 
+use super::{base64::Base64, big_int::BigInt, move_type::MoveType, sui_address::SuiAddress};
 use crate::{
     data::package_resolver::PackageResolver,
     error::Error,
     types::{json::Json, move_type::unexpected_signer_error},
 };
-
-use super::{base64::Base64, big_int::BigInt, move_type::MoveType, sui_address::SuiAddress};
 
 const STD: AccountAddress = AccountAddress::ONE;
 const SUI: AccountAddress = AccountAddress::TWO;
@@ -326,7 +325,7 @@ fn extract_string(type_: &StructTag, fields: Vec<(Identifier, A::MoveValue)>) ->
         let sample = if bytes.len() < PREFIX {
             String::from_utf8_lossy(bytes)
         } else {
-            String::from_utf8_lossy(&bytes[..PREFIX - 3]) + "..."
+            String::from_utf8_lossy(&bytes[.. PREFIX - 3]) + "..."
         };
 
         Error::Internal(format!("{e} in {sample:?}"))
@@ -408,10 +407,10 @@ mod tests {
         ($type:literal { $($name:literal : $layout:expr),* $(,)?}) => {
             A::MoveTypeLayout::Struct(Box::new(S {
                 type_: StructTag::from_str($type).expect("Failed to parse struct"),
-                fields: Box::new(vec![$(MoveFieldLayout {
+                fields: vec![$(MoveFieldLayout {
                     name: ident_str!($name).to_owned(),
                     layout: $layout,
-                }),*])
+                }),*]
             }))
         }
     }

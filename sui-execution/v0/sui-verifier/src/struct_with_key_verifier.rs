@@ -4,9 +4,8 @@
 //! This pass verifies necessary properties for Move Objects, i.e. structs with the `key` ability.
 //! The properties checked are
 //! - The first field is named "id"
-//! - The first field has type `suonei::object::UID`
+//! - The first field has type `sui::object::UID`
 
-use crate::verification_failure;
 use move_binary_format::file_format::{CompiledModule, SignatureToken};
 use sui_types::{
     error::ExecutionError,
@@ -14,6 +13,8 @@ use sui_types::{
     id::{OBJECT_MODULE_NAME, UID_STRUCT_NAME},
     SUI_FRAMEWORK_ADDRESS,
 };
+
+use crate::verification_failure;
 
 pub fn verify_module(module: &CompiledModule) -> Result<(), ExecutionError> {
     verify_key_structs(module)

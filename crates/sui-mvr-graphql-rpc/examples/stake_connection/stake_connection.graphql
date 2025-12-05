@@ -4,13 +4,13 @@
     address: "0xc0a5b916d0e406ddde11a29558cd91b29c49e644eef597b7424a622955280e1e"
   ) {
     address
-    balance(type: "0x2::oct::OCT") {
+    balance(type: "0x2::sui::SUI") {
       coinType {
         repr
       }
       totalBalance
     }
-    stakedOcts {
+    stakedSuis {
       nodes {
         status
         principal

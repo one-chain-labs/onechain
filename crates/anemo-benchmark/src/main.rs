@@ -129,12 +129,12 @@ async fn main() {
     let (upload_notify_tx, mut upload_notify) = tokio::sync::mpsc::unbounded_channel();
     let (download_notify_tx, mut download_notify) = tokio::sync::mpsc::unbounded_channel();
 
-    for _ in 0..args.requests_up {
+    for _ in 0 .. args.requests_up {
         for peer in peers.iter().cloned() {
             tasks.spawn(upload_to_peer(peer, send_bytes.clone(), upload_notify_tx.clone()));
         }
     }
-    for _ in 0..args.requests_down {
+    for _ in 0 .. args.requests_down {
         for peer in peers.iter().cloned() {
             tasks.spawn(download_from_peer(peer, args.size_down, download_notify_tx.clone()));
         }

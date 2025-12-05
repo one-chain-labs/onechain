@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module base_addr::base {
-    use one::object::{Self, UID};
-    use one::tx_context::{Self, TxContext};
-    use one::transfer;
-    use one::event;
+    use sui::object::{Self, UID};
+    use sui::tx_context::{Self, TxContext};
+    use sui::transfer;
+    use sui::event;
 
     public struct A<T> {
         f1: bool,

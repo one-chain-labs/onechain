@@ -1,6 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeMap, str::FromStr, sync::Arc};
+
+use anyhow::Result;
+use tracing::info;
+
+use super::{
+    adversarial::{AdversarialPayloadCfg, AdversarialWorkloadBuilder},
+    expected_failure::{ExpectedFailurePayloadCfg, ExpectedFailureWorkloadBuilder},
+    randomized_transaction::RandomizedTransactionWorkloadBuilder,
+    randomness::RandomnessWorkloadBuilder,
+    shared_object_deletion::SharedCounterDeletionWorkloadBuilder,
+};
 use crate::{
     bank::BenchmarkBank,
     drivers::Interval,
@@ -17,17 +29,8 @@ use crate::{
         WorkloadInfo,
     },
 };
-use anyhow::Result;
-use std::{collections::BTreeMap, str::FromStr, sync::Arc};
-use tracing::info;
 
-use super::{
-    adversarial::{AdversarialPayloadCfg, AdversarialWorkloadBuilder},
-    expected_failure::{ExpectedFailurePayloadCfg, ExpectedFailureWorkloadBuilder},
-    randomness::RandomnessWorkloadBuilder,
-    shared_object_deletion::SharedCounterDeletionWorkloadBuilder,
-};
-
+#[derive(Debug)]
 pub struct WorkloadWeights {
     pub shared_counter: u32,
     pub transfer_object: u32,
@@ -37,6 +40,7 @@ pub struct WorkloadWeights {
     pub adversarial: u32,
     pub expected_failure: u32,
     pub randomness: u32,
+    pub randomized_transaction: u32,
 }
 
 pub struct WorkloadConfig {
@@ -76,6 +80,7 @@ impl WorkloadConfiguration {
                 adversarial,
                 expected_failure,
                 randomness,
+                randomized_transaction,
                 shared_counter_hotness_factor,
                 num_shared_counters,
                 shared_counter_max_tip,
@@ -91,7 +96,7 @@ impl WorkloadConfiguration {
 
                 // Creating the workload builders for each benchmark group. The workloads for each
                 // benchmark group will run in the same time for the same duration.
-                for workload_group in 0..num_of_benchmark_groups {
+                for workload_group in 0 .. num_of_benchmark_groups {
                     let i = workload_group as usize;
                     let config = WorkloadConfig {
                         group: workload_group,
@@ -106,6 +111,7 @@ impl WorkloadConfiguration {
                             adversarial: adversarial[i],
                             expected_failure: expected_failure[i],
                             randomness: randomness[i],
+                            randomized_transaction: randomized_transaction[i],
                         },
                         adversarial_cfg: AdversarialPayloadCfg::from_str(&adversarial_cfg[i]).unwrap(),
                         expected_failure_cfg: ExpectedFailurePayloadCfg {
@@ -174,6 +180,13 @@ impl WorkloadConfiguration {
         }: WorkloadConfig,
         system_state_observer: Arc<SystemStateObserver>,
     ) -> Vec<Option<WorkloadBuilderInfo>> {
+        tracing::info!(
+            "Workload Configuration weights {:?} target_qps: {:?} num_workers: {:?} duration: {:?}",
+            weights,
+            target_qps,
+            num_workers,
+            duration
+        );
         let total_weight = weights.shared_counter
             + weights.shared_deletion
             + weights.transfer_object
@@ -181,7 +194,8 @@ impl WorkloadConfiguration {
             + weights.batch_payment
             + weights.adversarial
             + weights.randomness
-            + weights.expected_failure;
+            + weights.expected_failure
+            + weights.randomized_transaction;
         let reference_gas_price = system_state_observer.state.borrow().reference_gas_price;
         let mut workload_builders = vec![];
         let shared_workload = SharedCounterWorkloadBuilder::from(
@@ -269,6 +283,16 @@ impl WorkloadConfiguration {
             group,
         );
         workload_builders.push(expected_failure_workload);
+        let randomized_transaction_workload = RandomizedTransactionWorkloadBuilder::from(
+            weights.randomized_transaction as f32 / total_weight as f32,
+            target_qps,
+            num_workers,
+            in_flight_ratio,
+            reference_gas_price,
+            duration,
+            group,
+        );
+        workload_builders.push(randomized_transaction_workload);
 
         workload_builders
     }

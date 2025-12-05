@@ -3,7 +3,6 @@
 
 use anyhow::anyhow;
 use bip32::{ChildNumber, DerivationPath, XPrv};
-
 use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use fastcrypto::{
     ed25519::{Ed25519KeyPair, Ed25519PrivateKey},

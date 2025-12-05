@@ -6,7 +6,7 @@ use std::{
     fmt::{Debug, Display},
 };
 
-use aws_config::profile::profile_file::{ProfileFileKind, ProfileFiles};
+use aws_runtime::env_config::file::{EnvConfigFileKind, EnvConfigFiles};
 use aws_sdk_ec2::{
     config::Region,
     primitives::Blob,
@@ -21,15 +21,14 @@ use aws_sdk_ec2::{
         VolumeType,
     },
 };
-use aws_smithy_http::result::SdkError;
+use aws_smithy_runtime_api::client::result::SdkError;
 use serde::Serialize;
 
+use super::{Instance, ServerProviderClient};
 use crate::{
     error::{CloudProviderError, CloudProviderResult},
     settings::Settings,
 };
-
-use super::{Instance, ServerProviderClient};
 
 // Make a request error from an AWS error message.
 impl<T> From<SdkError<T, aws_smithy_runtime_api::client::orchestrator::HttpResponse>> for CloudProviderError
@@ -60,9 +59,9 @@ impl AwsClient {
 
     /// Make a new AWS client.
     pub async fn new(settings: Settings) -> Self {
-        let profile_files = ProfileFiles::builder()
-            .with_file(ProfileFileKind::Credentials, &settings.token_file)
-            .with_contents(ProfileFileKind::Config, "[default]\noutput=json")
+        let profile_files = EnvConfigFiles::builder()
+            .with_file(EnvConfigFileKind::Credentials, &settings.token_file)
+            .with_contents(EnvConfigFileKind::Config, "[default]\noutput=json")
             .build();
 
         let mut clients = HashMap::new();
@@ -129,7 +128,7 @@ impl AwsClient {
         // Parse the response to select the first returned image id.
         response
             .images()
-            .and_then(|images| images.first())
+            .first()
             .ok_or_else(|| CloudProviderError::RequestError("Cannot find image id".into()))?
             .image_id
             .clone()
@@ -193,7 +192,7 @@ impl AwsClient {
         let response = request.send().await?;
 
         // Return true if the response contains references to NVMe drives.
-        if let Some(info) = response.instance_types().and_then(|x| x.first()) {
+        if let Some(info) = response.instance_types().first() {
             if let Some(info) = info.instance_storage_info() {
                 if info.nvme_support() == Some(&EphemeralNvmeSupport::Required) {
                     return Ok(true);
@@ -214,13 +213,9 @@ impl ServerProviderClient for AwsClient {
         let mut instances = Vec::new();
         for (region, client) in &self.clients {
             let request = client.describe_instances().filters(filter.clone());
-            if let Some(reservations) = request.send().await?.reservations() {
-                for reservation in reservations {
-                    if let Some(aws_instances) = reservation.instances() {
-                        for instance in aws_instances {
-                            instances.push(self.make_instance(region.clone(), instance));
-                        }
-                    }
+            for reservation in request.send().await?.reservations() {
+                for instance in reservation.instances() {
+                    instances.push(self.make_instance(region.clone(), instance));
                 }
             }
         }
@@ -311,8 +306,7 @@ impl ServerProviderClient for AwsClient {
             .tag_specifications(tags);
 
         let response = request.send().await?;
-        let instance =
-            &response.instances().and_then(|x| x.first()).expect("AWS instances list should contain instances");
+        let instance = response.instances().first().expect("AWS instances list should contain instances");
 
         Ok(self.make_instance(region, instance))
     }

@@ -4,10 +4,7 @@
 
 use move_binary_format::file_format_common::VERSION_MAX;
 use move_vm_config::verifier::{
-    MeterConfig,
-    VerifierConfig,
-    DEFAULT_MAX_CONSTANT_VECTOR_LEN,
-    DEFAULT_MAX_IDENTIFIER_LENGTH,
+    MeterConfig, VerifierConfig, DEFAULT_MAX_CONSTANT_VECTOR_LEN, DEFAULT_MAX_IDENTIFIER_LENGTH,
     DEFAULT_MAX_VARIANTS,
 };
 

@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Result};
-use move_core_types::ident_str;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display, Formatter, Write},
@@ -10,31 +8,15 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use sui_genesis_builder::validator_info::GenesisValidatorInfo;
-use url::{ParseError, Url};
 
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    crypto::{AuthorityPublicKey, NetworkPublicKey, Signable, DEFAULT_EPOCH_ID},
-    dynamic_field::Field,
-    multiaddr::Multiaddr,
-    object::Owner,
-    sui_system_state::{
-        sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
-        sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        SUI_SYSTEM_MODULE_NAME,
-    },
-    SUI_SYSTEM_PACKAGE_ID,
-};
-use tap::tap::TapOptional;
-
-use crate::fire_drill::get_gas_obj_ref;
+use anyhow::{anyhow, bail, Result};
 use clap::*;
 use colored::Colorize;
 use fastcrypto::{
     encoding::{Base64, Encoding},
     traits::{KeyPair, ToFromBytes},
 };
+use move_core_types::ident_str;
 use serde::Serialize;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 use sui_bridge::{
@@ -42,6 +24,7 @@ use sui_bridge::{
     sui_client::SuiClient as SuiBridgeClient,
     sui_transaction_builder::{build_committee_register_transaction, build_committee_update_url_transaction},
 };
+use sui_genesis_builder::validator_info::GenesisValidatorInfo;
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions};
 use sui_keys::{
     key_derive::generate_new_key,
@@ -57,17 +40,34 @@ use sui_keys::{
 };
 use sui_sdk::{wallet_context::WalletContext, SuiClient};
 use sui_types::{
+    base_types::{ObjectID, ObjectRef, SuiAddress},
     crypto::{
         generate_proof_of_possession,
         get_authority_key_pair,
         AuthorityKeyPair,
+        AuthorityPublicKey,
         AuthorityPublicKeyBytes,
         NetworkKeyPair,
+        NetworkPublicKey,
+        Signable,
         SignatureScheme,
         SuiKeyPair,
+        DEFAULT_EPOCH_ID,
+    },
+    dynamic_field::Field,
+    multiaddr::Multiaddr,
+    object::Owner,
+    sui_system_state::{
+        sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
+        sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
+    SUI_SYSTEM_PACKAGE_ID,
 };
+use tap::tap::TapOptional;
+use url::{ParseError, Url};
+
+use crate::fire_drill::get_gas_obj_ref;
 
 #[path = "unit_tests/validator_tests.rs"]
 #[cfg(test)]
@@ -143,7 +143,7 @@ pub enum SuiValidatorCommand {
         /// Validator's OperationCap ID can be found by using the `display-metadata` subcommand.
         #[clap(name = "operation-cap-id", long)]
         operation_cap_id: Option<ObjectID>,
-        /// The OneChain Address of the validator is being reported or un-reported
+        /// The Sui Address of the validator is being reported or un-reported
         #[clap(name = "reportee-address")]
         reportee_address: SuiAddress,
         /// If true, undo an existing report.
@@ -199,7 +199,7 @@ pub enum SuiValidatorCommand {
         #[clap(name = "gas-budget", long)]
         gas_budget: Option<u64>,
     },
-    /// Update OneChain native bridge committee node url
+    /// Update sui native bridge committee node url
     UpdateBridgeCommitteeNodeUrl {
         /// New node url to be registered in the on chain bridge object.
         #[clap(long)]
@@ -254,7 +254,7 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
     } else {
         let kp = match key {
             Some(key) => {
-                println!("Generated new key file {:?} based on one.keystore file.", file_name);
+                println!("Generated new key file {:?} based on sui.keystore file.", file_name);
                 key
             }
             None => {
@@ -306,7 +306,6 @@ impl SuiValidatorCommand {
                         protocol_key: keypair.public().into(),
                         worker_key: worker_keypair.public().clone(),
                         account_address: SuiAddress::from(&account_keypair.public()),
-                        revenue_receiving_address: SuiAddress::from(&account_keypair.public()),
                         network_key: network_keypair.public().clone(),
                         gas_price,
                         commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
@@ -350,7 +349,6 @@ impl SuiValidatorCommand {
                     CallArg::Pure(bcs::to_bytes(validator.p2p_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_primary_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_worker_address()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.revenue_receiving_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
@@ -385,6 +383,7 @@ impl SuiValidatorCommand {
                 let resp = update_metadata(context, metadata, gas_budget).await?;
                 SuiValidatorCommandResponse::UpdateMetadata(resp)
             }
+
             SuiValidatorCommand::UpdateGasPrice { operation_cap_id, gas_price, gas_budget } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let resp = update_gas_price(context, operation_cap_id, gas_price, gas_budget).await?;
@@ -571,7 +570,7 @@ fn check_address(
     }
 }
 
-pub async fn get_cap_object_ref(
+async fn get_cap_object_ref(
     context: &mut WalletContext,
     operation_cap_id: Option<ObjectID>,
 ) -> Result<(ValidatorStatus, SuiValidatorSummary, ObjectRef)> {
@@ -684,7 +683,7 @@ async fn get_validator_summary_from_cap_id(
     Ok((status, summary))
 }
 
-pub async fn construct_unsigned_0x5_txn(
+async fn construct_unsigned_0x5_txn(
     context: &mut WalletContext,
     sender: SuiAddress,
     function: &'static str,
@@ -700,7 +699,7 @@ pub async fn construct_unsigned_0x5_txn(
     TransactionData::new_move_call(
         sender,
         SUI_SYSTEM_PACKAGE_ID,
-        SUI_SYSTEM_MODULE_NAME.to_owned(),
+        ident_str!("sui_system").to_owned(),
         ident_str!(function).to_owned(),
         vec![],
         gas_obj_ref,
@@ -710,7 +709,7 @@ pub async fn construct_unsigned_0x5_txn(
     )
 }
 
-pub async fn call_0x5(
+async fn call_0x5(
     context: &mut WalletContext,
     function: &'static str,
     call_args: Vec<CallArg>,
@@ -803,7 +802,10 @@ pub fn write_transaction_response(response: &SuiTransactionBlockResponse) -> Res
 impl Debug for SuiValidatorCommandResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let string = serde_json::to_string_pretty(self);
-        let s = string.unwrap_or_else(|err| format!("{err}").red().to_string());
+        let s = match string {
+            Ok(s) => s,
+            Err(err) => format!("{err}").red().to_string(),
+        };
         write!(f, "{}", s)
     }
 }

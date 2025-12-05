@@ -49,12 +49,13 @@ impl ActionVerifier<BridgeAction> for GovernanceVerifier {
 
 #[cfg(test)]
 mod tests {
+    use sui_types::bridge::BridgeChainId;
+
     use super::*;
     use crate::{
         test_utils::get_test_sui_to_eth_bridge_action,
         types::{BridgeAction, EmergencyAction, EmergencyActionType, LimitUpdateAction},
     };
-    use sui_types::bridge::BridgeChainId;
 
     #[tokio::test]
     async fn test_governance_verifier() {

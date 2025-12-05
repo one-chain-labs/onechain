@@ -14,7 +14,10 @@ use crate::{
     typing::{ast as T, visitor::simple_visitor},
 };
 
-use super::{LinterDiagnosticCategory, LinterDiagnosticCode, COIN_MOD_NAME, COIN_STRUCT_NAME, LINT_WARNING_PREFIX};
+use super::{
+    LinterDiagnosticCategory, LinterDiagnosticCode, COIN_MOD_NAME, COIN_STRUCT_NAME,
+    LINT_WARNING_PREFIX,
+};
 
 const COIN_FIELD_DIAG: DiagnosticInfo = custom(
     LINT_WARNING_PREFIX,
@@ -31,13 +34,18 @@ simple_visitor!(
         mdef.attributes.is_test_or_test_only()
     },
     // TODO enums
-    fn visit_struct_custom(&mut self, _module: ModuleIdent, _sname: DatatypeName, sdef: &N::StructDefinition) -> bool {
+    fn visit_struct_custom(
+        &mut self,
+        _module: ModuleIdent,
+        _sname: DatatypeName,
+        sdef: &N::StructDefinition,
+    ) -> bool {
         if sdef.attributes.is_test_or_test_only() {
             return false;
         }
 
         if let N::StructFields::Defined(_, sfields) = &sdef.fields {
-            for (_floc, _fname, (_, ftype)) in sfields {
+            for (_floc, _fname, (_, (_, ftype))) in sfields {
                 if is_field_coin_type(ftype) {
                     let msg = "Sub-optimal 'sui::coin::Coin' field type. Using \
                         'sui::balance::Balance' instead will be more space efficient";
@@ -57,6 +65,8 @@ fn is_field_coin_type(sp!(_, t): &N::Type) -> bool {
             let sp!(_, tname) = tname;
             tname.is(&SUI_ADDR_VALUE, COIN_MOD_NAME, COIN_STRUCT_NAME)
         }
-        T::Unit | T::Param(_) | T::Var(_) | T::Anything | T::UnresolvedError | T::Fun(_, _) => false,
+        T::Unit | T::Param(_) | T::Var(_) | T::Anything | T::UnresolvedError | T::Fun(_, _) => {
+            false
+        }
     }
 }

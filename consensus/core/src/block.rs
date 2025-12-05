@@ -92,6 +92,7 @@ pub trait BlockAPI {
     fn timestamp_ms(&self) -> BlockTimestampMs;
     fn ancestors(&self) -> &[BlockRef];
     fn transactions(&self) -> &[Transaction];
+    fn transactions_data(&self) -> Vec<&[u8]>;
     fn commit_votes(&self) -> &[CommitVote];
     fn transaction_votes(&self) -> &[BlockTransactionVotes];
     fn misbehavior_reports(&self) -> &[MisbehaviorReport];
@@ -164,6 +165,10 @@ impl BlockAPI for BlockV1 {
 
     fn transactions(&self) -> &[Transaction] {
         &self.transactions
+    }
+
+    fn transactions_data(&self) -> Vec<&[u8]> {
+        self.transactions.iter().map(|t| t.data()).collect()
     }
 
     fn commit_votes(&self) -> &[CommitVote] {
@@ -262,6 +267,10 @@ impl BlockAPI for BlockV2 {
         &self.transactions
     }
 
+    fn transactions_data(&self) -> Vec<&[u8]> {
+        self.transactions.iter().map(|t| t.data()).collect()
+    }
+
     fn transaction_votes(&self) -> &[BlockTransactionVotes] {
         &self.transaction_votes
     }
@@ -308,7 +317,7 @@ impl fmt::Debug for BlockRef {
 
 impl Hash for BlockRef {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.digest.0[..8]);
+        state.write(&self.digest.0[.. 8]);
     }
 }
 
@@ -328,7 +337,7 @@ impl BlockDigest {
 
 impl Hash for BlockDigest {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.0[..8]);
+        state.write(&self.0[.. 8]);
     }
 }
 
@@ -343,7 +352,7 @@ impl fmt::Display for BlockDigest {
         write!(
             f,
             "{}",
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0).get(0..4).ok_or(fmt::Error)?
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0).get(0 .. 4).ok_or(fmt::Error)?
         )
     }
 }
@@ -467,7 +476,7 @@ fn to_consensus_block_intent(digest: InnerBlockDigest) -> IntentMessage<InnerBlo
     IntentMessage::new(Intent::consensus_app(IntentScope::ConsensusBlock), digest)
 }
 
-/// Process for signing & verying a block signature:
+/// Process for signing a block & verifying a block signature:
 /// 1. Compute the digest of `Block`.
 /// 2. Wrap the digest in `IntentMessage`.
 /// 3. Sign the serialized `IntentMessage`, or verify signature against it.
@@ -476,6 +485,7 @@ fn compute_block_signature(block: &Block, protocol_keypair: &ProtocolKeyPair) ->
     let message = bcs::to_bytes(&to_consensus_block_intent(digest)).map_err(ConsensusError::SerializationFailure)?;
     Ok(protocol_keypair.sign(&message))
 }
+
 fn verify_block_signature(block: &Block, signature: &[u8], protocol_pubkey: &ProtocolPublicKey) -> ConsensusResult<()> {
     let digest = compute_inner_block_digest(block)?;
     let message = bcs::to_bytes(&to_consensus_block_intent(digest)).map_err(ConsensusError::SerializationFailure)?;
@@ -575,6 +585,15 @@ impl fmt::Debug for VerifiedBlock {
             self.commit_votes().len(),
         )
     }
+}
+
+/// Block with extended additional information, such as
+/// local blocks that are excluded from the block's ancestors.
+/// The extended information do not need to be certified or forwarded to other authorities.
+#[derive(Clone, Debug)]
+pub(crate) struct ExtendedBlock {
+    pub block: VerifiedBlock,
+    pub excluded_ancestors: Vec<BlockRef>,
 }
 
 /// Generates the genesis blocks for the current Committee.

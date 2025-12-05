@@ -4,14 +4,13 @@
 use std::num::NonZeroUsize;
 
 use prometheus::Registry;
-use sui_types::digests::CheckpointDigest;
-use tracing::info;
-
 use sui_archival::reader::{ArchiveReader, ArchiveReaderMetrics};
 use sui_config::{
     node::ArchiveReaderConfig,
     object_storage_config::{ObjectStoreConfig, ObjectStoreType},
 };
+use sui_types::digests::CheckpointDigest;
+use tracing::info;
 
 use crate::{errors::IndexerError, types::IndexerResult};
 

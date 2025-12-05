@@ -1,6 +1,31 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeMap, env, path::PathBuf, sync::Arc};
+
+use anyhow::Result;
+use clap::*;
+use fastcrypto::encoding::Encoding;
+use futures::{future::join_all, StreamExt};
+use sui_archival::{read_manifest_as_json, write_manifest_from_json};
+use sui_config::{
+    genesis::Genesis,
+    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
+    Config,
+};
+use sui_core::{authority_aggregator::AuthorityAggregatorBuilder, authority_client::AuthorityAPI};
+use sui_protocol_config::Chain;
+use sui_replay::{execute_replay_command, ReplayToolCommand};
+use sui_sdk::{rpc_types::SuiTransactionBlockResponseOptions, SuiClient, SuiClientBuilder};
+use sui_types::{
+    base_types::*,
+    crypto::AuthorityPublicKeyBytes,
+    messages_checkpoint::{CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber},
+    messages_grpc::TransactionInfoRequest,
+    transaction::{SenderSignedData, Transaction},
+};
+use telemetry_subscribers::TracingHandle;
+
 use crate::{
     check_completed_snapshot,
     db_tool::{execute_db_tool_command, print_db_all_tables, DbToolCommand},
@@ -18,30 +43,6 @@ use crate::{
     GroupedObjectOutput,
     SnapshotVerifyMode,
     VerboseObjectOutput,
-};
-use anyhow::Result;
-use futures::{future::join_all, StreamExt};
-use std::{collections::BTreeMap, env, path::PathBuf, sync::Arc};
-use sui_config::genesis::Genesis;
-use sui_core::authority_client::AuthorityAPI;
-use sui_protocol_config::Chain;
-use sui_replay::{execute_replay_command, ReplayToolCommand};
-use sui_sdk::{rpc_types::SuiTransactionBlockResponseOptions, SuiClient, SuiClientBuilder};
-use telemetry_subscribers::TracingHandle;
-
-use sui_types::{base_types::*, crypto::AuthorityPublicKeyBytes, messages_grpc::TransactionInfoRequest};
-
-use clap::*;
-use fastcrypto::encoding::Encoding;
-use sui_archival::{read_manifest_as_json, write_manifest_from_json};
-use sui_config::{
-    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
-    Config,
-};
-use sui_core::authority_aggregator::AuthorityAggregatorBuilder;
-use sui_types::{
-    messages_checkpoint::{CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber},
-    transaction::{SenderSignedData, Transaction},
 };
 
 #[derive(Parser, Clone, ValueEnum)]
@@ -92,8 +93,8 @@ pub enum ToolCommand {
         /// prints tabular output suitable for processing with unix tools. For
         /// instance, to quickly check that all validators agree on the history of an object:
         /// ```text
-        /// $ one-tool fetch-object --id 0x260efde76ebccf57f4c5e951157f5c361cde822c \
-        ///      --genesis $HOME/.one/one_config/genesis.blob \
+        /// $ sui-tool fetch-object --id 0x260efde76ebccf57f4c5e951157f5c361cde822c \
+        ///      --genesis $HOME/.sui/sui_config/genesis.blob \
         ///      --verbosity concise --concise-no-header
         /// ```
         #[arg(value_enum, long = "verbosity", default_value = "grouped", ignore_case = true)]

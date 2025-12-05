@@ -1,6 +1,26 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{str::FromStr, sync::Arc};
+
+use fastcrypto::{
+    ed25519::Ed25519KeyPair,
+    encoding::{Base64, Encoding},
+    traits::ToFromBytes,
+};
+use fastcrypto_zkp::{
+    bn254::{
+        zk_login::{parse_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK},
+        zk_login_api::ZkLoginEnv,
+    },
+    zk_login_utils::Bn254FrElement,
+};
+use im::hashmap::HashMap as ImHashMap;
+use once_cell::sync::OnceCell;
+use rand::{rngs::StdRng, SeedableRng};
+use roaring::RoaringBitmap;
+use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
+
 use super::{MultiSigPublicKey, ThresholdUnit, WeightUnit};
 use crate::{
     base_types::SuiAddress,
@@ -22,24 +42,6 @@ use crate::{
     zk_login_authenticator::ZkLoginAuthenticator,
     zk_login_util::DEFAULT_JWK_BYTES,
 };
-use fastcrypto::{
-    ed25519::Ed25519KeyPair,
-    encoding::{Base64, Encoding},
-    traits::ToFromBytes,
-};
-use fastcrypto_zkp::{
-    bn254::{
-        zk_login::{parse_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK},
-        zk_login_api::ZkLoginEnv,
-    },
-    zk_login_utils::Bn254FrElement,
-};
-use im::hashmap::HashMap as ImHashMap;
-use once_cell::sync::OnceCell;
-use rand::{rngs::StdRng, SeedableRng};
-use roaring::RoaringBitmap;
-use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
-use std::{str::FromStr, sync::Arc};
 #[test]
 fn test_combine_sigs() {
     let kp1: SuiKeyPair = SuiKeyPair::Ed25519(get_key_pair().1);
@@ -169,7 +171,7 @@ fn test_max_sig() {
     let mut keys = Vec::new();
     let mut pks = Vec::new();
 
-    for _ in 0..11 {
+    for _ in 0 .. 11 {
         let k = SuiKeyPair::Ed25519(get_key_pair_from_rng(&mut seed).1);
         pks.push(k.public());
         keys.push(k);
@@ -180,11 +182,11 @@ fn test_max_sig() {
         .is_err());
 
     // multisig_pk with unreachable threshold fails.
-    assert!(MultiSigPublicKey::new(pks.clone()[..5].to_vec(), vec![3; 5], 16).is_err());
+    assert!(MultiSigPublicKey::new(pks.clone()[.. 5].to_vec(), vec![3; 5], 16).is_err());
 
     // multisig_pk with max weights for each pk and max reachable threshold is ok.
     let res = MultiSigPublicKey::new(
-        pks.clone()[..10].to_vec(),
+        pks.clone()[.. 10].to_vec(),
         vec![WeightUnit::MAX; MAX_SIGNER_IN_MULTISIG],
         (WeightUnit::MAX as ThresholdUnit) * (MAX_SIGNER_IN_MULTISIG as ThresholdUnit),
     );
@@ -192,7 +194,7 @@ fn test_max_sig() {
 
     // multisig_pk with unreachable threshold fails.
     let res = MultiSigPublicKey::new(
-        pks.clone()[..10].to_vec(),
+        pks.clone()[.. 10].to_vec(),
         vec![WeightUnit::MAX; MAX_SIGNER_IN_MULTISIG],
         (WeightUnit::MAX as ThresholdUnit) * (MAX_SIGNER_IN_MULTISIG as ThresholdUnit) + 1,
     );
@@ -200,7 +202,7 @@ fn test_max_sig() {
 
     // multisig_pk with max weights for each pk with threshold is 1x max weight validates ok.
     let low_threshold_pk =
-        MultiSigPublicKey::new(pks.clone()[..10].to_vec(), vec![WeightUnit::MAX; 10], WeightUnit::MAX.into()).unwrap();
+        MultiSigPublicKey::new(pks.clone()[.. 10].to_vec(), vec![WeightUnit::MAX; 10], WeightUnit::MAX.into()).unwrap();
     let sig = Signature::new_secure(&msg, &keys[0]).into();
     assert!(MultiSig::combine(vec![sig; 1], low_threshold_pk).unwrap().init_and_validate().is_ok());
 }
@@ -331,7 +333,7 @@ fn zklogin_in_multisig_works_with_both_addresses() {
     let parsed: ImHashMap<JwkId, JWK> =
         parse_jwks(DEFAULT_JWK_BYTES, &OIDCProvider::Twitch).unwrap().into_iter().collect();
 
-    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, Some(30));
+    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, true, Some(30));
     let res = multisig.verify_claims(
         intent_msg,
         multisig_address,

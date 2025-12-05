@@ -1,9 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ingestion::client::{FetchError, FetchResult, IngestionClientTrait};
-use axum::body::Bytes;
 use std::path::PathBuf;
+
+use axum::body::Bytes;
+
+use crate::ingestion::client::{FetchError, FetchResult, IngestionClientTrait};
 
 // FIXME: To productionize this, we need to add garbage collection to remove old checkpoint files.
 
@@ -34,23 +36,22 @@ impl IngestionClientTrait for LocalIngestionClient {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use sui_storage::blob::{Blob, BlobEncoding};
+    use tokio_util::sync::CancellationToken;
+
     use crate::{
         ingestion::{client::IngestionClient, test_utils::test_checkpoint_data},
         metrics::tests::test_metrics,
     };
-    use std::sync::Arc;
-    use sui_storage::blob::{Blob, BlobEncoding};
-    use tokio_util::sync::CancellationToken;
 
     #[tokio::test]
     async fn local_test_fetch() {
-        let tempdir = tempfile::tempdir().unwrap().keep();
+        let tempdir = tempfile::tempdir().unwrap().into_path();
         let path = tempdir.join("1.chk");
         let test_checkpoint = test_checkpoint_data(1);
         tokio::fs::write(&path, &test_checkpoint).await.unwrap();
 
-        let metrics = Arc::new(test_metrics());
-        let local_client = IngestionClient::new_local(tempdir, metrics);
+        let local_client = IngestionClient::new_local(tempdir, test_metrics());
         let checkpoint = local_client.fetch(1, &CancellationToken::new()).await.unwrap();
         assert_eq!(Blob::encode(&*checkpoint, BlobEncoding::Bcs).unwrap().to_bytes(), test_checkpoint);
     }

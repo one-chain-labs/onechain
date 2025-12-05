@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::*;
+use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary as NativeSystemStateSummary;
+
 use super::{
     big_int::BigInt,
     gas::GasCostSummary,
@@ -10,8 +13,6 @@ use super::{
     system_parameters::SystemParameters,
     uint53::UInt53,
 };
-use async_graphql::*;
-use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary as NativeSystemStateSummary;
 
 #[derive(Clone, Debug)]
 pub(crate) struct SystemStateSummary {

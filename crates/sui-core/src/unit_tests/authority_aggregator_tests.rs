@@ -1,19 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::{make_transfer_object_transaction, make_transfer_sui_transaction};
-use move_core_types::{account_address::AccountAddress, ident_str};
-use rand::{rngs::StdRng, SeedableRng};
-use shared_crypto::intent::{Intent, IntentScope};
 use std::{
     collections::{BTreeMap, HashSet},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+
+use move_core_types::{account_address::AccountAddress, ident_str};
+use rand::{rngs::StdRng, SeedableRng};
+use shared_crypto::intent::{Intent, IntentScope};
 use sui_authority_aggregation::quorum_map_then_reduce_with_timeout;
+use sui_framework::BuiltInFramework;
 use sui_macros::sim_test;
 use sui_move_build::BuildConfig;
+#[cfg(msim)]
+use sui_simulator::configs::constant_latency_ms;
 use sui_types::{
     crypto::{
         get_key_pair,
@@ -25,10 +28,14 @@ use sui_types::{
         Signature,
         Signer,
     },
+    effects::{TestEffectsBuilder, TransactionEffects, TransactionEffectsAPI, TransactionEvents},
+    execution_status::{ExecutionFailureStatus, ExecutionStatus},
+    messages_grpc::{HandleTransactionResponse, TransactionStatus, VerifiedObjectInfoResponse},
     object::Object,
     transaction::*,
-    utils::create_fake_transaction,
+    utils::{create_fake_transaction, to_sender_signed_transaction},
 };
+use tokio::time::Instant;
 
 use super::*;
 use crate::{
@@ -39,18 +46,8 @@ use crate::{
         LocalAuthorityClientFaultConfig,
         MockAuthorityApi,
     },
-    test_utils::init_local_authorities,
-};
-use sui_framework::BuiltInFramework;
-use sui_types::utils::to_sender_signed_transaction;
-use tokio::time::Instant;
-
-#[cfg(msim)]
-use sui_simulator::configs::constant_latency_ms;
-use sui_types::{
-    effects::{TestEffectsBuilder, TransactionEffects, TransactionEffectsAPI, TransactionEvents},
-    execution_status::{ExecutionFailureStatus, ExecutionStatus},
-    messages_grpc::{HandleTransactionResponse, TransactionStatus, VerifiedObjectInfoResponse},
+    test_utils::{make_transfer_object_transaction, make_transfer_sui_transaction},
+    unit_test_utils::init_local_authorities,
 };
 
 macro_rules! assert_matches {
@@ -476,7 +473,7 @@ async fn test_process_transaction_fault_success() {
     // A transaction is sent to all authories, however one of them will error out either before or after processing the transaction.
     // A cert should still be created, and sent out to all authorities again. This time
     // a different authority errors out either before or after processing the cert.
-    for i in 0..4 {
+    for i in 0 .. 4 {
         let mut config_before_process_transaction = LocalAuthorityClientFaultConfig::default();
         if i % 2 == 0 {
             config_before_process_transaction.fail_before_handle_transaction = true;
@@ -571,7 +568,10 @@ async fn test_quorum_once_with_timeout() {
 
     // New requests are started every 50ms even though each request hangs for 1000ms.
     // The 15th request succeeds, and we exit before processing the remaining authorities.
-    assert_eq!(case(agg.clone(), 1000).await, (0..15).map(|d| Duration::from_millis(d * 50)).collect::<Vec<Duration>>());
+    assert_eq!(
+        case(agg.clone(), 1000).await,
+        (0 .. 15).map(|d| Duration::from_millis(d * 50)).collect::<Vec<Duration>>()
+    );
 
     *count.lock().unwrap() = 0;
     // Here individual requests time out relatively quickly (100ms), but we continue increasing
@@ -599,7 +599,7 @@ fn get_authorities(
     let mut authorities = BTreeMap::new();
     let mut authorities_vec = Vec::new();
     let mut clients = BTreeMap::new();
-    for _ in 0..committee_size {
+    for _ in 0 .. committee_size {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name: AuthorityName = sec.public().into();
         authorities.insert(name, 1);
@@ -1217,15 +1217,7 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| {
-            matches!(
-                e,
-                AggregatorProcessTransactionError::RetryableConflictingTransaction {
-                    conflicting_tx_digest_to_retry,
-                    ..
-                } if conflicting_tx_digest_to_retry.is_none()
-            )
-        },
+        |e| matches!(e, AggregatorProcessTransactionError::RetryableTransaction { .. }),
         |e| matches!(e, SuiError::ObjectLockConflict { .. } | SuiError::RpcError(..)),
     )
     .await;
@@ -1240,20 +1232,12 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| {
-            matches!(
-                e,
-                AggregatorProcessTransactionError::RetryableConflictingTransaction {
-                    conflicting_tx_digest_to_retry,
-                    ..
-                } if conflicting_tx_digest_to_retry.is_none()
-            )
-        },
+        |e| matches!(e, AggregatorProcessTransactionError::RetryableTransaction { .. }),
         |e| matches!(e, SuiError::ObjectLockConflict { .. } | SuiError::RpcError(..)),
     )
     .await;
 
-    println!("Case 2 - Non-retryable Tx but Retryable Conflicting Transaction");
+    println!("Case 2 - Non-retryable Tx1 due to conflicting Tx2");
     // Validators return >= f+1 conflicting Tx2
     set_retryable_tx_info_response_error(&mut clients, &authority_keys);
     for (name, _) in authority_keys.iter().skip(1) {
@@ -1267,10 +1251,10 @@ async fn test_handle_conflicting_transaction_response() {
         |e| {
             matches!(
                 e,
-                AggregatorProcessTransactionError::RetryableConflictingTransaction {
-                    conflicting_tx_digest_to_retry,
+                AggregatorProcessTransactionError::FatalConflictingTransaction {
+                    conflicting_tx_digests,
                     ..
-                } if *conflicting_tx_digest_to_retry == Some(*conflicting_tx2.digest())
+                } if conflicting_tx_digests.contains_key(conflicting_tx2.digest())
             )
         },
         |e| matches!(e, SuiError::ObjectLockConflict { .. } | SuiError::RpcError(..)),
@@ -1288,12 +1272,20 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| matches!(e, AggregatorProcessTransactionError::FatalConflictingTransaction { .. }),
+        |e| {
+            matches!(
+                e,
+                AggregatorProcessTransactionError::FatalConflictingTransaction {
+                    conflicting_tx_digests,
+                    ..
+                } if conflicting_tx_digests.contains_key(conflicting_tx2.digest())
+            )
+        },
         |e| matches!(e, SuiError::ObjectLockConflict { .. }),
     )
     .await;
 
-    println!("Case 3 - Non-retryable Tx (Mixed Response - 2 conflicts, 1 signed, 1 non-retryable)");
+    println!("Case 4 - Non-retryable Tx (Mixed Response - 2 conflicts, 1 signed, 1 non-retryable)");
     // Validator 1 returns a signed tx1
     set_tx_info_response_with_signed_tx(&mut clients, &authority_keys, &tx1, 0);
     // Validator 2 returns a conflicting tx2
@@ -1317,12 +1309,20 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| matches!(e, AggregatorProcessTransactionError::FatalConflictingTransaction { .. }),
+        |e| {
+            matches!(
+                e,
+                AggregatorProcessTransactionError::FatalConflictingTransaction {
+                    conflicting_tx_digests,
+                    ..
+                } if !conflicting_tx_digests.is_empty()
+            )
+        },
         |e| matches!(e, SuiError::ObjectLockConflict { .. } | SuiError::ByzantineAuthoritySuspicion { .. }),
     )
     .await;
 
-    println!("Case 3.1 - Non-retryable Tx (Mixed Response - 1 conflict, 1 signed, 1 non-retryable, 1 retryable)");
+    println!("Case 4.1 - Non-retryable Tx (Mixed Response - 1 conflict, 1 signed, 1 non-retryable, 1 retryable)");
     // Validator 1 returns a signed tx1
     set_tx_info_response_with_signed_tx(&mut clients, &authority_keys, &tx1, 0);
     // Validator 2 returns a conflicting tx2
@@ -1346,13 +1346,22 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| matches!(e, AggregatorProcessTransactionError::FatalConflictingTransaction { .. }),
+        |e| {
+            matches!(
+                e,
+                AggregatorProcessTransactionError::FatalConflictingTransaction {
+                    conflicting_tx_digests,
+                    ..
+                } if conflicting_tx_digests.contains_key(conflicting_tx2.digest()) &&
+                conflicting_tx_digests.contains_key(conflicting_tx3.digest())
+            )
+        },
         |e| matches!(e, SuiError::ObjectLockConflict { .. } | SuiError::UserInputError { .. }),
     )
     .await;
 
     println!(
-        "Case 3.2 - Non-retryable Tx (Mixed Response - 1 conflict, 1 signed, 1 non-retryable, 1 ObjectNotFoundError)"
+        "Case 4.2 - Non-retryable Tx (Mixed Response - 1 conflict, 1 signed, 1 non-retryable, 1 ObjectNotFoundError)"
     );
     // Validator 1 returns a signed tx1
     set_tx_info_response_with_signed_tx(&mut clients, &authority_keys, &tx1, 0);
@@ -1367,7 +1376,15 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| matches!(e, AggregatorProcessTransactionError::FatalConflictingTransaction { .. }),
+        |e| {
+            matches!(
+                e,
+                AggregatorProcessTransactionError::FatalConflictingTransaction {
+                    conflicting_tx_digests,
+                    ..
+                } if conflicting_tx_digests.contains_key(conflicting_tx2.digest())
+            )
+        },
         |e| {
             matches!(
                 e,
@@ -1379,7 +1396,7 @@ async fn test_handle_conflicting_transaction_response() {
     )
     .await;
 
-    println!("Case 4 - Successful Conflicting Transaction with Cert");
+    println!("Case 5 - Successful Conflicting Transaction with Cert");
     // All Validators gives signed-tx
     set_tx_info_response_with_signed_tx(&mut clients, &authority_keys, &tx1, 0);
 
@@ -1410,7 +1427,7 @@ async fn test_handle_conflicting_transaction_response() {
     // We have a valid cert because val-0 has it
     agg.process_transaction(tx1.clone().into(), Some(client_ip)).await.unwrap();
 
-    println!("Case 5 - Retryable Transaction (MissingCommitteeAtEpoch Error)");
+    println!("Case 6 - Retryable Transaction (MissingCommitteeAtEpoch Error)");
     // Validators return signed-tx with epoch 1
     set_tx_info_response_with_signed_tx(&mut clients, &authority_keys, &tx1, 1);
 
@@ -1434,24 +1451,24 @@ async fn test_handle_conflicting_transaction_response() {
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| matches!(e, AggregatorProcessTransactionError::RetryableConflictingTransaction { .. }),
+        |e| matches!(e, AggregatorProcessTransactionError::RetryableTransaction { .. }),
         |e| matches!(e, SuiError::MissingCommitteeAtEpoch(..) | SuiError::ObjectLockConflict { .. }),
     )
     .await;
 
-    println!("Case 5.1 - Retryable Transaction (WrongEpoch Error)");
+    println!("Case 6.1 - Retryable Transaction (WrongEpoch Error)");
     // Update committee store to epoch 2, now SafeClient will pass
     let committee_2 = Committee::new_for_testing_with_normalized_voting_power(2, authorities.clone());
     agg.committee_store.insert_new_committee(&committee_2).unwrap();
     assert_resp_err(
         &agg,
         tx1.clone().into(),
-        |e| matches!(e, AggregatorProcessTransactionError::RetryableConflictingTransaction { .. }),
+        |e| matches!(e, AggregatorProcessTransactionError::RetryableTransaction { .. }),
         |e| matches!(e, SuiError::WrongEpoch { .. } | SuiError::ObjectLockConflict { .. }),
     )
     .await;
 
-    println!("Case 5.2 - Successful Cert Transaction");
+    println!("Case 6.2 - Successful Cert Transaction");
     // Update aggregator committee to epoch 2, and transaction will succeed.
     agg.committee = Arc::new(committee_2);
     agg.process_transaction(tx1.clone().into(), Some(client_ip)).await.unwrap();
@@ -1752,7 +1769,7 @@ fn make_fake_authorities() -> (
     let mut authorities = BTreeMap::new();
     let mut clients = BTreeMap::new();
     let mut authority_keys = Vec::new();
-    for _ in 0..4 {
+    for _ in 0 .. 4 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name: AuthorityName = sec.public().into();
         authorities.insert(name, 1);
@@ -1775,14 +1792,14 @@ async fn run_aggregator(
     let mut byzantines = Vec::new();
 
     // Assign a few authorities as byzantines represented in a list of pubkeys.
-    for i in 0..num_byzantines {
+    for i in 0 .. num_byzantines {
         let byzantine =
             get_key_pair_from_rng::<AuthorityKeyPair, StdRng>(&mut StdRng::from_seed([i; 32])).1.public().into();
         byzantines.push(byzantine);
     }
 
     // Set up authorities and their clients.
-    for i in 0..num_authorities {
+    for i in 0 .. num_authorities {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair_from_rng(&mut StdRng::from_seed([i; 32]));
         let name: AuthorityName = sec.public().into();
         authorities.insert(name, 1);
@@ -1832,14 +1849,14 @@ async fn process_with_cert(
     let mut byzantines = Vec::new();
 
     // Assign a few authorities as byzantines represented in a list of pubkeys.
-    for i in 0..num_byzantines {
+    for i in 0 .. num_byzantines {
         let byzantine =
             get_key_pair_from_rng::<AuthorityKeyPair, StdRng>(&mut StdRng::from_seed([i; 32])).1.public().into();
         byzantines.push(byzantine);
     }
 
     // Set up authorities and their clients.
-    for i in 0..num_authorities {
+    for i in 0 .. num_authorities {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair_from_rng(&mut StdRng::from_seed([i; 32]));
         let name: AuthorityName = sec.public().into();
         authorities.insert(name, 1);
@@ -1900,14 +1917,6 @@ async fn assert_resp_err<E, F>(
 {
     match agg.process_transaction(tx, Some(make_socket_addr())).await {
         Err(received_agg_err) if agg_err_checker(&received_agg_err) => match received_agg_err {
-            AggregatorProcessTransactionError::RetryableConflictingTransaction {
-                errors,
-                conflicting_tx_digest_to_retry: _,
-                conflicting_tx_digests,
-            } => {
-                assert!(!conflicting_tx_digests.is_empty());
-                assert!(errors.iter().map(|e| &e.0).all(sui_err_checker));
-            }
             AggregatorProcessTransactionError::TxAlreadyFinalizedWithDifferentUserSignatures => (),
             AggregatorProcessTransactionError::FatalConflictingTransaction { errors, conflicting_tx_digests } => {
                 assert!(!conflicting_tx_digests.is_empty());
@@ -2015,7 +2024,7 @@ fn test_retryable_overload_info() {
     let mut retryable_overload_info = RetryableOverloadInfo::default();
     assert_eq!(retryable_overload_info.get_quorum_retry_after(3000, 7000), Duration::from_secs(0));
 
-    for _ in 0..4 {
+    for _ in 0 .. 4 {
         retryable_overload_info.add_stake_retryable_overload(1000, Duration::from_secs(1));
     }
     assert_eq!(retryable_overload_info.get_quorum_retry_after(3000, 7000), Duration::from_secs(1));
@@ -2027,7 +2036,7 @@ fn test_retryable_overload_info() {
     assert_eq!(retryable_overload_info.get_quorum_retry_after(4000, 7000), Duration::from_secs(1));
 
     retryable_overload_info = RetryableOverloadInfo::default();
-    for i in 0..10 {
+    for i in 0 .. 10 {
         retryable_overload_info.add_stake_retryable_overload(1000, Duration::from_secs(i));
     }
     assert_eq!(retryable_overload_info.get_quorum_retry_after(0, 7000), Duration::from_secs(6));

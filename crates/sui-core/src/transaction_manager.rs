@@ -12,8 +12,9 @@ use lru::LruCache;
 use mysten_common::fatal;
 use mysten_metrics::monitored_scope;
 use parking_lot::RwLock;
+use sui_config::node::AuthorityOverloadConfig;
 use sui_types::{
-    base_types::{ObjectID, SequenceNumber, TransactionDigest},
+    base_types::{FullObjectID, SequenceNumber, TransactionDigest},
     committee::EpochId,
     digests::TransactionEffectsDigest,
     error::{SuiError, SuiResult},
@@ -22,8 +23,9 @@ use sui_types::{
     fp_ensure,
     message_envelope::Message,
     storage::InputKey,
-    transaction::{TransactionDataAPI, VerifiedCertificate},
+    transaction::{SenderSignedData, TransactionDataAPI, VerifiedCertificate},
 };
+use tap::TapOptional;
 use tokio::{sync::mpsc::UnboundedSender, time::Instant};
 use tracing::{error, info, instrument, trace, warn};
 
@@ -31,9 +33,6 @@ use crate::{
     authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityMetrics},
     execution_cache::{ObjectCacheRead, TransactionCacheRead},
 };
-use sui_config::node::AuthorityOverloadConfig;
-use sui_types::transaction::SenderSignedData;
-use tap::TapOptional;
 
 #[cfg(test)]
 #[path = "unit_tests/transaction_manager_tests.rs"]
@@ -83,10 +82,10 @@ pub struct PendingCertificate {
 }
 
 struct CacheInner {
-    versioned_cache: LruCache<ObjectID, SequenceNumber>,
+    versioned_cache: LruCache<FullObjectID, SequenceNumber>,
     // we cache packages separately, because they are more expensive to look up in the db, so we
     // don't want to evict packages in favor of mutable objects.
-    unversioned_cache: LruCache<ObjectID, ()>,
+    unversioned_cache: LruCache<FullObjectID, ()>,
 
     max_size: usize,
     metrics: Arc<AuthorityMetrics>,
@@ -202,7 +201,7 @@ struct Inner {
     // Stores age info for all transactions depending on each object.
     // Used for throttling signing and submitting transactions depending on hot objects.
     // An `IndexMap` is used to ensure that the insertion order is preserved.
-    input_objects: HashMap<ObjectID, TransactionQueue>,
+    input_objects: HashMap<FullObjectID, TransactionQueue>,
 
     // Maps object IDs to the highest observed sequence number of the object. When the value is
     // None, indicates that the object is immutable, corresponding to an InputKey with no sequence
@@ -401,7 +400,11 @@ impl TransactionManager {
 
                 let receiving_object_entries = cert.data().intent_message().value.receiving_objects();
                 for entry in receiving_object_entries {
-                    let key = InputKey::VersionedObject { id: entry.0, version: entry.1 };
+                    let key = InputKey::VersionedObject {
+                        // TODO: Add support for receiving ConsensusV2 objects. For now this assumes fastpath.
+                        id: FullObjectID::new(entry.0, None),
+                        version: entry.1,
+                    };
                     receiving_objects.insert(key);
                     input_object_keys.insert(key);
                 }
@@ -444,7 +447,12 @@ impl TransactionManager {
         // So missing objects' availability are checked again after acquiring TM lock.
         let cache_miss_availability = self
             .object_cache_read
-            .multi_input_objects_available(&input_object_cache_misses, receiving_objects, epoch_store.epoch())
+            .multi_input_objects_available(
+                &input_object_cache_misses,
+                receiving_objects,
+                epoch_store.epoch(),
+                epoch_store.protocol_config().use_object_per_epoch_marker_table_v2_as_option().unwrap_or(false),
+            )
             .into_iter()
             .zip(input_object_cache_misses);
 
@@ -665,15 +673,11 @@ impl TransactionManager {
         self.metrics.execution_driver_dispatch_queue.inc();
     }
 
-    /// Gets the missing input object keys for the given transaction.
-    pub(crate) fn get_missing_input(&self, digest: &TransactionDigest) -> Option<Vec<InputKey>> {
-        let reconfig_lock = self.inner.read();
-        let inner = reconfig_lock.read();
-        inner.pending_certificates.get(digest).map(|cert| cert.waiting_input_objects.clone().into_iter().collect())
-    }
-
     // Returns the number of transactions waiting on each object ID, as well as the age of the oldest transaction in the queue.
-    pub(crate) fn objects_queue_len_and_age(&self, keys: Vec<ObjectID>) -> Vec<(ObjectID, usize, Option<Duration>)> {
+    pub(crate) fn objects_queue_len_and_age(
+        &self,
+        keys: Vec<FullObjectID>,
+    ) -> Vec<(FullObjectID, usize, Option<Duration>)> {
         let reconfig_lock = self.inner.read();
         let inner = reconfig_lock.read();
         keys.into_iter()
@@ -721,14 +725,14 @@ impl TransactionManager {
                 .transaction_data()
                 .shared_input_objects()
                 .into_iter()
-                .filter_map(|r| r.mutable.then_some(r.id))
+                .filter_map(|r| r.mutable.then_some(FullObjectID::new(r.id, Some(r.initial_shared_version))))
                 .collect(),
         ) {
             // When this occurs, most likely transactions piled up on a shared object.
             if queue_len >= overload_config.max_transaction_manager_per_object_queue_length {
                 info!("Overload detected on object {:?} with {} pending transactions", object_id, queue_len);
                 fp_bail!(SuiError::TooManyTransactionsPendingOnObject {
-                    object_id,
+                    object_id: object_id.id(),
                     queue_len,
                     threshold: overload_config.max_transaction_manager_per_object_queue_length,
                 });
@@ -742,7 +746,7 @@ impl TransactionManager {
                         age.as_millis()
                     );
                     fp_bail!(SuiError::TooOldTransactionPendingOnObject {
-                        object_id,
+                        object_id: object_id.id(),
                         txn_age_sec: age.as_secs(),
                         threshold: overload_config.max_txn_age_in_queue.as_secs(),
                     });
@@ -872,9 +876,11 @@ impl TransactionQueue {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use prometheus::Registry;
     use rand::{Rng, RngCore};
+    use sui_types::base_types::ObjectID;
+
+    use super::*;
 
     #[test]
     #[cfg_attr(msim, ignore)]
@@ -883,7 +889,7 @@ mod test {
         let mut cache = AvailableObjectsCache::new_with_size(metrics, 5);
 
         // insert 10 unique unversioned objects
-        for i in 0..10 {
+        for i in 0 .. 10 {
             let object = ObjectID::new([i; 32]);
             let input_key = InputKey::Package { id: object };
             assert_eq!(cache.is_object_available(&input_key), None);
@@ -892,15 +898,15 @@ mod test {
         }
 
         // first 5 have been evicted
-        for i in 0..5 {
+        for i in 0 .. 5 {
             let object = ObjectID::new([i; 32]);
             let input_key = InputKey::Package { id: object };
             assert_eq!(cache.is_object_available(&input_key), None);
         }
 
         // insert 10 unique versioned objects
-        for i in 0..10 {
-            let object = ObjectID::new([i; 32]);
+        for i in 0 .. 10 {
+            let object = FullObjectID::new(ObjectID::new([i; 32]), None);
             let input_key = InputKey::VersionedObject { id: object, version: (i as u64).into() };
             assert_eq!(cache.is_object_available(&input_key), None);
             cache.insert(&input_key);
@@ -908,21 +914,21 @@ mod test {
         }
 
         // first 5 versioned objects have been evicted
-        for i in 0..5 {
-            let object = ObjectID::new([i; 32]);
+        for i in 0 .. 5 {
+            let object = FullObjectID::new(ObjectID::new([i; 32]), None);
             let input_key = InputKey::VersionedObject { id: object, version: (i as u64).into() };
             assert_eq!(cache.is_object_available(&input_key), None);
         }
 
         // but versioned objects do not cause evictions of unversioned objects
-        for i in 5..10 {
+        for i in 5 .. 10 {
             let object = ObjectID::new([i; 32]);
             let input_key = InputKey::Package { id: object };
             assert_eq!(cache.is_object_available(&input_key), Some(true));
         }
 
         // object 9 is available at version 9
-        let object = ObjectID::new([9; 32]);
+        let object = FullObjectID::new(ObjectID::new([9; 32]), None);
         let input_key = InputKey::VersionedObject { id: object, version: 9.into() };
         assert_eq!(cache.is_object_available(&input_key), Some(true));
         // but not at version 10
@@ -1046,7 +1052,7 @@ mod test {
     fn transaction_queue_random_test() {
         let mut rng = rand::thread_rng();
         let mut digests = Vec::new();
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let mut digest = [0; 32];
             rng.fill_bytes(&mut digest);
             digests.push(TransactionDigest::new(digest));
@@ -1059,9 +1065,9 @@ mod test {
 
         // first insert some random digests so that the queue starts
         // out well-populated
-        for _ in 0..70 {
+        for _ in 0 .. 70 {
             now += Duration::from_secs(1);
-            let digest = digests[rng.gen_range(0..digests.len())];
+            let digest = digests[rng.gen_range(0 .. digests.len())];
             let time = now;
             queue.insert(digest, time);
             verifier.entry(digest).or_insert(time);
@@ -1069,12 +1075,12 @@ mod test {
 
         // Do random operations on both the queue and the verifier, and
         // verify that the two structures always agree
-        for _ in 0..100000 {
+        for _ in 0 .. 100000 {
             // advance time
             now += Duration::from_secs(1);
 
             // pick a random digest
-            let digest = digests[rng.gen_range(0..digests.len())];
+            let digest = digests[rng.gen_range(0 .. digests.len())];
 
             // either insert or remove it
             if rng.gen_bool(0.5) {

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use async_trait::async_trait;
 
 use crate::payload::{validation::check_objects, MultiGetObjects, ProcessPayload, RpcCommandProcessor, SignerInfo};
-use async_trait::async_trait;
 
 #[async_trait]
 impl<'a> ProcessPayload<'a, &'a MultiGetObjects> for RpcCommandProcessor {

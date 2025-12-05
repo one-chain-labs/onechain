@@ -8,16 +8,6 @@ pub mod writer;
 #[cfg(test)]
 mod tests;
 
-use crate::reader::{ArchiveReader, ArchiveReaderMetrics};
-use anyhow::{anyhow, Result};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use bytes::Bytes;
-use fastcrypto::hash::{HashFunction, Sha3_256};
-use indicatif::{ProgressBar, ProgressStyle};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use object_store::path::Path;
-use prometheus::Registry;
-use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::{BufWriter, Cursor, Read, Seek, SeekFrom, Write},
@@ -29,6 +19,16 @@ use std::{
     },
     time::{Duration, Instant},
 };
+
+use anyhow::{anyhow, Result};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use bytes::Bytes;
+use fastcrypto::hash::{HashFunction, Sha3_256};
+use indicatif::{ProgressBar, ProgressStyle};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use object_store::path::Path;
+use prometheus::Registry;
+use serde::{Deserialize, Serialize};
 use sui_config::{genesis::Genesis, node::ArchiveReaderConfig, object_storage_config::ObjectStoreConfig};
 use sui_storage::{
     blob::{Blob, BlobEncoding},
@@ -47,6 +47,8 @@ use sui_types::{
     storage::{SingleCheckpointSharedInMemoryStore, WriteStore},
 };
 use tracing::{error, info};
+
+use crate::reader::{ArchiveReader, ArchiveReaderMetrics};
 
 #[allow(rustdoc::invalid_html_tags)]
 /// Checkpoints and summaries are persisted as blob files. Files are committed to local store
@@ -375,7 +377,7 @@ pub async fn verify_archive_with_genesis_config(
     );
 
     let num_retries = std::cmp::max(num_retries, 1);
-    for _ in 0..num_retries {
+    for _ in 0 .. num_retries {
         match verify_archive_with_local_store(store.clone(), remote_store_config.clone(), concurrency, interactive).await
         {
             Ok(_) => return Ok(()),
@@ -475,7 +477,9 @@ where
         });
         None
     };
-    archive_reader.read(store.clone(), (latest_checkpoint + 1)..u64::MAX, txn_counter, checkpoint_counter, true).await?;
+    archive_reader
+        .read(store.clone(), (latest_checkpoint + 1) .. u64::MAX, txn_counter, checkpoint_counter, true)
+        .await?;
     progress_bar.iter().for_each(|p| p.finish_and_clear());
     let end = store.get_highest_synced_checkpoint().map_err(|_| anyhow!("Failed to read watermark"))?.sequence_number;
     info!("Highest verified checkpoint: {}", end);

@@ -6,30 +6,29 @@ pub mod nodefw_client;
 pub mod nodefw_test_server;
 pub mod policies;
 
-use dashmap::DashMap;
-use fs::File;
-use prometheus::IntGauge;
 use std::{
+    fmt::Debug,
     fs,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Add,
     sync::Arc,
+    time::{Duration, Instant, SystemTime},
 };
+
+use dashmap::DashMap;
+use fs::File;
+use mysten_metrics::spawn_monitored_task;
+use prometheus::IntGauge;
+use rand::Rng;
+use sui_types::traffic_control::{PolicyConfig, PolicyType, RemoteFirewallConfig, Weight};
+use tokio::sync::{mpsc, mpsc::error::TrySendError};
+use tracing::{debug, error, info, trace, warn};
 
 use self::metrics::TrafficControllerMetrics;
 use crate::traffic_controller::{
     nodefw_client::{BlockAddress, BlockAddresses, NodeFWClient},
     policies::{Policy, PolicyResponse, TrafficControlPolicy, TrafficTally},
 };
-use mysten_metrics::spawn_monitored_task;
-use rand::Rng;
-use std::{
-    fmt::Debug,
-    time::{Duration, Instant, SystemTime},
-};
-use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig, Weight};
-use tokio::sync::{mpsc, mpsc::error::TrySendError};
-use tracing::{debug, error, info, trace, warn};
 
 pub const METRICS_INTERVAL_SECS: u64 = 2;
 pub const DEFAULT_DRAIN_TIMEOUT_SECS: u64 = 300;
@@ -105,6 +104,7 @@ impl TrafficController {
         fw_config: Option<RemoteFirewallConfig>,
     ) -> Self {
         let metrics = Arc::new(metrics);
+        Self::set_policy_config_metrics(&policy_config, metrics.clone());
         let (tx, rx) = mpsc::channel(policy_config.channel_capacity);
         // Memoized drainfile existence state. This is passed into delegation
         // funtions to prevent them from continuing to populate blocklists
@@ -128,6 +128,17 @@ impl TrafficController {
         ));
         spawn_monitored_task!(run_clear_blocklists_loop(clear_loop_blocklists, clear_loop_metrics,));
         Self { tally_channel: Some(tx), acl: Acl::Blocklists(blocklists), metrics: metrics.clone(), dry_run_mode }
+    }
+
+    fn set_policy_config_metrics(policy_config: &PolicyConfig, metrics: Arc<TrafficControllerMetrics>) {
+        if let PolicyType::FreqThreshold(config) = &policy_config.spam_policy_type {
+            metrics.spam_client_threshold.set(config.client_threshold as i64);
+            metrics.spam_proxied_client_threshold.set(config.proxied_client_threshold as i64);
+        }
+        if let PolicyType::FreqThreshold(config) = &policy_config.error_policy_type {
+            metrics.error_client_threshold.set(config.client_threshold as i64);
+            metrics.error_proxied_client_threshold.set(config.proxied_client_threshold as i64);
+        }
     }
 
     pub fn init_for_test(policy_config: PolicyConfig, fw_config: Option<RemoteFirewallConfig>) -> Self {
@@ -557,7 +568,7 @@ impl TrafficSim {
         assert!(duration.as_secs() > 0);
 
         let controller = TrafficController::init_for_test(policy.clone(), None);
-        let tasks = (0..num_clients).map(|task_num| {
+        let tasks = (0 .. num_clients).map(|task_num| {
             tokio::spawn(Self::run_single_client(controller.clone(), duration, task_num, per_client_tps))
         });
 
@@ -569,7 +580,7 @@ impl TrafficSim {
                 println!("TPS per client: {}", per_client_tps);
                 println!("Target total TPS: {}", per_client_tps * num_clients as usize);
                 println!("\n");
-                for _ in 0..duration.as_secs() {
+                for _ in 0 .. duration.as_secs() {
                     print!(".");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
@@ -608,7 +619,7 @@ impl TrafficSim {
         // Do an initial sleep for a random amount of time to smooth
         // out the traffic. This shouldn't be strictly necessary and
         // we can remove if we want more determinism
-        let sleep_time = Duration::from_micros(rand::thread_rng().gen_range(0..100));
+        let sleep_time = Duration::from_micros(rand::thread_rng().gen_range(0 .. 100));
         tokio::time::sleep(sleep_time).await;
 
         // collectors
@@ -673,7 +684,7 @@ impl TrafficSim {
         // until ttl is expired.
         println!("Num blocked requests: {}", metrics.num_blocked);
         // This metric on the other hand reflects the number of times a client was added to the blocklist
-        // and thus can be compared an the expectation based on the policy block threshold and ttl
+        // and thus can be compared with the expectation based on the policy block threshold and ttl
         println!("Num times added to blocklist: {}", metrics.num_blocklist_adds);
         // This averages the duration for the first request to be blocked across all clients,
         // which is useful for understanding if the policy is rate limiting based on expectation

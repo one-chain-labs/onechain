@@ -9,6 +9,7 @@ use std::{
     },
     time::Duration,
 };
+
 use sui_macros::{register_fail_point, register_fail_point_if, sim_test};
 use sui_test_transaction_builder::make_transfer_sui_transaction;
 use test_cluster::TestClusterBuilder;
@@ -20,7 +21,7 @@ async fn basic_checkpoints_integration_test() {
     let digest = *tx.digest();
     test_cluster.execute_transaction(tx).await;
 
-    for _ in 0..600 {
+    for _ in 0 .. 600 {
         let all_included = test_cluster.swarm.validator_node_handles().into_iter().all(|handle| {
             handle.with(|node| {
                 node.state().epoch_store_for_testing().is_transaction_executed_in_checkpoint(&digest).unwrap()

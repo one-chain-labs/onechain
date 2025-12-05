@@ -1,5 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{
+    collections::VecDeque,
+    net::TcpListener,
+    sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use anyhow::{bail, Result};
 use axum::{extract::Extension, http::StatusCode, routing::get, Router};
 use once_cell::sync::Lazy;
@@ -9,12 +16,6 @@ use prometheus::{
     register_histogram_vec,
     CounterVec,
     HistogramVec,
-};
-use std::{
-    collections::VecDeque,
-    net::TcpListener,
-    sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
 };
 use tower::ServiceBuilder;
 use tower_http::{

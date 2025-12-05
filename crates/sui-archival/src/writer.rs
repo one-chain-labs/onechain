@@ -2,25 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
-use crate::{
-    create_file_metadata,
-    read_manifest,
-    write_manifest,
-    CheckpointUpdates,
-    FileMetadata,
-    FileType,
-    Manifest,
-    CHECKPOINT_FILE_MAGIC,
-    CHECKPOINT_FILE_SUFFIX,
-    EPOCH_DIR_PREFIX,
-    MAGIC_BYTES,
-    SUMMARY_FILE_MAGIC,
-    SUMMARY_FILE_SUFFIX,
-};
-use anyhow::{Context, Result};
-use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use object_store::DynObjectStore;
-use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
 use std::{
     fs,
     fs::{File, OpenOptions},
@@ -31,6 +12,11 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+
+use anyhow::{Context, Result};
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use object_store::DynObjectStore;
+use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
 use sui_config::object_storage_config::ObjectStoreConfig;
 use sui_storage::{
     blob::{Blob, BlobEncoding},
@@ -55,6 +41,22 @@ use tokio::{
     time::Instant,
 };
 use tracing::{debug, info};
+
+use crate::{
+    create_file_metadata,
+    read_manifest,
+    write_manifest,
+    CheckpointUpdates,
+    FileMetadata,
+    FileType,
+    Manifest,
+    CHECKPOINT_FILE_MAGIC,
+    CHECKPOINT_FILE_SUFFIX,
+    EPOCH_DIR_PREFIX,
+    MAGIC_BYTES,
+    SUMMARY_FILE_MAGIC,
+    SUMMARY_FILE_SUFFIX,
+};
 
 pub struct ArchiveMetrics {
     pub latest_checkpoint_archived: IntGauge,
@@ -127,7 +129,7 @@ impl CheckpointWriter {
         Ok(CheckpointWriter {
             root_dir_path,
             epoch_num,
-            checkpoint_range: checkpoint_sequence_num..checkpoint_sequence_num,
+            checkpoint_range: checkpoint_sequence_num .. checkpoint_sequence_num,
             wbuf: BufWriter::new(checkpoint_file),
             summary_wbuf: BufWriter::new(summary_file),
             checkpoint_buf_offset: 0,
@@ -304,7 +306,7 @@ impl CheckpointWriter {
     }
 
     fn reset_checkpoint_range(&mut self) {
-        self.checkpoint_range = self.checkpoint_range.end..self.checkpoint_range.end
+        self.checkpoint_range = self.checkpoint_range.end .. self.checkpoint_range.end
     }
 
     fn epoch_dir(&self) -> PathBuf {

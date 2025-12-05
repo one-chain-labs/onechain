@@ -6,8 +6,6 @@ use std::collections::HashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-
-use crate::Page;
 use sui_types::{
     base_types::{EpochId, ObjectDigest, ObjectID, ObjectRef, SequenceNumber, TransactionDigest},
     coin::CoinMetadata,
@@ -16,7 +14,9 @@ use sui_types::{
     sui_serde::{BigInt, SequenceNumber as AsSequenceNumber},
 };
 
-pub type CoinPage = Page<Coin, ObjectID>;
+use crate::Page;
+
+pub type CoinPage = Page<Coin, String>;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, JsonSchema, PartialEq, Eq, Clone)]

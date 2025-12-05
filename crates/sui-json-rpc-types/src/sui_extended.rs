@@ -8,7 +8,6 @@ use move_core_types::identifier::Identifier;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-
 use sui_types::{
     base_types::{AuthorityName, EpochId, ObjectID},
     committee::Committee,
@@ -22,7 +21,7 @@ use crate::Page;
 pub type EpochPage = Page<EpochInfo, BigInt<u64>>;
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EpochInfo {
     /// epoch number
@@ -58,7 +57,7 @@ impl EpochInfo {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EndOfEpochInfo {
     #[schemars(with = "BigInt<u64>")]
@@ -104,7 +103,7 @@ pub struct EndOfEpochInfo {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveFunctionName {
     pub package: ObjectID,

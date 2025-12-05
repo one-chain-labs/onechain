@@ -1,21 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 
 use anyhow::{bail, Context, Result};
+use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
 use sui_indexer_alt_framework::{
-    db,
+    models::cp_sequence_numbers::epoch_interval,
     pipeline::{concurrent::Handler, Processor},
 };
+use sui_indexer_alt_schema::{epochs::StoredEpochStart, schema::kv_epoch_starts};
+use sui_pg_db as db;
 use sui_types::{
     full_checkpoint_content::CheckpointData,
     sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
     transaction::{TransactionDataAPI, TransactionKind},
 };
-
-use crate::{models::epochs::StoredEpochStart, schema::kv_epoch_starts};
 
 pub(crate) struct KvEpochStarts;
 
@@ -65,5 +66,17 @@ impl Handler for KvEpochStarts {
 
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
         Ok(diesel::insert_into(kv_epoch_starts::table).values(values).on_conflict_do_nothing().execute(conn).await?)
+    }
+
+    async fn prune(&self, from: u64, to_exclusive: u64, conn: &mut db::Connection<'_>) -> Result<usize> {
+        let Range { start: from_epoch, end: to_epoch } = epoch_interval(conn, from .. to_exclusive).await?;
+        if from_epoch < to_epoch {
+            let filter =
+                kv_epoch_starts::table.filter(kv_epoch_starts::epoch.between(from_epoch as i64, to_epoch as i64 - 1));
+
+            Ok(diesel::delete(filter).execute(conn).await?)
+        } else {
+            Ok(0)
+        }
     }
 }

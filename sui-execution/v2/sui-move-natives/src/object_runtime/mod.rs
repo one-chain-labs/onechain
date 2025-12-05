@@ -3,8 +3,11 @@
 
 pub(crate) mod object_store;
 
-use self::object_store::{ChildObjectEffect, ObjectResult};
-use super::get_object_id;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+
 use better_any::{Tid, TidAble};
 use indexmap::{map::IndexMap, set::IndexSet};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -22,10 +25,6 @@ use move_vm_types::{
     values::{GlobalValue, Value},
 };
 use object_store::ChildObjectStore;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-};
 use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
 use sui_types::{
     base_types::{MoveObjectType, ObjectID, SequenceNumber, SuiAddress},
@@ -42,6 +41,9 @@ use sui_types::{
     SUI_RANDOMNESS_STATE_OBJECT_ID,
     SUI_SYSTEM_STATE_OBJECT_ID,
 };
+
+use self::object_store::{ChildObjectEffect, ObjectResult};
+use super::get_object_id;
 
 pub enum ObjectEvent {
     /// Transfer to a new address or object. Or make it shared or immutable.
@@ -587,7 +589,7 @@ pub fn get_all_uids(
     struct UIDTraversal<'i>(&'i mut BTreeSet<ObjectID>);
     struct UIDCollector<'i>(&'i mut BTreeSet<ObjectID>);
 
-    impl<'i, 'b, 'l> AV::Traversal<'b, 'l> for UIDTraversal<'i> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for UIDTraversal<'_> {
         type Error = AV::Error;
 
         fn traverse_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {
@@ -600,7 +602,7 @@ pub fn get_all_uids(
         }
     }
 
-    impl<'i, 'b, 'l> AV::Traversal<'b, 'l> for UIDCollector<'i> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for UIDCollector<'_> {
         type Error = AV::Error;
 
         fn traverse_address(

@@ -29,7 +29,7 @@ pub const UTF_TYPE_NAME: Symbol = symbol!("String");
 pub const ASCII_MODULE_NAME: Symbol = symbol!("ascii");
 pub const ASCII_TYPE_NAME: Symbol = symbol!("String");
 
-pub const SUI_ADDR_NAME: Symbol = symbol!("one");
+pub const SUI_ADDR_NAME: Symbol = symbol!("sui");
 pub const OBJECT_MODULE_NAME: Symbol = symbol!("object");
 pub const OBJECT_NEW: Symbol = symbol!("new");
 pub const OBJECT_NEW_UID_FROM_HASH: Symbol = symbol!("new_uid_from_hash");
@@ -39,11 +39,11 @@ pub const UID_TYPE_NAME: Symbol = symbol!("UID");
 pub const ID_TYPE_NAME: Symbol = symbol!("ID");
 pub const TX_CONTEXT_MODULE_NAME: Symbol = symbol!("tx_context");
 pub const TX_CONTEXT_TYPE_NAME: Symbol = symbol!("TxContext");
-pub const SUI_MODULE_NAME: Symbol = symbol!("oct");
-pub const SUI_OTW_NAME: Symbol = symbol!("OCT");
+pub const SUI_MODULE_NAME: Symbol = symbol!("sui");
+pub const SUI_OTW_NAME: Symbol = symbol!("SUI");
 
-pub const SUI_SYSTEM_ADDR_NAME: Symbol = symbol!("one_system");
-pub const SUI_SYSTEM_MODULE_NAME: Symbol = symbol!("one_system");
+pub const SUI_SYSTEM_ADDR_NAME: Symbol = symbol!("sui_system");
+pub const SUI_SYSTEM_MODULE_NAME: Symbol = symbol!("sui_system");
 pub const SUI_SYSTEM_CREATE: Symbol = symbol!("create");
 pub const CLOCK_MODULE_NAME: Symbol = symbol!("clock");
 pub const CLOCK_TYPE_NAME: Symbol = symbol!("Clock");
@@ -71,8 +71,12 @@ pub const SHARE_FUNCTION_NAME: Symbol = symbol!("share_object");
 pub const RECEIVE_FUNCTION_NAME: Symbol = symbol!("receive");
 pub const RECEIVING_TYPE_NAME: Symbol = symbol!("Receiving");
 
-pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] =
-    &[TRANSFER_FUNCTION_NAME, FREEZE_FUNCTION_NAME, SHARE_FUNCTION_NAME, RECEIVE_FUNCTION_NAME];
+pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] = &[
+    TRANSFER_FUNCTION_NAME,
+    FREEZE_FUNCTION_NAME,
+    SHARE_FUNCTION_NAME,
+    RECEIVE_FUNCTION_NAME,
+];
 
 //**************************************************************************************************
 // Diagnostics
@@ -134,8 +138,13 @@ pub const OBJECT_DECL_DIAG: DiagnosticInfo = custom(
     /* code */ 7,
     "invalid object declaration",
 );
-pub const EVENT_EMIT_CALL_DIAG: DiagnosticInfo =
-    custom(SUI_DIAG_PREFIX, Severity::NonblockingError, /* category */ TYPING, /* code */ 8, "invalid event");
+pub const EVENT_EMIT_CALL_DIAG: DiagnosticInfo = custom(
+    SUI_DIAG_PREFIX,
+    Severity::NonblockingError,
+    /* category */ TYPING,
+    /* code */ 8,
+    "invalid event",
+);
 pub const PRIVATE_TRANSFER_CALL_DIAG: DiagnosticInfo = custom(
     SUI_DIAG_PREFIX,
     Severity::NonblockingError,

@@ -10,7 +10,6 @@ use fastcrypto::{
     hash::HashFunction,
 };
 use futures::StreamExt;
-
 use shared_crypto::intent::{Intent, IntentMessage};
 use sui_json_rpc_types::{
     StakeStatus,
@@ -58,7 +57,7 @@ use crate::{
     SuiEnv,
 };
 
-/// This module implements the [Rosetta Construction API](https://www.rosetta-api.org/docs/ConstructionApi.html)
+// This module implements the [Rosetta Construction API](https://www.rosetta-api.org/docs/ConstructionApi.html)
 
 /// Derive returns the AccountIdentifier associated with a public key.
 ///
@@ -275,7 +274,7 @@ pub async fn metadata(
                     .flat_map(|s| {
                         s.stakes.into_iter().filter_map(|s| {
                             if let StakeStatus::Active { .. } = s.status {
-                                Some(s.staked_oct_id)
+                                Some(s.staked_sui_id)
                             } else {
                                 None
                             }

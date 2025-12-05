@@ -145,9 +145,21 @@ pub struct DataLoad {
 /// trace. MoveVM events, are well structured, and can be a frame event or an instruction event.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum TraceEvent {
-    OpenFrame { frame: Box<Frame>, gas_left: u64 },
-    CloseFrame { frame_id: TraceIndex, return_: Vec<TraceValue>, gas_left: u64 },
-    Instruction { type_parameters: Vec<TypeTag>, pc: u16, gas_left: u64, instruction: Box<String> },
+    OpenFrame {
+        frame: Box<Frame>,
+        gas_left: u64,
+    },
+    CloseFrame {
+        frame_id: TraceIndex,
+        return_: Vec<TraceValue>,
+        gas_left: u64,
+    },
+    Instruction {
+        type_parameters: Vec<TypeTag>,
+        pc: u16,
+        gas_left: u64,
+        instruction: Box<String>,
+    },
     Effect(Box<Effect>),
     External(Box<serde_json::Value>),
 }
@@ -184,7 +196,9 @@ impl TraceValue {
 
     pub fn location(&self) -> Option<&Location> {
         match self {
-            TraceValue::ImmRef { location, .. } | TraceValue::MutRef { location, .. } => Some(location),
+            TraceValue::ImmRef { location, .. } | TraceValue::MutRef { location, .. } => {
+                Some(location)
+            }
             _ => None,
         }
     }
@@ -192,7 +206,10 @@ impl TraceValue {
 
 impl MoveTrace {
     pub fn new() -> Self {
-        Self { version: TRACE_VERSION, events: vec![] }
+        Self {
+            version: TRACE_VERSION,
+            events: vec![],
+        }
     }
 
     pub fn to_json(&self) -> serde_json::Value {
@@ -200,15 +217,27 @@ impl MoveTrace {
     }
 }
 
+impl Default for MoveTrace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MoveTraceBuilder {
     /// Create a new `MoveTraceBuilder` with no additional tracing.
     pub fn new() -> Self {
-        Self { tracer: Box::new(NopTracer), trace: MoveTrace::new() }
+        Self {
+            tracer: Box::new(NopTracer),
+            trace: MoveTrace::new(),
+        }
     }
 
     /// Create a new `MoveTraceBuilder` with a custom `tracer`.
     pub fn new_with_tracer(tracer: Box<dyn Tracer>) -> Self {
-        Self { tracer, trace: MoveTrace::new() }
+        Self {
+            tracer,
+            trace: MoveTrace::new(),
+        }
     }
 
     /// Consume the `MoveTraceBuilder` and return the `MoveTrace` that has been built by it.
@@ -251,7 +280,11 @@ impl MoveTraceBuilder {
 
     /// Record a `CloseFrame` event in the trace.
     pub fn close_frame(&mut self, frame_id: TraceIndex, return_: Vec<TraceValue>, gas_left: u64) {
-        self.push_event(TraceEvent::CloseFrame { frame_id, return_, gas_left });
+        self.push_event(TraceEvent::CloseFrame {
+            frame_id,
+            return_,
+            gas_left,
+        });
     }
 
     /// Record an `Instruction` event in the trace along with the effects of the instruction.
@@ -284,6 +317,12 @@ impl MoveTraceBuilder {
     fn push_event(&mut self, event: TraceEvent) {
         self.trace.events.push(event.clone());
         self.tracer.notify(&event, Writer(&mut self.trace));
+    }
+}
+
+impl Default for MoveTraceBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -328,17 +367,28 @@ impl Display for Effect {
             Effect::Push(value) => {
                 write!(f, "Push {}", value)
             }
-            Effect::Read(Read { location, root_value_read: value_read, moved }) => {
+            Effect::Read(Read {
+                location,
+                root_value_read: value_read,
+                moved,
+            }) => {
                 let arrow = if *moved { "==>" } else { "-->" };
                 write!(f, "{location} {arrow} {value_read}")
             }
-            Effect::Write(Write { location, root_value_after_write: value_written }) => {
+            Effect::Write(Write {
+                location,
+                root_value_after_write: value_written,
+            }) => {
                 write!(f, "{location} <-- {value_written}")
             }
             Effect::ExecutionError(error_string) => {
                 write!(f, "ExecutionError: {error_string}")
             }
-            Effect::DataLoad(DataLoad { ref_type, location, snapshot }) => {
+            Effect::DataLoad(DataLoad {
+                ref_type,
+                location,
+                snapshot,
+            }) => {
                 let ref_type = match ref_type {
                     RefType::Imm => "&",
                     RefType::Mut => "&mut",

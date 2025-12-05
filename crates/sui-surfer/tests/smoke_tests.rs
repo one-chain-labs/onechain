@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{path::PathBuf, time::Duration};
+
 use sui_macros::sim_test;
 
 #[sim_test]

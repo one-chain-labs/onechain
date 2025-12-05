@@ -8,7 +8,7 @@
 
 //# publish
 module test::m {
-    use one::transfer::Receiving;
+    use sui::transfer::Receiving;
 
     public struct Parent has key { id: UID }
     public struct S has key { id: UID }
@@ -106,9 +106,9 @@ module test::m {
 
 //# programmable --sender A --inputs object(10,0) receiving(10,1)
 //> 0: test::m::parent_uid(Input(0));
-//> 1: one::transfer::receive<test::m::S>(Result(0), Input(1));
+//> 1: sui::transfer::receive<test::m::S>(Result(0), Input(1));
 //> 2: test::m::destroy_s(Result(1));
-//> 3: one::object::delete(Result(0));
+//> 3: sui::object::delete(Result(0));
 
 // Now publish one with store. We should still be able to call `receive` to receive it.
 
@@ -120,6 +120,6 @@ module test::m {
 
 //# programmable --sender A --inputs object(14,0) receiving(14,1)
 //> 0: test::m::parent_uid(Input(0));
-//> 1: one::transfer::receive<test::m::Store>(Result(0), Input(1));
+//> 1: sui::transfer::receive<test::m::Store>(Result(0), Input(1));
 //> 2: test::m::destroy_store(Result(1));
-//> 3: one::object::delete(Result(0));
+//> 3: sui::object::delete(Result(0));

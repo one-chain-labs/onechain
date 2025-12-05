@@ -4,9 +4,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use diesel::prelude::*;
-use serde::de::DeserializeOwned;
-
 use move_core_types::annotated_value::MoveTypeLayout;
+use serde::de::DeserializeOwned;
 use sui_json_rpc::coin_api::parse_to_struct_tag;
 use sui_json_rpc_types::{Balance, Coin as SuiCoin};
 use sui_package_resolver::{PackageStore, Resolver};
@@ -479,7 +478,7 @@ mod tests {
 
         match stored_obj.object_type {
             Some(t) => {
-                assert_eq!(t, "0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>");
+                assert_eq!(t, "0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>");
             }
             None => {
                 panic!("object_type should not be none");
@@ -495,7 +494,7 @@ mod tests {
         let stored_obj = StoredObject::from(indexed_obj);
 
         let sui_coin = SuiCoin::try_from(stored_obj).unwrap();
-        assert_eq!(sui_coin.coin_type, "0x2::oct::OCT");
+        assert_eq!(sui_coin.coin_type, "0x2::sui::SUI");
     }
 
     #[test]
@@ -506,12 +505,12 @@ mod tests {
         let stored_obj = StoredObject::from(indexed_obj);
         let test_balance = CoinBalance { coin_type: stored_obj.coin_type.unwrap(), coin_num: 1, coin_balance: 100 };
         let balance = Balance::try_from(test_balance).unwrap();
-        assert_eq!(balance.coin_type, "0x2::oct::OCT");
+        assert_eq!(balance.coin_type, "0x2::sui::SUI");
     }
 
     #[test]
     fn test_vec_of_coin_sui_conversion() {
-        // 0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>
+        // 0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::sui::SUI>>>
         let vec_coins_type = TypeTag::Vector(Box::new(Coin::type_(TypeTag::Struct(Box::new(GAS::type_()))).into()));
         let object_type = StructTag {
             address: AccountAddress::from_hex_literal("0xe7").unwrap(),
@@ -545,7 +544,7 @@ mod tests {
 
         match stored_obj.object_type {
             Some(t) => {
-                assert_eq!(t, "0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>");
+                assert_eq!(t, "0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>>>");
             }
             None => {
                 panic!("object_type should not be none");

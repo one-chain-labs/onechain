@@ -13,6 +13,15 @@ use mysten_common::debug_fatal;
 use parking_lot::Mutex;
 use sui_types::base_types::SequenceNumber;
 
+pub enum CacheResult<T> {
+    /// Entry is in the cache
+    Hit(T),
+    /// Entry is not in the cache and is known to not exist
+    NegativeHit,
+    /// Entry is not in the cache and may or may not exist in the store
+    Miss,
+}
+
 /// CachedVersionMap is a map from version to value, with the additional contraints:
 /// - The key (SequenceNumber) must be monotonically increasing for each insert. If
 ///   a key is inserted that is less than the previous key, it results in an assertion
@@ -154,6 +163,7 @@ pub struct MonotonicCache<K, V> {
     key_generation: Vec<AtomicU64>,
 }
 
+#[derive(Copy, Clone)]
 pub enum Ticket {
     // Read tickets are used when caching the result of a read from the db.
     // They are only valid if the generation number matches the current generation.
@@ -172,13 +182,13 @@ const KEY_GENERATION_SIZE: usize = 1024 * 16;
 
 impl<K, V> MonotonicCache<K, V>
 where
-    K: Hash + Eq + Send + Sync + Copy + std::fmt::Debug + 'static,
+    K: Hash + Eq + Send + Sync + Copy + 'static,
     V: IsNewer + Clone + Send + Sync + 'static,
 {
     pub fn new(cache_size: u64) -> Self {
         Self {
             cache: MokaCache::builder().max_capacity(cache_size).build(),
-            key_generation: (0..KEY_GENERATION_SIZE).map(|_| AtomicU64::new(0)).collect(),
+            key_generation: (0 .. KEY_GENERATION_SIZE).map(|_| AtomicU64::new(0)).collect(),
         }
     }
 
@@ -284,10 +294,9 @@ where
             let mut entry = entry.value().lock();
             check_ticket()?;
 
+            // Ticket expiry should make this assert impossible.
             if entry.is_newer_than(&value) {
-                // TODO: Ticket expiry should this assert impossible. While trying to root cause
-                // the bug we can simply ignore the insert.
-                debug_fatal!("entry is newer than value for key {:?}", key);
+                debug_fatal!("entry is newer than value");
             } else {
                 *entry = value;
             }
@@ -316,8 +325,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sui_types::base_types::SequenceNumber;
+
+    use super::*;
 
     // Helper function to create a SequenceNumber for simplicity
     fn seq(num: u64) -> SequenceNumber {
@@ -445,7 +455,7 @@ mod tests {
     #[test]
     fn truncate_map_to_smaller_size() {
         let mut map = CachedVersionMap::default();
-        for i in 1..=5 {
+        for i in 1 ..= 5 {
             map.insert(seq(i), format!("Item {}", i));
         }
         map.truncate_to(3);
@@ -461,9 +471,9 @@ mod tests {
 
     #[test]
     fn test_assert_order() {
-        let iter = AssertOrdered::from(1..=10);
+        let iter = AssertOrdered::from(1 ..= 10);
         let result: Vec<_> = iter.collect();
-        assert_eq!(result, (1..=10).collect::<Vec<_>>());
+        assert_eq!(result, (1 ..= 10).collect::<Vec<_>>());
     }
 
     #[test]

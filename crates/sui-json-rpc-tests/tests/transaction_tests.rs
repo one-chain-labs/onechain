@@ -6,9 +6,11 @@ use std::str::FromStr;
 
 use move_core_types::identifier::Identifier;
 use sui_json::{call_args, type_args};
+use sui_json_rpc_api::{IndexerApiClient, ReadApiClient, TransactionBuilderClient, WriteApiClient};
 use sui_json_rpc_types::{
     SuiObjectDataOptions,
     SuiObjectResponseQuery,
+    SuiTransactionBlockDataAPI,
     SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
     SuiTransactionBlockResponseQuery,
@@ -17,7 +19,7 @@ use sui_json_rpc_types::{
 };
 use sui_macros::sim_test;
 use sui_types::{
-    base_types::ObjectID,
+    base_types::{ObjectID, SuiAddress},
     gas_coin::GAS,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     quorum_driver_types::ExecuteTransactionRequestType,
@@ -25,8 +27,6 @@ use sui_types::{
     SUI_FRAMEWORK_ADDRESS,
 };
 use test_cluster::TestClusterBuilder;
-
-use sui_json_rpc_api::{IndexerApiClient, TransactionBuilderClient, WriteApiClient};
 
 #[sim_test]
 async fn test_get_transaction_block() -> Result<(), anyhow::Error> {
@@ -49,7 +49,7 @@ async fn test_get_transaction_block() -> Result<(), anyhow::Error> {
 
     // Make some transactions
     let mut tx_responses: Vec<SuiTransactionBlockResponse> = Vec::new();
-    for obj in &objects[..objects.len() - 1] {
+    for obj in &objects[.. objects.len() - 1] {
         let oref = obj.object().unwrap();
         let transaction_bytes: TransactionBlockBytes =
             http_client.transfer_object(address, oref.object_id, Some(gas_id), 1_000_000.into(), address).await?;
@@ -170,7 +170,7 @@ async fn test_get_fullnode_transaction() -> Result<(), anyhow::Error> {
         let gas_id = objects.last().unwrap().object().unwrap().object_id;
 
         // Make some transactions
-        for obj in &objects[..objects.len() - 1] {
+        for obj in &objects[.. objects.len() - 1] {
             let oref = obj.object().unwrap();
             let data = client
                 .transaction_builder()
@@ -237,7 +237,7 @@ async fn test_get_fullnode_transaction() -> Result<(), anyhow::Error> {
         .unwrap();
     assert_eq!(10, latest.data.len());
     assert_eq!(Some(all_txs[9].digest), latest.next_cursor);
-    assert_eq!(all_txs[0..10], latest.data);
+    assert_eq!(all_txs[0 .. 10], latest.data);
     assert!(latest.has_next_page);
 
     // test get from address txs in ascending order
@@ -363,4 +363,27 @@ async fn test_query_transaction_blocks() -> Result<(), anyhow::Error> {
     // verify that only 1 tx is returned and no SuiRpcInputError::ContainsDuplicates error
     assert_eq!(1, tx.data.len());
     Ok(())
+}
+
+#[sim_test]
+async fn test_display_transaction_block_with_empty_balance_changes() {
+    let cluster = TestClusterBuilder::new().with_epoch_duration_ms(5_000).build().await;
+    cluster.wait_for_epoch(Some(1)).await;
+
+    let client = cluster.rpc_client();
+
+    let checkpoint = client.get_checkpoint(1.into()).await.unwrap();
+
+    // Empty balance changes occur for system transactions like ConsensusCommitPrologueV3.
+    // The first transaction in checkpoint 1 should be such transaction.
+    let digest = checkpoint.transactions.first().unwrap();
+    let tx_block =
+        client.get_transaction_block(*digest, Some(SuiTransactionBlockResponseOptions::full_content())).await.unwrap();
+
+    // Ensure that it is indeed a system tx with empty balance changes
+    assert_eq!(*tx_block.transaction.as_ref().unwrap().data.sender(), SuiAddress::ZERO);
+    assert!(tx_block.balance_changes.is_some());
+    assert!(tx_block.balance_changes.as_ref().unwrap().is_empty());
+
+    let _ = tx_block.to_string();
 }

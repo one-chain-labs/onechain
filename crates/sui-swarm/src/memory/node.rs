@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
-use one_node::SuiNodeHandle;
 use std::sync::{Mutex, MutexGuard};
+
+use anyhow::{anyhow, Result};
 use sui_config::NodeConfig;
+use sui_node::SuiNodeHandle;
 use sui_types::{
     base_types::{AuthorityName, ConciseableName},
     crypto::KeypairTraits,
@@ -73,7 +74,7 @@ impl Node {
 
     /// If this Node is currently running
     pub fn is_running(&self) -> bool {
-        self.container.lock().unwrap().as_ref().map_or(false, |c| c.is_alive())
+        self.container.lock().unwrap().as_ref().is_some_and(|c| c.is_alive())
     }
 
     pub fn get_node_handle(&self) -> Option<SuiNodeHandle> {

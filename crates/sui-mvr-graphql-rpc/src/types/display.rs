@@ -2,18 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use async_graphql::*;
-
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use move_core_types::annotated_value::{MoveStruct, MoveValue};
 use sui_indexer::{models::display::StoredDisplay, schema::display};
+use sui_json_rpc_types::SuiMoveValue;
 use sui_types::TypeTag;
 
 use crate::{
     data::{Db, DbConnection, QueryExecutor},
     error::Error,
 };
-use sui_json_rpc_types::SuiMoveValue;
 
 pub(crate) struct Display {
     pub stored: StoredDisplay,

@@ -1,19 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashMap, sync::Arc};
+
 use async_trait::async_trait;
 use futures::FutureExt;
-use std::{collections::HashMap, sync::Arc};
 use sui_protocol_config::ProtocolConfig;
+use sui_storage::{http_key_value_store::*, key_value_store::*, key_value_store_metrics::KeyValueStoreMetrics};
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
     base_types::{random_object_ref, ExecutionDigests, ObjectID, SequenceNumber, VersionNumber},
     committee::Committee,
     crypto::{get_key_pair, AccountKeyPair, KeypairTraits},
-    digests::{CheckpointContentsDigest, CheckpointDigest, TransactionDigest, TransactionEventsDigest},
+    digests::{CheckpointContentsDigest, CheckpointDigest, TransactionDigest},
     effects::{TestEffectsBuilder, TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::SuiResult,
-    event::Event,
     messages_checkpoint::{
         CertifiedCheckpointSummary,
         CheckpointContents,
@@ -21,11 +22,10 @@ use sui_types::{
         CheckpointSummary,
         SignedCheckpointSummary,
     },
+    object::Object,
+    storage::ObjectKey,
     transaction::Transaction,
 };
-
-use sui_storage::{http_key_value_store::*, key_value_store::*, key_value_store_metrics::KeyValueStoreMetrics};
-use sui_types::{object::Object, storage::ObjectKey};
 
 fn random_tx() -> Transaction {
     let (sender, key): (_, AccountKeyPair) = get_key_pair();
@@ -38,16 +38,10 @@ fn random_fx() -> TransactionEffects {
     TestEffectsBuilder::new(tx.data()).build()
 }
 
-fn random_events() -> TransactionEvents {
-    let event = Event::random_for_testing();
-    TransactionEvents { data: vec![event] }
-}
-
 #[derive(Default)]
 struct MockTxStore {
     txs: HashMap<TransactionDigest, Transaction>,
     fxs: HashMap<TransactionDigest, TransactionEffects>,
-    events: HashMap<TransactionEventsDigest, TransactionEvents>,
     checkpoint_summaries: HashMap<CheckpointSequenceNumber, CertifiedCheckpointSummary>,
     checkpoint_contents: HashMap<CheckpointSequenceNumber, CheckpointContents>,
     checkpoint_summaries_by_digest: HashMap<CheckpointDigest, CertifiedCheckpointSummary>,
@@ -71,10 +65,6 @@ impl MockTxStore {
         self.fxs.insert(*fx.transaction_digest(), fx);
     }
 
-    fn add_events(&mut self, events: TransactionEvents) {
-        self.events.insert(events.digest(), events);
-    }
-
     fn add_random_tx(&mut self) -> Transaction {
         let tx = random_tx();
         self.add_tx(tx.clone());
@@ -85,12 +75,6 @@ impl MockTxStore {
         let fx = random_fx();
         self.add_fx(fx.clone());
         fx
-    }
-
-    fn add_random_events(&mut self) -> TransactionEvents {
-        let events = random_events();
-        self.add_events(events.clone());
-        events
     }
 
     fn add_random_checkpoint(&mut self) -> (CertifiedCheckpointSummary, CheckpointContents) {
@@ -138,8 +122,7 @@ impl TransactionKeyValueStoreTrait for MockTxStore {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
-    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>, Vec<Option<TransactionEvents>>)> {
+    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>)> {
         let mut txs = Vec::new();
         for digest in transactions {
             txs.push(self.txs.get(digest).cloned());
@@ -150,12 +133,7 @@ impl TransactionKeyValueStoreTrait for MockTxStore {
             fxs.push(self.fxs.get(digest).cloned());
         }
 
-        let mut evts = Vec::new();
-        for digest in events {
-            evts.push(self.events.get(digest).cloned());
-        }
-
-        Ok((txs, fxs, evts))
+        Ok((txs, fxs))
     }
 
     async fn multi_get_checkpoints(
@@ -242,45 +220,23 @@ async fn test_get_fx() {
 }
 
 #[tokio::test]
-async fn test_get_events() {
-    let mut store = MockTxStore::new();
-    let events = random_events();
-    store.add_events(events.clone());
-    let store = TransactionKeyValueStore::from(store);
-
-    let result = store.multi_get_events(&[events.digest()]).now_or_never().unwrap();
-    assert_eq!(result.unwrap(), vec![Some(events)]);
-
-    let result = store.multi_get_events(&[TransactionEventsDigest::random()]).now_or_never().unwrap();
-    assert_eq!(result.unwrap(), vec![None]);
-}
-
-#[tokio::test]
 async fn test_multi_get() {
     let mut store = MockTxStore::new();
     let txns = vec![store.add_random_tx(), store.add_random_tx()];
     let fxs = vec![store.add_random_fx(), store.add_random_fx(), store.add_random_fx()];
-    let events = vec![store.add_random_events(), store.add_random_events()];
-
     let store = TransactionKeyValueStore::from(store);
 
     let result = store
         .multi_get(
             &txns.iter().map(|tx| *tx.digest()).collect::<Vec<_>>(),
             &fxs.iter().map(|fx| *fx.transaction_digest()).collect::<Vec<_>>(),
-            &events.iter().map(|events| events.digest()).collect::<Vec<_>>(),
         )
         .now_or_never()
         .unwrap();
 
     let txns = txns.into_iter().map(Some).collect::<Vec<_>>();
     let fxs = fxs.into_iter().map(Some).collect::<Vec<_>>();
-    let events = events.into_iter().map(Some).collect::<Vec<_>>();
-
-    assert_eq!(result.unwrap(), (txns, fxs, events));
-
-    let result = store.multi_get_events(&[TransactionEventsDigest::random()]).now_or_never().unwrap();
-    assert_eq!(result.unwrap(), vec![None]);
+    assert_eq!(result.unwrap(), (txns, fxs));
 }
 
 #[tokio::test]
@@ -334,33 +290,34 @@ async fn test_get_tx_from_fallback() {
     assert_eq!(result.unwrap(), vec![None]);
 
     let result = fallback
-        .multi_get(
-            &[*fallback_tx.digest(), *tx.digest()],
-            &[*fx.transaction_digest(), *fallback_fx.transaction_digest()],
-            &[],
-        )
+        .multi_get(&[*fallback_tx.digest(), *tx.digest()], &[
+            *fx.transaction_digest(),
+            *fallback_fx.transaction_digest(),
+        ])
         .now_or_never()
         .unwrap();
-    assert_eq!(result.unwrap(), (vec![Some(fallback_tx), Some(tx)], vec![Some(fx), Some(fallback_fx)], vec![]));
+    assert_eq!(result.unwrap(), (vec![Some(fallback_tx), Some(tx)], vec![Some(fx), Some(fallback_fx)],));
 }
 
 #[cfg(msim)]
 mod simtests {
-    use super::*;
+    use std::{
+        net::SocketAddr,
+        sync::Mutex,
+        time::{Duration, Instant},
+    };
+
     use axum::{
         body::Body,
         extract::{Request, State},
         response::Response,
         routing::get,
     };
-    use std::{
-        net::SocketAddr,
-        sync::Mutex,
-        time::{Duration, Instant},
-    };
     use sui_macros::sim_test;
     use sui_simulator::configs::constant_latency_ms;
     use tracing::info;
+
+    use super::*;
 
     async fn svc(State(state): State<Arc<Mutex<HashMap<String, Vec<u8>>>>>, request: Request<Body>) -> Response {
         let path = request.uri().path().to_string();
@@ -408,7 +365,6 @@ mod simtests {
         let tx = random_tx();
         let random_digest = TransactionDigest::random();
         let fx = random_fx();
-        let events = random_events();
 
         {
             let bytes = bcs::to_bytes(&tx).unwrap();
@@ -416,14 +372,10 @@ mod simtests {
 
             let bytes = bcs::to_bytes(&fx).unwrap();
             assert_eq!(fx, bcs::from_bytes::<TransactionEffects>(&bytes).unwrap());
-
-            let bytes = bcs::to_bytes(&events).unwrap();
-            assert_eq!(events, bcs::from_bytes::<TransactionEvents>(&bytes).unwrap());
         }
 
         data.insert(format!("{}/tx", encode_digest(tx.digest())), bcs::to_bytes(&tx).unwrap());
         data.insert(format!("{}/fx", encode_digest(fx.transaction_digest())), bcs::to_bytes(&fx).unwrap());
-        data.insert(format!("{}/ev", encode_digest(&events.digest())), bcs::to_bytes(&events).unwrap());
 
         // a bogus entry with the wrong digest
         data.insert(format!("{}/tx", encode_digest(&random_digest)), bcs::to_bytes(&tx).unwrap());
@@ -435,19 +387,16 @@ mod simtests {
         let store = HttpKVStore::new("http://10.10.10.10:8080", 1000, metrics.clone()).unwrap();
 
         // send one request to warm up the client (and open a connection)
-        store.multi_get(&[*tx.digest()], &[], &[]).await.unwrap();
+        store.multi_get(&[*tx.digest()], &[]).await.unwrap();
 
         let start_time = Instant::now();
-        let result = store
-            .multi_get(&[*tx.digest(), *random_tx().digest()], &[*fx.transaction_digest()], &[events.digest()])
-            .await
-            .unwrap();
+        let result = store.multi_get(&[*tx.digest(), *random_tx().digest()], &[*fx.transaction_digest()]).await.unwrap();
 
         // verify that the request took approximately one round trip despite fetching 4 items,
         // i.e. test that pipelining or multiplexing is working.
         assert!(start_time.elapsed() < Duration::from_millis(600));
 
-        assert_eq!(result, (vec![Some(tx), None], vec![Some(fx)], vec![Some(events)]));
+        assert_eq!(result, (vec![Some(tx), None], vec![Some(fx)]));
 
         // the tx was fetched twice, so there should be one cache hit
         assert_eq!(
@@ -459,8 +408,8 @@ mod simtests {
             1
         );
 
-        let result = store.multi_get(&[random_digest], &[], &[]).await.unwrap();
-        assert_eq!(result, (vec![None], vec![], vec![]));
+        let result = store.multi_get(&[random_digest], &[]).await.unwrap();
+        assert_eq!(result, (vec![None], vec![]));
     }
 }
 
@@ -472,11 +421,6 @@ fn test_key_to_path_and_back() {
     assert_eq!(path_elements_to_key(path_elts.0.as_str(), path_elts.1).unwrap(), key);
 
     let key = Key::Fx(TransactionDigest::random());
-    let path_elts = key.to_path_elements();
-    assert_eq!(path_elements_to_key(path_elts.0.as_str(), path_elts.1).unwrap(), key);
-
-    let events = TransactionEventsDigest::random();
-    let key = Key::Events(events);
     let path_elts = key.to_path_elements();
     assert_eq!(path_elements_to_key(path_elts.0.as_str(), path_elts.1).unwrap(), key);
 

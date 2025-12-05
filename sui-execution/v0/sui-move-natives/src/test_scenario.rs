@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    get_nth_struct_field,
-    legacy_test_cost,
-    object_runtime::{ObjectRuntime, RuntimeResults},
+use std::{
+    borrow::Borrow,
+    collections::{BTreeMap, BTreeSet, VecDeque},
 };
+
 use linked_hash_map::LinkedHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -22,15 +22,17 @@ use move_vm_types::{
     values::{self, StructRef, Value},
 };
 use smallvec::smallvec;
-use std::{
-    borrow::Borrow,
-    collections::{BTreeMap, BTreeSet, VecDeque},
-};
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     id::UID,
     object::Owner,
     storage::WriteKind,
+};
+
+use crate::{
+    get_nth_struct_field,
+    legacy_test_cost,
+    object_runtime::{ObjectRuntime, RuntimeResults},
 };
 
 const E_COULD_NOT_GENERATE_EFFECTS: u64 = 0;
@@ -525,7 +527,7 @@ fn find_all_wrapped_objects<'a, 'i>(
         uid: &'u MoveStructLayout,
     }
 
-    impl<'i, 'u, 'b, 'l> AV::Traversal<'b, 'l> for Traversal<'i, 'u> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for Traversal<'_, '_> {
         type Error = AV::Error;
 
         fn traverse_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {

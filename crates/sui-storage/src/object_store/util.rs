@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_store::{ObjectStoreDeleteExt, ObjectStoreGetExt, ObjectStoreListExt, ObjectStorePutExt};
+use std::{collections::BTreeMap, num::NonZeroUsize, ops::Range, path::PathBuf, sync::Arc, time::Duration};
+
 use anyhow::{anyhow, Context, Result};
 use backoff::future::retry;
 use bytes::Bytes;
@@ -10,10 +11,11 @@ use indicatif::ProgressBar;
 use itertools::Itertools;
 use object_store::{path::Path, DynObjectStore, Error, ObjectStore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, num::NonZeroUsize, ops::Range, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::Instant;
 use tracing::{error, warn};
 use url::Url;
+
+use crate::object_store::{ObjectStoreDeleteExt, ObjectStoreGetExt, ObjectStoreListExt, ObjectStorePutExt};
 
 pub const MANIFEST_FILENAME: &str = "MANIFEST";
 
@@ -352,7 +354,7 @@ pub async fn write_snapshot_manifest<S: ObjectStoreListExt + ObjectStorePutExt>(
             // trim the "epoch_XX/" dir prefix here
             let mut path_str = object_metadata.location.to_string();
             if path_str.starts_with(&epoch_prefix) {
-                path_str = String::from(&path_str[epoch_prefix.len()..]);
+                path_str = String::from(&path_str[epoch_prefix.len() ..]);
                 file_names.push(path_str);
             } else {
                 warn!("{path_str}, should be coming from the files in the {epoch_prefix} dir",)
@@ -371,11 +373,13 @@ pub async fn write_snapshot_manifest<S: ObjectStoreListExt + ObjectStorePutExt>(
 
 #[cfg(test)]
 mod tests {
-    use crate::object_store::util::{copy_recursively, delete_recursively, write_snapshot_manifest, MANIFEST_FILENAME};
-    use object_store::path::Path;
     use std::{fs, num::NonZeroUsize};
+
+    use object_store::path::Path;
     use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
     use tempfile::TempDir;
+
+    use crate::object_store::util::{copy_recursively, delete_recursively, write_snapshot_manifest, MANIFEST_FILENAME};
 
     #[tokio::test]
     pub async fn test_copy_recursively() -> anyhow::Result<()> {

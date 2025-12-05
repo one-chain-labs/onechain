@@ -10,12 +10,12 @@
 
 module raffles::example1;
 
-use one::{
+use sui::{
     balance::{Self, Balance},
     clock::Clock,
     coin::{Self, Coin},
     random::{Random, new_generator},
-    oct::OCT
+    sui::SUI
 };
 
 /// Error codes
@@ -33,7 +33,7 @@ public struct Game has key {
     participants: u32,
     end_time: u64,
     winner: Option<u32>,
-    balance: Balance<OCT>,
+    balance: Balance<SUI>,
 }
 
 /// Ticket represents a participant in a single game.
@@ -73,7 +73,7 @@ entry fun determine_winner(game: &mut Game, r: &Random, clock: &Clock, ctx: &mut
 /// Anyone can play and receive a ticket.
 public fun buy_ticket(
     game: &mut Game,
-    coin: Coin<OCT>,
+    coin: Coin<SUI>,
     clock: &Clock,
     ctx: &mut TxContext,
 ): Ticket {
@@ -91,7 +91,7 @@ public fun buy_ticket(
 }
 
 /// The winner can take the prize.
-public fun redeem(ticket: Ticket, game: Game, ctx: &mut TxContext): Coin<OCT> {
+public fun redeem(ticket: Ticket, game: Game, ctx: &mut TxContext): Coin<SUI> {
     assert!(object::id(&game) == ticket.game_id, EGameMismatch);
     assert!(game.winner.contains(&ticket.participant_index), ENotWinner);
     destroy_ticket(ticket);

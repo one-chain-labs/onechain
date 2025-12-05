@@ -48,6 +48,7 @@ use crate::{
     server::watermark_task::Watermark,
     types::{
         base64::Base64 as GraphQLBase64,
+        object::ObjectKey,
         zklogin_verify_signature::{verify_zklogin_signature, ZkLoginIntentScope, ZkLoginVerifyResult},
     },
 };
@@ -272,10 +273,26 @@ impl Query {
         TransactionBlock::query(ctx, lookup).await.extend()
     }
 
+    /// Fetch a list of objects by their IDs and versions.
+    async fn multi_get_objects(&self, ctx: &Context<'_>, keys: Vec<ObjectKey>) -> Result<Vec<Object>> {
+        let cfg: &ServiceConfig = ctx.data_unchecked();
+        if keys.len() > cfg.limits.max_multi_get_objects_keys as usize {
+            return Err(Error::Client(format!(
+                "Number of keys exceeds max limit of '{}'",
+                cfg.limits.max_multi_get_objects_keys
+            ))
+            .into());
+        }
+
+        let Watermark { checkpoint, .. } = *ctx.data()?;
+
+        Object::query_many(ctx, keys, checkpoint).await.extend()
+    }
+
     /// The coin objects that exist in the network.
     ///
     /// The type field is a string of the inner type of the coin by which to filter (e.g.
-    /// `0x2::oct::OCT`). If no type is provided, it will default to `0x2::oct::OCT`.
+    /// `0x2::sui::SUI`). If no type is provided, it will default to `0x2::sui::SUI`.
     async fn coins(
         &self,
         ctx: &Context<'_>,

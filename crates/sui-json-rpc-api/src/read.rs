@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-
 use sui_json_rpc_types::{
     Checkpoint,
     CheckpointId,
@@ -20,7 +19,7 @@ use sui_json_rpc_types::{
 };
 use sui_open_rpc_macros::open_rpc;
 use sui_types::{
-    base_types::{ObjectID, SequenceNumber, TransactionDigest, SuiAddress},
+    base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest},
     sui_serde::BigInt,
 };
 
@@ -130,17 +129,6 @@ pub trait ReadApi {
         descending_order: bool,
     ) -> RpcResult<CheckpointPage>;
 
-    #[method(name = "getCheckpoints", version <= "0.31")]
-    async fn get_checkpoints_deprecated_limit(
-        &self,
-        /// An optional paging cursor. If provided, the query will start from the next item after the specified cursor. Default to start from the first item if not specified.
-        cursor: Option<BigInt<u64>>,
-        /// Maximum item returned per page, default to [QUERY_MAX_RESULT_LIMIT_CHECKPOINTS] if not specified.
-        limit: Option<BigInt<u64>>,
-        /// query result ordering, default to false (ascending order), oldest record first.
-        descending_order: bool,
-    ) -> RpcResult<CheckpointPage>;
-
     /// Return transaction events.
     #[method(name = "getEvents")]
     async fn get_events(
@@ -183,5 +171,4 @@ pub trait ReadApi {
         /// The author of the signature.
         author: SuiAddress,
     ) -> RpcResult<ZkLoginVerifyResult>;
-    
 }

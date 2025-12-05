@@ -170,16 +170,20 @@ pub fn normalize_path(path: impl AsRef<Path>, allow_cwd_parent: bool) -> Result<
                     unreachable!("Component::CurDir never added to the stack");
                 }
 
-                Some(RootDir | Prefix(_)) => {
-                    bail!("Invalid path accessing parent of root directory: {}", path.as_ref().to_string_lossy(),)
-                }
+                Some(RootDir | Prefix(_)) => bail!(
+                    "Invalid path accessing parent of root directory: {}",
+                    path.as_ref().to_string_lossy(),
+                ),
             },
         }
     }
 
     let normalized: PathBuf = stack.iter().collect();
     if !allow_cwd_parent && stack.first() == Some(&ParentDir) {
-        bail!("Path cannot access parent of current directory: {}", normalized.to_string_lossy());
+        bail!(
+            "Path cannot access parent of current directory: {}",
+            normalized.to_string_lossy()
+        );
     }
 
     Ok(normalized)

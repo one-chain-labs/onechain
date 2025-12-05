@@ -14,7 +14,11 @@ pub struct Migrate;
 impl Migrate {
     pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
-        config.migrate_package(&rerooted_path, &mut std::io::stdout(), &mut std::io::stdin().lock())?;
+        config.migrate_package(
+            &rerooted_path,
+            &mut std::io::stdout(),
+            &mut std::io::stdin().lock(),
+        )?;
         Ok(())
     }
 }

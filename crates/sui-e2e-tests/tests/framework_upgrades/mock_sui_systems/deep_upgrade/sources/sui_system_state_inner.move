@@ -1,21 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module one_system::sui_system_state_inner {
+module sui_system::sui_system_state_inner {
     use std::vector;
 
-    use one::balance::{Self, Balance};
-    use one::oct::OCT;
-    use one::tx_context::TxContext;
-    use one::bag::{Self, Bag};
-    use one::table::{Self, Table};
-    use one::object::ID;
+    use sui::balance::{Self, Balance};
+    use sui::sui::SUI;
+    use sui::tx_context::TxContext;
+    use sui::bag::{Self, Bag};
+    use sui::table::{Self, Table};
+    use sui::object::ID;
 
-    use one_system::validator::{Validator, ValidatorV2};
-    use one_system::validator_wrapper::ValidatorWrapper;
-    use one_system::validator_wrapper;
-    use one::object;
-    use one_system::validator;
+    use sui_system::validator::{Validator, ValidatorV2};
+    use sui_system::validator_wrapper::ValidatorWrapper;
+    use sui_system::validator_wrapper;
+    use sui::object;
+    use sui_system::validator;
 
     const SYSTEM_STATE_VERSION_V1: u64 = 18446744073709551605;  // u64::MAX - 10
     // Not using MAX - 9 since it's already used in the shallow upgrade test.
@@ -43,7 +43,7 @@ module one_system::sui_system_state_inner {
         protocol_version: u64,
         system_state_version: u64,
         validators: ValidatorSet,
-        storage_fund: Balance<OCT>,
+        storage_fund: Balance<SUI>,
         parameters: SystemParameters,
         reference_gas_price: u64,
         safe_mode: bool,
@@ -57,7 +57,7 @@ module one_system::sui_system_state_inner {
         protocol_version: u64,
         system_state_version: u64,
         validators: ValidatorSetV2,
-        storage_fund: Balance<OCT>,
+        storage_fund: Balance<SUI>,
         parameters: SystemParameters,
         reference_gas_price: u64,
         safe_mode: bool,
@@ -67,7 +67,7 @@ module one_system::sui_system_state_inner {
 
     public(package) fun create(
         validators: vector<Validator>,
-        storage_fund: Balance<OCT>,
+        storage_fund: Balance<SUI>,
         protocol_version: u64,
         epoch_start_timestamp_ms: u64,
         epoch_duration_ms: u64,
@@ -96,11 +96,11 @@ module one_system::sui_system_state_inner {
         self: &mut SuiSystemStateInnerV2,
         new_epoch: u64,
         next_protocol_version: u64,
-        storage_reward: Balance<OCT>,
-        computation_reward: Balance<OCT>,
+        storage_reward: Balance<SUI>,
+        computation_reward: Balance<SUI>,
         storage_rebate_amount: u64,
         epoch_start_timestamp_ms: u64,
-    ) : Balance<OCT> {
+    ) : Balance<SUI> {
         touch_dummy_inactive_validator(self);
 
         self.epoch_start_timestamp_ms = epoch_start_timestamp_ms;

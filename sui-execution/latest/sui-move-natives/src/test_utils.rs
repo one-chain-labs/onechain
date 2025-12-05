@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{legacy_test_cost, types::is_otw_struct};
+use std::collections::VecDeque;
+
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{gas_algebra::InternalGas, runtime_value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeContext;
 use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value};
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::{legacy_test_cost, types::is_otw_struct};
 
 pub fn destroy(
     _context: &mut NativeContext,

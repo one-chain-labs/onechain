@@ -4,16 +4,9 @@
 use async_trait::async_trait;
 use mysten_metrics::{get_metrics, metered_channel::Sender, spawn_monitored_task};
 use sui_data_ingestion_core::Worker;
-use sui_rpc_api::CheckpointData;
+use sui_types::full_checkpoint_content::CheckpointData;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
-
-use crate::{
-    config::SnapshotLagConfig,
-    metrics::IndexerMetrics,
-    store::{IndexerStore, PgIndexerStore},
-    types::IndexerResult,
-};
 
 use super::{
     checkpoint_handler::CheckpointHandler,
@@ -22,6 +15,12 @@ use super::{
     Handler,
     ObjectsSnapshotHandlerTables,
     TransactionObjectChangesToCommit,
+};
+use crate::{
+    config::SnapshotLagConfig,
+    metrics::IndexerMetrics,
+    store::{IndexerStore, PgIndexerStore},
+    types::IndexerResult,
 };
 
 #[derive(Clone)]

@@ -23,6 +23,7 @@ use tracing::warn;
 
 use crate::{
     block::{BlockRef, Round, VerifiedBlock},
+    commit::CertifiedCommits,
     context::Context,
     core::Core,
     core_thread::CoreError::Shutdown,
@@ -37,6 +38,10 @@ const CORE_THREAD_COMMANDS_CHANNEL_SIZE: usize = 2000;
 enum CoreThreadCommand {
     /// Add blocks to be processed and accepted
     AddBlocks(Vec<VerifiedBlock>, oneshot::Sender<BTreeSet<BlockRef>>),
+    /// Checks if block refs exist locally and sync missing ones.
+    CheckBlockRefs(Vec<BlockRef>, oneshot::Sender<BTreeSet<BlockRef>>),
+    /// Add committed sub dag blocks for processing and acceptance.
+    AddCertifiedCommits(CertifiedCommits, oneshot::Sender<BTreeSet<BlockRef>>),
     /// Called when the min round has passed or the leader timeout occurred and a block should be produced.
     /// When the command is called with `force = true`, then the block will be created for `round` skipping
     /// any checks (ex leader existence of previous round). More information can be found on the `Core` component.
@@ -56,6 +61,10 @@ pub enum CoreError {
 #[async_trait]
 pub trait CoreThreadDispatcher: Sync + Send + 'static {
     async fn add_blocks(&self, blocks: Vec<VerifiedBlock>) -> Result<BTreeSet<BlockRef>, CoreError>;
+
+    async fn check_block_refs(&self, block_refs: Vec<BlockRef>) -> Result<BTreeSet<BlockRef>, CoreError>;
+
+    async fn add_certified_commits(&self, commits: CertifiedCommits) -> Result<BTreeSet<BlockRef>, CoreError>;
 
     async fn new_block(&self, round: Round, force: bool) -> Result<(), CoreError>;
 
@@ -121,6 +130,16 @@ impl CoreThread {
                             let missing_block_refs = self.core.add_blocks(blocks)?;
                             sender.send(missing_block_refs).ok();
                         }
+                        CoreThreadCommand::CheckBlockRefs(blocks, sender) => {
+                            let _scope = monitored_scope("CoreThread::loop::find_excluded_blocks");
+                            let missing_block_refs = self.core.check_block_refs(blocks)?;
+                            sender.send(missing_block_refs).ok();
+                        }
+                        CoreThreadCommand::AddCertifiedCommits(commits, sender) => {
+                            let _scope = monitored_scope("CoreThread::loop::add_certified_commits");
+                            let missing_block_refs = self.core.add_certified_commits(commits)?;
+                            sender.send(missing_block_refs).ok();
+                        }
                         CoreThreadCommand::NewBlock(round, sender, force) => {
                             let _scope = monitored_scope("CoreThread::loop::new_block");
                             self.core.new_block(round, force)?;
@@ -144,7 +163,7 @@ impl CoreThread {
                     let exists = *self.rx_subscriber_exists.borrow();
                     self.core.set_subscriber_exists(exists);
                     if !should_propose_before && self.core.should_propose() {
-                        // If core cannnot propose before but can propose now, try to produce a new block to ensure liveness,
+                        // If core cannot propose before but can propose now, try to produce a new block to ensure liveness,
                         // because block proposal could have been skipped.
                         self.core.new_block(Round::MAX, true)?;
                     }
@@ -159,7 +178,7 @@ impl CoreThread {
                         state.accepted_quorum_rounds
                     );
                     if !should_propose_before && self.core.should_propose() {
-                        // If core cannnot propose before but can propose now, try to produce a new block to ensure liveness,
+                        // If core cannot propose before but can propose now, try to produce a new block to ensure liveness,
                         // because block proposal could have been skipped.
                         self.core.new_block(Round::MAX, true)?;
                     }
@@ -264,6 +283,26 @@ impl CoreThreadDispatcher for ChannelCoreThreadDispatcher {
         Ok(missing_block_refs)
     }
 
+    async fn check_block_refs(&self, block_refs: Vec<BlockRef>) -> Result<BTreeSet<BlockRef>, CoreError> {
+        let (sender, receiver) = oneshot::channel();
+        self.send(CoreThreadCommand::CheckBlockRefs(block_refs.clone(), sender)).await;
+        let missing_block_refs = receiver.await.map_err(|e| Shutdown(e.to_string()))?;
+
+        Ok(missing_block_refs)
+    }
+
+    async fn add_certified_commits(&self, commits: CertifiedCommits) -> Result<BTreeSet<BlockRef>, CoreError> {
+        for commit in commits.commits() {
+            for block in commit.blocks() {
+                self.highest_received_rounds[block.author()].fetch_max(block.round(), Ordering::AcqRel);
+            }
+        }
+        let (sender, receiver) = oneshot::channel();
+        self.send(CoreThreadCommand::AddCertifiedCommits(commits, sender)).await;
+        let missing_block_refs = receiver.await.map_err(|e| Shutdown(e.to_string()))?;
+        Ok(missing_block_refs)
+    }
+
     async fn new_block(&self, round: Round, force: bool) -> Result<(), CoreError> {
         let (sender, receiver) = oneshot::channel();
         self.send(CoreThreadCommand::NewBlock(round, sender, force)).await;
@@ -321,7 +360,7 @@ impl MockCoreThreadDispatcher {
     #[cfg(test)]
     pub(crate) async fn get_add_blocks(&self) -> Vec<VerifiedBlock> {
         let mut add_blocks = self.add_blocks.lock();
-        add_blocks.drain(0..).collect()
+        add_blocks.drain(0 ..).collect()
     }
 
     #[cfg(test)]
@@ -344,6 +383,14 @@ impl CoreThreadDispatcher for MockCoreThreadDispatcher {
         let mut add_blocks = self.add_blocks.lock();
         add_blocks.extend(blocks);
         Ok(BTreeSet::new())
+    }
+
+    async fn check_block_refs(&self, _block_refs: Vec<BlockRef>) -> Result<BTreeSet<BlockRef>, CoreError> {
+        Ok(BTreeSet::new())
+    }
+
+    async fn add_certified_commits(&self, _commits: CertifiedCommits) -> Result<BTreeSet<BlockRef>, CoreError> {
+        todo!()
     }
 
     async fn new_block(&self, _round: Round, _force: bool) -> Result<(), CoreError> {

@@ -3,7 +3,6 @@
 
 use fastcrypto::encoding::Base64;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-
 use sui_json_rpc_types::{
     DevInspectArgs,
     DevInspectResults,

@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use move_core_types::language_storage::{StructTag, TypeTag};
+use serde::{Deserialize, Serialize};
+
 use super::{error::Result, ObjectStore};
 use crate::{
     base_types::{EpochId, MoveObjectType, ObjectID, SequenceNumber, SuiAddress},
@@ -12,9 +17,6 @@ use crate::{
     messages_checkpoint::{CheckpointContents, CheckpointSequenceNumber, FullCheckpointContents, VerifiedCheckpoint},
     transaction::VerifiedTransaction,
 };
-use move_core_types::language_storage::{StructTag, TypeTag};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 pub trait ReadStore: ObjectStore {
     //
@@ -122,9 +124,10 @@ pub trait ReadStore: ObjectStore {
         checkpoint: VerifiedCheckpoint,
         checkpoint_contents: CheckpointContents,
     ) -> anyhow::Result<CheckpointData> {
+        use std::collections::HashMap;
+
         use super::ObjectKey;
         use crate::{effects::TransactionEffectsAPI, full_checkpoint_content::CheckpointTransaction};
-        use std::collections::HashMap;
 
         let transaction_digests =
             checkpoint_contents.iter().map(|execution_digests| execution_digests.transaction).collect::<Vec<_>>();
@@ -561,7 +564,7 @@ pub struct DynamicFieldIndexInfo {
     pub name_value: Vec<u8>,
     // TODO do we want to also store the type of the value? We can get this for free for
     // DynamicFields, but for DynamicObjects it would require a lookup in the DB on init, or
-    // scanning the transaction's output objects for the coorisponding Object to retreive its type
+    // scanning the transaction's output objects for the coorisponding Object to retrieve its type
     // information.
     //
     // pub value_type: TypeTag,

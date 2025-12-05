@@ -10,30 +10,30 @@
 //# publish --upgradeable --sender A
 module Test_DepDepV1::DepDepM1 {
 
-    public struct Obj has key, store { id: one::object::UID, v: u64 }
+    public struct Obj has key, store { id: sui::object::UID, v: u64 }
 
-    public fun foo(ctx: &mut one::tx_context::TxContext) {
-        one::transfer::share_object(Obj { id: one::object::new(ctx), v: 42 })
+    public fun foo(ctx: &mut sui::tx_context::TxContext) {
+        sui::transfer::share_object(Obj { id: sui::object::new(ctx), v: 42 })
     }
 }
 
 //# upgrade --package Test_DepDepV1 --upgrade-capability 1,1 --sender A
 module Test_DepDepV2::DepDepM1 {
 
-    public struct Obj has key, store { id: one::object::UID, v: u64 }
+    public struct Obj has key, store { id: sui::object::UID, v: u64 }
 
-    public fun foo(ctx: &mut one::tx_context::TxContext) {
-        one::transfer::share_object(Obj { id: one::object::new(ctx), v: 7 })
+    public fun foo(ctx: &mut sui::tx_context::TxContext) {
+        sui::transfer::share_object(Obj { id: sui::object::new(ctx), v: 7 })
     }
 }
 
 //# upgrade --package Test_DepDepV2 --upgrade-capability 1,1 --sender A
 module Test_DepDepV3::DepDepM1 {
 
-    public struct Obj has key, store { id: one::object::UID, v: u64 }
+    public struct Obj has key, store { id: sui::object::UID, v: u64 }
 
-    public fun foo(ctx: &mut one::tx_context::TxContext) {
-        one::transfer::share_object(Obj { id: one::object::new(ctx), v: 0 })
+    public fun foo(ctx: &mut sui::tx_context::TxContext) {
+        sui::transfer::share_object(Obj { id: sui::object::new(ctx), v: 0 })
     }
 }
 
@@ -45,14 +45,14 @@ module Test_DepDepV3::DepDepM1 {
 module Test_DepV1::DepM1 {
     use Test_DepDepV1::DepDepM1;
 
-    public fun bar(ctx: &mut one::tx_context::TxContext) { DepDepM1::foo(ctx) }
+    public fun bar(ctx: &mut sui::tx_context::TxContext) { DepDepM1::foo(ctx) }
 }
 
 //# upgrade --package Test_DepV1 --upgrade-capability 4,1 --dependencies Test_DepDepV2 --sender A
 module Test_DepV2::DepM1 {
     use Test_DepDepV2::DepDepM1;
 
-    public fun bar(ctx: &mut one::tx_context::TxContext) { DepDepM1::foo(ctx)  }
+    public fun bar(ctx: &mut sui::tx_context::TxContext) { DepDepM1::foo(ctx)  }
 }
 
 
@@ -63,7 +63,7 @@ module Test_DepV2::DepM1 {
 module Test_V1::M1 {
     use Test_DepV1::DepM1;
 
-    public entry fun baz(ctx: &mut one::tx_context::TxContext) { DepM1::bar(ctx) }
+    public entry fun baz(ctx: &mut sui::tx_context::TxContext) { DepM1::bar(ctx) }
 }
 
 // override direct dependency
@@ -72,7 +72,7 @@ module Test_V1::M1 {
 module Test_V2::M1 {
     use Test_DepV2::DepM1;
 
-    public entry fun baz(ctx: &mut one::tx_context::TxContext) { DepM1::bar(ctx) }
+    public entry fun baz(ctx: &mut sui::tx_context::TxContext) { DepM1::bar(ctx) }
 }
 
 // override indirect dependency
@@ -81,7 +81,7 @@ module Test_V2::M1 {
 module Test_V3::M1 {
     use Test_DepV1::DepM1;
 
-    public entry fun baz(ctx: &mut one::tx_context::TxContext) { DepM1::bar(ctx) }
+    public entry fun baz(ctx: &mut sui::tx_context::TxContext) { DepM1::bar(ctx) }
 }
 
 //# run Test_V1::M1::baz
@@ -114,7 +114,7 @@ module Test_V3::M1 {
 //# upgrade --package Test_V3 --upgrade-capability 6,1 --dependencies Test_DepDepV1 --sender A
 module Test_V4::M1 {
     use Test_DepV1::DepM1;
-    public entry fun baz(ctx: &mut one::tx_context::TxContext) { DepM1::bar(ctx) }
+    public entry fun baz(ctx: &mut sui::tx_context::TxContext) { DepM1::bar(ctx) }
 }
 
 // missing indirect dependency (should fail)
@@ -122,7 +122,7 @@ module Test_V4::M1 {
 //# upgrade --package Test_V3 --upgrade-capability 6,1 --dependencies Test_DepV2 --sender A
 module Test_V4::M1 {
     use Test_DepV2::DepM1;
-    public entry fun baz(ctx: &mut one::tx_context::TxContext) { DepM1::bar(ctx) }
+    public entry fun baz(ctx: &mut sui::tx_context::TxContext) { DepM1::bar(ctx) }
 }
 
 // downgrade indirect dependency (should fail)
@@ -130,5 +130,5 @@ module Test_V4::M1 {
 //# upgrade --package Test_V3 --upgrade-capability 6,1 --dependencies Test_DepV2 Test_DepDepV1 --sender A
 module Test_V4::M1 {
     use Test_DepV2::DepM1;
-    public entry fun baz(ctx: &mut one::tx_context::TxContext) { DepM1::bar(ctx) }
+    public entry fun baz(ctx: &mut sui::tx_context::TxContext) { DepM1::bar(ctx) }
 }

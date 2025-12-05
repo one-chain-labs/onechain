@@ -92,9 +92,8 @@ pub trait ProtocolMetrics {
 
 #[cfg(test)]
 pub mod test_protocol_metrics {
-    use crate::client::Instance;
-
     use super::ProtocolMetrics;
+    use crate::client::Instance;
 
     pub struct TestProtocolMetrics;
 

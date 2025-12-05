@@ -1,6 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
+use anyhow::Result;
+use futures::StreamExt;
+use mysten_metrics::metered_channel::{Receiver, ReceiverStream};
+use sui_bridge::events::{MoveTokenDepositedEvent, MoveTokenTransferApproved, MoveTokenTransferClaimed};
+use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
+use sui_types::{digests::TransactionDigest, BRIDGE_ADDRESS};
+use tracing::{error, info};
+
 use crate::{
     metrics::BridgeIndexerMetrics,
     postgres_manager::{update_sui_progress_store, write, PgPool},
@@ -11,18 +21,6 @@ use crate::{
     TokenTransferData,
     TokenTransferStatus,
 };
-use anyhow::Result;
-use futures::StreamExt;
-use sui_types::digests::TransactionDigest;
-
-use std::time::Duration;
-use sui_bridge::events::{MoveTokenDepositedEvent, MoveTokenTransferApproved, MoveTokenTransferClaimed};
-
-use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
-
-use mysten_metrics::metered_channel::{Receiver, ReceiverStream};
-use sui_types::BRIDGE_ADDRESS;
-use tracing::{error, info};
 
 pub(crate) const COMMIT_BATCH_SIZE: usize = 10;
 

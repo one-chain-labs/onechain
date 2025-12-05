@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use prometheus::Registry;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+use prometheus::Registry;
 
 pub const METRICS_HOST_PORT: u16 = 9184;
 

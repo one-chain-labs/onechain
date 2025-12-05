@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use expect_test::expect;
 use std::{fs::File, io::Read, path::PathBuf};
 
+use expect_test::expect;
 use sui_move::manage_package::ManagePackage;
 use sui_move_build::BuildConfig;
 use sui_types::base_types::ObjectID;

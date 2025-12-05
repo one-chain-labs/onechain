@@ -271,13 +271,12 @@ pub(crate) fn abilities(set: AbilitySet) -> Vec<MoveAbility> {
 mod tests {
     use std::str::FromStr;
 
-    use super::*;
-
     use expect_test::expect;
     use move_core_types::language_storage::StructTag;
     use sui_package_resolver::{DatatypeKey, DatatypeRef};
-
     use OpenSignatureBody as S;
+
+    use super::*;
 
     fn struct_key(s: &str) -> DatatypeKey {
         DatatypeRef::from(&StructTag::from_str(s).unwrap()).as_key()
@@ -313,7 +312,7 @@ mod tests {
     #[test]
     fn instance_signature() {
         let signature = OpenMoveTypeSignature::from(S::Datatype(struct_key("0x2::coin::Coin"), vec![S::Datatype(
-            struct_key("0x2::oct::OCT"),
+            struct_key("0x2::sui::SUI"),
             vec![],
         )]));
 
@@ -351,11 +350,11 @@ mod tests {
     #[test]
     fn instance_signature_repr() {
         let signature = OpenMoveTypeSignature::from(S::Datatype(struct_key("0x2::coin::Coin"), vec![S::Datatype(
-            struct_key("0x2::oct::OCT"),
+            struct_key("0x2::sui::SUI"),
             vec![],
         )]));
 
-        let expect = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
+        let expect = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>"];
         expect.assert_eq(&format!("{signature}"));
     }
 }

@@ -6,14 +6,14 @@
 //# publish
 
 module pkg::m {
-    use one::coin::{Self, Coin};
-    use one::oct::OCT;
+    use sui::coin::{Self, Coin};
+    use sui::sui::SUI;
 
     public fun foo<C: drop>(x: u64, c: &Coin<C>): u64 {
         coin::value(c) + x
     }
 
-    public fun bar(c: &Coin<OCT>): u64 {
+    public fun bar(c: &Coin<SUI>): u64 {
         foo(42, c) * foo(43, c)
     }
 }

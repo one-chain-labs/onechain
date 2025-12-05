@@ -4,7 +4,7 @@ version = "0.0.1"
 published-at = "$STORAGE_ID"
 
 [dependencies]
-One = { local = "$REPO_ROOT/crates/sui-framework/packages/one-framework" }
+Sui = { local = "$REPO_ROOT/crates/sui-framework/packages/sui-framework" }
 
 [addresses]
 z = "$RUNTIME_ID"

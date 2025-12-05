@@ -6,14 +6,13 @@ use std::collections::BTreeSet;
 use anyhow::Result;
 use fastcrypto::encoding::{Base64, Encoding};
 use sui_data_ingestion_core::Worker;
-use tokio::sync::Mutex;
-use tracing::error;
-
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
 use sui_types::{
     effects::{TransactionEffects, TransactionEffectsAPI},
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
     transaction::{Command, TransactionDataAPI, TransactionKind},
 };
+use tokio::sync::Mutex;
+use tracing::error;
 
 use crate::{handlers::AnalyticsHandler, tables::TransactionEntry, FileType};
 
@@ -176,11 +175,12 @@ impl TransactionHandler {
 
 #[cfg(test)]
 mod tests {
-    use crate::handlers::transaction_handler::TransactionHandler;
     use fastcrypto::encoding::{Base64, Encoding};
     use simulacrum::Simulacrum;
     use sui_data_ingestion_core::Worker;
     use sui_types::{base_types::SuiAddress, storage::ReadStore};
+
+    use crate::handlers::transaction_handler::TransactionHandler;
 
     #[tokio::test]
     pub async fn test_transaction_handler() -> anyhow::Result<()> {

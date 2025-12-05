@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::SecurityWatchdogConfig;
+use std::{any::Any, collections::HashMap};
+
 use anyhow::anyhow;
 use arrow_array::{
     cast::AsArray,
@@ -25,8 +26,9 @@ use arrow_array::{
 };
 use lexical_util::num::AsPrimitive;
 use snowflake_api::{QueryResult, SnowflakeApi};
-use std::{any::Any, collections::HashMap};
 use tracing::info;
+
+use crate::SecurityWatchdogConfig;
 
 pub type Row = HashMap<String, Box<dyn Any + Send>>;
 
@@ -44,7 +46,7 @@ pub trait QueryRunner: Send + Sync + 'static {
 macro_rules! insert_primitive_values {
     ($rows:expr, $column:expr, $name:expr, $type:ty) => {
         if let Some(value) = $column.as_primitive_opt::<$type>() {
-            for i in 0..value.len() {
+            for i in 0 .. value.len() {
                 let entry = $rows.get_mut(i);
                 if let Some(entry) = entry {
                     entry.insert($name.clone(), Box::new(value.value(i)));
@@ -61,7 +63,7 @@ macro_rules! insert_primitive_values {
 macro_rules! insert_string_values {
     ($rows:expr, $column:expr, $name:expr, $type:ty) => {
         if let Some(value) = $column.as_string_opt::<$type>() {
-            for i in 0..value.len() {
+            for i in 0 .. value.len() {
                 let entry = $rows.get_mut(i);
                 if let Some(entry) = entry {
                     entry.insert($name.clone(), Box::new(value.value(i).to_string()));

@@ -1,22 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use fastcrypto::encoding::Base64;
-use futures::{stream, StreamExt};
-use futures_core::Stream;
-use jsonrpsee::core::client::Subscription;
 use std::{
     collections::BTreeMap,
     future,
     sync::Arc,
     time::{Duration, Instant},
 };
-use sui_json_rpc_types::{DevInspectArgs, SuiData};
 
-use crate::{
-    error::{Error, SuiRpcResult},
-    RpcClient,
-};
+use fastcrypto::encoding::Base64;
+use futures::{stream, StreamExt};
+use futures_core::Stream;
+use jsonrpsee::core::client::Subscription;
 use sui_json_rpc_api::{
     CoinReadApiClient,
     GovernanceReadApiClient,
@@ -33,6 +28,7 @@ use sui_json_rpc_types::{
     Coin,
     CoinPage,
     DelegatedStake,
+    DevInspectArgs,
     DevInspectResults,
     DryRunTransactionBlockResponse,
     DynamicFieldPage,
@@ -42,6 +38,7 @@ use sui_json_rpc_types::{
     ProtocolConfigResponse,
     SuiCoinMetadata,
     SuiCommittee,
+    SuiData,
     SuiEvent,
     SuiGetPastObjectRequest,
     SuiMoveNormalizedModule,
@@ -55,6 +52,8 @@ use sui_json_rpc_types::{
     SuiTransactionBlockResponseQuery,
     TransactionBlocksPage,
     TransactionFilter,
+    ZkLoginIntentScope,
+    ZkLoginVerifyResult,
 };
 use sui_types::{
     balance::Supply,
@@ -66,6 +65,11 @@ use sui_types::{
     sui_serde::BigInt,
     sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
     transaction::{Transaction, TransactionData, TransactionKind},
+};
+
+use crate::{
+    error::{Error, SuiRpcResult},
+    RpcClient,
 };
 
 const WAIT_FOR_LOCAL_EXECUTION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -654,6 +658,17 @@ impl ReadApi {
     ) -> SuiRpcResult<SuiPastObjectResponse> {
         Ok(self.api.http.try_get_object_before_version(object_id, version).await?)
     }
+
+    /// Verify a zkLogin signature against bytes that is parsed using intent_scope, and the sui address.
+    pub async fn verify_zklogin_signature(
+        &self,
+        bytes: String,
+        signature: String,
+        intent_scope: ZkLoginIntentScope,
+        address: SuiAddress,
+    ) -> SuiRpcResult<ZkLoginVerifyResult> {
+        Ok(self.api.http.verify_zklogin_signature(bytes, signature, intent_scope, address).await?)
+    }
 }
 
 /// Coin Read API provides the functionality needed to get information from the Sui network regarding the coins owned by an address.
@@ -670,7 +685,7 @@ impl CoinReadApi {
     /// Return a paginated response with the coins for the given address, or an error upon failure.
     ///
     /// The coins can be filtered by `coin_type` (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC)
-    /// or use `None` for the default `Coin<OCT>`.
+    /// or use `None` for the default `Coin<SUI>`.
     ///
     /// # Examples
     ///
@@ -694,7 +709,7 @@ impl CoinReadApi {
         &self,
         owner: SuiAddress,
         coin_type: Option<String>,
-        cursor: Option<ObjectID>,
+        cursor: Option<String>,
         limit: Option<usize>,
     ) -> SuiRpcResult<CoinPage> {
         Ok(self.api.http.get_coins(owner, coin_type, cursor, limit).await?)
@@ -725,7 +740,7 @@ impl CoinReadApi {
     pub async fn get_all_coins(
         &self,
         owner: SuiAddress,
-        cursor: Option<ObjectID>,
+        cursor: Option<String>,
         limit: Option<usize>,
     ) -> SuiRpcResult<CoinPage> {
         Ok(self.api.http.get_all_coins(owner, cursor, limit).await?)
@@ -734,7 +749,7 @@ impl CoinReadApi {
     /// Return the coins for the given address as a stream.
     ///
     /// The coins can be filtered by `coin_type` (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC)
-    /// or use `None` for the default `Coin<OCT>`.
+    /// or use `None` for the default `Coin<SUI>`.
     ///
     /// # Examples
     ///
@@ -758,7 +773,7 @@ impl CoinReadApi {
             (vec![], /* cursor */ None, /* has_next_page */ true, coin_type),
             move |(mut data, cursor, has_next_page, coin_type)| async move {
                 if let Some(item) = data.pop() {
-                    Some((item, (data, cursor, /* has_next_page */ true, coin_type)))
+                    Some((item, (data, cursor, has_next_page, coin_type)))
                 } else if has_next_page {
                     let page = self.get_coins(owner, coin_type.clone(), cursor, Some(100)).await.ok()?;
                     let mut data = page.data;
@@ -777,7 +792,7 @@ impl CoinReadApi {
     /// If that it is not possible, it will fail with an insufficient fund error.
     ///
     /// The coins can be filtered by `coin_type` (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC)
-    /// or use `None` to use the default `Coin<OCT>`.
+    /// or use `None` to use the default `Coin<SUI>`.
     ///
     /// # Examples
     ///
@@ -826,7 +841,7 @@ impl CoinReadApi {
     ///
     /// Note that this function sums up all the balances of all the coins matching
     /// the given coin type. By default, if `coin_type` is set to `None`,
-    /// it will use the default `Coin<OCT>`.
+    /// it will use the default `Coin<SUI>`.
     ///
     /// # Examples
     ///
@@ -889,7 +904,7 @@ impl CoinReadApi {
     ///     let sui = SuiClientBuilder::default().build_localnet().await?;
     ///     let coin_metadata = sui
     ///         .coin_read_api()
-    ///         .get_coin_metadata("0x2::oct::OCT".to_string())
+    ///         .get_coin_metadata("0x2::sui::SUI".to_string())
     ///         .await?;
     ///     Ok(())
     /// }
@@ -910,7 +925,7 @@ impl CoinReadApi {
     ///     let sui = SuiClientBuilder::default().build_localnet().await?;
     ///     let total_supply = sui
     ///         .coin_read_api()
-    ///         .get_total_supply("0x2::oct::OCT".to_string())
+    ///         .get_total_supply("0x2::sui::SUI".to_string())
     ///         .await?;
     ///     Ok(())
     /// }

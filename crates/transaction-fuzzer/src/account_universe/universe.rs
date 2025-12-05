@@ -4,6 +4,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use proptest::{
+    collection::{vec, SizeRange},
+    prelude::*,
+};
+use proptest_derive::Arbitrary;
+
 use crate::{
     account_universe::{
         account::{AccountCurrent, AccountData},
@@ -13,12 +19,6 @@ use crate::{
     },
     executor::Executor,
 };
-
-use proptest::{
-    collection::{vec, SizeRange},
-    prelude::*,
-};
-use proptest_derive::Arbitrary;
 
 const PICK_SIZE: usize = 3;
 
@@ -85,7 +85,7 @@ impl AccountUniverseGen {
         // issues.
         let min_balance = (100_000 * (default_num_transactions()) * 5) as u64;
         let max_balance = min_balance * 10;
-        Self::strategy(min_accounts..default_num_accounts(), min_balance..max_balance)
+        Self::strategy(min_accounts .. default_num_accounts(), min_balance .. max_balance)
     }
 
     /// Sets the pick style used by this account universe.
@@ -154,7 +154,7 @@ impl AccountPicker {
         match pick_style {
             AccountPickStyle::Unlimited => AccountPicker::Unlimited(num_accounts),
             AccountPickStyle::Limited(limit) => {
-                let remaining = (0..num_accounts).map(|idx| (idx, limit)).collect();
+                let remaining = (0 .. num_accounts).map(|idx| (idx, limit)).collect();
                 AccountPicker::Limited(remaining)
             }
         }
@@ -183,7 +183,7 @@ impl AccountPicker {
     fn pick_account_indices_impl(max: usize, indexes: &[Index; PICK_SIZE]) -> [usize; PICK_SIZE] {
         let idxs = pick_slice_idxs(max, indexes);
         assert_eq!(idxs.len(), PICK_SIZE);
-        let idxs: [usize; PICK_SIZE] = idxs[0..PICK_SIZE].try_into().unwrap();
+        let idxs: [usize; PICK_SIZE] = idxs[0 .. PICK_SIZE].try_into().unwrap();
         assert!(idxs[0] < idxs[1], "pick_slice_idxs should return sorted order");
         idxs
     }

@@ -2,15 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-
-use crate::payload::{
-    validation::cross_validate_entities,
-    AddressQueryType,
-    ProcessPayload,
-    QueryTransactionBlocks,
-    RpcCommandProcessor,
-    SignerInfo,
-};
 use async_trait::async_trait;
 use futures::future::join_all;
 use sui_json_rpc_types::{
@@ -24,6 +15,15 @@ use sui_json_rpc_types::{
 use sui_sdk::SuiClient;
 use sui_types::base_types::TransactionDigest;
 use tracing::log::warn;
+
+use crate::payload::{
+    validation::cross_validate_entities,
+    AddressQueryType,
+    ProcessPayload,
+    QueryTransactionBlocks,
+    RpcCommandProcessor,
+    SignerInfo,
+};
 
 #[async_trait]
 impl<'a> ProcessPayload<'a, &'a QueryTransactionBlocks> for RpcCommandProcessor {

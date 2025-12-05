@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use ethers::{prelude::*, types::Address as EthAddress};
+
 use crate::{
     abi::{
         eth_bridge_committee,
@@ -28,7 +30,6 @@ use crate::{
     },
     utils::EthSigner,
 };
-use ethers::{prelude::*, types::Address as EthAddress};
 
 pub async fn build_eth_transaction(
     contract_address: EthAddress,

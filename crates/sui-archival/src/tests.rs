@@ -1,18 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    read_manifest,
-    reader::{ArchiveReader, ArchiveReaderMetrics},
-    verify_archive_with_local_store,
-    write_manifest,
-    writer::ArchiveWriter,
-    Manifest,
-};
-use anyhow::{anyhow, Context, Result};
-use more_asserts as ma;
-use object_store::DynObjectStore;
-use prometheus::Registry;
 use std::{
     fs,
     fs::File,
@@ -22,6 +10,11 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
+
+use anyhow::{anyhow, Context, Result};
+use more_asserts as ma;
+use object_store::DynObjectStore;
+use prometheus::Registry;
 use sui_config::{
     node::ArchiveReaderConfig,
     object_storage_config::{ObjectStoreConfig, ObjectStoreType},
@@ -33,6 +26,15 @@ use sui_types::{
     storage::{ReadStore, SharedInMemoryStore, SingleCheckpointSharedInMemoryStore},
 };
 use tempfile::tempdir;
+
+use crate::{
+    read_manifest,
+    reader::{ArchiveReader, ArchiveReaderMetrics},
+    verify_archive_with_local_store,
+    write_manifest,
+    writer::ArchiveWriter,
+    Manifest,
+};
 
 struct TestState {
     archive_writer: ArchiveWriter,
@@ -47,7 +49,7 @@ struct TestState {
 }
 
 fn temp_dir() -> std::path::PathBuf {
-    tempdir().expect("Failed to open temporary directory").keep()
+    tempdir().expect("Failed to open temporary directory").into_path()
 }
 
 async fn write_new_checkpoints_to_store(
@@ -223,7 +225,7 @@ async fn test_archive_reader_e2e() -> Result<(), anyhow::Error> {
     test_state.archive_reader.sync_manifest_once().await?;
     test_state
         .archive_reader
-        .read(read_store.clone(), 0..(latest_archived_checkpoint_seq_num + 1), tx_counter, checkpoint_counter, true)
+        .read(read_store.clone(), 0 .. (latest_archived_checkpoint_seq_num + 1), tx_counter, checkpoint_counter, true)
         .await?;
     ma::assert_ge!(read_store.get_highest_verified_checkpoint()?.sequence_number, latest_archived_checkpoint_seq_num);
     ma::assert_ge!(read_store.get_highest_synced_checkpoint()?.sequence_number, latest_archived_checkpoint_seq_num);

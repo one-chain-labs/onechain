@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::{Display, Formatter},
+};
+
 use move_core_types::{
     annotated_value::MoveStructLayout,
     ident_str,
@@ -8,33 +13,28 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt::{Display, Formatter},
-};
 
 use crate::{
     balance::Balance,
     base_types::{ObjectID, SequenceNumber},
     coin::Coin,
     error::{ExecutionError, ExecutionErrorKind},
-    id::UID,
     object::{Data, MoveObject, Object},
     SUI_FRAMEWORK_ADDRESS,
 };
 
 /// The number of Mist per Sui token
-pub const MIST_PER_OCT: u64 = 1_000_000_000;
+pub const MIST_PER_SUI: u64 = 1_000_000_000;
 
 /// Total supply denominated in Sui
-pub const TOTAL_SUPPLY_OCT: u64 = 10_000_000_000;
+pub const TOTAL_SUPPLY_SUI: u64 = 10_000_000_000;
 
 // Note: cannot use checked arithmetic here since `const unwrap` is still unstable.
 /// Total supply denominated in Mist
-pub const TOTAL_SUPPLY_MIST: u64 = TOTAL_SUPPLY_OCT * MIST_PER_OCT;
+pub const TOTAL_SUPPLY_MIST: u64 = TOTAL_SUPPLY_SUI * MIST_PER_SUI;
 
-pub const GAS_MODULE_NAME: &IdentStr = ident_str!("oct");
-pub const GAS_STRUCT_NAME: &IdentStr = ident_str!("OCT");
+pub const GAS_MODULE_NAME: &IdentStr = ident_str!("sui");
+pub const GAS_STRUCT_NAME: &IdentStr = ident_str!("SUI");
 
 pub use checked::*;
 
@@ -69,13 +69,13 @@ mod checked {
         }
     }
 
-    /// Rust version of the Move sui::coin::Coin<Sui::oct::OCT> type
+    /// Rust version of the Move sui::coin::Coin<Sui::sui::SUI> type
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct GasCoin(pub Coin);
 
     impl GasCoin {
         pub fn new(id: ObjectID, value: u64) -> Self {
-            Self(Coin::new(UID::new(id), value))
+            Self(Coin::new(id, value))
         }
 
         pub fn value(&self) -> u64 {
@@ -86,12 +86,12 @@ mod checked {
             Coin::type_(TypeTag::Struct(Box::new(GAS::type_())))
         }
 
-        /// Return `true` if `s` is the type of a gas coin (i.e., 0x2::coin::Coin<0x2::oct::OCT>)
+        /// Return `true` if `s` is the type of a gas coin (i.e., 0x2::coin::Coin<0x2::sui::SUI>)
         pub fn is_gas_coin(s: &StructTag) -> bool {
             Coin::is_coin(s) && s.type_params.len() == 1 && GAS::is_gas_type(&s.type_params[0])
         }
 
-        /// Return `true` if `s` is the type of a gas balance (i.e., 0x2::balance::Balance<0x2::oct::OCT>)
+        /// Return `true` if `s` is the type of a gas balance (i.e., 0x2::balance::Balance<0x2::sui::SUI>)
         pub fn is_gas_balance(s: &StructTag) -> bool {
             Balance::is_balance(s) && s.type_params.len() == 1 && GAS::is_gas_type(&s.type_params[0])
         }

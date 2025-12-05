@@ -3,16 +3,17 @@
 
 //! A mock implementation of Ethereum JSON-RPC client, based on `MockProvider` from `ethers-rs`.
 
-use async_trait::async_trait;
-use ethers::providers::{JsonRpcClient, MockError};
-use serde::{de::DeserializeOwned, Serialize};
-use serde_json::Value;
 use std::{
     borrow::Borrow,
     collections::HashMap,
     fmt::Debug,
     sync::{Arc, Mutex},
 };
+
+use async_trait::async_trait;
+use ethers::providers::{JsonRpcClient, MockError};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
 
 /// Helper type that can be used to pass through the `params` value.
 /// This is necessary because the wrapper provider is supposed to skip the `params` if it's of
@@ -86,8 +87,9 @@ impl EthMockProvider {
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod tests {
-    use super::*;
     use ethers::{providers::Middleware, types::U64};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_basic_responses_match() {

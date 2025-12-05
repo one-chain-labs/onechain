@@ -4,7 +4,7 @@
 /// Test CTURD object basics (create, transfer, update, read, delete)
 module basics::object_basics;
 
-use one::event;
+use sui::event;
 
 public struct Object has key, store {
     id: UID,

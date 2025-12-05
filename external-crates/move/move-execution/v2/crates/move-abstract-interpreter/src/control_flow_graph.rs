@@ -87,7 +87,12 @@ impl VMControlFlowGraph {
         let mut block_ids = Set::new();
         block_ids.insert(ENTRY_BLOCK_ID);
         for pc in 0..code.len() {
-            VMControlFlowGraph::record_block_ids(pc as CodeOffset, code, jump_tables, &mut block_ids);
+            VMControlFlowGraph::record_block_ids(
+                pc as CodeOffset,
+                code,
+                jump_tables,
+                &mut block_ids,
+            );
         }
 
         // Create basic blocks
@@ -216,7 +221,11 @@ impl VMControlFlowGraph {
             })
             .collect();
 
-        VMControlFlowGraph { blocks, traversal_successors, loop_heads }
+        VMControlFlowGraph {
+            blocks,
+            traversal_successors,
+            loop_heads,
+        }
     }
 
     pub fn display(&self) {
@@ -323,10 +332,14 @@ impl ControlFlowGraph for VMControlFlowGraph {
     }
 
     fn is_back_edge(&self, cur: BlockId, next: BlockId) -> bool {
-        self.loop_heads.get(&next).map_or(false, |back_edges| back_edges.contains(&cur))
+        self.loop_heads
+            .get(&next)
+            .is_some_and(|back_edges| back_edges.contains(&cur))
     }
 
     fn num_back_edges(&self) -> usize {
-        self.loop_heads.iter().fold(0, |acc, (_, edges)| acc + edges.len())
+        self.loop_heads
+            .iter()
+            .fold(0, |acc, (_, edges)| acc + edges.len())
     }
 }

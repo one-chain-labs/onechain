@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module deepbook::critbit {
-    use one::table::{Self, Table};
+    use sui::table::{Self, Table};
     use deepbook::math::{count_leading_zeros};
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<

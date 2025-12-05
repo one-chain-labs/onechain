@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::language_storage::TypeTag;
+use sui_types::{error::ExecutionError, execution::ExecutionResult, transaction::Argument, transfer::Receiving};
+
 use crate::{
     execution_value::{RawValueType, Value},
     type_resolver::TypeTagResolver,
 };
-use move_core_types::language_storage::TypeTag;
-use sui_types::{error::ExecutionError, execution::ExecutionResult, transaction::Argument, transfer::Receiving};
 
 pub type TransactionIndex = usize;
 

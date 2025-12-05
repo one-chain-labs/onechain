@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{reader::StateSnapshotReaderV1, writer::StateSnapshotWriterV1, FileCompression};
+use std::{collections::HashSet, num::NonZeroUsize, sync::Arc};
+
 use fastcrypto::hash::MultisetHash;
 use futures::future::AbortHandle;
 use indicatif::MultiProgress;
-use std::{collections::HashSet, num::NonZeroUsize, sync::Arc};
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 use sui_core::{authority::authority_store_tables::AuthorityPerpetualTables, state_accumulator::StateAccumulator};
 use sui_protocol_config::ProtocolConfig;
@@ -17,8 +17,10 @@ use sui_types::{
 };
 use tempfile::tempdir;
 
+use crate::{reader::StateSnapshotReaderV1, writer::StateSnapshotWriterV1, FileCompression};
+
 fn temp_dir() -> std::path::PathBuf {
-    tempdir().expect("Failed to open temporary directory").keep()
+    tempdir().expect("Failed to open temporary directory").into_path()
 }
 
 pub fn insert_keys(db: &AuthorityPerpetualTables, total_unique_object_ids: u64) -> Result<(), anyhow::Error> {
@@ -87,9 +89,9 @@ async fn test_snapshot_basic() -> Result<(), anyhow::Error> {
         0,
         &remote_store_config,
         &local_store_restore_config,
-        usize::MAX,
         NonZeroUsize::new(1).unwrap(),
         MultiProgress::new(),
+        false, // skip_reset_local_store
     )
     .await?;
     let restored_perpetual_db = AuthorityPerpetualTables::open(&restored_db_path, None);
@@ -130,9 +132,9 @@ async fn test_snapshot_empty_db() -> Result<(), anyhow::Error> {
         0,
         &remote_store_config,
         &local_store_restore_config,
-        usize::MAX,
         NonZeroUsize::new(1).unwrap(),
         MultiProgress::new(),
+        false, // skip_reset_local_store
     )
     .await?;
     let restored_perpetual_db = AuthorityPerpetualTables::open(&restored_db_path, None);

@@ -5,16 +5,15 @@ use std::str::FromStr;
 
 use async_graphql::Context;
 
+use super::{
+    error::MoveRegistryError,
+    on_chain::{AppInfo, AppRecord, VersionedName},
+};
 use crate::{
     config::{MoveRegistryConfig, ResolutionType},
     data::move_registry_data_loader::MoveRegistryDataLoader,
     error::Error,
     types::{chain_identifier::ChainIdentifier, move_object::MoveObject, move_package::MovePackage, object::Object},
-};
-
-use super::{
-    error::MoveRegistryError,
-    on_chain::{AppInfo, AppRecord, VersionedName},
 };
 
 pub(crate) struct NamedMovePackage;

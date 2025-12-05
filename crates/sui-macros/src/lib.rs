@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::future::BoxFuture;
 use std::{collections::HashMap, future::Future, sync::Arc};
 
+use futures::future::BoxFuture;
 pub use sui_proc_macros::*;
 
 /// Evaluates an expression in a new thread which will not be subject to interception of
@@ -39,8 +39,9 @@ fn with_fp_map<T>(func: impl FnOnce(&mut FpMap) -> T) -> T {
 
 #[cfg(not(msim))]
 fn with_fp_map<T>(func: impl FnOnce(&mut FpMap) -> T) -> T {
-    use once_cell::sync::Lazy;
     use std::sync::Mutex;
+
+    use once_cell::sync::Lazy;
 
     static MAP: Lazy<Mutex<FpMap>> = Lazy::new(Default::default);
     let mut map = MAP.lock().unwrap();

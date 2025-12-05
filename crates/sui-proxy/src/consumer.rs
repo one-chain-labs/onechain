@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{admin::ReqwestClient, prom_to_mimir::Mimir, remote_write::WriteRequest};
+use std::io::Read;
+
 use anyhow::Result;
 use axum::{body::Bytes, http::StatusCode};
 use bytes::buf::Reader;
@@ -19,8 +20,9 @@ use prometheus::{
 };
 use prost::Message;
 use protobuf::CodedInputStream;
-use std::io::Read;
 use tracing::{debug, error};
+
+use crate::{admin::ReqwestClient, prom_to_mimir::Mimir, remote_write::WriteRequest};
 
 static CONSUMER_OPS_SUBMITTED: Lazy<Counter> = Lazy::new(|| {
     register_counter!(

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+
 use sui_types::{
     base_types::TransactionDigest,
     effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
@@ -180,11 +181,12 @@ impl InsertState {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sui_types::{
         base_types::{ObjectDigest, ObjectID, SequenceNumber},
         effects::TransactionEffects,
     };
+
+    use super::*;
 
     #[test]
     pub fn test_causal_order() {

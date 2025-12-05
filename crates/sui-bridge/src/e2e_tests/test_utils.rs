@@ -1,13 +1,77 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    fs::{self, DirBuilder, File},
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    process::{Child, Command},
+    str::FromStr,
+    sync::Arc,
+};
+
+use anyhow::anyhow;
+use ethers::{prelude::*, types::Address as EthAddress};
+use futures::{future::join_all, Future};
+use move_core_types::{
+    ident_str,
+    language_storage::{StructTag, TypeTag},
+};
+use prometheus::Registry;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
+use sui_config::local_ip_utils::get_available_port;
+use sui_json_rpc_api::BridgeReadApiClient;
+use sui_json_rpc_types::{
+    SuiEvent,
+    SuiExecutionStatus,
+    SuiTransactionBlockEffectsAPI,
+    SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions,
+    SuiTransactionBlockResponseQuery,
+    TransactionFilter,
+};
+use sui_sdk::{wallet_context::WalletContext, SuiClient};
+use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::{
+    base_types::{ObjectID, ObjectRef, SuiAddress},
+    bridge::{
+        get_bridge,
+        get_bridge_obj_initial_shared_version,
+        BridgeChainId,
+        BridgeSummary,
+        BridgeTrait,
+        BRIDGE_MODULE_NAME,
+        TOKEN_ID_BTC,
+        TOKEN_ID_ETH,
+        TOKEN_ID_USDC,
+        TOKEN_ID_USDT,
+    },
+    committee::TOTAL_VOTING_POWER,
+    crypto::{get_key_pair, EncodeDecodeBase64, KeypairTraits, ToFromBytes},
+    digests::TransactionDigest,
+    object::Object,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
+    transaction::{ObjectArg, Transaction, TransactionData},
+    BRIDGE_PACKAGE_ID,
+    SUI_BRIDGE_OBJECT_ID,
+};
+use tap::TapFallible;
+use tempfile::tempdir;
+use test_cluster::{TestCluster, TestClusterBuilder};
+use tokio::{join, task::JoinHandle, time::Instant};
+use tracing::{error, info};
+
 use crate::{
     abi::{EthBridgeCommittee, EthBridgeConfig, EthBridgeEvent, EthERC20, EthSuiBridge, EthSuiBridgeEvents},
-    config::default_ed25519_key_pair,
+    config::{default_ed25519_key_pair, BridgeNodeConfig, EthConfig, SuiConfig},
     crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes, BridgeAuthoritySignInfo},
     events::*,
     metrics::BridgeMetrics,
+    node::run_bridge_node,
     server::BridgeNodePublicMetadata,
+    sui_client::SuiBridgeClient,
     sui_transaction_builder::{build_add_tokens_on_sui_transaction, build_committee_register_transaction},
     types::{
         BridgeAction,
@@ -23,80 +87,8 @@ use crate::{
         wait_for_server_to_be_up,
         EthSigner,
     },
-};
-use ethers::types::Address as EthAddress;
-use futures::{future::join_all, Future};
-use move_core_types::language_storage::{StructTag, TypeTag};
-use prometheus::Registry;
-use rand::{rngs::SmallRng, Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    fs::{self, DirBuilder, File},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    process::Command,
-    str::FromStr,
-    sync::Arc,
-};
-use sui_json_rpc_api::BridgeReadApiClient;
-use sui_json_rpc_types::{
-    SuiEvent,
-    SuiExecutionStatus,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
-    SuiTransactionBlockResponseOptions,
-    SuiTransactionBlockResponseQuery,
-    TransactionFilter,
-};
-use sui_sdk::wallet_context::WalletContext;
-use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef},
-    bridge::{
-        get_bridge,
-        get_bridge_obj_initial_shared_version,
-        BridgeChainId,
-        BridgeSummary,
-        BridgeTrait,
-        BRIDGE_MODULE_NAME,
-        TOKEN_ID_BTC,
-        TOKEN_ID_ETH,
-        TOKEN_ID_USDC,
-        TOKEN_ID_USDT,
-    },
-    committee::TOTAL_VOTING_POWER,
-    crypto::{get_key_pair, ToFromBytes},
-    digests::TransactionDigest,
-    object::Object,
-    transaction::{ObjectArg, Transaction, TransactionData},
-    BRIDGE_PACKAGE_ID,
-    SUI_BRIDGE_OBJECT_ID,
-};
-use tokio::{join, task::JoinHandle, time::Instant};
-
-use tracing::{error, info};
-
-use crate::{
-    config::{BridgeNodeConfig, EthConfig, SuiConfig},
-    node::run_bridge_node,
-    sui_client::SuiBridgeClient,
     BRIDGE_ENABLE_PROTOCOL_VERSION,
 };
-use anyhow::anyhow;
-use ethers::prelude::*;
-use move_core_types::ident_str;
-use std::process::Child;
-use sui_config::local_ip_utils::get_available_port;
-use sui_sdk::SuiClient;
-use sui_types::{
-    base_types::SuiAddress,
-    crypto::{EncodeDecodeBase64, KeypairTraits},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-};
-use tap::TapFallible;
-use tempfile::tempdir;
-use test_cluster::{TestCluster, TestClusterBuilder};
 
 const BRIDGE_COMMITTEE_NAME: &str = "BridgeCommittee";
 const SUI_BRIDGE_NAME: &str = "SuiBridge";
@@ -189,7 +181,7 @@ impl BridgeTestClusterBuilder {
         let metrics = Arc::new(BridgeMetrics::new_for_testing());
         let mut bridge_keys = vec![];
         let mut bridge_keys_copy = vec![];
-        for _ in 0..self.num_validators {
+        for _ in 0 .. self.num_validators {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp.copy());
             bridge_keys_copy.push(kp);
@@ -460,7 +452,7 @@ pub(crate) async fn deploy_sol_contract(
     let sol_path = format!("{}/../../bridge/evm", env!("CARGO_MANIFEST_DIR"));
 
     // Write the deploy config to a temp file then provide it to the forge late
-    let deploy_config_path = tempfile::tempdir().unwrap().keep().join("sol_deploy_config.json");
+    let deploy_config_path = tempfile::tempdir().unwrap().into_path().join("sol_deploy_config.json");
     let node_len = bridge_authority_keys.len();
     let stake = TOTAL_VOTING_POWER / (node_len as u64);
     let committee_members = bridge_authority_keys
@@ -651,7 +643,7 @@ pub(crate) async fn start_bridge_cluster(
         .enumerate()
     {
         // prepare node config (server + client)
-        let tmp_dir = tempdir().unwrap().keep().join(i.to_string());
+        let tmp_dir = tempdir().unwrap().into_path().join(i.to_string());
         std::fs::create_dir_all(tmp_dir.clone()).unwrap();
         let db_path = tmp_dir.join("client_db");
         // write authority key to file

@@ -89,7 +89,10 @@ namespace_entry!(MemberEntry, .module_members);
 
 impl AliasSet {
     pub fn new() -> Self {
-        Self { modules: UniqueSet::new(), members: UniqueSet::new() }
+        Self {
+            modules: UniqueSet::new(),
+            members: UniqueSet::new(),
+        }
     }
 
     #[allow(unused)]
@@ -112,9 +115,9 @@ impl AliasMap {
     pub fn resolve_leading_access(&mut self, name: &Name) -> Option<(Name, LeadingAccessEntry)> {
         let (name, entry) = LeadingAccessEntry::find(self, name)?;
         match &entry {
-            LeadingAccessEntry::Module(_) | LeadingAccessEntry::Address(_) | LeadingAccessEntry::Member(_, _) => {
-                Some((name, entry))
-            }
+            LeadingAccessEntry::Module(_)
+            | LeadingAccessEntry::Address(_)
+            | LeadingAccessEntry::Member(_, _) => Some((name, entry)),
             // For code legacy reasons, don't resolve type parameters, they are just here for
             // shadowing
             LeadingAccessEntry::TypeParam => None,
@@ -133,7 +136,9 @@ impl AliasMap {
 
     pub fn resolve(&mut self, namespace: NameSpace, name: &Name) -> Option<AliasEntry> {
         match namespace {
-            NameSpace::LeadingAccess => self.resolve_leading_access(name).map(|resolved| resolved.into()),
+            NameSpace::LeadingAccess => self
+                .resolve_leading_access(name)
+                .map(|resolved| resolved.into()),
             NameSpace::ModuleMembers => self.resolve_call(name).map(|resolved| resolved.into()),
         }
     }
@@ -155,10 +160,15 @@ impl AliasMap {
         loc: Loc,
         new_aliases: AliasMapBuilder,
     ) -> Result<Vec<UnnecessaryAlias>, Box<Diagnostic>> {
-        let AliasMapBuilder::Namespaced { leading_access: new_leading_access, module_members: new_module_members } =
-            new_aliases
+        let AliasMapBuilder::Namespaced {
+            leading_access: new_leading_access,
+            module_members: new_module_members,
+        } = new_aliases
         else {
-            return Err(Box::new(ice!((loc, "ICE alias map builder should be namespaced for 2024 paths"))));
+            return Err(Box::new(ice!((
+                loc,
+                "ICE alias map builder should be namespaced for 2024 paths"
+            ))));
         };
 
         let mut unused = BTreeSet::new();
@@ -168,7 +178,10 @@ impl AliasMap {
                 unused.insert((alias, *entry).into());
                 LeadingAccessEntry::find_custom(self, &alias, |scope, prev_name, prev_entry| {
                     if entry == prev_entry {
-                        duplicate.push(UnnecessaryAlias { entry: (alias, *entry).into(), prev: prev_name.loc });
+                        duplicate.push(UnnecessaryAlias {
+                            entry: (alias, *entry).into(),
+                            prev: prev_name.loc,
+                        });
                         scope.unused.remove(&(*prev_name, *prev_entry).into());
                     }
                 });
@@ -179,7 +192,10 @@ impl AliasMap {
                 unused.insert((alias, *entry).into());
                 MemberEntry::find_custom(self, &alias, |scope, prev_name, prev_entry| {
                     if entry == prev_entry {
-                        duplicate.push(UnnecessaryAlias { entry: (alias, *entry).into(), prev: prev_name.loc });
+                        duplicate.push(UnnecessaryAlias {
+                            entry: (alias, *entry).into(),
+                            prev: prev_name.loc,
+                        });
                         scope.unused.remove(&(*prev_name, *prev_entry).into());
                     }
                 });
@@ -189,7 +205,13 @@ impl AliasMap {
         let leading_access = new_leading_access.map(|_alias, (entry, _is_implicit)| entry);
         let module_members = new_module_members.map(|_alias, (entry, _is_implicit)| entry);
 
-        let new_map = Self { unused, leading_access, module_members, ide_alias_info: None, previous: None };
+        let new_map = Self {
+            unused,
+            leading_access,
+            module_members,
+            ide_alias_info: None,
+            previous: None,
+        };
 
         // set the previous scope
         let previous = std::mem::replace(self, new_map);
@@ -206,7 +228,9 @@ impl AliasMap {
         let mut new_map = Self::new();
         for tparam in tparams {
             // ignore duplicates, they will be checked in naming
-            let _ = new_map.leading_access.add(*tparam, LeadingAccessEntry::TypeParam);
+            let _ = new_map
+                .leading_access
+                .add(*tparam, LeadingAccessEntry::TypeParam);
             let _ = new_map.module_members.add(*tparam, MemberEntry::TypeParam);
         }
 
@@ -217,7 +241,11 @@ impl AliasMap {
 
     /// Resets the alias map to the previous scope, and returns the set of unused aliases
     pub fn pop_scope(&mut self) -> AliasSet {
-        let previous = self.previous.take().map(|prev| *prev).unwrap_or_else(Self::new);
+        let previous = self
+            .previous
+            .take()
+            .map(|prev| *prev)
+            .unwrap_or_else(Self::new);
         let popped = std::mem::replace(self, previous);
         let mut result = AliasSet::new();
         for alias_entry in popped.unused {
@@ -258,7 +286,13 @@ impl AliasMap {
 
 impl fmt::Debug for AliasMap {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        let Self { unused, leading_access, module_members, ide_alias_info: _, previous } = self;
+        let Self {
+            unused,
+            leading_access,
+            module_members,
+            ide_alias_info: _,
+            previous,
+        } = self;
         writeln!(f, "AliasMap(\n  unused: [")?;
         for entry in unused {
             writeln!(f, "    {entry:?},")?;

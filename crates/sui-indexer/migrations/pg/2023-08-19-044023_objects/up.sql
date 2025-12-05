@@ -17,7 +17,7 @@ CREATE TABLE objects (
     -- bcs serialized Object
     serialized_object           bytea         NOT NULL,
     -- Non-null when the object is a coin.
-    -- e.g. `0x2::oct::OCT`
+    -- e.g. `0x2::sui::SUI`
     coin_type                   text,
     -- Non-null when the object is a coin.
     coin_balance                bigint,

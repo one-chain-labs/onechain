@@ -11,8 +11,6 @@ use fastcrypto::encoding::{Encoding, Hex};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
-use tokio::task::JoinHandle;
-
 use sui_config::local_ip_utils;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_rosetta::{
@@ -44,6 +42,7 @@ use sui_rosetta::{
 };
 use sui_sdk::SuiClient;
 use sui_types::{base_types::SuiAddress, crypto::SuiSignature};
+use tokio::task::JoinHandle;
 
 pub async fn start_rosetta_test_server(client: SuiClient) -> (RosettaClient, Vec<JoinHandle<()>>) {
     let online_server = RosettaOnlineServer::new(SuiEnv::LocalNet, client);

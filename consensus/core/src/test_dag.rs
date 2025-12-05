@@ -37,7 +37,7 @@ pub(crate) fn build_dag(
 
     let num_authorities = context.committee.size();
     let starting_round = ancestors.first().unwrap().round + 1;
-    for round in starting_round..=stop {
+    for round in starting_round ..= stop {
         let (references, blocks): (Vec<_>, Vec<_>) = context
             .committee
             .authorities()
@@ -84,13 +84,13 @@ pub(crate) fn create_random_dag(
     num_rounds: Round,
     context: Arc<Context>,
 ) -> DagBuilder {
-    assert!((0..=100).contains(&include_leader_percentage), "include_leader_percentage must be in the range 0..100");
+    assert!((0 ..= 100).contains(&include_leader_percentage), "include_leader_percentage must be in the range 0..100");
 
     let mut rng = StdRng::seed_from_u64(seed);
     let mut dag_builder = DagBuilder::new(context);
 
-    for r in 1..=num_rounds {
-        let random_num = rng.gen_range(0..100);
+    for r in 1 ..= num_rounds {
+        let random_num = rng.gen_range(0 .. 100);
         let include_leader = random_num <= include_leader_percentage;
         dag_builder.layer(r).min_ancestor_links(include_leader, Some(random_num));
     }

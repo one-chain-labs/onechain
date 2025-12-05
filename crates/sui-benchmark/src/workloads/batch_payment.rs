@@ -1,6 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashMap, sync::Arc};
+
+use async_trait::async_trait;
+use sui_core::test_utils::make_pay_sui_transaction;
+use sui_types::{
+    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
+    crypto::get_key_pair,
+    digests::ObjectDigest,
+    gas_coin::MIST_PER_SUI,
+    object::Owner,
+    transaction::Transaction,
+};
+use tracing::{debug, error};
+
 use crate::{
     drivers::Interval,
     in_memory_wallet::InMemoryWallet,
@@ -16,23 +30,11 @@ use crate::{
     ExecutionEffects,
     ValidatorProxy,
 };
-use async_trait::async_trait;
-use std::{collections::HashMap, sync::Arc};
-use sui_core::test_utils::make_pay_sui_transaction;
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    crypto::get_key_pair,
-    digests::ObjectDigest,
-    gas_coin::MIST_PER_OCT,
-    object::Owner,
-    transaction::Transaction,
-};
-use tracing::{debug, error};
 
 /// Value of each address's "primary coin" in mist. The first transaction gives
 /// each address a coin worth PRIMARY_COIN_VALUE, and all subsequent transfers
 /// send TRANSFER_AMOUNT coins each time
-const PRIMARY_COIN_VALUE: u64 = 100 * MIST_PER_OCT;
+const PRIMARY_COIN_VALUE: u64 = 100 * MIST_PER_SUI;
 
 /// Number of mist sent to each address on each batch transfer
 const BATCH_TRANSFER_AMOUNT: u64 = 1;
@@ -135,7 +137,7 @@ impl BatchPaymentWorkloadBuilder {
         duration: Interval,
         group: u32,
     ) -> Option<WorkloadBuilderInfo> {
-        let target_qps = (workload_weight * target_qps as f32) as u64;
+        let target_qps = (workload_weight * target_qps as f32).ceil() as u64;
         let num_workers = (workload_weight * num_workers as f32).ceil() as u64;
         let max_ops = target_qps * in_flight_ratio;
         if max_ops == 0 || num_workers == 0 {
@@ -166,7 +168,7 @@ impl WorkloadBuilder<dyn Payload> for BatchPaymentWorkloadBuilder {
             + ESTIMATED_COMPUTATION_COST
             + (STORAGE_COST_PER_COIN * self.batch_size as u64);
         debug!("Creating gas coins for batch payload {} coin(s) of balance {amount}", self.num_payloads);
-        (0..self.num_payloads)
+        (0 .. self.num_payloads)
             .map(|_| {
                 let (address, keypair) = get_key_pair();
                 GasCoinConfig { amount, address, keypair: Arc::new(keypair) }
@@ -220,7 +222,7 @@ impl Workload<dyn Payload> for BatchPaymentWorkload {
             let gas_coin = objs.pop().unwrap();
             state.add_account(addr, key, gas_coin, objs);
             // add empty accounts for `addr` to transfer to
-            for _ in 0..self.batch_size - 1 {
+            for _ in 0 .. self.batch_size - 1 {
                 let (a, key) = get_key_pair();
                 // we'll replace this after the first send
                 let gas = DUMMY_GAS;

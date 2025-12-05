@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{sui_client_config::SuiClientConfig, SuiClient};
+use std::{collections::BTreeSet, path::Path, sync::Arc};
+
 use anyhow::anyhow;
 use shared_crypto::intent::Intent;
-use std::{collections::BTreeSet, path::Path, sync::Arc};
 use sui_config::{Config, PersistedConfig};
 use sui_json_rpc_types::{
     SuiObjectData,
@@ -23,6 +23,8 @@ use sui_types::{
     transaction::{Transaction, TransactionData, TransactionDataAPI},
 };
 use tokio::sync::RwLock;
+
+use crate::{sui_client_config::SuiClientConfig, SuiClient};
 
 pub struct WalletContext {
     pub config: PersistedConfig<SuiClientConfig>,
@@ -164,7 +166,7 @@ impl WalletContext {
             }
         }
         Err(anyhow!(
-            "No non-argument gas objects found for this address with value >= budget {budget}. Run one_chain client gas to check for gas objects."
+            "No non-argument gas objects found for this address with value >= budget {budget}. Run sui client gas to check for gas objects."
         ))
     }
 

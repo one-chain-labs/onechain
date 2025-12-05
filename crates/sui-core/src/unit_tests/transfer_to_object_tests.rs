@@ -3,6 +3,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
+use move_core_types::ident_str;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
@@ -29,7 +30,6 @@ use crate::{
     },
     move_call,
 };
-use move_core_types::ident_str;
 
 // The primary use for these tests is to make sure the generated effect sets match what we expect
 // when receiving an object, and if we then perform different types of operations on the received
@@ -76,7 +76,7 @@ impl TestRunner {
         let authority_state = TestAuthorityBuilder::new().build().await;
         let rgp = authority_state.reference_gas_price_for_testing().unwrap();
         let mut gas_object_ids = vec![];
-        for _ in 0..num {
+        for _ in 0 .. num {
             let gas_object_id = ObjectID::random();
             let gas_object = Object::with_id_owner_for_testing(gas_object_id, sender);
             authority_state.insert_genesis_object(gas_object).await;
@@ -1704,8 +1704,8 @@ async fn test_have_deleted_owned_object() {
 
         assert!(cache.get_object(&new_child.0.0).is_some());
         // Should not show as deleted for either versions
-        assert!(!cache.have_deleted_owned_object_at_version_or_after(&new_child.0.0, new_child.0.1, 0));
-        assert!(!cache.have_deleted_owned_object_at_version_or_after(&new_child.0.0, child.0.1, 0));
+        assert!(!cache.have_deleted_fastpath_object_at_version_or_after(new_child.0.0, new_child.0.1, 0, true));
+        assert!(!cache.have_deleted_fastpath_object_at_version_or_after(new_child.0.0, child.0.1, 0, true));
 
         let effects = runner
             .run({
@@ -1722,13 +1722,13 @@ async fn test_have_deleted_owned_object() {
 
         let deleted_child = effects.deleted().into_iter().find(|(id, _, _)| *id == new_child.0 .0).unwrap();
         assert!(cache.get_object(&deleted_child.0).is_none());
-        assert!(cache.have_deleted_owned_object_at_version_or_after(&deleted_child.0, deleted_child.1, 0));
-        assert!(cache.have_deleted_owned_object_at_version_or_after(&deleted_child.0, new_child.0.1, 0));
-        assert!(cache.have_deleted_owned_object_at_version_or_after(&deleted_child.0, child.0.1, 0));
+        assert!(cache.have_deleted_fastpath_object_at_version_or_after(deleted_child.0, deleted_child.1, 0, true));
+        assert!(cache.have_deleted_fastpath_object_at_version_or_after(deleted_child.0, new_child.0.1, 0, true));
+        assert!(cache.have_deleted_fastpath_object_at_version_or_after(deleted_child.0, child.0.1, 0, true));
         // Should not show as deleted for versions after this though
-        assert!(!cache.have_deleted_owned_object_at_version_or_after(&deleted_child.0, deleted_child.1.next(), 0));
+        assert!(!cache.have_deleted_fastpath_object_at_version_or_after(deleted_child.0, deleted_child.1.next(), 0, true));
         // Should not show as deleted for other epochs outside of our current epoch too
-        assert!(!cache.have_deleted_owned_object_at_version_or_after(&deleted_child.0, deleted_child.1, 1));
+        assert!(!cache.have_deleted_fastpath_object_at_version_or_after(deleted_child.0, deleted_child.1, 1, true));
     }
     }
 }

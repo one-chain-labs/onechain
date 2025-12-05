@@ -8,7 +8,9 @@ use crate::{
     editions::FeatureGate,
     expansion::ast::{Attribute, Attribute_, ModuleIdent},
     naming::{
-        ast::{self as N, SyntaxMethod, SyntaxMethodKind, SyntaxMethodKind_, SyntaxMethods, TypeName},
+        ast::{
+            self as N, SyntaxMethod, SyntaxMethodKind, SyntaxMethodKind_, SyntaxMethods, TypeName,
+        },
         translate::Context,
     },
     parser::ast::FunctionName,
@@ -42,12 +44,17 @@ pub(super) fn resolve_syntax_attributes(
 
     let syntax_method_prekinds = resolve_syntax_method_prekind(context, attr)?;
 
-    if !context.check_feature(context.current_package, FeatureGate::SyntaxMethods, attr_loc) {
+    if !context.check_feature(
+        context.current_package,
+        FeatureGate::SyntaxMethods,
+        attr_loc,
+    ) {
         return None;
     }
 
     let param_ty = get_first_type(context, &attr_loc, &function.signature)?;
-    let Some(type_name) = determine_subject_type_name(context, module_name, &attr_loc, &param_ty) else {
+    let Some(type_name) = determine_subject_type_name(context, module_name, &attr_loc, &param_ty)
+    else {
         assert!(context.env.has_errors());
         return None;
     };
@@ -61,7 +68,11 @@ pub(super) fn resolve_syntax_attributes(
     if let Some(macro_loc) = function.macro_ {
         let msg = "Syntax attributes may not appear on macro definitions";
         let fn_msg = "This function is a macro";
-        context.add_diag(diag!(Declarations::InvalidSyntaxMethod, (attr_loc, msg), (macro_loc, fn_msg)));
+        context.add_diag(diag!(
+            Declarations::InvalidSyntaxMethod,
+            (attr_loc, msg),
+            (macro_loc, fn_msg)
+        ));
         return None;
     }
 
@@ -72,7 +83,12 @@ pub(super) fn resolve_syntax_attributes(
             assert!(context.env.has_errors());
             continue;
         };
-        if !valid_return_type(context, &kind, param_ty.loc, &function.signature.return_type) {
+        if !valid_return_type(
+            context,
+            &kind,
+            param_ty.loc,
+            &function.signature.return_type,
+        ) {
             assert!(context.env.has_errors());
             continue;
         } else {
@@ -104,9 +120,16 @@ fn prev_syntax_defn_error(
         SyntaxMethodKind_::Index => format!("'{}'", SyntaxAttribute::INDEX),
         SyntaxMethodKind_::IndexMut => format!("mutable '{}'", SyntaxAttribute::INDEX),
     };
-    let msg = format!("Redefined {} 'syntax' method for '{}'", kind_string, type_name);
+    let msg = format!(
+        "Redefined {} 'syntax' method for '{}'",
+        kind_string, type_name
+    );
     let prev_msg = "This syntax method was previously defined here.";
-    context.add_diag(diag!(Declarations::InvalidAttribute, (sloc, msg), (prev.loc, prev_msg)));
+    context.add_diag(diag!(
+        Declarations::InvalidAttribute,
+        (sloc, msg),
+        (prev.loc, prev_msg)
+    ));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -198,7 +221,11 @@ fn determine_valid_kind(
                     SyntaxAttribute::INDEX,
                 );
                 let ty_msg = "This type is not a reference";
-                context.add_diag(diag!(Declarations::InvalidAttribute, (sloc, msg), (subject_type.loc, ty_msg)));
+                context.add_diag(diag!(
+                    Declarations::InvalidAttribute,
+                    (sloc, msg),
+                    (subject_type.loc, ty_msg)
+                ));
                 return None;
             }
         }
@@ -279,8 +306,15 @@ fn determine_subject_type_name(
                 "Invalid {} annotation. Cannot associate a syntax method with a type parameter",
                 SyntaxAttribute::SYNTAX
             );
-            let tmsg = format!("But '{}' was declared as a type parameter here", param.user_specified_name);
-            context.add_diag(diag!(Declarations::InvalidSyntaxMethod, (*ann_loc, msg), (*loc, tmsg)));
+            let tmsg = format!(
+                "But '{}' was declared as a type parameter here",
+                param.user_specified_name
+            );
+            context.add_diag(diag!(
+                Declarations::InvalidSyntaxMethod,
+                (*ann_loc, msg),
+                (*loc, tmsg)
+            ));
             None
         }
         N::Type_::Var(_) | N::Type_::Anything | N::Type_::UnresolvedError => {
@@ -297,14 +331,20 @@ fn determine_subject_type_name(
     }
 }
 
-fn valid_return_type(context: &mut Context, sp!(loc, kind_): &SyntaxMethodKind, subject_loc: Loc, ty: &N::Type) -> bool {
+fn valid_return_type(
+    context: &mut Context,
+    sp!(loc, kind_): &SyntaxMethodKind,
+    subject_loc: Loc,
+    ty: &N::Type,
+) -> bool {
     match kind_ {
         SyntaxMethodKind_::Index => {
             if valid_imm_ref(ty) {
                 valid_index_return_type(context, loc, ty)
             } else if valid_mut_ref(ty) {
                 let msg = format!("Invalid {} annotation", SyntaxAttribute::SYNTAX);
-                let tmsg = "This syntax method must return an immutable reference to match its subject type";
+                let tmsg =
+                    "This syntax method must return an immutable reference to match its subject type";
                 context.add_diag(diag!(
                     Declarations::InvalidSyntaxMethod,
                     (*loc, msg),
@@ -333,7 +373,8 @@ fn valid_return_type(context: &mut Context, sp!(loc, kind_): &SyntaxMethodKind, 
                 valid_index_return_type(context, loc, ty)
             } else if valid_imm_ref(ty) {
                 let msg = format!("Invalid {} annotation", SyntaxAttribute::SYNTAX);
-                let tmsg = "This syntax method must return a mutable reference to match its subject type";
+                let tmsg =
+                    "This syntax method must return a mutable reference to match its subject type";
                 context.add_diag(diag!(
                     Declarations::InvalidSyntaxMethod,
                     (*loc, msg),
@@ -367,22 +408,38 @@ fn valid_mut_ref(sp!(_, type_): &N::Type) -> bool {
     matches!(type_.is_ref(), Some(true))
 }
 
-fn valid_index_return_type(context: &mut Context, kind_loc: &Loc, sp!(tloc, type_): &N::Type) -> bool {
+fn valid_index_return_type(
+    context: &mut Context,
+    kind_loc: &Loc,
+    sp!(tloc, type_): &N::Type,
+) -> bool {
     match type_ {
         N::Type_::Apply(_, _, _) | N::Type_::Param(_) => true,
         N::Type_::Ref(_, inner) => valid_index_return_type(context, kind_loc, inner),
         N::Type_::Unit => {
-            let msg =
-                format!("Invalid {} annotation. This syntax method cannot return a unit type", SyntaxAttribute::SYNTAX);
+            let msg = format!(
+                "Invalid {} annotation. This syntax method cannot return a unit type",
+                SyntaxAttribute::SYNTAX
+            );
             let tmsg = "Unit type occurs as the return type for this function";
-            context.add_diag(diag!(Declarations::InvalidSyntaxMethod, (*kind_loc, msg), (*tloc, tmsg)));
+            context.add_diag(diag!(
+                Declarations::InvalidSyntaxMethod,
+                (*kind_loc, msg),
+                (*tloc, tmsg)
+            ));
             false
         }
         N::Type_::Fun(_, _) => {
-            let msg =
-                format!("Invalid {} annotation. A syntax method cannot return a function", SyntaxAttribute::SYNTAX);
+            let msg = format!(
+                "Invalid {} annotation. A syntax method cannot return a function",
+                SyntaxAttribute::SYNTAX
+            );
             let tmsg = "But a function type appears in this return type";
-            context.add_diag(diag!(Declarations::InvalidSyntaxMethod, (*kind_loc, msg), (*tloc, tmsg)));
+            context.add_diag(diag!(
+                Declarations::InvalidSyntaxMethod,
+                (*kind_loc, msg),
+                (*tloc, tmsg)
+            ));
             false
         }
         N::Type_::Var(_) | N::Type_::Anything | N::Type_::UnresolvedError => {
@@ -393,7 +450,11 @@ fn valid_index_return_type(context: &mut Context, kind_loc: &Loc, sp!(tloc, type
     }
 }
 
-fn get_first_type(context: &mut Context, attr_loc: &Loc, fn_signature: &N::FunctionSignature) -> Option<N::Type> {
+fn get_first_type(
+    context: &mut Context,
+    attr_loc: &Loc,
+    fn_signature: &N::FunctionSignature,
+) -> Option<N::Type> {
     if let Some((_, _, ty)) = fn_signature.parameters.first() {
         Some(ty.clone())
     } else {

@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
 use std::{
     borrow::{Cow, Cow::Owned},
     cmp::Ordering,
@@ -12,6 +11,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::*;
 use colored::Colorize;
@@ -92,7 +92,7 @@ impl<P: Display, S: Send, H: AsyncHandler<S>> Shell<P, S, H> {
                                 continue;
                             }
                             "echo" => {
-                                let line = line.as_slice()[1..line.len()].join(" ");
+                                let line = line.as_slice()[1 .. line.len()].join(" ");
                                 writeln!(out, "{}", line)?;
                                 continue;
                             }

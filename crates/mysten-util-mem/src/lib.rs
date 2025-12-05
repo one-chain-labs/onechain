@@ -40,7 +40,6 @@ pub mod external_impls;
 
 pub use allocators::MallocSizeOfExt;
 pub use malloc_size::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
-
 pub use mysten_util_mem_derive::*;
 
 /// Heap size of structure.
@@ -93,8 +92,9 @@ impl MemoryAllocationTracker {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod test {
-    use super::{malloc_size, MallocSizeOf, MallocSizeOfExt};
     use std::sync::Arc;
+
+    use super::{malloc_size, MallocSizeOf, MallocSizeOfExt};
 
     #[test]
     fn test_arc() {

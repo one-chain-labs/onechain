@@ -3,11 +3,15 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{drivers::Interval, system_state_observer::SystemStateObserver, ValidatorProxy};
 use async_trait::async_trait;
 use prometheus::Registry;
 
-use crate::workloads::{GroupID, WorkloadInfo};
+use crate::{
+    drivers::Interval,
+    system_state_observer::SystemStateObserver,
+    workloads::{GroupID, WorkloadInfo},
+    ValidatorProxy,
+};
 
 #[async_trait]
 pub trait Driver<T> {

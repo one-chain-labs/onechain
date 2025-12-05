@@ -3,12 +3,6 @@
 
 use std::str::FromStr;
 
-use crate::{
-    key_identity::KeyIdentity,
-    keytool::{read_authority_keypair_from_file, read_keypair_from_file, CommandOutput},
-};
-
-use super::{write_keypair_to_file, KeyToolCommand};
 use anyhow::Ok;
 use fastcrypto::{
     ed25519::Ed25519KeyPair,
@@ -38,6 +32,12 @@ use sui_types::{
 use tempfile::TempDir;
 use tokio::test;
 
+use super::{write_keypair_to_file, KeyToolCommand};
+use crate::{
+    key_identity::KeyIdentity,
+    keytool::{read_authority_keypair_from_file, read_keypair_from_file, CommandOutput},
+};
+
 const TEST_MNEMONIC: &str =
     "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss";
 
@@ -47,7 +47,7 @@ async fn test_addresses_command() -> Result<(), anyhow::Error> {
     let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(3));
 
     // Add another 3 Secp256k1 KeyPairs
-    for _ in 0..3 {
+    for _ in 0 .. 3 {
         keystore.add_key(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
     }
 
@@ -136,9 +136,9 @@ async fn test_read_write_keystore_with_flag() {
 #[test]
 async fn test_sui_operations_config() {
     let temp_dir = TempDir::new().unwrap();
-    let path = temp_dir.path().join("one.keystore");
+    let path = temp_dir.path().join("sui.keystore");
     let path1 = path.clone();
-    // This is the hardcoded keystore in sui-operation: https://github.com/one-chain-labs/onechain-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/sui.keystore
+    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/sui.keystore
     // If this test fails, address hardcoded in sui-operations is likely needed be updated.
     let kp = SuiKeyPair::decode_base64("ANRj4Rx5FZRehqwrctiLgZDPrY/3tI5+uJLCdaXPCj6C").unwrap();
     let contents = vec![kp.encode_base64()];
@@ -151,9 +151,9 @@ async fn test_sui_operations_config() {
         read.unwrap().addresses()[0]
     );
 
-    // This is the hardcoded keystore in sui-operation: https://github.com/one-chain-labs/onechain-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/sui-benchmark.keystore
+    // This is the hardcoded keystore in sui-operation: https://github.com/MystenLabs/sui-operations/blob/af04c9d3b61610dbb36401aff6bef29d06ef89f8/docker/config/generate/static/sui-benchmark.keystore
     // If this test fails, address hardcoded in sui-operations is likely needed be updated.
-    let path2 = temp_dir.path().join("one-benchmark.keystore");
+    let path2 = temp_dir.path().join("sui-benchmark.keystore");
     let path3 = path2.clone();
     let kp = SuiKeyPair::decode_base64("APCWxPNCbgGxOYKeMfPqPmXmwdNVyau9y4IsyBcmC14A").unwrap();
     let contents = vec![kp.encode_base64()];
@@ -169,7 +169,7 @@ async fn test_sui_operations_config() {
 #[test]
 async fn test_load_keystore_err() {
     let temp_dir = TempDir::new().unwrap();
-    let path = temp_dir.path().join("one.keystore");
+    let path = temp_dir.path().join("sui.keystore");
     let path2 = path.clone();
 
     // write encoded AuthorityKeyPair without flag byte to file
@@ -184,7 +184,7 @@ async fn test_load_keystore_err() {
 
 #[test]
 async fn test_private_keys_import_export() -> Result<(), anyhow::Error> {
-    // private key in Bech32, private key in Hex, private key in Base64, derived OneChain address in Hex
+    // private key in Bech32, private key in Hex, private key in Base64, derived Sui address in Hex
     const TEST_CASES: &[(&str, &str, &str, &str)] = &[
         (
             "suiprivkey1qzwant3kaegmjy4qxex93s0jzvemekkjmyv3r2sjwgnv2y479pgsywhveae",
@@ -243,7 +243,7 @@ async fn test_private_keys_import_export() -> Result<(), anyhow::Error> {
         // assert failure when private key is malformed
         let output = KeyToolCommand::Import {
             alias: None,
-            input_string: private_key[1..].to_string(),
+            input_string: private_key[1 ..].to_string(),
             key_scheme: SignatureScheme::ED25519,
             derivation_path: None,
         }
@@ -488,7 +488,7 @@ async fn test_sign_command() -> Result<(), anyhow::Error> {
     // Create a dummy TransactionData
     let gas = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());
     let gas_price = 1;
-    let tx_data = TransactionData::new_pay_oct(
+    let tx_data = TransactionData::new_pay_sui(
         *sender,
         vec![gas],
         vec![SuiAddress::random_for_testing_only()],

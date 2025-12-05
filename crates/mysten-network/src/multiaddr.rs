@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use eyre::{eyre, Result};
 use std::{
     borrow::Cow,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
 };
-use tracing::error;
 
 pub use ::multiaddr::{Error, Protocol};
+use eyre::{eyre, Result};
+use tracing::error;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Multiaddr(::multiaddr::Multiaddr);
@@ -248,6 +248,27 @@ impl<'de> serde::Deserialize<'de> for Multiaddr {
     }
 }
 
+impl std::net::ToSocketAddrs for Multiaddr {
+    type Iter = Box<dyn Iterator<Item = SocketAddr>>;
+
+    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
+        let mut iter = self.iter();
+
+        match (iter.next(), iter.next()) {
+            (Some(Protocol::Ip4(ip4)), Some(Protocol::Tcp(port) | Protocol::Udp(port))) => {
+                (ip4, port).to_socket_addrs().map(|iter| Box::new(iter) as _)
+            }
+            (Some(Protocol::Ip6(ip6)), Some(Protocol::Tcp(port) | Protocol::Udp(port))) => {
+                (ip6, port).to_socket_addrs().map(|iter| Box::new(iter) as _)
+            }
+            (Some(Protocol::Dns(hostname)), Some(Protocol::Tcp(port) | Protocol::Udp(port))) => {
+                (hostname.as_ref(), port).to_socket_addrs().map(|iter| Box::new(iter) as _)
+            }
+            _ => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "unable to convert Multiaddr to SocketAddr")),
+        }
+    }
+}
+
 pub(crate) fn parse_tcp<'a, T: Iterator<Item = Protocol<'a>>>(protocols: &mut T) -> Result<u16> {
     if let Protocol::Tcp(port) = protocols.next().ok_or_else(|| eyre!("unexpected end of multiaddr"))? {
         Ok(port)
@@ -320,8 +341,9 @@ pub(crate) fn parse_ip6(address: &Multiaddr) -> Result<(SocketAddr, &'static str
 
 #[cfg(test)]
 mod test {
-    use super::Multiaddr;
     use multiaddr::multiaddr;
+
+    use super::Multiaddr;
 
     #[test]
     fn test_to_socket_addr_basic() {

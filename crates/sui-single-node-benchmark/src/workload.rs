@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, sync::Arc};
+
+use sui_test_transaction_builder::PublishData;
+
 use crate::{
     benchmark_context::BenchmarkContext,
     command::WorkloadKind,
     tx_generator::{MoveTxGenerator, PackagePublishTxGenerator, TxGenerator},
 };
-use std::{path::PathBuf, sync::Arc};
-use sui_test_transaction_builder::PublishData;
 
 #[derive(Clone)]
 pub struct Workload {

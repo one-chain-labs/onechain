@@ -1,15 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::{ObjectID, SequenceNumber},
-    crypto::DefaultHash,
-    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiResult},
-    execution_status::PackageUpgradeError,
-    id::{ID, UID},
-    object::OBJECT_START_VERSION,
-    SUI_FRAMEWORK_ADDRESS,
-};
+use std::collections::{BTreeMap, BTreeSet};
+
 use fastcrypto::hash::HashFunction;
 use move_binary_format::{
     binary_config::BinaryConfig,
@@ -23,15 +16,21 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
 };
-use move_disassembler::disassembler::Disassembler;
-use move_ir_types::location::Spanned;
 use once_cell::sync::Lazy;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use serde_with::{serde_as, Bytes};
-use std::collections::{BTreeMap, BTreeSet};
 use sui_protocol_config::ProtocolConfig;
+
+use crate::{
+    base_types::{ObjectID, SequenceNumber},
+    crypto::DefaultHash,
+    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiResult},
+    execution_status::PackageUpgradeError,
+    id::{ID, UID},
+    object::OBJECT_START_VERSION,
+    SUI_FRAMEWORK_ADDRESS,
+};
 
 // TODO: robust MovePackage tests
 // #[cfg(test)]
@@ -469,10 +468,6 @@ impl MovePackage {
             .map_err(|error| SuiError::ModuleDeserializationFailure { error: error.to_string() })
     }
 
-    pub fn disassemble(&self) -> SuiResult<BTreeMap<String, Value>> {
-        disassemble_modules(self.module_map.values())
-    }
-
     pub fn normalize(&self, binary_config: &BinaryConfig) -> SuiResult<BTreeMap<String, normalized::Module>> {
         normalize_modules(self.module_map.values(), binary_config)
     }
@@ -533,28 +528,6 @@ pub fn is_test_fun(name: &IdentStr, module: &CompiledModule, fn_info_map: &FnInf
         Some(fn_info) => fn_info.is_test,
         None => false,
     }
-}
-
-pub fn disassemble_modules<'a, I>(modules: I) -> SuiResult<BTreeMap<String, Value>>
-where
-    I: Iterator<Item = &'a Vec<u8>>,
-{
-    let mut disassembled = BTreeMap::new();
-    for bytecode in modules {
-        // this function is only from JSON RPC - it is OK to deserialize with max Move binary
-        // version
-        let module = CompiledModule::deserialize_with_defaults(bytecode)
-            .map_err(|error| SuiError::ModuleDeserializationFailure { error: error.to_string() })?;
-        let d = Disassembler::from_module_with_max_size(
-            &module,
-            Spanned::unsafe_no_loc(()).loc,
-            *MAX_DISASSEMBLED_MODULE_SIZE,
-        )
-        .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
-        let bytecode_str = d.disassemble().map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
-        disassembled.insert(module.name().to_string(), Value::String(bytecode_str));
-    }
-    Ok(disassembled)
 }
 
 pub fn normalize_modules<'a, I>(

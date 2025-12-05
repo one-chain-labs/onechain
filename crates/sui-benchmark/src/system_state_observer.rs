@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ValidatorProxy;
 use std::{sync::Arc, time::Duration};
+
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use tokio::{
     sync::{oneshot::Sender, watch, watch::Receiver},
@@ -10,6 +10,8 @@ use tokio::{
     time::Instant,
 };
 use tracing::{error, info};
+
+use crate::ValidatorProxy;
 
 #[derive(Debug, Clone)]
 pub struct SystemState {

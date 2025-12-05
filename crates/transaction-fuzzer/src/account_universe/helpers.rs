@@ -4,12 +4,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::sample::Index as PropIndex;
-use proptest_derive::Arbitrary;
 use std::{
     collections::BTreeSet,
     ops::{Deref, Index as OpsIndex},
 };
+
+use proptest::sample::Index as PropIndex;
+use proptest_derive::Arbitrary;
 
 /// Given a maximum value `max` and a list of [`Index`](proptest::sample::Index) instances, picks
 /// integers in the range `[0, max)` uniformly randomly and without duplication.
@@ -28,7 +29,7 @@ where
     // for a longer explanation. This is a variant that works with zero-indexing.
     let mut selected = BTreeSet::new();
     let to_select = indexes_len.min(max);
-    for (iter_idx, choice) in ((max - to_select)..max).enumerate() {
+    for (iter_idx, choice) in ((max - to_select) .. max).enumerate() {
         // "RandInt(1, J)" in the original algorithm means a number between 1
         // and choice, both inclusive. `PropIndex::index` picks a number between 0 and
         // whatever's passed in, with the latter exclusive. Pass in "+1" to ensure the same

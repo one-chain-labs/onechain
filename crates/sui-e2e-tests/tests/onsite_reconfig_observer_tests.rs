@@ -7,10 +7,9 @@ use sui_core::{
     quorum_driver::reconfig_observer::{OnsiteReconfigObserver, ReconfigObserver},
     safe_client::SafeClientMetricsBase,
 };
+use sui_macros::sim_test;
 use test_cluster::TestClusterBuilder;
 use tracing::info;
-
-use sui_macros::sim_test;
 
 #[sim_test]
 async fn test_onsite_reconfig_observer_basic() {

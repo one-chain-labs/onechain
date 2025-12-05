@@ -6,18 +6,22 @@ use itertools::Itertools;
 use crate::control_flow_graph::{BlockId, ControlFlowGraph, VMControlFlowGraph};
 
 use move_binary_format::file_format::{
-    Bytecode,
-    EnumDefinitionIndex,
-    JumpTableInner,
-    VariantJumpTable,
-    VariantJumpTableIndex,
+    Bytecode, EnumDefinitionIndex, JumpTableInner, VariantJumpTable, VariantJumpTableIndex,
 };
 
 #[test]
 fn traversal_no_loops() {
     let cfg = {
         use Bytecode::*;
-        VMControlFlowGraph::new(&[/* L0 */ LdTrue, /*    */ BrTrue(3), /* L2 */ Branch(3), /* L3 */ Ret], &[])
+        VMControlFlowGraph::new(
+            &[
+                /* L0 */ LdTrue,
+                /*    */ BrTrue(3),
+                /* L2 */ Branch(3),
+                /* L3 */ Ret,
+            ],
+            &[],
+        )
     };
 
     cfg.display();
@@ -92,7 +96,9 @@ fn traversal_loops_with_switch() {
             &[VariantJumpTable {
                 // Doesn't matter
                 head_enum: EnumDefinitionIndex::new(0),
-                jump_table: JumpTableInner::Full(vec![/* Inner break */ 3, /* Inner continue */ 2]),
+                jump_table: JumpTableInner::Full(vec![
+                    /* Inner break */ 3, /* Inner continue */ 2,
+                ]),
             }],
         )
     };
@@ -106,7 +112,14 @@ fn traversal_loops_with_switch() {
 fn traversal_non_loop_back_branch() {
     let cfg = {
         use Bytecode::*;
-        VMControlFlowGraph::new(&[/* L0 */ Branch(2), /* L1 */ Ret, /* L2 */ Branch(1)], &[])
+        VMControlFlowGraph::new(
+            &[
+                /* L0 */ Branch(2),
+                /* L1 */ Ret,
+                /* L2 */ Branch(1),
+            ],
+            &[],
+        )
     };
 
     cfg.display();
@@ -119,7 +132,11 @@ fn traversal_non_loop_back_branch_variant_switch() {
     let cfg = {
         use Bytecode::*;
         VMControlFlowGraph::new(
-            &[/* L0 */ VariantSwitch(VariantJumpTableIndex::new(0)), /* L1 */ Ret, /* L2 */ Branch(1)],
+            &[
+                /* L0 */ VariantSwitch(VariantJumpTableIndex::new(0)),
+                /* L1 */ Ret,
+                /* L2 */ Branch(1),
+            ],
             &[VariantJumpTable {
                 // Doesn't matter
                 head_enum: EnumDefinitionIndex::new(0),
@@ -139,27 +156,34 @@ fn out_of_order_blocks_variant_switch() {
 
     let blocks = (0..=127)
         .map(|i| {
-            (i, vec![
-                Bytecode::Pop,      // Pop the value from the variant switch
-                Bytecode::LdU16(i), // Ld the number so we can track what block this is canonically
-                Bytecode::Pop,      // Then pop it
-                Bytecode::Ret,      // Then ret
-            ])
+            (
+                i,
+                vec![
+                    Bytecode::Pop,      // Pop the value from the variant switch
+                    Bytecode::LdU16(i), // Ld the number so we can track what block this is canonically
+                    Bytecode::Pop,      // Then pop it
+                    Bytecode::Ret,      // Then ret
+                ],
+            )
         })
         .collect::<Vec<_>>();
 
     let block_len = blocks.last().unwrap().1.len() as u16;
 
     let (canonical_blocks, canonical_traversal) = {
-        let jump_table = JumpTableInner::Full(blocks.iter().map(|(i, _)| 1 + *i * block_len).collect());
+        let jump_table =
+            JumpTableInner::Full(blocks.iter().map(|(i, _)| 1 + *i * block_len).collect());
         let mut start_block = vec![Bytecode::VariantSwitch(VariantJumpTableIndex::new(0))];
         start_block.extend(blocks.clone().into_iter().flat_map(|(_, block)| block));
 
-        let cfg = VMControlFlowGraph::new(&start_block, &[VariantJumpTable {
-            // Doesn't matter
-            head_enum: EnumDefinitionIndex::new(0),
-            jump_table,
-        }]);
+        let cfg = VMControlFlowGraph::new(
+            &start_block,
+            &[VariantJumpTable {
+                // Doesn't matter
+                head_enum: EnumDefinitionIndex::new(0),
+                jump_table,
+            }],
+        );
 
         cfg.display();
         (cfg.num_blocks(), traversal(&cfg))
@@ -180,13 +204,26 @@ fn out_of_order_blocks_variant_switch() {
 
         let jump_table = JumpTableInner::Full(perm.iter().map(|i| 1 + *i * block_len).collect());
 
-        let cfg = VMControlFlowGraph::new(&blocks, &[VariantJumpTable {
-            // Doesn't matter
-            head_enum: EnumDefinitionIndex::new(0),
-            jump_table,
-        }]);
-        assert_eq!(cfg.num_blocks(), canonical_blocks, "num blocks differ: Permutation: {:?}", perm);
-        assert_eq!(traversal(&cfg), canonical_traversal, "traversal differs: Permutation: {:?}", perm);
+        let cfg = VMControlFlowGraph::new(
+            &blocks,
+            &[VariantJumpTable {
+                // Doesn't matter
+                head_enum: EnumDefinitionIndex::new(0),
+                jump_table,
+            }],
+        );
+        assert_eq!(
+            cfg.num_blocks(),
+            canonical_blocks,
+            "num blocks differ: Permutation: {:?}",
+            perm
+        );
+        assert_eq!(
+            traversal(&cfg),
+            canonical_traversal,
+            "traversal differs: Permutation: {:?}",
+            perm
+        );
     }
 }
 

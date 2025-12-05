@@ -48,7 +48,7 @@ curl https://releases.sui.io/$SUI_SHA/sui-node -o sui-node
 To build directly from source:
 
 ```shell
-git clone https://github.com/one-chain-labs/onechain.git && cd sui
+git clone https://github.com/MystenLabs/sui.git && cd sui
 git checkout [SHA|BRANCH|TAG]
 cargo build --release --bin sui-node
 ```
@@ -274,7 +274,7 @@ sui client call --package 0x3 --module sui_system --function update_validator_na
 sui client call --package 0x3 --module sui_system --function update_validator_next_epoch_p2p_address --args 0x5 "[4, 192, 168, 1, 1]" --gas-budget 10000
 ```
 
-See the [full list of metadata update functions here](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-system/sources/sui_system.move#L267-L444).
+See the [full list of metadata update functions here](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/sui_system.move#L267-L444).
 
 ### Operation Cap
 
@@ -342,12 +342,12 @@ There may be instances where urgent security fixes need to be rolled out before 
 This release process will be different and we expect us to announce the directory for such binaries out of band.
 Our public key to verify these binaries would be stored [here](https://sui-private.s3.us-west-2.amazonaws.com/sui_security_release.pem)
 
-You can download all the necessary signed binaries and docker artifacts incorporating the security fixes by using the [download_private.sh](https://github.com/one-chain-labs/onechain/blob/main/nre/download_private.sh)
+You can download all the necessary signed binaries and docker artifacts incorporating the security fixes by using the [download_private.sh](https://github.com/MystenLabs/sui/blob/main/nre/download_private.sh)
 
 Usage
 `./download_private.sh <directory-name>`
 
-You can also download and verify specific binaries that may not be included by the above script using the [download_and_verify_private_binary.sh](https://github.com/one-chain-labs/onechain/blob/main/nre/download_and_verify_private_binary.sh) script.
+You can also download and verify specific binaries that may not be included by the above script using the [download_and_verify_private_binary.sh](https://github.com/MystenLabs/sui/blob/main/nre/download_and_verify_private_binary.sh) script.
 
 Usage:
 `./download_and_verify_private_binary.sh <directory-name> <binary-name>`

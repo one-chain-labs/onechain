@@ -1,6 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
+
+use anyhow::{Error, Result};
+use itertools::Itertools;
+use sui_core::test_utils::{make_pay_sui_transaction, make_transfer_sui_transaction};
+use sui_types::{base_types::SuiAddress, crypto::AccountKeyPair};
+use tracing::info;
+
 use crate::{
     util::UpdatedAndNewlyMintedGasCoins,
     workloads::{
@@ -11,15 +22,6 @@ use crate::{
     },
     ValidatorProxy,
 };
-use anyhow::{Error, Result};
-use itertools::Itertools;
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
-use sui_core::test_utils::{make_pay_sui_transaction, make_transfer_sui_transaction};
-use sui_types::{base_types::SuiAddress, crypto::AccountKeyPair};
-use tracing::info;
 
 /// Bank is used for generating gas for running the benchmark.
 #[derive(Clone)]

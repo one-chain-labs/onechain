@@ -11,6 +11,7 @@ mod checked {
         collections::{BTreeMap, HashSet},
         sync::Arc,
     };
+
     use sui_config::verifier_signing_config::VerifierSigningConfig;
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{

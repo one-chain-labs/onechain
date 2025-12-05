@@ -53,7 +53,11 @@ impl<'env> ExpGenerator<'env> for FunctionDataBuilder<'env> {
     }
 
     fn get_local_type(&self, temp: TempIndex) -> Type {
-        self.data.local_types.get(temp).expect("local variable").clone()
+        self.data
+            .local_types
+            .get(temp)
+            .expect("local variable")
+            .clone()
     }
 }
 
@@ -105,14 +109,21 @@ impl<'env> FunctionDataBuilder<'env> {
 
     /// Sets the default location from a code attribute id.
     pub fn set_loc_from_attr(&mut self, attr_id: AttrId) {
-        let loc =
-            if let Some(l) = self.data.locations.get(&attr_id) { l.clone() } else { self.global_env().unknown_loc() };
+        let loc = if let Some(l) = self.data.locations.get(&attr_id) {
+            l.clone()
+        } else {
+            self.global_env().unknown_loc()
+        };
         self.current_loc = loc;
     }
 
     /// Gets the location from the bytecode attribute.
     pub fn get_loc(&self, attr_id: AttrId) -> Loc {
-        self.data.locations.get(&attr_id).cloned().unwrap_or_else(|| self.fun_env.get_loc())
+        self.data
+            .locations
+            .get(&attr_id)
+            .cloned()
+            .unwrap_or_else(|| self.fun_env.get_loc())
     }
 
     /// Creates a new bytecode attribute id with default location.
@@ -137,7 +148,9 @@ impl<'env> FunctionDataBuilder<'env> {
         // Perform some minimal peephole optimization
         match (self.data.code.last(), &bc) {
             // jump L; L: ..
-            (Some(Jump(_, label1)), Label(_, label2)) if !no_fallthrough_jump_removal && label1 == label2 => {
+            (Some(Jump(_, label1)), Label(_, label2))
+                if !no_fallthrough_jump_removal && label1 == label2 =>
+            {
                 *self.data.code.last_mut().unwrap() = bc;
             }
             _ => {

@@ -3,6 +3,18 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    dataloader::Loader,
+    *,
+};
+use diesel::{prelude::QueryableByName, BoolExpressionMethods, ExpressionMethods, JoinOnDsl, QueryDsl, Selectable};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use serde::{Deserialize, Serialize};
+use sui_indexer::{models::objects::StoredFullHistoryObject, schema::packages};
+use sui_package_resolver::{error::Error as PackageCacheError, Package as ParsedMovePackage};
+use sui_types::{is_system_package, move_package::MovePackage as NativeMovePackage, object::Data};
+
 use super::{
     balance::{self, Balance},
     base64::Base64,
@@ -13,7 +25,7 @@ use super::{
     move_object::MoveObject,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedOct,
+    stake::StakedSui,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -30,17 +42,6 @@ use crate::{
     raw_query::RawQuery,
     types::sui_address::addr,
 };
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    dataloader::Loader,
-    *,
-};
-use diesel::{prelude::QueryableByName, BoolExpressionMethods, ExpressionMethods, JoinOnDsl, QueryDsl, Selectable};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use serde::{Deserialize, Serialize};
-use sui_indexer::{models::objects::StoredFullHistoryObject, schema::packages};
-use sui_package_resolver::{error::Error as PackageCacheError, Package as ParsedMovePackage};
-use sui_types::{is_system_package, move_package::MovePackage as NativeMovePackage, object::Data};
 
 #[derive(Clone)]
 pub(crate) struct MovePackage {
@@ -195,7 +196,7 @@ impl MovePackage {
     }
 
     /// Total balance of all coins with marker type owned by this package. If type is not supplied,
-    /// it defaults to `0x2::oct::OCT`.
+    /// it defaults to `0x2::sui::SUI`.
     ///
     /// Note that coins owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
@@ -220,7 +221,7 @@ impl MovePackage {
 
     /// The coin objects owned by this package.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     ///
     /// Note that coins owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
@@ -236,19 +237,19 @@ impl MovePackage {
         OwnerImpl::from(&self.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this package.
+    /// The `0x3::staking_pool::StakedSui` objects owned by this package.
     ///
     /// Note that objects owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
-    pub(crate) async fn staked_octs(
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(&self.super_).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.

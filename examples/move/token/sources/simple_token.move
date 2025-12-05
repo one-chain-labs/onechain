@@ -5,7 +5,7 @@
 /// actions are allowed as long as the user is not on the denylist.
 module examples::simple_token {
     use examples::denylist_rule::Denylist;
-    use one::{
+    use sui::{
         coin::{Self, TreasuryCap},
         token::{Self, TokenPolicy, TokenPolicyCap},
         tx_context::sender
@@ -67,7 +67,7 @@ module examples::simple_token {
 /// on a test currency.
 module examples::simple_token_tests {
     use examples::{denylist_rule as denylist, simple_token::set_rules};
-    use one::{
+    use sui::{
         coin,
         token::{Self, TokenPolicy, TokenPolicyCap},
         token_test_utils::{Self as test, TEST}

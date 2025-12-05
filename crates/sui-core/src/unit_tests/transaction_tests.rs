@@ -1,17 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{authority::test_authority_builder::TestAuthorityBuilder, mock_consensus::with_block_status};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::Deref,
+};
+
 use consensus_core::{BlockRef, BlockStatus};
 use fastcrypto::{ed25519::Ed25519KeyPair, traits::KeyPair};
 use fastcrypto_zkp::bn254::zk_login::{parse_jwks, OIDCProvider, ZkLoginInputs};
 use move_core_types::ident_str;
 use rand::{rngs::StdRng, SeedableRng};
 use shared_crypto::intent::{Intent, IntentMessage};
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Deref,
-};
+use sui_macros::sim_test;
+use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use sui_types::{
     authenticator_state::ActiveJwk,
     base_types::dbg_addr,
@@ -30,23 +32,23 @@ use sui_types::{
     messages_grpc::HandleSoftBundleCertificatesRequestV3,
     multisig::{MultiSig, MultiSigPublicKey},
     signature::GenericSignature,
+    sui_system_state::SUI_SYSTEM_MODULE_NAME,
     transaction::{AuthenticatorStateUpdate, GenesisTransaction, TransactionDataAPI, TransactionKind},
     utils::{get_one_zklogin_inputs, load_test_vectors, to_sender_signed_transaction},
     zk_login_authenticator::ZkLoginAuthenticator,
     zk_login_util::DEFAULT_JWK_BYTES,
+    SUI_SYSTEM_PACKAGE_ID,
 };
 
 use crate::{
     authority::{
         authority_test_utils::send_batch_consensus_no_execution,
         authority_tests::{call_move_, create_gas_objects, publish_object_basics},
+        test_authority_builder::TestAuthorityBuilder,
     },
     consensus_adapter::consensus_tests::make_consensus_adapter_for_test,
+    mock_consensus::with_block_status,
 };
-use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-use sui_types::{sui_system_state::SUI_SYSTEM_MODULE_NAME, SUI_SYSTEM_PACKAGE_ID};
-
-use sui_macros::sim_test;
 macro_rules! assert_matches {
     ($expression:expr, $pattern:pat $(if $guard: expr)?) => {
         match $expression {
@@ -61,13 +63,6 @@ macro_rules! assert_matches {
     };
 }
 
-use crate::{
-    authority_client::{AuthorityAPI, NetworkAuthorityClient},
-    authority_server::{AuthorityServer, AuthorityServerHandle},
-    stake_aggregator::{InsertResult, StakeAggregator},
-};
-
-use super::*;
 use fastcrypto::traits::AggregateAuthenticator;
 use sui_types::{
     digests::ConsensusCommitDigest,
@@ -75,7 +70,13 @@ use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
 };
 
+use super::*;
 pub use crate::authority::authority_test_utils::init_state_with_ids;
+use crate::{
+    authority_client::{AuthorityAPI, NetworkAuthorityClient},
+    authority_server::{AuthorityServer, AuthorityServerHandle},
+    stake_aggregator::{InsertResult, StakeAggregator},
+};
 
 #[sim_test]
 async fn test_handle_transfer_transaction_bad_signature() {
@@ -229,9 +230,7 @@ async fn test_user_sends_consensus_commit_prologue_v3() {
         sub_dag_index: None,
         commit_timestamp_ms: 42,
         consensus_commit_digest: ConsensusCommitDigest::default(),
-        consensus_determined_version_assignments: ConsensusDeterminedVersionAssignments::CancelledTransactions(
-            Vec::new(),
-        ),
+        consensus_determined_version_assignments: ConsensusDeterminedVersionAssignments::empty_for_testing(),
     }))
     .await;
 }
@@ -775,13 +774,13 @@ async fn setup_zklogin_network(
     let sender_2 = SuiAddress::from(&multisig_pk);
 
     let recipient = dbg_addr(2);
-    let objects: Vec<_> = (0..20)
+    let objects: Vec<_> = (0 .. 20)
         .map(|i| match i < 10 {
             true => (sender, ObjectID::random()),
             false => (sender_2, ObjectID::random()),
         })
         .collect();
-    let gas_objects: Vec<_> = (0..20)
+    let gas_objects: Vec<_> = (0 .. 20)
         .map(|i| match i < 10 {
             true => (sender, ObjectID::random()),
             false => (sender_2, ObjectID::random()),
@@ -918,8 +917,8 @@ async fn zklogin_txn_fail_if_missing_jwk() {
     };
     let sender = SuiAddress::try_from_unpadded(zklogin).unwrap();
     let recipient = dbg_addr(2);
-    let objects: Vec<_> = (0..10).map(|_| (sender, ObjectID::random())).collect();
-    let gas_objects: Vec<_> = (0..10).map(|_| (sender, ObjectID::random())).collect();
+    let objects: Vec<_> = (0 .. 10).map(|_| (sender, ObjectID::random())).collect();
+    let gas_objects: Vec<_> = (0 .. 10).map(|_| (sender, ObjectID::random())).collect();
     let object_ids: Vec<_> = objects.iter().map(|(_, id)| *id).collect();
     let gas_object_ids: Vec<_> = gas_objects.iter().map(|(_, id)| *id).collect();
     let authority_state = init_state_with_ids(objects.into_iter().chain(gas_objects).collect::<Vec<_>>()).await;
@@ -1002,7 +1001,7 @@ async fn zk_multisig_test() {
     );
 
     // Step 1. construct 2 zklogin signatures
-    let test_vectors = &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1..];
+    let test_vectors = &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1 ..];
     let mut zklogin_sigs = vec![];
     for (kp, _pk_zklogin, inputs) in test_vectors {
         let intent_message = IntentMessage::new(Intent::sui_transaction(), data.clone());
@@ -1060,7 +1059,7 @@ async fn test_oversized_txn() {
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
         // Put a lot of commands in the txn so it's large.
-        for _ in 0..(1024 * 16) {
+        for _ in 0 .. (1024 * 16) {
             builder.transfer_object(recipient, obj_ref).unwrap();
         }
         builder.finish()
@@ -1136,7 +1135,7 @@ async fn test_very_large_certificate() {
 
     // Insert a lot into the bitmap so the cert is very large, while the txn inside is reasonably sized.
     let mut signers_map = roaring::bitmap::RoaringBitmap::new();
-    signers_map.insert_range(0..52108864);
+    signers_map.insert_range(0 .. 52108864);
     let sigs: Vec<AuthoritySignature> = signatures.into_values().collect();
 
     let quorum_signature = sui_types::crypto::AuthorityQuorumSignInfo {
@@ -1268,7 +1267,7 @@ async fn test_handle_soft_bundle_certificates() {
 
     let mut senders = Vec::new();
     let mut gas_object_ids = Vec::new();
-    for _i in 0..4 {
+    for _i in 0 .. 4 {
         let (address, keypair): (_, AccountKeyPair) = get_key_pair();
         let gas_object_id = ObjectID::random();
 
@@ -1335,7 +1334,7 @@ async fn test_handle_soft_bundle_certificates() {
 
     let rgp = authority.reference_gas_price_for_testing().unwrap();
     let mut certificates: Vec<CertifiedTransaction> = Vec::new();
-    for i in 0..4 {
+    for i in 0 .. 4 {
         let cert = {
             let gas_object_ref = authority.get_object(&gas_object_ids[i]).await.unwrap().compute_object_reference();
             let data = TransactionData::new_move_call(
@@ -1400,7 +1399,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
     let mut senders = Vec::new();
     let mut gas_objects = Vec::new();
     let mut owned_objects = Vec::new();
-    for _i in 0..15 {
+    for _i in 0 .. 15 {
         let (sender, keypair): (_, AccountKeyPair) = get_key_pair();
         let mut objects = create_gas_objects(2, sender);
         senders.push((sender, keypair));
@@ -1496,7 +1495,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
     println!("Case 1: submit a soft bundle with more txs than the limit.");
     {
         let mut certificates: Vec<CertifiedTransaction> = vec![];
-        for i in 0..5 {
+        for i in 0 .. 5 {
             let owned_object_ref =
                 authority.get_object(&owned_objects[i].id()).await.unwrap().compute_object_reference();
             let gas_object_ref = authority.get_object(&gas_objects[i].id()).await.unwrap().compute_object_reference();
@@ -1526,7 +1525,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
             .await;
         assert!(response.is_err());
         assert_matches!(response.unwrap_err(), SuiError::UserInputError {
-            error: UserInputError::TooManyTransactionsInSoftBundle { .. }
+            error: UserInputError::TooManyTransactionsInSoftBundle { .. },
         });
     }
 
@@ -1560,7 +1559,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
             .await;
         assert!(response.is_err());
         assert_matches!(response.unwrap_err(), SuiError::UserInputError {
-            error: UserInputError::NoSharedObjectError { .. }
+            error: UserInputError::NoSharedObjectError { .. },
         });
     }
 
@@ -1633,7 +1632,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
             .await;
         assert!(response.is_err());
         assert_matches!(response.unwrap_err(), SuiError::UserInputError {
-            error: UserInputError::GasPriceMismatchError { .. }
+            error: UserInputError::GasPriceMismatchError { .. },
         });
     }
 
@@ -1707,7 +1706,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
             .await;
         assert!(response.is_err());
         assert_matches!(response.unwrap_err(), SuiError::UserInputError {
-            error: UserInputError::CertificateAlreadyProcessed { .. }
+            error: UserInputError::CertificateAlreadyProcessed { .. },
         });
     }
 
@@ -1717,7 +1716,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
     {
         let mut certificates: Vec<CertifiedTransaction> = vec![];
 
-        for i in 11..14 {
+        for i in 11 .. 14 {
             let owned_object_ref =
                 authority.get_object(&owned_objects[i].id()).await.unwrap().compute_object_reference();
             let gas_object_ref = authority.get_object(&gas_objects[i].id()).await.unwrap().compute_object_reference();
@@ -1728,7 +1727,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
             let pt = {
                 let mut builder = ProgrammableTransactionBuilder::new();
                 // Put a lot of commands in the txn so it's large.
-                for _ in 0..1000 {
+                for _ in 0 .. 1000 {
                     builder.transfer_object(*recipient, owned_object_ref).unwrap();
                 }
                 builder.finish()
@@ -1761,7 +1760,7 @@ async fn test_handle_soft_bundle_certificates_errors() {
             .await;
         assert!(response.is_err());
         assert_matches!(response.unwrap_err(), SuiError::UserInputError {
-            error: UserInputError::SoftBundleTooLarge { size: 25116, limit: 5000 }
+            error: UserInputError::SoftBundleTooLarge { size: 25116, limit: 5000 },
         });
     }
 }

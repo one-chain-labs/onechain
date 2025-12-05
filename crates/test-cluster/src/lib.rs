@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::{future::join_all, StreamExt};
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use one_node::SuiNodeHandle;
-use rand::{distributions::*, rngs::OsRng, seq::SliceRandom};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -13,6 +9,11 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+
+use futures::{future::join_all, StreamExt};
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use mysten_common::fatal;
+use rand::{distributions::*, rngs::OsRng, seq::SliceRandom};
 use sui_config::{
     genesis::Genesis,
     node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
@@ -32,6 +33,7 @@ use sui_json_rpc_types::{
     TransactionFilter,
 };
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
+use sui_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolVersion;
 use sui_sdk::{
     apis::QuorumDriverApi,
@@ -303,7 +305,9 @@ impl TestCluster {
             node.get_node_handle()
                 .unwrap()
                 .with_async(|node| async {
-                    node.close_epoch_for_testing().await.unwrap();
+                    node.close_epoch_for_testing().await.unwrap_or_else(|_| {
+                        fatal!("Failed to close epoch for validator {:?}", node.state().name);
+                    });
                     cur_stake += cur_committee.weight(&node.state().name);
                 })
                 .await;
@@ -604,7 +608,7 @@ impl TestCluster {
         let context = &self.wallet;
         let (sender, gas) = context.get_one_gas_object().await.unwrap().unwrap();
         let tx = context.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(amount, funding_address).build(),
+            &TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(amount, funding_address).build(),
         );
         context.execute_transaction_must_succeed(tx).await;
 
@@ -612,7 +616,7 @@ impl TestCluster {
     }
 
     pub async fn transfer_sui_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
-        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_oct(Some(amount), receiver).build();
+        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_sui(Some(amount), receiver).build();
         let effects = self.sign_and_execute_transaction(&tx).await.effects.unwrap();
         assert_eq!(&SuiExecutionStatus::Success, effects.status());
         effects.created().first().unwrap().object_id()
@@ -946,8 +950,8 @@ impl TestClusterBuilder {
                 use rand::Rng;
 
                 // generate random (and possibly conflicting) id/key pairings.
-                let id_num = rand::thread_rng().gen_range(1..=4);
-                let key_num = rand::thread_rng().gen_range(1..=4);
+                let id_num = rand::thread_rng().gen_range(1 ..= 4);
+                let key_num = rand::thread_rng().gen_range(1 ..= 4);
 
                 let id = JwkId { iss: provider.get_config().iss, kid: format!("kid{}", id_num) };
 

@@ -1,15 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::displays::Pretty;
 use std::fmt::{Display, Formatter};
+
 use sui_types::{gas::SuiGasStatus, gas_model::gas_v2::SuiGasStatus as GasStatusV2};
 use tabled::{
     builder::Builder as TableBuilder,
     settings::{style::HorizontalLine, Style as TableStyle},
 };
 
-impl<'a> Display for Pretty<'a, SuiGasStatus> {
+use crate::displays::Pretty;
+
+impl Display for Pretty<'_, SuiGasStatus> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(sui_gas_status) = self;
         match sui_gas_status {

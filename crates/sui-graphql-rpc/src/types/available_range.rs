@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data::{Conn, Db, DbConnection, QueryExecutor},
-    error::Error,
-};
-
-use super::checkpoint::{Checkpoint, CheckpointId};
 use async_graphql::*;
 use diesel::{CombineDsl, ExpressionMethods, QueryDsl, QueryResult};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use sui_indexer::schema::{checkpoints, objects_snapshot};
+
+use super::checkpoint::{Checkpoint, CheckpointId};
+use crate::{
+    data::{Conn, Db, DbConnection, QueryExecutor},
+    error::Error,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub(crate) struct AvailableRange {

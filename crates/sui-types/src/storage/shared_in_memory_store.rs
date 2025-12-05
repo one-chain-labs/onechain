@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashMap, sync::Arc};
+
+use tap::Pipe;
+use tracing::error;
+
 use super::{error::Result, ObjectStore};
 use crate::{
     base_types::{EpochId, TransactionDigest},
@@ -17,9 +22,6 @@ use crate::{
     storage::{ReadStore, WriteStore},
     transaction::VerifiedTransaction,
 };
-use std::{collections::HashMap, sync::Arc};
-use tap::Pipe;
-use tracing::error;
 
 #[derive(Clone, Debug, Default)]
 pub struct SharedInMemoryStore(Arc<std::sync::RwLock<InMemoryStore>>);

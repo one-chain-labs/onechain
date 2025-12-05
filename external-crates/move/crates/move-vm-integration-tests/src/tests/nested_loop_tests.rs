@@ -45,14 +45,18 @@ fn test_publish_module_with_nested_loops() {
                 /* silent debug */ true,
             ),
             VMConfig {
-                verifier: VerifierConfig { max_loop_depth: Some(2), ..Default::default() },
+                verifier: VerifierConfig {
+                    max_loop_depth: Some(2),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )
         .unwrap();
 
         let mut sess = vm.new_session(&storage);
-        sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter).unwrap();
+        sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
+            .unwrap();
     }
 
     // Should fail with max_loop_depth = 1
@@ -65,13 +69,17 @@ fn test_publish_module_with_nested_loops() {
                 /* silent debug */ true,
             ),
             VMConfig {
-                verifier: VerifierConfig { max_loop_depth: Some(1), ..Default::default() },
+                verifier: VerifierConfig {
+                    max_loop_depth: Some(1),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )
         .unwrap();
 
         let mut sess = vm.new_session(&storage);
-        sess.publish_module(m_blob, TEST_ADDR, &mut UnmeteredGasMeter).unwrap_err();
+        sess.publish_module(m_blob, TEST_ADDR, &mut UnmeteredGasMeter)
+            .unwrap_err();
     }
 }

@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{str::FromStr, sync::Arc, time::Duration};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
@@ -11,10 +13,9 @@ use reqwest::{
     Url,
 };
 use serde::{Deserialize, Serialize};
-use std::{str::FromStr, sync::Arc, time::Duration};
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, VersionNumber},
-    digests::{CheckpointContentsDigest, CheckpointDigest, TransactionDigest, TransactionEventsDigest},
+    digests::{CheckpointContentsDigest, CheckpointDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, SuiResult},
     messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber},
@@ -74,7 +75,6 @@ where
 pub enum Key {
     Tx(TransactionDigest),
     Fx(TransactionDigest),
-    Events(TransactionEventsDigest),
     CheckpointContents(CheckpointSequenceNumber),
     CheckpointSummary(CheckpointSequenceNumber),
     CheckpointContentsByDigest(CheckpointContentsDigest),
@@ -90,7 +90,6 @@ impl Key {
         match self {
             Key::Tx(_) => "tx",
             Key::Fx(_) => "fx",
-            Key::Events(_) => "ev",
             Key::CheckpointContents(_) => "cc",
             Key::CheckpointSummary(_) => "cs",
             Key::CheckpointContentsByDigest(_) => "cc",
@@ -105,7 +104,6 @@ impl Key {
         match self {
             Key::Tx(digest) => encode_digest(digest),
             Key::Fx(digest) => encode_digest(digest),
-            Key::Events(digest) => encode_digest(digest),
             Key::CheckpointContents(seq) => encoded_tagged_key(&TaggedKey::CheckpointSequenceNumber(*seq)),
             Key::CheckpointSummary(seq) => encoded_tagged_key(&TaggedKey::CheckpointSequenceNumber(*seq)),
             Key::CheckpointContentsByDigest(digest) => encode_digest(digest),
@@ -137,7 +135,6 @@ pub fn path_elements_to_key(digest: &str, type_: &str) -> anyhow::Result<Key> {
     match type_ {
         "tx" => Ok(Key::Tx(TransactionDigest::try_from(decoded_digest)?)),
         "fx" => Ok(Key::Fx(TransactionDigest::try_from(decoded_digest)?)),
-        "ev" => Ok(Key::Events(TransactionEventsDigest::try_from(decoded_digest)?)),
         "cc" => {
             // first try to decode as digest, otherwise try to decode as tagged key
             match CheckpointContentsDigest::try_from(decoded_digest.clone()) {
@@ -268,7 +265,7 @@ fn multi_split_slice<'a, T>(slice: &'a [T], lengths: &'a [usize]) -> Vec<&'a [T]
         .iter()
         .map(|length| {
             let end = start + length;
-            let result = &slice[start..end];
+            let result = &slice[start .. end];
             start = end;
             result
         })
@@ -298,23 +295,16 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
-    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>, Vec<Option<TransactionEvents>>)> {
+    ) -> SuiResult<(Vec<Option<Transaction>>, Vec<Option<TransactionEffects>>)> {
         let num_txns = transactions.len();
         let num_effects = effects.len();
-        let num_events = events.len();
 
-        let keys = transactions
-            .iter()
-            .map(|tx| Key::Tx(*tx))
-            .chain(effects.iter().map(|fx| Key::Fx(*fx)))
-            .chain(events.iter().map(|events| Key::Events(*events)))
-            .collect::<Vec<_>>();
+        let keys =
+            transactions.iter().map(|tx| Key::Tx(*tx)).chain(effects.iter().map(|fx| Key::Fx(*fx))).collect::<Vec<_>>();
 
         let fetches = self.multi_fetch(keys).await;
-        let txn_slice = fetches[..num_txns].to_vec();
-        let fx_slice = fetches[num_txns..num_txns + num_effects].to_vec();
-        let events_slice = fetches[num_txns + num_effects..].to_vec();
+        let txn_slice = fetches[.. num_txns].to_vec();
+        let fx_slice = fetches[num_txns .. num_txns + num_effects].to_vec();
 
         let txn_results = txn_slice
             .iter()
@@ -338,20 +328,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
                 })
             })
             .collect::<Vec<_>>();
-
-        let events_results = events_slice
-            .iter()
-            .take(num_events)
-            .zip(events.iter())
-            .map(map_fetch)
-            .map(|maybe_bytes| {
-                maybe_bytes.and_then(|(bytes, digest)| {
-                    deser_check_digest(digest, bytes, |events: &TransactionEvents| events.digest())
-                })
-            })
-            .collect::<Vec<_>>();
-
-        Ok((txn_results, fx_results, events_results))
+        Ok((txn_results, fx_results))
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -467,7 +444,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
             .zip(digests.iter())
             .map(map_fetch)
             .map(|maybe_bytes| {
-                maybe_bytes.and_then(|(bytes, key)| deser::<_, TransactionEvents>(&key, &bytes.slice(1..)))
+                maybe_bytes.and_then(|(bytes, key)| deser::<_, TransactionEvents>(&key, &bytes.slice(1 ..)))
             })
             .collect::<Vec<_>>())
     }

@@ -1,21 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use rstest::rstest;
+
 use super::*;
 use crate::{
     reopen,
     retry_transaction,
-    retry_transaction_forever,
     rocks::{
-        iter::{Iter, RevIter},
+        iter::Iter,
         safe_iter::{SafeIter, SafeRevIter},
-        util::{is_ref_count_value, reference_count_merge_operator},
     },
 };
-use rstest::rstest;
-use serde::Deserialize;
 
 fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").keep()
+    tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
 
 // A wrapper that holds different type of iterators for testing purpose. We use it to get same
@@ -23,23 +21,19 @@ fn temp_dir() -> std::path::PathBuf {
 // of underlying Iterator.
 enum TestIteratorWrapper<'a, K, V> {
     Iter(Iter<'a, K, V>),
-    RevIter(RevIter<'a, K, V>),
     SafeIter(SafeIter<'a, K, V>),
-    SafeRevIter(SafeRevIter<'a, K, V>),
 }
 
 // Implement Iterator for TestIteratorWrapper that returns the same type result for different types of Iterator.
 // For non-safe Iterator, it returns the key value pair. For SafeIterator, it consumes the result (assuming no error),
 // and return they key value pairs.
-impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iterator for TestIteratorWrapper<'a, K, V> {
+impl<K: DeserializeOwned, V: DeserializeOwned> Iterator for TestIteratorWrapper<'_, K, V> {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             TestIteratorWrapper::Iter(iter) => iter.next(),
-            TestIteratorWrapper::RevIter(iter) => iter.next(),
             TestIteratorWrapper::SafeIter(iter) => iter.next().map(|result| result.unwrap()),
-            TestIteratorWrapper::SafeRevIter(iter) => iter.next().map(|result| result.unwrap()),
         }
     }
 }
@@ -54,6 +48,14 @@ where
         true => TestIteratorWrapper::SafeIter(db.safe_iter()),
         false => TestIteratorWrapper::Iter(db.unbounded_iter()),
     }
+}
+
+fn get_reverse_iter<K, V>(db: &DBMap<K, V>, lower_bound: Option<K>, upper_bound: Option<K>) -> SafeRevIter<'_, K, V>
+where
+    K: Serialize + DeserializeOwned,
+    V: Serialize + DeserializeOwned,
+{
+    db.reversed_safe_iter_with_bounds(lower_bound, upper_bound).unwrap()
 }
 
 // Creates an range bounded Iterator based on `use_safe_iter` on `db`.
@@ -89,40 +91,6 @@ where
     }
 }
 
-impl<'a, K: Serialize, V> TestIteratorWrapper<'a, K, V> {
-    pub fn skip_to(self, key: &K) -> Result<Self, TypedStoreError> {
-        match self {
-            TestIteratorWrapper::Iter(iter) => Ok(TestIteratorWrapper::Iter(iter.skip_to(key)?)),
-            TestIteratorWrapper::SafeIter(iter) => Ok(TestIteratorWrapper::SafeIter(iter.skip_to(key)?)),
-            _ => panic!("Not supported!"),
-        }
-    }
-
-    pub fn skip_prior_to(self, key: &K) -> Result<Self, TypedStoreError> {
-        match self {
-            TestIteratorWrapper::Iter(iter) => Ok(TestIteratorWrapper::Iter(iter.skip_prior_to(key)?)),
-            TestIteratorWrapper::SafeIter(iter) => Ok(TestIteratorWrapper::SafeIter(iter.skip_prior_to(key)?)),
-            _ => panic!("Not supported!"),
-        }
-    }
-
-    pub fn skip_to_last(self) -> Self {
-        match self {
-            TestIteratorWrapper::Iter(iter) => TestIteratorWrapper::Iter(iter.skip_to_last()),
-            TestIteratorWrapper::SafeIter(iter) => TestIteratorWrapper::SafeIter(iter.skip_to_last()),
-            _ => panic!("Not supported!"),
-        }
-    }
-
-    pub fn reverse(self) -> Self {
-        match self {
-            TestIteratorWrapper::Iter(iter) => TestIteratorWrapper::RevIter(iter.reverse()),
-            TestIteratorWrapper::SafeIter(iter) => TestIteratorWrapper::SafeRevIter(iter.reverse()),
-            _ => panic!("Not supported!"),
-        }
-    }
-}
-
 #[rstest]
 #[tokio::test]
 async fn test_open(#[values(true, false)] is_transactional: bool) {
@@ -151,8 +119,8 @@ async fn test_reopen_macro() {
 
     let (db_map_1, db_map_2) = reopen!(&rocks, FIRST_CF;<i32, String>, SECOND_CF;<i32, String>);
 
-    let keys_vals_cf1 = (1..100).map(|i| (i, i.to_string()));
-    let keys_vals_cf2 = (1..100).map(|i| (i, i.to_string()));
+    let keys_vals_cf1 = (1 .. 100).map(|i| (i, i.to_string()));
+    let keys_vals_cf2 = (1 .. 100).map(|i| (i, i.to_string()));
 
     assert_eq!(db_map_1.cf, FIRST_CF);
     assert_eq!(db_map_2.cf, SECOND_CF);
@@ -214,19 +182,6 @@ async fn test_get(#[values(true, false)] is_transactional: bool) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_raw(#[values(true, false)] is_transactional: bool) {
-    let db = open_map(temp_dir(), None, is_transactional);
-
-    db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
-
-    let val_bytes = db.get_raw_bytes(&123456789).expect("Failed to get_raw_bytes").unwrap();
-
-    assert_eq!(bcs::to_bytes(&"123456789".to_string()).unwrap(), val_bytes);
-    assert_eq!(None, db.get_raw_bytes(&000000000).expect("Failed to get_raw_bytes"));
-}
-
-#[rstest]
-#[tokio::test]
 async fn test_multi_get(#[values(true, false)] is_transactional: bool) {
     let db = open_map(temp_dir(), None, is_transactional);
 
@@ -234,22 +189,6 @@ async fn test_multi_get(#[values(true, false)] is_transactional: bool) {
     db.insert(&456, &"456".to_string()).expect("Failed to insert");
 
     let result = db.multi_get([123, 456, 789]).expect("Failed to multi get");
-
-    assert_eq!(result.len(), 3);
-    assert_eq!(result[0], Some("123".to_string()));
-    assert_eq!(result[1], Some("456".to_string()));
-    assert_eq!(result[2], None);
-}
-
-#[rstest]
-#[tokio::test]
-async fn test_chunked_multi_get(#[values(true, false)] is_transactional: bool) {
-    let db = open_map(temp_dir(), None, is_transactional);
-
-    db.insert(&123, &"123".to_string()).expect("Failed to insert");
-    db.insert(&456, &"456".to_string()).expect("Failed to insert");
-
-    let result = db.chunked_multi_get([123, 456, 789], 1).expect("Failed to chunk multi get");
 
     assert_eq!(result.len(), 3);
     assert_eq!(result[0], Some("123".to_string()));
@@ -267,82 +206,38 @@ async fn test_skip(#[values(true, false)] is_transactional: bool, #[values(true,
     db.insert(&789, &"789".to_string()).expect("Failed to insert");
 
     // Skip all smaller
-    let key_vals: Vec<_> = get_iter(&db, use_safe_iter).skip_to(&456).expect("Seek failed").collect();
+    let key_vals: Vec<_> = get_iter_with_bounds(&db, Some(456), None, use_safe_iter).collect();
     assert_eq!(key_vals.len(), 2);
     assert_eq!(key_vals[0], (456, "456".to_string()));
     assert_eq!(key_vals[1], (789, "789".to_string()));
 
-    // Skip all smaller: same for the keys iterator
-    let keys: Vec<_> = db.keys().skip_to(&456).expect("Seek failed").collect();
-    assert_eq!(keys.len(), 2);
-    assert_eq!(keys[0], Ok(456));
-    assert_eq!(keys[1], Ok(789));
-
     // Skip to the end
-    assert_eq!(get_iter(&db, use_safe_iter).skip_to(&999).expect("Seek failed").count(), 0);
-    // same for the keys
-    assert_eq!(db.keys().skip_to(&999).expect("Seek failed").count(), 0);
+    assert_eq!(get_iter_with_bounds(&db, Some(999), None, use_safe_iter).count(), 0);
 
     // Skip to last
-    assert_eq!(get_iter(&db, use_safe_iter).skip_to_last().next(), Some((789, "789".to_string())));
-    // same for the keys
-    assert_eq!(db.keys().skip_to_last().next(), Some(Ok(789)));
+    assert_eq!(get_reverse_iter(&db, None, None).next(), Some(Ok((789, "789".to_string()))),);
 
     // Skip to successor of first value
-    assert_eq!(get_iter(&db, use_safe_iter).skip_to(&000).expect("Skip failed").count(), 3);
-    assert_eq!(db.keys().skip_to(&000).expect("Skip failed").count(), 3);
+    assert_eq!(get_iter_with_bounds(&db, Some(000), None, use_safe_iter).count(), 3);
+    assert_eq!(get_iter_with_bounds(&db, Some(000), None, use_safe_iter).count(), 3);
 }
 
-#[rstest]
 #[tokio::test]
-async fn test_skip_to_previous_simple(
-    #[values(true, false)] is_transactional: bool,
-    #[values(true, false)] use_safe_iter: bool,
-) {
-    let db = open_map(temp_dir(), None, is_transactional);
-
+async fn test_reverse_iter_with_bounds() {
+    let db = open_map(temp_dir(), None, false);
     db.insert(&123, &"123".to_string()).expect("Failed to insert");
     db.insert(&456, &"456".to_string()).expect("Failed to insert");
     db.insert(&789, &"789".to_string()).expect("Failed to insert");
 
-    // Skip to the one before the end
-    let key_vals: Vec<_> = get_iter(&db, use_safe_iter).skip_prior_to(&999).expect("Seek failed").collect();
-    assert_eq!(key_vals.len(), 1);
-    assert_eq!(key_vals[0], (789, "789".to_string()));
-    // Same for the keys iterator
-    let keys: Vec<_> = db.keys().skip_prior_to(&999).expect("Seek failed").collect();
-    assert_eq!(keys.len(), 1);
-    assert_eq!(keys[0], Ok(789));
+    let mut iter = get_reverse_iter(&db, None, Some(999));
+    assert_eq!(iter.next().unwrap(), Ok((789, "789".to_string())));
 
-    // Skip to prior of first value
-    // Note: returns an empty iterator!
-    assert_eq!(get_iter(&db, use_safe_iter).skip_prior_to(&000).expect("Seek failed").count(), 0);
-    // Same for the keys iterator
-    assert_eq!(db.keys().skip_prior_to(&000).expect("Seek failed").count(), 0);
-}
+    db.insert(&999, &"999".to_string()).expect("Failed to insert");
+    let mut iter = get_reverse_iter(&db, None, Some(999));
+    assert_eq!(iter.next().unwrap(), Ok((999, "999".to_string())));
 
-#[rstest]
-#[tokio::test]
-async fn test_iter_skip_to_previous_gap(
-    #[values(true, false)] is_transactional: bool,
-    #[values(true, false)] use_safe_iter: bool,
-) {
-    let db = open_map(temp_dir(), None, is_transactional);
-
-    for i in 1..100 {
-        if i != 50 {
-            db.insert(&i, &i.to_string()).unwrap();
-        }
-    }
-
-    // Skip prior to will return an iterator starting with an "unexpected" key if the sought one is not in the table
-    let db_iter = get_iter(&db, use_safe_iter).skip_prior_to(&50).unwrap();
-
-    assert_eq!((49..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-    // Same logic in the keys iterator
-    let db_iter = db.keys().skip_prior_to(&50).unwrap();
-
-    assert_eq!((49..50).chain(51..100).map(Ok).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    let mut iter = get_reverse_iter(&db, None, None);
+    assert_eq!(iter.next().unwrap(), Ok((999, "999".to_string())));
 }
 
 #[rstest]
@@ -380,47 +275,22 @@ async fn test_iter_reverse(#[values(true, false)] is_transactional: bool, #[valu
     db.insert(&2, &"2".to_string()).expect("Failed to insert");
     db.insert(&3, &"3".to_string()).expect("Failed to insert");
 
-    let mut iter = get_iter(&db, use_safe_iter).skip_to_last().reverse();
-    assert_eq!(Some((3, "3".to_string())), iter.next());
-    assert_eq!(Some((2, "2".to_string())), iter.next());
-    assert_eq!(Some((1, "1".to_string())), iter.next());
+    let mut iter = get_reverse_iter(&db, None, None);
+    assert_eq!(Some(Ok((3, "3".to_string()))), iter.next());
+    assert_eq!(Some(Ok((2, "2".to_string()))), iter.next());
+    assert_eq!(Some(Ok((1, "1".to_string()))), iter.next());
     assert_eq!(None, iter.next());
 
-    let mut iter = get_iter(&db, use_safe_iter).skip_to(&2).unwrap().reverse();
-    assert_eq!(Some((2, "2".to_string())), iter.next());
+    let mut iter = get_iter_with_bounds(&db, Some(1), None, use_safe_iter);
     assert_eq!(Some((1, "1".to_string())), iter.next());
-    assert_eq!(None, iter.next());
-}
-
-#[rstest]
-#[tokio::test]
-async fn test_keys(#[values(true, false)] is_transactional: bool) {
-    let db = open_map(temp_dir(), None, is_transactional);
-
-    db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
-
-    let mut keys = db.keys();
-    assert_eq!(Some(Ok(123456789)), keys.next());
-    assert_eq!(None, keys.next());
-}
-
-#[rstest]
-#[tokio::test]
-async fn test_values(#[values(true, false)] is_transactional: bool) {
-    let db = open_map(temp_dir(), None, is_transactional);
-
-    db.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
-
-    let mut values = db.values();
-    assert_eq!(Some(Ok("123456789".to_string())), values.next());
-    assert_eq!(None, values.next());
+    assert_eq!(Some((2, "2".to_string())), iter.next());
 }
 
 #[rstest]
 #[tokio::test]
 async fn test_try_extend(#[values(true, false)] is_transactional: bool) {
     let mut db = open_map(temp_dir(), None, is_transactional);
-    let mut keys_vals = (1..100).map(|i| (i, i.to_string()));
+    let mut keys_vals = (1 .. 100).map(|i| (i, i.to_string()));
 
     db.try_extend(&mut keys_vals).expect("Failed to extend the DB with (k, v) pairs");
     for (k, v) in keys_vals {
@@ -433,7 +303,7 @@ async fn test_try_extend(#[values(true, false)] is_transactional: bool) {
 #[tokio::test]
 async fn test_try_extend_from_slice(#[values(true, false)] is_transactional: bool) {
     let mut db = open_map(temp_dir(), None, is_transactional);
-    let keys_vals = (1..100).map(|i| (i, i.to_string()));
+    let keys_vals = (1 .. 100).map(|i| (i, i.to_string()));
 
     db.try_extend_from_slice(&keys_vals.clone().collect::<Vec<_>>()[..])
         .expect("Failed to extend the DB with (k, v) pairs");
@@ -447,7 +317,7 @@ async fn test_try_extend_from_slice(#[values(true, false)] is_transactional: boo
 #[tokio::test]
 async fn test_insert_batch(#[values(true, false)] is_transactional: bool) {
     let db = open_map(temp_dir(), None, is_transactional);
-    let keys_vals = (1..100).map(|i| (i, i.to_string()));
+    let keys_vals = (1 .. 100).map(|i| (i, i.to_string()));
     let mut insert_batch = db.batch();
     insert_batch.insert_batch(&db, keys_vals.clone()).expect("Failed to batch insert");
     insert_batch.write().expect("Failed to execute batch");
@@ -464,11 +334,11 @@ async fn test_insert_batch_across_cf(#[values(true, false)] is_transactional: bo
 
     let db_cf_1 =
         DBMap::reopen(&rocks, Some("First_CF"), &ReadWriteOptions::default(), false).expect("Failed to open storage");
-    let keys_vals_1 = (1..100).map(|i| (i, i.to_string()));
+    let keys_vals_1 = (1 .. 100).map(|i| (i, i.to_string()));
 
     let db_cf_2 =
         DBMap::reopen(&rocks, Some("Second_CF"), &ReadWriteOptions::default(), false).expect("Failed to open storage");
-    let keys_vals_2 = (1000..1100).map(|i| (i, i.to_string()));
+    let keys_vals_2 = (1000 .. 1100).map(|i| (i, i.to_string()));
 
     let mut batch = db_cf_1.batch();
     batch
@@ -497,11 +367,11 @@ async fn test_insert_batch_across_different_db(#[values(true, false)] is_transac
 
     let db_cf_1: DBMap<i32, String> =
         DBMap::reopen(&rocks, Some("First_CF"), &ReadWriteOptions::default(), false).expect("Failed to open storage");
-    let keys_vals_1 = (1..100).map(|i| (i, i.to_string()));
+    let keys_vals_1 = (1 .. 100).map(|i| (i, i.to_string()));
 
     let db_cf_2: DBMap<i32, String> =
         DBMap::reopen(&rocks2, Some("Second_CF"), &ReadWriteOptions::default(), false).expect("Failed to open storage");
-    let keys_vals_2 = (1000..1100).map(|i| (i, i.to_string()));
+    let keys_vals_2 = (1000 .. 1100).map(|i| (i, i.to_string()));
 
     assert!(db_cf_1
         .batch()
@@ -516,18 +386,18 @@ async fn test_delete_batch() {
     let db = DBMap::<i32, String>::open(temp_dir(), MetricConf::default(), None, None, &ReadWriteOptions::default())
         .expect("Failed to open storage");
 
-    let keys_vals = (1..100).map(|i| (i, i.to_string()));
+    let keys_vals = (1 .. 100).map(|i| (i, i.to_string()));
     let mut batch = db.batch();
     batch.insert_batch(&db, keys_vals).expect("Failed to batch insert");
 
     // delete the odd-index keys
-    let deletion_keys = (1..100).step_by(2);
+    let deletion_keys = (1 .. 100).step_by(2);
     batch.delete_batch(&db, deletion_keys).expect("Failed to batch delete");
 
     batch.write().expect("Failed to execute batch");
 
-    for k in db.keys() {
-        assert_eq!(k.unwrap() % 2, 0);
+    for (k, _) in get_iter(&db, true) {
+        assert_eq!(k % 2, 0);
     }
 }
 
@@ -543,7 +413,7 @@ async fn test_delete_range() {
     .expect("Failed to open storage");
 
     // Note that the last element is (100, "100".to_owned()) here
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
     let mut batch = db.batch();
     batch.insert_batch(&db, keys_vals).expect("Failed to batch insert");
 
@@ -551,10 +421,10 @@ async fn test_delete_range() {
 
     batch.write().expect("Failed to execute batch");
 
-    for k in 0..50 {
+    for k in 0 .. 50 {
         assert!(db.contains_key(&k).expect("Failed to query legal key"),);
     }
-    for k in 50..100 {
+    for k in 50 .. 100 {
         assert!(!db.contains_key(&k).expect("Failed to query legal key"));
     }
 
@@ -570,7 +440,7 @@ async fn test_clear() {
     // Test clear of empty map
     let _ = db.unsafe_clear();
 
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
     let mut insert_batch = db.batch();
     insert_batch.insert_batch(&db, keys_vals).expect("Failed to batch insert");
 
@@ -599,7 +469,7 @@ async fn test_iter_with_bounds(
     let db = open_map(temp_dir(), None, is_transactional);
 
     // Add [1, 50) and (50, 100) in the db
-    for i in 1..100 {
+    for i in 1 .. 100 {
         if i != 50 {
             db.insert(&i, &i.to_string()).unwrap();
         }
@@ -607,122 +477,56 @@ async fn test_iter_with_bounds(
 
     // Tests basic bounded scan.
     let db_iter = get_iter_with_bounds(&db, Some(20), Some(90), use_safe_iter);
-    assert_eq!((20..50).chain(51..90).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    assert_eq!((20 .. 50).chain(51 .. 90).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Don't specify upper bound.
     let db_iter = get_iter_with_bounds(&db, Some(20), None, use_safe_iter);
-    assert_eq!((20..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    assert_eq!((20 .. 50).chain(51 .. 100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Don't specify lower bound.
     let db_iter = get_iter_with_bounds(&db, None, Some(90), use_safe_iter);
-    assert_eq!((1..50).chain(51..90).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    assert_eq!((1 .. 50).chain(51 .. 90).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Don't specify any bounds.
     let db_iter = get_iter_with_bounds(&db, None, None, use_safe_iter);
-    assert_eq!((1..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    assert_eq!((1 .. 50).chain(51 .. 100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Specify a bound outside of dataset.
     let db_iter = db.iter_with_bounds(Some(200), Some(300));
     assert!(db_iter.collect::<Vec<_>>().is_empty());
 
-    // Tests bounded scan with skip operation.
-    // Skip prior to will return an iterator starting with an "unexpected" key if the sought one is not in the table
-    let db_iter = get_iter_with_bounds(&db, Some(1), Some(100), use_safe_iter).skip_prior_to(&50).unwrap();
-
-    assert_eq!((49..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Same logic in the keys iterator
-    let db_iter = db.keys().skip_prior_to(&50).unwrap();
-
-    assert_eq!((49..50).chain(51..100).map(Ok).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Skip to a key which is not within the bounds (bound is [1, 50))
-    let db_iter = get_iter_with_bounds(&db, Some(1), Some(50), use_safe_iter).skip_to(&50).unwrap();
-    assert_eq!(Vec::<(i32, String)>::new(), db_iter.collect::<Vec<_>>());
-
     // Skip to first key in the bound (bound is [1, 50))
-    let db_iter = get_iter_with_bounds(&db, Some(1), Some(50), use_safe_iter).skip_to(&1).unwrap();
-    assert_eq!((1..50).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Skip to a key which is not within the bounds (bound is [1, 50))
-    let db_iter = get_iter_with_bounds(&db, Some(1), Some(50), use_safe_iter).skip_prior_to(&50).unwrap();
-    assert_eq!(vec![(49, "49".to_string())], db_iter.collect::<Vec<_>>());
+    let db_iter = get_iter_with_bounds(&db, Some(1), Some(50), use_safe_iter);
+    assert_eq!((1 .. 50).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 }
 
 #[rstest]
 #[tokio::test]
 async fn test_range_iter(#[values(true, false)] is_transactional: bool, #[values(true, false)] use_safe_iter: bool) {
     let db = open_map(temp_dir(), None, is_transactional);
-    let min = u64::MAX - 100;
-    let max = u64::MAX;
-    for i in min..=max {
-        if i != min + 50 {
-            db.insert(&i, &i.to_string()).unwrap();
-        }
-    }
-    let db_iter = get_range_iter(&db, min..=max, use_safe_iter).skip_prior_to(&(min + 50)).unwrap();
-
-    assert_eq!(
-        (min + 49..min + 50).chain(min + 51..=max).map(|i| (i, i.to_string())).collect::<Vec<_>>(),
-        db_iter.collect::<Vec<_>>()
-    );
-
-    let db = open_map(temp_dir(), None, is_transactional);
 
     // Add [1, 50) and (50, 100) in the db
-    for i in 1..100 {
+    for i in 1 .. 100 {
         if i != 50 {
             db.insert(&i, &i.to_string()).unwrap();
         }
     }
 
     // Tests basic range iterating with inclusive end.
-    let db_iter = get_range_iter(&db, 10..=20, use_safe_iter);
-    assert_eq!((10..21).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    let db_iter = get_range_iter(&db, 10 ..= 20, use_safe_iter);
+    assert_eq!((10 .. 21).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Tests range with min start and exclusive end.
-    let db_iter = get_range_iter(&db, ..20, use_safe_iter);
-    assert_eq!((1..20).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
+    let db_iter = get_range_iter(&db, .. 20, use_safe_iter);
+    assert_eq!((1 .. 20).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Tests range with max end.
-    let db_iter = get_range_iter(&db, 60.., use_safe_iter);
-    assert_eq!((60..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Tests range with seek to the middle of the range.
-    // Skip prior to will return an iterator starting with an "unexpected" key if the sought one is not in the table
-    let db_iter = get_range_iter(&db, 1..=99, use_safe_iter).skip_prior_to(&50).unwrap();
-    assert_eq!((49..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Tests seeking to the beginning of the range.
-    let db_iter = get_range_iter(&db, 1..=99, use_safe_iter).skip_prior_to(&1).unwrap();
-    assert_eq!((1..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    let db_iter = get_range_iter(&db, 2..=99, use_safe_iter).skip_prior_to(&2).unwrap();
-    assert_eq!((2..50).chain(51..100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Tests seeking to the end of the range.
-    let db_iter = get_range_iter(&db, 60..70, use_safe_iter).skip_prior_to(&200).unwrap();
-    assert_eq!((69..70).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    let db_iter = get_range_iter(&db, 2..99, use_safe_iter).skip_prior_to(&2).unwrap();
-    assert_eq!((2..50).chain(51..99).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Same logic in the keys iterator
-    let db_iter = db.keys().skip_prior_to(&50).unwrap();
-
-    assert_eq!((49..50).chain(51..100).map(Ok).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Skip to a key which is not within the bounds (bound is [1, 50], but 50 doesn't exist in DB)
-    let db_iter = get_range_iter(&db, 1..=50, use_safe_iter).skip_to(&50).unwrap();
-    assert_eq!(Vec::<(i32, String)>::new(), db_iter.collect::<Vec<_>>());
+    let db_iter = get_range_iter(&db, 60 .., use_safe_iter);
+    assert_eq!((60 .. 100).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 
     // Skip to first key in the bound (bound is [1, 49))
-    let db_iter = get_range_iter(&db, 1..49, use_safe_iter).skip_to(&1).unwrap();
-    assert_eq!((1..49).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
-
-    // Skip to a key which is not within the bounds (bound is [1, 50))
-    let db_iter = get_range_iter(&db, 1..=50, use_safe_iter).skip_prior_to(&50).unwrap();
-    assert_eq!(vec![(49, "49".to_string())], db_iter.collect::<Vec<_>>());
+    let db_iter = get_range_iter(&db, 1 .. 49, use_safe_iter);
+    assert_eq!((1 .. 49).map(|i| (i, i.to_string())).collect::<Vec<_>>(), db_iter.collect::<Vec<_>>());
 }
 
 #[tokio::test]
@@ -736,7 +540,7 @@ async fn test_is_empty() {
     let _ = db.unsafe_clear();
     assert!(db.is_empty());
 
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
     let mut insert_batch = db.batch();
     insert_batch.insert_batch(&db, keys_vals).expect("Failed to batch insert");
 
@@ -758,7 +562,7 @@ async fn test_multi_insert(#[values(true, false)] is_transactional: bool) {
     // Init a DB
     let db: DBMap<i32, String> = open_map(temp_dir(), Some("table"), is_transactional);
     // Create kv pairs
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
 
     db.multi_insert(keys_vals.clone()).expect("Failed to multi-insert");
 
@@ -775,13 +579,13 @@ async fn test_checkpoint(#[values(true, false)] is_transactional: bool) {
     let db_path = path_prefix.join("db");
     let db: DBMap<i32, String> = open_map(db_path, Some("table"), is_transactional);
     // Create kv pairs
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
 
     db.multi_insert(keys_vals.clone()).expect("Failed to multi-insert");
     let checkpointed_path = path_prefix.join("checkpointed_db");
     db.rocksdb.checkpoint(&checkpointed_path).expect("Failed to create db checkpoint");
     // Create more kv pairs
-    let new_keys_vals = (101..201).map(|i| (i, i.to_string()));
+    let new_keys_vals = (101 .. 201).map(|i| (i, i.to_string()));
     db.multi_insert(new_keys_vals.clone()).expect("Failed to multi-insert");
     // Verify checkpoint
     let checkpointed_db: DBMap<i32, String> = open_map(checkpointed_path, Some("table"), is_transactional);
@@ -808,7 +612,7 @@ async fn test_multi_remove(#[values(true, false)] is_transactional: bool) {
     let db: DBMap<i32, String> = open_map(temp_dir(), Some("table"), is_transactional);
 
     // Create kv pairs
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
 
     db.multi_insert(keys_vals.clone()).expect("Failed to multi-insert");
 
@@ -944,26 +748,6 @@ async fn test_retry_transaction() {
     })
     // fails after hitting maximum number of retries
     .unwrap_err();
-
-    // obviously we cannot verify that this never times out, this is more just a test to make sure
-    // the macro compiles as expected.
-    tokio::time::timeout(Duration::from_secs(1), async move {
-        retry_transaction_forever!({
-            let mut tx1 = db
-                .transaction_without_snapshot()
-                .expect("failed to initiate transaction");
-            tx1.insert_batch(&db, vec![(key.to_string(), "2".to_string())])
-                .unwrap();
-            db.insert(&key, &"1".to_string()).unwrap();
-            tx1.commit()
-        })
-        // fails after hitting maximum number of retries
-        .unwrap_err();
-        panic!("should never finish");
-    })
-    .await
-    // must timeout
-    .unwrap_err();
 }
 
 #[tokio::test]
@@ -987,10 +771,6 @@ async fn test_transaction_read_your_write() {
     tx.delete_batch(&db, vec![(key2.to_string())]).unwrap();
 
     assert_eq!(tx.multi_get(&db, vec![key1.to_string(), key2.to_string()]).unwrap(), vec![Some("11".to_string()), None]);
-    let keys: Vec<String> = tx.keys(&db).map(|x| x.unwrap()).collect();
-    assert_eq!(keys, vec![key1.to_string()]);
-    let values: Vec<_> = tx.values(&db).collect();
-    assert_eq!(values, vec![Ok("11".to_string())]);
     assert!(tx.commit().is_ok());
 }
 
@@ -1008,7 +788,7 @@ async fn open_as_secondary_test() {
     )
     .expect("Failed to open storage");
     // Create kv pairs
-    let keys_vals = (0..101).map(|i| (i, i.to_string()));
+    let keys_vals = (0 .. 101).map(|i| (i, i.to_string()));
 
     primary_db.multi_insert(keys_vals.clone()).expect("Failed to multi-insert");
 
@@ -1035,94 +815,6 @@ async fn open_as_secondary_test() {
 
     // New value should be present
     assert_eq!(secondary_db.get(&0).unwrap(), Some("10".to_string()));
-}
-
-#[derive(Serialize, Deserialize, Copy, Clone)]
-struct ObjectWithRefCount {
-    value: i64,
-    ref_count: i64,
-}
-
-fn increment_counter(db: &DBMap<String, ObjectWithRefCount>, key: &str, value: i64) {
-    let mut batch = db.batch();
-    batch.partial_merge_batch(db, [(key.to_string(), value.to_le_bytes())]).unwrap();
-    batch.write().unwrap();
-}
-
-#[tokio::test]
-async fn refcount_test() {
-    let key = "key".to_string();
-    let mut options = rocksdb::Options::default();
-    options.set_merge_operator("refcount operator", reference_count_merge_operator, reference_count_merge_operator);
-    let db = DBMap::<String, ObjectWithRefCount>::open(
-        temp_dir(),
-        MetricConf::default(),
-        Some(options),
-        None,
-        &ReadWriteOptions::default(),
-    )
-    .expect("failed to open rocksdb");
-    let object = ObjectWithRefCount { value: 3, ref_count: 1 };
-    // increment value 10 times
-    let iterations = 10;
-    for _ in 0..iterations {
-        let mut batch = db.batch();
-        batch.merge_batch(&db, [(key.to_string(), object)]).unwrap();
-        batch.write().unwrap();
-    }
-    let value = db.get(&key).expect("failed to read value").expect("value is empty");
-    assert_eq!(value.value, object.value);
-    assert_eq!(value.ref_count, iterations);
-
-    // decrement value
-    increment_counter(&db, &key, -1);
-    let value = db.get(&key).unwrap().unwrap();
-    assert_eq!(value.value, object.value);
-    assert_eq!(value.ref_count, iterations - 1);
-}
-
-#[tokio::test]
-async fn refcount_with_compaction_test() {
-    let key = "key".to_string();
-    let mut options = rocksdb::Options::default();
-    options.set_merge_operator("refcount operator", reference_count_merge_operator, reference_count_merge_operator);
-    let db = DBMap::<String, ObjectWithRefCount>::open(
-        temp_dir(),
-        MetricConf::default(),
-        Some(options),
-        None,
-        &ReadWriteOptions::default(),
-    )
-    .expect("failed to open rocksdb");
-
-    let object = ObjectWithRefCount { value: 3, ref_count: 1 };
-    let mut batch = db.batch();
-    batch.merge_batch(&db, [(key.to_string(), object)]).unwrap();
-    batch.write().unwrap();
-    // increment value once
-    increment_counter(&db, &key, 1);
-    let value = db.get(&key).unwrap().unwrap();
-    assert_eq!(value.value, object.value);
-
-    // decrement value to 0
-    increment_counter(&db, &key, -1);
-    increment_counter(&db, &key, -1);
-    // ref count went to zero. Reading value returns empty array
-    assert!(db.get(&key).is_err());
-    let value = db.multi_get_raw_bytes([(&key)]).unwrap()[0].clone().unwrap();
-    assert!(value.is_empty());
-
-    // refcount increment makes value visible again
-    increment_counter(&db, &key, 1);
-    let value = db.get(&key).unwrap().unwrap();
-    assert_eq!(value.value, object.value);
-
-    increment_counter(&db, &key, -1);
-    db.compact_range(&object, &ObjectWithRefCount { value: 100, ref_count: 1 }).unwrap();
-
-    increment_counter(&db, &key, 1);
-    let value = db.get_raw_bytes(&key).unwrap().unwrap();
-    assert!(is_ref_count_value(&value));
 }
 
 fn open_map<P: AsRef<Path>, K, V>(path: P, opt_cf: Option<&str>, is_transactional: bool) -> DBMap<K, V> {

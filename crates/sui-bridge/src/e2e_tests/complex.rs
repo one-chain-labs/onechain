@@ -1,18 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::client::bridge_authority_aggregator::BridgeAuthorityAggregator;
+use std::sync::Arc;
+
+use ethers::types::Address as EthAddress;
+use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
+use sui_types::bridge::{BridgeChainId, TOKEN_ID_ETH};
+use tracing::info;
 
 use crate::{
+    client::bridge_authority_aggregator::BridgeAuthorityAggregator,
     e2e_tests::test_utils::{initiate_bridge_eth_to_sui, initiate_bridge_sui_to_eth, BridgeTestClusterBuilder},
     sui_transaction_builder::build_sui_transaction,
     types::{BridgeAction, BridgeActionStatus, EmergencyAction, EmergencyActionType},
 };
-use ethers::types::Address as EthAddress;
-use std::sync::Arc;
-use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
-use sui_types::bridge::{BridgeChainId, TOKEN_ID_ETH};
-use tracing::info;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 16)]
 async fn test_sui_bridge_paused() {
@@ -52,9 +53,9 @@ async fn test_sui_bridge_paused() {
     // verify bridge are not paused
     assert!(!bridge_client.get_bridge_summary().await.unwrap().is_frozen);
 
-    // try bridge from eth and verify it works on OneChain
+    // try bridge from eth and verify it works on sui
     initiate_bridge_eth_to_sui(&bridge_test_cluster, 10, 0).await.unwrap();
-    // verify Eth was transferred to OneChain address
+    // verify Eth was transferred to Sui address
     let eth_coin_type = sui_token_type_tags.get(&TOKEN_ID_ETH).unwrap();
     let eth_coin = bridge_client
         .sui_client()

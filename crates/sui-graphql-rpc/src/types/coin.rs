@@ -1,14 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    connection::ScanConnection,
-    consistency::{build_objects_query, View},
-    data::{Db, QueryExecutor},
-    error::Error,
-    filter,
-    raw_query::RawQuery,
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    *,
 };
+use diesel_async::scoped_futures::ScopedFutureExt;
+use sui_indexer::{models::objects::StoredHistoryObject, types::OwnerType};
+use sui_types::{coin::Coin as NativeCoin, TypeTag};
 
 use super::{
     available_range::AvailableRange,
@@ -22,19 +21,21 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedOct,
+    stake::StakedSui,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
     type_filter::ExactTypeFilter,
     uint53::UInt53,
 };
-use async_graphql::*;
-
-use async_graphql::connection::{Connection, CursorType, Edge};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use sui_indexer::{models::objects::StoredHistoryObject, types::OwnerType};
-use sui_types::{coin::Coin as NativeCoin, TypeTag};
+use crate::{
+    connection::ScanConnection,
+    consistency::{build_objects_query, View},
+    data::{Db, QueryExecutor},
+    error::Error,
+    filter,
+    raw_query::RawQuery,
+};
 
 #[derive(Clone)]
 pub(crate) struct Coin {
@@ -71,7 +72,7 @@ impl Coin {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::oct::OCT`.
+    /// it defaults to `0x2::sui::SUI`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
@@ -90,7 +91,7 @@ impl Coin {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -103,16 +104,16 @@ impl Coin {
         OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
-    pub(crate) async fn staked_octs(
+    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(&self.super_.super_).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.

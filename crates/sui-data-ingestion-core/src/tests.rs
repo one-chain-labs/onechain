@@ -1,20 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    progress_store::ExecutorProgress,
-    DataIngestionMetrics,
-    FileProgressStore,
-    IndexerExecutor,
-    ReaderOptions,
-    Worker,
-    WorkerPool,
-};
+use std::{path::PathBuf, time::Duration};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use prometheus::Registry;
 use rand::{prelude::StdRng, SeedableRng};
-use std::{path::PathBuf, time::Duration};
 use sui_protocol_config::ProtocolConfig;
 use sui_storage::blob::{Blob, BlobEncoding};
 use sui_types::{
@@ -32,6 +24,16 @@ use sui_types::{
 };
 use tempfile::NamedTempFile;
 use tokio::sync::oneshot;
+
+use crate::{
+    progress_store::ExecutorProgress,
+    DataIngestionMetrics,
+    FileProgressStore,
+    IndexerExecutor,
+    ReaderOptions,
+    Worker,
+    WorkerPool,
+};
 
 async fn add_worker_pool<W: Worker + 'static>(
     indexer: &mut IndexerExecutor<FileProgressStore>,
@@ -95,7 +97,7 @@ async fn basic_flow() {
     let mut bundle = create_executor_bundle();
     add_worker_pool(&mut bundle.executor, TestWorker, 5).await.unwrap();
     let path = temp_dir();
-    for checkpoint_number in 0..20 {
+    for checkpoint_number in 0 .. 20 {
         let bytes = mock_checkpoint_data_bytes(checkpoint_number);
         std::fs::write(path.join(format!("{}.chk", checkpoint_number)), bytes).unwrap();
     }
@@ -105,7 +107,7 @@ async fn basic_flow() {
 }
 
 fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").keep()
+    tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
 
 fn create_executor_bundle() -> ExecutorBundle {

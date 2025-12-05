@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::Parser;
 use std::{path::PathBuf, time::Duration};
+
+use clap::Parser;
 use tracing::info;
 
 #[derive(Parser)]

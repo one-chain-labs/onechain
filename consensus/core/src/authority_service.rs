@@ -11,10 +11,10 @@ use parking_lot::RwLock;
 use sui_macros::fail_point_async;
 use tokio::{sync::broadcast, time::sleep};
 use tokio_util::sync::ReusableBoxFuture;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
-    block::{BlockAPI as _, BlockRef, SignedBlock, VerifiedBlock, GENESIS_ROUND},
+    block::{BlockAPI as _, BlockRef, ExtendedBlock, SignedBlock, VerifiedBlock, GENESIS_ROUND},
     block_verifier::BlockVerifier,
     commit::{CommitAPI as _, CommitRange, TrustedCommit},
     commit_vote_monitor::CommitVoteMonitor,
@@ -22,7 +22,7 @@ use crate::{
     core_thread::CoreThreadDispatcher,
     dag_state::DagState,
     error::{ConsensusError, ConsensusResult},
-    network::{BlockStream, NetworkService},
+    network::{BlockStream, ExtendedSerializedBlock, NetworkService},
     stake_aggregator::{QuorumThreshold, StakeAggregator},
     storage::Store,
     synchronizer::SynchronizerHandle,
@@ -39,7 +39,7 @@ pub(crate) struct AuthorityService<C: CoreThreadDispatcher> {
     block_verifier: Arc<dyn BlockVerifier>,
     synchronizer: Arc<SynchronizerHandle>,
     core_dispatcher: Arc<C>,
-    rx_block_broadcaster: broadcast::Receiver<VerifiedBlock>,
+    rx_block_broadcaster: broadcast::Receiver<ExtendedBlock>,
     subscription_counter: Arc<SubscriptionCounter>,
     dag_state: Arc<RwLock<DagState>>,
     store: Arc<dyn Store>,
@@ -52,7 +52,7 @@ impl<C: CoreThreadDispatcher> AuthorityService<C> {
         commit_vote_monitor: Arc<CommitVoteMonitor>,
         synchronizer: Arc<SynchronizerHandle>,
         core_dispatcher: Arc<C>,
-        rx_block_broadcaster: broadcast::Receiver<VerifiedBlock>,
+        rx_block_broadcaster: broadcast::Receiver<ExtendedBlock>,
         dag_state: Arc<RwLock<DagState>>,
         store: Arc<dyn Store>,
     ) -> Self {
@@ -73,13 +73,18 @@ impl<C: CoreThreadDispatcher> AuthorityService<C> {
 
 #[async_trait]
 impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
-    async fn handle_send_block(&self, peer: AuthorityIndex, serialized_block: Bytes) -> ConsensusResult<()> {
+    async fn handle_send_block(
+        &self,
+        peer: AuthorityIndex,
+        serialized_block: ExtendedSerializedBlock,
+    ) -> ConsensusResult<()> {
         fail_point_async!("consensus-rpc-response");
 
         let peer_hostname = &self.context.committee.authority(peer).hostname;
 
         // TODO: dedup block verifications, here and with fetched blocks.
-        let signed_block: SignedBlock = bcs::from_bytes(&serialized_block).map_err(ConsensusError::MalformedBlock)?;
+        let signed_block: SignedBlock =
+            bcs::from_bytes(&serialized_block.block).map_err(ConsensusError::MalformedBlock)?;
 
         // Reject blocks not produced by the peer.
         if peer != signed_block.author() {
@@ -96,19 +101,20 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         let peer_hostname = &self.context.committee.authority(peer).hostname;
 
         // Reject blocks failing validations.
-        if let Err(e) = self.block_verifier.verify(&signed_block) {
+        let verification_result = self.block_verifier.verify_and_vote(&signed_block);
+        if let Err(e) = verification_result {
             self.context
                 .metrics
                 .node_metrics
                 .invalid_blocks
-                .with_label_values(&[peer_hostname, "handle_send_block", e.clone().name()])
+                .with_label_values(&[peer_hostname, "handle_send_block", e.name()])
                 .inc();
             info!("Invalid block from {}: {}", peer, e);
             return Err(e);
         }
-        let verified_block = VerifiedBlock::new_verified(signed_block, serialized_block);
-
-        trace!("Received block {verified_block} via send block.");
+        let verified_block = VerifiedBlock::new_verified(signed_block, serialized_block.block);
+        let block_ref = verified_block.reference();
+        debug!("Received block {} via send block.", block_ref);
 
         // Reject block with timestamp too far in the future.
         let now = self.context.clock.timestamp_utc_ms();
@@ -117,12 +123,12 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             self.context.metrics.node_metrics.rejected_future_blocks.with_label_values(&[peer_hostname]).inc();
             debug!(
                 "Block {:?} timestamp ({} > {}) is too far in the future, rejected.",
-                verified_block.reference(),
+                block_ref,
                 verified_block.timestamp_ms(),
                 now,
             );
             return Err(ConsensusError::BlockRejected {
-                block_ref: verified_block.reference(),
+                block_ref,
                 reason: format!("Block timestamp is too far in the future: {} > {}", verified_block.timestamp_ms(), now),
             });
         }
@@ -137,7 +143,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
                 .inc_by(forward_time_drift.as_millis() as u64);
             debug!(
                 "Block {:?} timestamp ({} > {}) is in the future, waiting for {}ms",
-                verified_block.reference(),
+                block_ref,
                 verified_block.timestamp_ms(),
                 now,
                 forward_time_drift.as_millis(),
@@ -166,12 +172,10 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             self.context.metrics.node_metrics.rejected_blocks.with_label_values(&["commit_lagging"]).inc();
             debug!(
                 "Block {:?} is rejected because last commit index is lagging quorum commit index too much ({} < {})",
-                verified_block.reference(),
-                last_commit_index,
-                quorum_commit_index,
+                block_ref, last_commit_index, quorum_commit_index,
             );
             return Err(ConsensusError::BlockRejected {
-                block_ref: verified_block.reference(),
+                block_ref,
                 reason: format!(
                     "Last commit index is lagging quorum commit index too much ({} < {})",
                     last_commit_index, quorum_commit_index,
@@ -190,6 +194,63 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             }
         }
 
+        // ------------ After processing the block, process the excluded ancestors ------------
+
+        let mut excluded_ancestors = serialized_block
+            .excluded_ancestors
+            .into_iter()
+            .map(|serialized| bcs::from_bytes::<BlockRef>(&serialized))
+            .collect::<Result<Vec<BlockRef>, bcs::Error>>()
+            .map_err(ConsensusError::MalformedBlock)?;
+
+        let excluded_ancestors_limit = self.context.committee.size() * 2;
+        if excluded_ancestors.len() > excluded_ancestors_limit {
+            debug!(
+                "Dropping {} excluded ancestor(s) from {} {} due to size limit",
+                excluded_ancestors.len() - excluded_ancestors_limit,
+                peer,
+                peer_hostname,
+            );
+            excluded_ancestors.truncate(excluded_ancestors_limit);
+        }
+
+        self.context
+            .metrics
+            .node_metrics
+            .network_received_excluded_ancestors_from_authority
+            .with_label_values(&[peer_hostname])
+            .inc_by(excluded_ancestors.len() as u64);
+
+        for excluded_ancestor in &excluded_ancestors {
+            let excluded_ancestor_hostname = &self.context.committee.authority(excluded_ancestor.author).hostname;
+            self.context
+                .metrics
+                .node_metrics
+                .network_excluded_ancestors_count_by_authority
+                .with_label_values(&[excluded_ancestor_hostname])
+                .inc();
+        }
+
+        let missing_excluded_ancestors =
+            self.core_dispatcher.check_block_refs(excluded_ancestors).await.map_err(|_| ConsensusError::Shutdown)?;
+
+        if !missing_excluded_ancestors.is_empty() {
+            self.context
+                .metrics
+                .node_metrics
+                .network_excluded_ancestors_sent_to_fetch
+                .with_label_values(&[peer_hostname])
+                .inc_by(missing_excluded_ancestors.len() as u64);
+
+            let synchronizer = self.synchronizer.clone();
+            tokio::spawn(async move {
+                // schedule the fetching of them from this peer in the background
+                if let Err(err) = synchronizer.fetch_blocks(missing_excluded_ancestors, peer).await {
+                    warn!("Errored while trying to fetch missing excluded ancestors via synchronizer: {err}");
+                }
+            });
+        }
+
         Ok(())
     }
 
@@ -204,7 +265,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
             dag_state
                 .get_cached_blocks(self.context.own_index, last_received + 1)
                 .into_iter()
-                .map(|block| block.serialized().clone()),
+                .map(|block| ExtendedSerializedBlock { block: block.serialized().clone(), excluded_ancestors: vec![] }),
         );
 
         let broadcasted_blocks = BroadcastedBlockStream::new(
@@ -214,7 +275,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         );
 
         // Return a stream of blocks that first yields missed blocks as requested, then new blocks.
-        Ok(Box::pin(missed_blocks.chain(broadcasted_blocks.map(|block| block.serialized().clone()))))
+        Ok(Box::pin(missed_blocks.chain(broadcasted_blocks.map(ExtendedSerializedBlock::from))))
     }
 
     async fn handle_fetch_blocks(
@@ -292,7 +353,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         let inclusive_end = commit_range
             .end()
             .min(commit_range.start() + self.context.parameters.commit_sync_batch_size as CommitIndex - 1);
-        let mut commits = self.store.scan_commits((commit_range.start()..=inclusive_end).into())?;
+        let mut commits = self.store.scan_commits((commit_range.start() ..= inclusive_end).into())?;
         let mut certifier_block_refs = vec![];
         'commit: while let Some(c) = commits.last() {
             let index = c.index();
@@ -305,6 +366,13 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
                 certifier_block_refs = votes;
                 break 'commit;
             } else {
+                debug!(
+                    "Commit {} votes did not reach quorum to certify, {} < {}, skipping",
+                    index,
+                    stake_aggregator.stake(),
+                    stake_aggregator.threshold(&self.context.committee)
+                );
+                self.context.metrics.node_metrics.commit_sync_fetch_commits_handler_uncertified_skipped.inc();
                 commits.pop();
             }
         }
@@ -361,7 +429,7 @@ impl<C: CoreThreadDispatcher> NetworkService for AuthorityService<C> {
         let mut highest_received_rounds = self.core_dispatcher.highest_received_rounds();
 
         let blocks = self.dag_state.read().get_last_cached_block_per_authority(Round::MAX);
-        let highest_accepted_rounds = blocks.into_iter().map(|block| block.round()).collect::<Vec<_>>();
+        let highest_accepted_rounds = blocks.into_iter().map(|(block, _)| block.round()).collect::<Vec<_>>();
 
         // Own blocks do not go through the core dispatcher, so they need to be set separately.
         highest_received_rounds[self.context.own_index] = highest_accepted_rounds[self.context.own_index];
@@ -433,7 +501,7 @@ impl SubscriptionCounter {
 
 /// Each broadcasted block stream wraps a broadcast receiver for blocks.
 /// It yields blocks that are broadcasted after the stream is created.
-type BroadcastedBlockStream = BroadcastStream<VerifiedBlock>;
+type BroadcastedBlockStream = BroadcastStream<ExtendedBlock>;
 
 /// Adapted from `tokio_stream::wrappers::BroadcastStream`. The main difference is that
 /// this tolerates lags with only logging, without yielding errors.
@@ -508,28 +576,30 @@ async fn make_recv_future<T: Clone>(
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::BTreeSet, sync::Arc, time::Duration};
+
+    use async_trait::async_trait;
+    use bytes::Bytes;
+    use consensus_config::AuthorityIndex;
+    use parking_lot::{Mutex, RwLock};
+    use tokio::{sync::broadcast, time::sleep};
+
     use crate::{
         authority_service::AuthorityService,
         block::{BlockAPI, BlockRef, SignedBlock, TestBlock, VerifiedBlock},
-        commit::CommitRange,
+        commit::{CertifiedCommits, CommitRange},
         commit_vote_monitor::CommitVoteMonitor,
         context::Context,
         core_thread::{CoreError, CoreThreadDispatcher},
         dag_state::DagState,
         error::ConsensusResult,
-        network::{BlockStream, NetworkClient, NetworkService},
+        network::{BlockStream, ExtendedSerializedBlock, NetworkClient, NetworkService},
         round_prober::QuorumRound,
         storage::mem_store::MemStore,
         synchronizer::Synchronizer,
         test_dag_builder::DagBuilder,
         Round,
     };
-    use async_trait::async_trait;
-    use bytes::Bytes;
-    use consensus_config::AuthorityIndex;
-    use parking_lot::{Mutex, RwLock};
-    use std::{collections::BTreeSet, sync::Arc, time::Duration};
-    use tokio::{sync::broadcast, time::sleep};
 
     struct FakeCoreThreadDispatcher {
         blocks: Mutex<Vec<VerifiedBlock>>,
@@ -551,6 +621,14 @@ mod tests {
             let block_refs = blocks.iter().map(|b| b.reference()).collect();
             self.blocks.lock().extend(blocks);
             Ok(block_refs)
+        }
+
+        async fn check_block_refs(&self, _block_refs: Vec<BlockRef>) -> Result<BTreeSet<BlockRef>, CoreError> {
+            Ok(BTreeSet::new())
+        }
+
+        async fn add_certified_commits(&self, _commits: CertifiedCommits) -> Result<BTreeSet<BlockRef>, CoreError> {
+            todo!()
         }
 
         async fn new_block(&self, _round: Round, _force: bool) -> Result<(), CoreError> {
@@ -684,7 +762,8 @@ mod tests {
         );
 
         let service = authority_service.clone();
-        let serialized = input_block.serialized().clone();
+        let serialized = ExtendedSerializedBlock { block: input_block.serialized().clone(), excluded_ancestors: vec![] };
+
         tokio::spawn(async move {
             service.handle_send_block(context.committee.to_authority_index(0).unwrap(), serialized).await.unwrap();
         });
@@ -733,7 +812,7 @@ mod tests {
         // Create some blocks for a few authorities. Create some equivocations as well and store in dag state.
         let mut dag_builder = DagBuilder::new(context.clone());
         dag_builder
-            .layers(1..=10)
+            .layers(1 ..= 10)
             .authorities(vec![AuthorityIndex::new_for_test(2)])
             .equivocate(1)
             .build()

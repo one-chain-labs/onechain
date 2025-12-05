@@ -3,9 +3,10 @@
 
 use std::time::Duration;
 
-use crate::authority::test_authority_builder::TestAuthorityBuilder;
 use sui_types::base_types::TransactionDigest;
 use tokio::time::timeout;
+
+use crate::authority::test_authority_builder::TestAuthorityBuilder;
 
 #[tokio::test]
 async fn test_notify_read_executed_transactions_to_checkpoint() {
@@ -31,7 +32,7 @@ async fn test_notify_read_executed_transactions_to_checkpoint() {
 
     // Now insert the rest of the transactions
     let store = authority_state.epoch_store_for_testing();
-    store.insert_finalized_transactions(&txes_to_be_notified[1..], checkpoint_sequence_2).expect("Should not fail");
+    store.insert_finalized_transactions(&txes_to_be_notified[1 ..], checkpoint_sequence_2).expect("Should not fail");
 
     // We should get notified about all the transactions having been executed via checkpoints
     let _ = timeout(Duration::from_secs(5), handle).await.expect("Should not timeout").expect("Should not fail");

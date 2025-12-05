@@ -1,46 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(not(msim))]
+use std::str::FromStr;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
+    env,
     fmt::Write,
+    fs,
     fs::read_dir,
+    io,
     io::Read,
     net::SocketAddr,
     os::unix::prelude::FileExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str,
     thread,
     time::Duration,
 };
 
-use std::env;
-#[cfg(not(msim))]
-use std::str::FromStr;
-
 use expect_test::expect;
 use move_package::{lock_file::schema::ManagedPackage, BuildConfig as MoveBuildConfig};
-use one_chain::{
-    client_ptb::{self, ptb::PTB},
-    key_identity::{get_identity_address, KeyIdentity},
-    sui_commands::IndexerArgs,
-};
 use serde_json::json;
-use sui_sdk::SuiClient;
-use sui_test_transaction_builder::batch_make_transfer_transactions;
-use sui_types::{
-    object::Owner,
-    transaction::{
-        TEST_ONLY_GAS_UNIT_FOR_GENERIC,
-        TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS,
-        TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
-        TEST_ONLY_GAS_UNIT_FOR_SPLIT_COIN,
-        TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
-    },
-};
-use tokio::time::sleep;
-
-use one_chain::{
+use sui::{
     client_commands::{
         estimate_gas_budget,
         Opts,
@@ -49,7 +31,9 @@ use one_chain::{
         SuiClientCommands,
         SwitchResponse,
     },
-    sui_commands::{parse_host_port, SuiCommand},
+    client_ptb::ptb::PTB,
+    key_identity::{get_identity_address, KeyIdentity},
+    sui_commands::{parse_host_port, IndexerArgs, SuiCommand},
 };
 use sui_config::{
     PersistedConfig,
@@ -70,6 +54,7 @@ use sui_json_rpc_types::{
     SuiObjectDataOptions,
     SuiObjectResponse,
     SuiObjectResponseQuery,
+    SuiRawData,
     SuiTransactionBlockDataAPI,
     SuiTransactionBlockEffects,
     SuiTransactionBlockEffectsAPI,
@@ -77,20 +62,234 @@ use sui_json_rpc_types::{
 use sui_keys::keystore::AccountKeystore;
 use sui_macros::sim_test;
 use sui_move_build::{BuildConfig, SuiPackageHooks};
-use sui_sdk::{sui_client_config::SuiClientConfig, wallet_context::WalletContext};
+use sui_sdk::{sui_client_config::SuiClientConfig, wallet_context::WalletContext, SuiClient};
 use sui_swarm_config::{
     genesis_config::{AccountConfig, GenesisConfig},
     network_config::NetworkConfig,
 };
+use sui_test_transaction_builder::batch_make_transfer_transactions;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     crypto::{get_key_pair, Ed25519SuiSignature, Secp256k1SuiSignature, SignatureScheme, SuiKeyPair, SuiSignatureInner},
     error::SuiObjectResponseError,
     gas_coin::GasCoin,
+    move_package::{MovePackage, UpgradeInfo},
+    object::Owner,
+    transaction::{
+        TEST_ONLY_GAS_UNIT_FOR_GENERIC,
+        TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS,
+        TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
+        TEST_ONLY_GAS_UNIT_FOR_SPLIT_COIN,
+        TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
+    },
 };
+use tempfile::TempDir;
 use test_cluster::{TestCluster, TestClusterBuilder};
+use tokio::time::sleep;
 
 const TEST_DATA_DIR: &str = "tests/data/";
+
+struct TreeShakingTest {
+    test_cluster: TestCluster,
+    client: SuiClient,
+    rgp: u64,
+    gas_obj_id: ObjectID,
+    temp_dir: TempDir,
+}
+
+impl TreeShakingTest {
+    async fn new() -> Result<Self, anyhow::Error> {
+        let mut test_cluster = TestClusterBuilder::new().build().await;
+        let rgp = test_cluster.get_reference_gas_price().await;
+        let address = test_cluster.get_address_0();
+        let context = &mut test_cluster.wallet;
+        let client = context.get_client().await?;
+
+        let object_refs = client
+            .read_api()
+            .get_owned_objects(
+                address,
+                Some(SuiObjectResponseQuery::new_with_options(
+                    SuiObjectDataOptions::new().with_type().with_owner().with_previous_transaction(),
+                )),
+                None,
+                None,
+            )
+            .await?
+            .data;
+
+        let gas_obj_id = object_refs.first().unwrap().object().unwrap().object_id;
+
+        // Setup temp directory with test data
+        let temp_dir = tempfile::Builder::new().prefix("tree_shaking").tempdir()?;
+        std::fs::create_dir_all(temp_dir.path()).unwrap();
+        let tests_dir = PathBuf::from(TEST_DATA_DIR);
+        copy_dir_all(tests_dir, temp_dir.path())?;
+
+        Ok(Self { test_cluster, client, rgp, gas_obj_id, temp_dir })
+    }
+
+    fn package_path(&self, name: &str) -> PathBuf {
+        self.temp_dir.path().to_path_buf().join("tree_shaking").join(name)
+    }
+
+    async fn publish_package(
+        &mut self,
+        package_name: &str,
+        with_unpublished_dependencies: bool,
+    ) -> Result<(ObjectID, ObjectID), anyhow::Error> {
+        publish_package(
+            self.package_path(package_name),
+            self.test_cluster.wallet_mut(),
+            self.rgp,
+            self.gas_obj_id,
+            with_unpublished_dependencies,
+        )
+        .await
+    }
+
+    async fn publish_package_without_tree_shaking(&mut self, package_name: &str) -> ObjectID {
+        let package_path = self.package_path(package_name);
+
+        let obj_ref =
+            sui_test_transaction_builder::publish_package(self.test_cluster.wallet_mut(), package_path.clone()).await;
+
+        obj_ref.0
+    }
+
+    async fn upgrade_package(
+        &mut self,
+        package_name: &str,
+        upgrade_capability: ObjectID,
+    ) -> Result<ObjectID, anyhow::Error> {
+        let mut build_config = BuildConfig::new_for_testing().config;
+        build_config.lock_file = Some(self.package_path(package_name).join("Move.lock"));
+        let resp = SuiClientCommands::Upgrade {
+            package_path: self.package_path(package_name),
+            upgrade_capability,
+            opts: OptsWithGas::for_testing(Some(self.gas_obj_id), self.rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+            build_config,
+            skip_dependency_verification: false,
+            verify_deps: false,
+            verify_compatibility: true,
+            with_unpublished_dependencies: false,
+        }
+        .execute(self.test_cluster.wallet_mut())
+        .await?;
+
+        let SuiClientCommandResult::TransactionBlock(publish_response) = resp else {
+            unreachable!("Invalid response");
+        };
+
+        let SuiTransactionBlockEffects::V1(effects) = publish_response.clone().effects.unwrap();
+        assert!(effects.status.is_ok());
+
+        let package_a_v1 = effects.created().iter().find(|refe| matches!(refe.owner, Owner::Immutable)).unwrap();
+        Ok(package_a_v1.object_id())
+    }
+
+    async fn fetch_linkage_table(&self, pkg: ObjectID) -> BTreeMap<ObjectID, UpgradeInfo> {
+        let move_pkg = fetch_move_packages(&self.client, vec![pkg]).await;
+        move_pkg.first().unwrap().linkage_table().clone()
+    }
+}
+
+/// Publishes a package and returns the package object id and the upgrade capability object id
+/// Note that this sets the `Move.lock` file to be written to the root of the package path.
+async fn publish_package(
+    package_path: PathBuf,
+    context: &mut WalletContext,
+    rgp: u64,
+    gas_obj_id: ObjectID,
+    with_unpublished_dependencies: bool,
+) -> Result<(ObjectID, ObjectID), anyhow::Error> {
+    let mut build_config = BuildConfig::new_for_testing().config;
+    let move_lock_path = package_path.clone().join("Move.lock");
+    build_config.lock_file = Some(move_lock_path.clone());
+    let resp = SuiClientCommands::Publish {
+        package_path: package_path.clone(),
+        build_config: build_config.clone(),
+        skip_dependency_verification: false,
+        verify_deps: false,
+        with_unpublished_dependencies,
+        opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+    }
+    .execute(context)
+    .await?;
+
+    let SuiClientCommandResult::TransactionBlock(publish_response) = resp else {
+        unreachable!("Invalid response");
+    };
+
+    let SuiTransactionBlockEffects::V1(effects) = publish_response.clone().effects.unwrap();
+
+    assert!(effects.status.is_ok());
+    let package_a = effects.created().iter().find(|refe| matches!(refe.owner, Owner::Immutable)).unwrap();
+    let cap = effects.created().iter().find(|refe| matches!(refe.owner, Owner::AddressOwner(_))).unwrap();
+
+    Ok((package_a.reference.object_id, cap.reference.object_id))
+}
+
+// Recursively copy a directory and all its contents
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+    fs::create_dir_all(&dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Fetch move packages based on the provided package IDs.
+pub async fn fetch_move_packages(client: &SuiClient, package_ids: Vec<ObjectID>) -> Vec<MovePackage> {
+    let objects = client
+        .read_api()
+        .multi_get_object_with_options(package_ids, SuiObjectDataOptions::bcs_lossless())
+        .await
+        .unwrap();
+
+    objects
+        .into_iter()
+        .map(|o| {
+            let o = o.into_object().unwrap();
+            let Some(SuiRawData::Package(p)) = o.bcs else {
+                panic!("Expected package");
+            };
+            p.to_move_package(u64::MAX /* safe as this pkg comes from the network */).unwrap()
+        })
+        .collect()
+}
+
+fn add_published_id_to_manifest(
+    package_path: &Path,
+    package_id: &ObjectID,
+    add_to_address_section: bool,
+) -> Result<(), anyhow::Error> {
+    let content = std::fs::read_to_string(package_path.join("Move.toml"))?;
+    let mut toml: toml::Value = toml::from_str(&content)?;
+    if let Some(tbl) = toml.get_mut("package") {
+        if let Some(tbl) = tbl.as_table_mut() {
+            tbl.insert("published-at".to_string(), toml::Value::String(package_id.to_hex_uncompressed()));
+        }
+    }
+
+    if add_to_address_section {
+        if let Some(tbl) = toml.get_mut("addresses") {
+            if let Some(tbl) = tbl.as_table_mut() {
+                tbl.insert("a".to_string(), toml::Value::String(package_id.to_hex_uncompressed()));
+            }
+        }
+    }
+
+    let toml_str = toml::to_string(&toml)?;
+    std::fs::write(package_path.join("Move.toml"), toml_str)?;
+    Ok(())
+}
 
 #[sim_test]
 async fn test_genesis() -> Result<(), anyhow::Error> {
@@ -176,7 +375,7 @@ async fn test_addresses_command() -> Result<(), anyhow::Error> {
     let mut context = test_cluster.wallet;
 
     // Add 3 accounts
-    for _ in 0..3 {
+    for _ in 0 .. 3 {
         context.config.keystore.add_key(None, SuiKeyPair::Ed25519(get_key_pair().1))?;
     }
 
@@ -245,6 +444,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
         package_path: package_path.clone(),
         build_config,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
     }
@@ -299,7 +499,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
     );
 
     let args = shlex::split(&complex_ptb_string).unwrap();
-    client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
+    sui::client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
 
     let delete_object_ptb_string = format!(
         r#"
@@ -313,7 +513,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
     );
 
     let args = shlex::split(&delete_object_ptb_string).unwrap();
-    client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
+    sui::client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
 
     Ok(())
 }
@@ -337,42 +537,8 @@ async fn test_ptb_publish() -> Result<(), anyhow::Error> {
         package_path.display()
     );
     let args = shlex::split(&publish_ptb_string).unwrap();
-    client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
+    sui::client_ptb::ptb::PTB { args: args.clone() }.execute(context).await?;
     Ok(())
-}
-
-// fixing issue https://github.com/one-chain-labs/onechain/issues/6546
-#[tokio::test]
-async fn test_regression_6546() -> Result<(), anyhow::Error> {
-    let mut test_cluster = TestClusterBuilder::new().build().await;
-    let address = test_cluster.get_address_0();
-    let context = &mut test_cluster.wallet;
-
-    let SuiClientCommandResult::Objects(coins) =
-        SuiClientCommands::Objects { address: Some(KeyIdentity::Address(address)) }.execute(context).await?
-    else {
-        panic!()
-    };
-    let config_path = test_cluster.swarm.dir().join(SUI_CLIENT_CONFIG);
-
-    test_with_sui_binary(&[
-        "client",
-        "--client.config",
-        config_path.to_str().unwrap(),
-        "call",
-        "--package",
-        "0x2",
-        "--module",
-        "sui",
-        "--function",
-        "transfer",
-        "--args",
-        &coins.first().unwrap().object()?.object_id.to_string(),
-        &test_cluster.get_address_1().to_string(),
-        "--gas-budget",
-        "100000000",
-    ])
-    .await
 }
 
 #[sim_test]
@@ -495,6 +661,7 @@ async fn test_move_call_args_linter_command() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -635,7 +802,7 @@ async fn test_move_call_args_linter_command() -> Result<(), anyhow::Error> {
     // let err_string = format!("{} ", resp.err().unwrap());
     // let framework_addr = SUI_FRAMEWORK_ADDRESS.to_hex_literal();
     // let package_addr = package.to_hex_literal();
-    // assert!(err_string.contains(&format!("Expected argument of type {package_addr}::object_basics::Object, but found type {framework_addr}::coin::Coin<{framework_addr}::oct::OCT>")));
+    // assert!(err_string.contains(&format!("Expected argument of type {package_addr}::object_basics::Object, but found type {framework_addr}::coin::Coin<{framework_addr}::sui::SUI>")));
 
     // Try a proper transfer
     let args = [SuiJsonValue::new(json!(created_obj))?, SuiJsonValue::new(json!(address2))?];
@@ -709,6 +876,7 @@ async fn test_package_publish_command() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -766,6 +934,7 @@ async fn test_package_management_on_publish_command() -> Result<(), anyhow::Erro
         build_config: build_config.clone(),
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -822,6 +991,7 @@ async fn test_delete_shared_object() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -918,6 +1088,7 @@ async fn test_receive_argument() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1022,6 +1193,7 @@ async fn test_receive_argument_by_immut_ref() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1126,6 +1298,7 @@ async fn test_receive_argument_by_mut_ref() -> Result<(), anyhow::Error> {
         build_config,
         skip_dependency_verification: false,
         with_unpublished_dependencies: false,
+        verify_deps: true,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
     }
     .execute(context)
@@ -1231,6 +1404,7 @@ async fn test_package_publish_command_with_unpublished_dependency_succeeds() -> 
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: false,
         with_unpublished_dependencies,
     }
     .execute(context)
@@ -1286,6 +1460,7 @@ async fn test_package_publish_command_with_unpublished_dependency_fails() -> Res
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies,
     }
     .execute(context)
@@ -1324,6 +1499,7 @@ async fn test_package_publish_command_non_zero_unpublished_dep_fails() -> Result
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies,
     }
     .execute(context)
@@ -1373,6 +1549,7 @@ async fn test_package_publish_command_failure_invalid() -> Result<(), anyhow::Er
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies,
     }
     .execute(context)
@@ -1408,6 +1585,7 @@ async fn test_package_publish_nonexistent_dependency() -> Result<(), anyhow::Err
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1432,7 +1610,7 @@ async fn test_package_publish_test_flag() -> Result<(), anyhow::Error> {
     let mut package_path = PathBuf::from(TEST_DATA_DIR);
     package_path.push("module_publish_with_nonexistent_dependency");
     let mut build_config: MoveBuildConfig = BuildConfig::new_for_testing().config;
-    // this would have been the result of calling `one_chain client publish --test`
+    // this would have been the result of calling `sui client publish --test`
     build_config.test_mode = true;
 
     let result = SuiClientCommands::Publish {
@@ -1440,6 +1618,7 @@ async fn test_package_publish_test_flag() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1448,7 +1627,7 @@ async fn test_package_publish_test_flag() -> Result<(), anyhow::Error> {
     let expect = expect![[r#"
         Err(
             ModulePublishFailure {
-                error: "The `publish` subcommand should not be used with the `--test` flag\n\nCode in published packages must not depend on test code.\nIn order to fix this and publish the package without `--test`, remove any non-test dependencies on test-only code.\nYou can ensure all test-only dependencies have been removed by compiling the package normally with `one_chain move build`.",
+                error: "The `publish` subcommand should not be used with the `--test` flag\n\nCode in published packages must not depend on test code.\nIn order to fix this and publish the package without `--test`, remove any non-test dependencies on test-only code.\nYou can ensure all test-only dependencies have been removed by compiling the package normally with `sui move build`.",
             },
         )
     "#]];
@@ -1489,6 +1668,7 @@ async fn test_package_upgrade_command() -> Result<(), anyhow::Error> {
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1535,7 +1715,9 @@ async fn test_package_upgrade_command() -> Result<(), anyhow::Error> {
         upgrade_capability: cap.reference.object_id,
         build_config,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+        verify_compatibility: true,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1594,6 +1776,7 @@ async fn test_package_management_on_upgrade_command() -> Result<(), anyhow::Erro
         build_config: build_config.clone(),
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1634,7 +1817,9 @@ async fn test_package_management_on_upgrade_command() -> Result<(), anyhow::Erro
         upgrade_capability: cap.reference.object_id,
         build_config: build_config.clone(),
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+        verify_compatibility: true,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1699,6 +1884,7 @@ async fn test_package_management_on_upgrade_command_conflict() -> Result<(), any
         build_config: build_config_publish.clone(),
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1745,7 +1931,9 @@ async fn test_package_management_on_upgrade_command_conflict() -> Result<(), any
         upgrade_capability: cap.reference.object_id,
         build_config: build_config_upgrade.clone(),
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+        verify_compatibility: true,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
     }
     .execute(context)
@@ -1758,8 +1946,8 @@ async fn test_package_management_on_upgrade_command_conflict() -> Result<(), any
         Conflicting published package address: `Move.toml` contains published-at address 0x0000000000000000000000000000000000000000000000000000000000000bad but `Move.lock` file contains published-at address <elided-for-test>. You may want to:
 
                          - delete the published-at address in the `Move.toml` if the `Move.lock` address is correct; OR
-                         - update the `Move.lock` address using the `one_chain manage-package` command to be the same as the `Move.toml`; OR
-                         - check that your `one_chain active-env` (currently localnet) corresponds to the chain on which the package is published (i.e., devnet, testnet, mainnet); OR
+                         - update the `Move.lock` address using the `sui manage-package` command to be the same as the `Move.toml`; OR
+                         - check that your `sui active-env` (currently localnet) corresponds to the chain on which the package is published (i.e., devnet, testnet, mainnet); OR
                          - contact the maintainer if this package is a dependency and request resolving the conflict."#]];
     expect.assert_eq(&err_string);
     Ok(())
@@ -1885,7 +2073,7 @@ async fn test_native_transfer() -> Result<(), anyhow::Error> {
 }
 
 #[test]
-// Test for issue https://github.com/one-chain-labs/onechain/issues/1078
+// Test for issue https://github.com/MystenLabs/sui/issues/1078
 fn test_bug_1078() {
     let read = SuiClientCommandResult::Object(SuiObjectResponse::new_with_error(SuiObjectResponseError::NotExists {
         object_id: ObjectID::random(),
@@ -2358,9 +2546,9 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
         .data;
     let coin = object_refs.get(1).unwrap().object().unwrap().object_id;
 
-    SuiClientCommands::TransferOct {
+    SuiClientCommands::TransferSui {
         to: KeyIdentity::Address(address1),
-        coin_object_id: coin,
+        sui_coin_object_id: coin,
         amount: Some(1),
         opts: Opts {
             gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2373,9 +2561,9 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    SuiClientCommands::TransferOct {
+    SuiClientCommands::TransferSui {
         to: KeyIdentity::Address(address1),
-        coin_object_id: coin,
+        sui_coin_object_id: coin,
         amount: Some(1),
         opts: Opts {
             gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2389,9 +2577,9 @@ async fn test_serialize_tx() -> Result<(), anyhow::Error> {
     .await?;
 
     // use alias for transfer
-    SuiClientCommands::TransferOct {
+    SuiClientCommands::TransferSui {
         to: KeyIdentity::Alias(alias1),
-        coin_object_id: coin,
+        sui_coin_object_id: coin,
         amount: Some(1),
         opts: Opts {
             gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2509,7 +2697,7 @@ async fn test_stake_with_u64_amount() -> Result<(), anyhow::Error> {
 }
 
 async fn test_with_sui_binary(args: &[&str]) -> Result<(), anyhow::Error> {
-    let mut cmd = assert_cmd::Command::cargo_bin("one_chain").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin("sui").unwrap();
     let args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     // test cluster will not response if this call is in the same thread
     let out = thread::spawn(move || cmd.args(args).assert());
@@ -2583,14 +2771,14 @@ async fn test_get_owned_objects_owned_by_address_and_check_pagination() -> Resul
 #[tokio::test]
 async fn test_linter_suppression_stats() -> Result<(), anyhow::Error> {
     const LINTER_MSG: &str = "Total number of linter warnings suppressed: 5 (unique lints: 3)";
-    let mut cmd = assert_cmd::Command::cargo_bin("one_chain").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin("sui").unwrap();
     let args = vec!["move", "test", "--path", "tests/data/linter"];
-    let output = cmd.args(&args).output().expect("failed to run 'one_chain move test'");
+    let output = cmd.args(&args).output().expect("failed to run 'sui move test'");
     let out_str = str::from_utf8(&output.stderr).unwrap();
     assert!(out_str.contains(LINTER_MSG), "Expected to match {LINTER_MSG}, got: {out_str}");
     // test no-lint suppresses
     let args = vec!["move", "test", "--no-lint", "--path", "tests/data/linter"];
-    let output = cmd.args(&args).output().expect("failed to run 'one_chain move test'");
+    let output = cmd.args(&args).output().expect("failed to run 'sui move test'");
     let out_str = str::from_utf8(&output.stderr).unwrap();
     assert!(!out_str.contains(LINTER_MSG), "Expected _not to_ match {LINTER_MSG}, got: {out_str}");
     Ok(())
@@ -2663,9 +2851,9 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     assert_dry_run(transfer_dry_run, object_id, "Transfer");
 
     // === TRANSFER SUI === //
-    let transfer_sui_dry_run = SuiClientCommands::TransferOct {
+    let transfer_sui_dry_run = SuiClientCommands::TransferSui {
         to: KeyIdentity::Address(SuiAddress::random_for_testing_only()),
-        coin_object_id: object_to_send,
+        sui_coin_object_id: object_to_send,
         amount: Some(1),
         opts: Opts::for_testing_dry_run(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
     }
@@ -2705,7 +2893,7 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     assert_dry_run(pay_dry_run, gas_coin_id, "Pay");
 
     // === PAY SUI === //
-    let pay_sui_dry_run = SuiClientCommands::PayOct {
+    let pay_sui_dry_run = SuiClientCommands::PaySui {
         input_coins: vec![object_id],
         recipients: vec![KeyIdentity::Address(SuiAddress::random_for_testing_only())],
         amounts: vec![1],
@@ -2717,7 +2905,7 @@ async fn test_dry_run() -> Result<(), anyhow::Error> {
     assert_dry_run(pay_sui_dry_run, object_id, "PaySui");
 
     // === PAY ALL SUI === //
-    let pay_all_sui_dry_run = SuiClientCommands::PayAllOct {
+    let pay_all_sui_dry_run = SuiClientCommands::PayAllSui {
         input_coins: vec![object_id],
         recipient: KeyIdentity::Address(SuiAddress::random_for_testing_only()),
         opts: Opts::for_testing_dry_run(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2838,7 +3026,7 @@ async fn test_pay_sui() -> Result<(), anyhow::Error> {
     let (address2, address3) = (addresses[0], addresses[1]);
     let context = &mut test_cluster.wallet;
     let amounts = [1000, 5000];
-    let pay_oct = SuiClientCommands::PayOct {
+    let pay_sui = SuiClientCommands::PaySui {
         input_coins: vec![object_id1, object_id2],
         recipients: vec![recipient1.clone(), recipient2.clone()],
         amounts: amounts.into(),
@@ -2847,12 +3035,12 @@ async fn test_pay_sui() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    // pay OCT takes the input coins and transfers from each of them (in order) the amounts to the
+    // pay sui takes the input coins and transfers from each of them (in order) the amounts to the
     // respective receipients.
     // check if each recipient has one object, if the tx status is success,
     // and if the gas object used was the first object in the input coins
     // we also check if the balances of each recipient are right!
-    if let SuiClientCommandResult::TransactionBlock(response) = pay_oct {
+    if let SuiClientCommandResult::TransactionBlock(response) = pay_sui {
         assert!(response.status_ok().unwrap());
         // check gas coin used
         assert_eq!(response.effects.as_ref().unwrap().gas_object().object_id(), object_id1);
@@ -2882,7 +3070,7 @@ async fn test_pay_sui() -> Result<(), anyhow::Error> {
         assert_eq!(objs_refs.data.len(), 1);
         assert_eq!(client.coin_read_api().get_balance(address3, None).await?.total_balance, amounts[1] as u128);
     } else {
-        panic!("PayOct test failed");
+        panic!("PaySui test failed");
     }
     Ok(())
 }
@@ -2894,7 +3082,7 @@ async fn test_pay_all_sui() -> Result<(), anyhow::Error> {
     let recipient1 = &recipients[0];
     let address2 = addresses[0];
     let context = &mut test_cluster.wallet;
-    let pay_all_oct = SuiClientCommands::PayAllOct {
+    let pay_all_sui = SuiClientCommands::PayAllSui {
         input_coins: vec![object_id1, object_id2],
         recipient: recipient1.clone(),
         opts: Opts::for_testing(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
@@ -2902,10 +3090,10 @@ async fn test_pay_all_sui() -> Result<(), anyhow::Error> {
     .execute(context)
     .await?;
 
-    // pay all OCT will take the input coins and smash them into one coin and transfer that coin to
+    // pay all sui will take the input coins and smash them into one coin and transfer that coin to
     // the recipient, so we check that the recipient has one object, if the tx status is success,
     // and if the gas object used was the first object in the input coins
-    if let SuiClientCommandResult::TransactionBlock(response) = pay_all_oct {
+    if let SuiClientCommandResult::TransactionBlock(response) = pay_all_sui {
         let objs_refs = client
             .read_api()
             .get_owned_objects(
@@ -2920,7 +3108,7 @@ async fn test_pay_all_sui() -> Result<(), anyhow::Error> {
         assert_eq!(objs_refs.data.len(), 1);
         assert_eq!(response.effects.unwrap().gas_object().object_id(), object_id1);
     } else {
-        panic!("PayAllOct test failed");
+        panic!("PayAllSui test failed");
     }
 
     Ok(())
@@ -2982,19 +3170,19 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
     let address2 = addresses[0];
     let context = &mut test_cluster.wallet;
     let amount = 1000;
-    let transfer_oct = SuiClientCommands::TransferOct {
+    let transfer_sui = SuiClientCommands::TransferSui {
         to: KeyIdentity::Address(address2),
-        coin_object_id: object_id1,
+        sui_coin_object_id: object_id1,
         amount: Some(amount),
         opts: Opts::for_testing(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
     }
     .execute(context)
     .await?;
 
-    // transfer OCT will transfer the amount from object_id1 to address2, and use the same object
+    // transfer sui will transfer the amount from object_id1 to address2, and use the same object
     // as gas, and we check if the recipient address received the object, and the expected balance
     // is correct
-    if let SuiClientCommandResult::TransactionBlock(response) = transfer_oct {
+    if let SuiClientCommandResult::TransactionBlock(response) = transfer_sui {
         assert!(response.status_ok().unwrap());
         assert_eq!(response.effects.as_ref().unwrap().gas_object().object_id(), object_id1);
         let objs_refs = client
@@ -3011,18 +3199,18 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
         let balance = client.coin_read_api().get_balance(address2, None).await?.total_balance;
         assert_eq!(balance, amount as u128);
     } else {
-        panic!("TransferOct test failed");
+        panic!("TransferSui test failed");
     }
     // transfer the whole object by not passing an amount
-    let transfer_oct = SuiClientCommands::TransferOct {
+    let transfer_sui = SuiClientCommands::TransferSui {
         to: recipient1.clone(),
-        coin_object_id: object_id1,
+        sui_coin_object_id: object_id1,
         amount: None,
         opts: Opts::for_testing(rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
     }
     .execute(context)
     .await?;
-    if let SuiClientCommandResult::TransactionBlock(response) = transfer_oct {
+    if let SuiClientCommandResult::TransactionBlock(response) = transfer_sui {
         assert!(response.status_ok().unwrap());
         assert_eq!(response.effects.as_ref().unwrap().gas_object().object_id(), object_id1);
         let objs_refs = client
@@ -3035,10 +3223,10 @@ async fn test_transfer_sui() -> Result<(), anyhow::Error> {
             )
             .await?;
         assert!(!objs_refs.has_next_page);
-        assert_eq!(objs_refs.data.len(), 2, "Expected to have two coins when calling transfer OCT the 2nd time");
+        assert_eq!(objs_refs.data.len(), 2, "Expected to have two coins when calling transfer sui the 2nd time");
         assert!(objs_refs.data.iter().any(|x| x.object().unwrap().object_id == object_id1));
     } else {
-        panic!("TransferOct test failed");
+        panic!("TransferSui test failed");
     }
     Ok(())
 }
@@ -3052,13 +3240,13 @@ async fn test_gas_estimation() -> Result<(), anyhow::Error> {
     let amount = 1000;
     let sender = context.active_address().unwrap();
     let tx_builder = client.transaction_builder();
-    let tx_kind = tx_builder.transfer_oct_tx_kind(address2, Some(amount));
+    let tx_kind = tx_builder.transfer_sui_tx_kind(address2, Some(amount));
     let gas_estimate = estimate_gas_budget(context, sender, tx_kind, rgp, None, None).await;
     assert!(gas_estimate.is_ok());
 
-    let transfer_oct_cmd = SuiClientCommands::TransferOct {
+    let transfer_sui_cmd = SuiClientCommands::TransferSui {
         to: KeyIdentity::Address(address2),
-        coin_object_id: object_id1,
+        sui_coin_object_id: object_id1,
         amount: Some(amount),
         opts: Opts {
             gas_budget: None,
@@ -3071,13 +3259,13 @@ async fn test_gas_estimation() -> Result<(), anyhow::Error> {
     .execute(context)
     .await
     .unwrap();
-    if let SuiClientCommandResult::TransactionBlock(response) = transfer_oct_cmd {
+    if let SuiClientCommandResult::TransactionBlock(response) = transfer_sui_cmd {
         assert!(response.status_ok().unwrap());
         let gas_used = response.effects.as_ref().unwrap().gas_object().object_id();
         assert_eq!(gas_used, object_id1);
         assert!(response.effects.as_ref().unwrap().gas_cost_summary().gas_used() <= gas_estimate.unwrap());
     } else {
-        panic!("TransferOct test failed");
+        panic!("TransferSui test failed");
     }
     Ok(())
 }
@@ -3115,6 +3303,7 @@ async fn test_clever_errors() -> Result<(), anyhow::Error> {
         package_path: package_path.clone(),
         build_config,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
     }
@@ -3137,7 +3326,7 @@ async fn test_clever_errors() -> Result<(), anyhow::Error> {
     let elide_transaction_digest = |s: String| -> String {
         let mut x = s.splitn(5, '\'').collect::<Vec<_>>();
         x[1] = "ELIDED_TRANSACTION_DIGEST";
-        let tmp = format!("ELIDED_ADDRESS{}", &x[3][66..]);
+        let tmp = format!("ELIDED_ADDRESS{}", &x[3][66 ..]);
         x[3] = &tmp;
         x.join("'")
     };
@@ -3211,51 +3400,6 @@ async fn test_clever_errors() -> Result<(), anyhow::Error> {
 }
 
 #[tokio::test]
-async fn test_move_build_bytecode_with_address_resolution() -> Result<(), anyhow::Error> {
-    let test_cluster = TestClusterBuilder::new().build().await;
-    let config_path = test_cluster.swarm.dir().join(SUI_CLIENT_CONFIG);
-
-    // Package setup: a simple package depends on another and copied to tmpdir
-    let mut simple_package_path = PathBuf::from(TEST_DATA_DIR);
-    simple_package_path.push("simple");
-
-    let mut depends_on_simple_package_path = PathBuf::from(TEST_DATA_DIR);
-    depends_on_simple_package_path.push("depends_on_simple");
-
-    let tmp_dir = tempfile::tempdir().unwrap();
-
-    fs_extra::dir::copy(&simple_package_path, &tmp_dir, &fs_extra::dir::CopyOptions::default())?;
-
-    fs_extra::dir::copy(&depends_on_simple_package_path, &tmp_dir, &fs_extra::dir::CopyOptions::default())?;
-
-    // Publish simple package.
-    let simple_tmp_dir = tmp_dir.path().join("simple");
-    test_with_sui_binary(&[
-        "client",
-        "--client.config",
-        config_path.to_str().unwrap(),
-        "publish",
-        simple_tmp_dir.to_str().unwrap(),
-    ])
-    .await?;
-
-    // Build the package that depends on 'simple' package. Addresses must resolve successfully
-    // from the `Move.lock` for this command to succeed at all.
-    let depends_on_simple_tmp_dir = tmp_dir.path().join("depends_on_simple");
-    test_with_sui_binary(&[
-        "move",
-        "--client.config",
-        config_path.to_str().unwrap(),
-        "build",
-        "--dump-bytecode-as-base64",
-        "--path",
-        depends_on_simple_tmp_dir.to_str().unwrap(),
-    ])
-    .await?;
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_parse_host_port() {
     let input = "127.0.0.0";
     let result = parse_host_port(input.to_string(), 9123).unwrap();
@@ -3286,4 +3430,229 @@ async fn test_parse_host_port() {
     assert!(parse_host_port(input.to_string(), 9123).is_err());
     let input = "127.9.0.1:asb";
     assert!(parse_host_port(input.to_string(), 9123).is_err());
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_with_unpublished_deps() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await.unwrap();
+    // A package and with unpublished deps
+    let (package_id, _) = test.publish_package("H_depends_on_G_unpublished", true).await.unwrap();
+
+    // set with_unpublished_dependencies to true and publish package H
+    let linkage_table_h = test.fetch_linkage_table(package_id).await;
+    // H depends on G, which is unpublished, so the linkage table should be empty as G will be
+    // included in H during publishing
+    assert!(linkage_table_h.is_empty());
+
+    // try publish package H but `with_unpublished_dependencies` is false. Should error
+    let resp = test.publish_package("H_depends_on_G_unpublished", false).await;
+    assert!(resp.is_err());
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_with_bytecode_deps() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await?;
+    let with_unpublished_dependencies = false;
+
+    // bytecode deps without source code
+    let (package_a_id, _) = test.publish_package("A", with_unpublished_dependencies).await?;
+
+    // make pkg a to be a bytecode dep for package F
+    // set published-at field to package id and addresses a to package id
+    let package_path = test.package_path("A");
+    add_published_id_to_manifest(&package_path, &package_a_id, true)?;
+
+    // delete the sources folder from pkg A to setup A as bytecode dep for package F
+    fs::remove_file(package_path.join("Move.lock"))?;
+    let build_folder = package_path.join("build");
+    if build_folder.exists() {
+        fs::remove_dir_all(&build_folder)?;
+    }
+    move_package::package_hooks::register_package_hooks(Box::new(SuiPackageHooks));
+    // now build the package which will create the build folder and a new Move.lock file
+    BuildConfig::default().build(&package_path).unwrap();
+    fs::remove_dir_all(package_path.join("sources"))?;
+
+    let (package_f_id, _) =
+        test.publish_package("F_depends_on_A_as_bytecode_dep", with_unpublished_dependencies).await?;
+    let linkage_table_f = test.fetch_linkage_table(package_f_id).await;
+    // F depends on A as a bytecode dep, so the linkage table should not be empty
+    assert!(linkage_table_f.contains_key(&package_a_id), "Package F should depend on A");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_without_dependencies() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await?;
+
+    // Publish package A and verify empty linkage table
+    let (package_a_id, _) = test.publish_package("A", false).await?;
+    let move_pkg_a = fetch_move_packages(&test.client, vec![package_a_id]).await;
+    let linkage_table_a = move_pkg_a.first().unwrap().linkage_table();
+    assert!(linkage_table_a.is_empty(), "Package A should have no dependencies");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_with_direct_dependency() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await?;
+
+    // First publish package A
+    let (package_a_id, _) = test.publish_package("A", false).await?;
+
+    // Then publish B which depends on A
+    let (package_b_id, _) = test.publish_package("B_depends_on_A", false).await?;
+    let linkage_table_b = test.fetch_linkage_table(package_b_id).await;
+    assert!(linkage_table_b.contains_key(&package_a_id), "Package B should depend on A");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_with_unused_dependency() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await?;
+
+    // First publish package A
+    let (_, _) = test.publish_package("A", false).await?;
+
+    // Then publish B which declares but doesn't use A
+    let (package_b_id, _) = test.publish_package("B_depends_on_A_but_no_code_references_A", false).await?;
+    let linkage_table_b = test.fetch_linkage_table(package_b_id).await;
+    assert!(linkage_table_b.is_empty(), "Package B should have empty linkage table when not using A");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_with_transitive_dependencies() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await?;
+
+    // Publish packages A and B
+    let (package_a_id, _) = test.publish_package("A", false).await?;
+    let (package_b_id, _) = test.publish_package("B_depends_on_A", false).await?;
+
+    // Publish C which depends on B (which depends on A)
+    let (package_c_id, _) = test.publish_package("C_depends_on_B_which_depends_on_A", false).await?;
+    let linkage_table_c = test.fetch_linkage_table(package_c_id).await;
+
+    assert!(linkage_table_c.contains_key(&package_a_id), "Package C should depend on A");
+    assert!(linkage_table_c.contains_key(&package_b_id), "Package C should depend on B");
+    assert_eq!(linkage_table_c.len(), 2, "Package C should have exactly two dependencies");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_with_transitive_dependencies_and_no_code_references() -> Result<(), anyhow::Error> {
+    // Publish package C_depends_on_B_but_no_code_references_B and check the linkage table
+    // we use here the package B published in TEST 3
+    let mut test = TreeShakingTest::new().await?;
+
+    // Publish packages A and B
+    let (_, _) = test.publish_package("A", false).await?;
+    let (_, _) = test.publish_package("B_depends_on_A_but_no_code_references_A", false).await?;
+
+    // Publish C which depends on B
+    let (package_c_id, _) = test.publish_package("C_depends_on_B_but_no_code_references_B", false).await?;
+    let linkage_table_c = test.fetch_linkage_table(package_c_id).await;
+
+    assert!(linkage_table_c.is_empty(), "Package C should have no dependencies");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_deps_on_pkg_upgrade() -> Result<(), anyhow::Error> {
+    // Publish package C_depends_on_B_but_no_code_references_B and check the linkage table
+    let mut test = TreeShakingTest::new().await?;
+
+    // Publish package A and B
+    let (package_a_id, cap) = test.publish_package("A", false).await?;
+    let (_, _) = test.publish_package("B_depends_on_A", false).await?;
+
+    // Upgrade package A (named A_v1)
+    std::fs::copy(test.package_path("A").join("Move.lock"), test.package_path("A_v1").join("Move.lock"))?;
+    let package_a_v1_id = test.upgrade_package("A_v1", cap).await?;
+
+    // Publish D which depends on A_v1 but no code references A
+    let (package_d_id, _) = test.publish_package("D_depends_on_A_v1_but_no_code_references_A", false).await?;
+    let linkage_table_d = test.fetch_linkage_table(package_d_id).await;
+
+    assert!(linkage_table_d.is_empty(), "Package D should have no dependencies");
+
+    // Publish D which depends on A_v1 and code references it
+    let (package_d_id, _) = test.publish_package("D_depends_on_A_v1", false).await?;
+    let linkage_table_d = test.fetch_linkage_table(package_d_id).await;
+
+    assert!(linkage_table_d.contains_key(&package_a_id), "Package D should depend on A");
+    assert!(
+        linkage_table_d.get(&package_a_id).is_some_and(|x| x.upgraded_id == package_a_v1_id),
+        "Package D should depend on A_v1 after upgrade, and the UpgradeInfo should have matching ids"
+    );
+
+    let (package_e_id, _) =
+        test.publish_package("E_depends_on_A_v1_and_on_B_depends_on_A_but_no_code_references_to_A_or_B", false).await?;
+
+    let linkage_table_e = test.fetch_linkage_table(package_e_id).await;
+    assert!(linkage_table_e.is_empty(), "Package E should have no dependencies");
+
+    let (package_e_id, _) =
+        test.publish_package("E_depends_on_A_v1_and_on_B_depends_on_A_and_code_references_A", false).await?;
+
+    let linkage_table_e = test.fetch_linkage_table(package_e_id).await;
+    assert!(linkage_table_e.contains_key(&package_a_id), "Package E should depend on A");
+
+    Ok(())
+}
+
+#[sim_test]
+async fn test_tree_shaking_package_deps_on_pkg_upgrade_1() -> Result<(), anyhow::Error> {
+    let mut test = TreeShakingTest::new().await?;
+
+    // Publish package A and D_depends_on_A_v1_but_no_code_references_A
+    let (package_a_id, cap) = test.publish_package("A", false).await?;
+    let package_path = test.package_path("A");
+    add_published_id_to_manifest(&package_path, &package_a_id, false)?;
+    // Upgrade package A (named A_v1)
+    std::fs::copy(test.package_path("A").join("Move.lock"), test.package_path("A_v1").join("Move.lock"))?;
+    let package_a_v1_id = test.upgrade_package("A_v1", cap).await?;
+
+    let package_path = test.package_path("A_v1");
+    add_published_id_to_manifest(&package_path, &package_a_v1_id, false)?;
+
+    let package_d_id = test.publish_package_without_tree_shaking("D_depends_on_A_v1_but_no_code_references_A").await;
+    let linkage_table_d = test.fetch_linkage_table(package_d_id).await;
+    assert!(linkage_table_d.contains_key(&package_a_id), "Package D should depend on A");
+
+    // published package D with the old stuff that isn't aware of automated address mgmt, so
+    // need to update the published-at field in the manifest
+    add_published_id_to_manifest(
+        &test.package_path("D_depends_on_A_v1_but_no_code_references_A"),
+        &package_d_id,
+        false,
+    )?;
+
+    // Upgrade package A (named A_v2)
+    std::fs::copy(test.package_path("A_v1").join("Move.lock"), test.package_path("A_v2").join("Move.lock"))?;
+    let package_a_v2_id = test.upgrade_package("A_v2", cap).await?;
+
+    // the old code for publishing a package from sui-test-transaction-builder does not know about
+    // move.lock and so on, so we need to add manually the published-at address.
+    let package_path = test.package_path("A_v2");
+    add_published_id_to_manifest(&package_path, &package_a_v2_id, false)?;
+
+    let (package_i_id, _) =
+        test.publish_package("I_depends_on_D_depends_on_A_v1_but_no_code_references_A_and_on_A_v2", false).await?;
+    let linkage_table_i = test.fetch_linkage_table(package_i_id).await;
+    assert!(linkage_table_i.contains_key(&package_a_id), "Package I linkage table should have A");
+    assert!(
+        linkage_table_i.get(&package_a_id).is_some_and(|x| x.upgraded_id == package_a_v2_id),
+        "Package I should depend on A_v2 after upgrade, and the UpgradeInfo should have matching ids"
+    );
+
+    Ok(())
 }

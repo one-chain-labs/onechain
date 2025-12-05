@@ -2,7 +2,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{authority_client::AuthorityAPI, epoch::committee_store::CommitteeStore};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+
 use prometheus::{
     core::GenericCounter,
     register_histogram_vec_with_registry,
@@ -12,7 +13,6 @@ use prometheus::{
     IntCounterVec,
     Registry,
 };
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use sui_types::{
     base_types::*,
     committee::*,
@@ -38,6 +38,8 @@ use sui_types::{
 };
 use tap::TapFallible;
 use tracing::{debug, error, instrument};
+
+use crate::{authority_client::AuthorityAPI, epoch::committee_store::CommitteeStore};
 
 macro_rules! check_error {
     ($address:expr, $cond:expr, $msg:expr) => {
@@ -364,7 +366,7 @@ where
 
             for object in input_objects {
                 let object_ref = object.compute_object_reference();
-                if !expected.get(&object_ref.0).is_some_and(|expect| &object_ref == expect) {
+                if expected.get(&object_ref.0).is_none_or(|expect| &object_ref != expect) {
                     return Err(SuiError::ByzantineAuthoritySuspicion {
                         authority: self.address,
                         reason: "Returned input object that wasn't present in the signed effects".to_string(),
@@ -380,7 +382,7 @@ where
 
             for object in output_objects {
                 let object_ref = object.compute_object_reference();
-                if !expected.get(&object_ref.0).is_some_and(|expect| &object_ref == expect) {
+                if expected.get(&object_ref.0).is_none_or(|expect| &object_ref != expect) {
                     return Err(SuiError::ByzantineAuthoritySuspicion {
                         authority: self.address,
                         reason: "Returned output object that wasn't present in the signed effects".to_string(),

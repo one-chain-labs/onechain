@@ -1,6 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use better_any::{Tid, TidAble};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{
+    annotated_value as A,
+    gas_algebra::InternalGas,
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    runtime_value as R,
+    vm_status::StatusCode,
+};
+use move_stdlib_natives::{GasParameters, NurseryGasParameters};
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction, NativeFunctionTable};
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    values::{Struct, Value},
+};
+use sui_protocol_config::ProtocolConfig;
+use sui_types::{MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS};
+use transfer::TransferReceiveObjectInternalCostParams;
+
 use self::{
     address::{AddressFromBytesCostParams, AddressFromU256CostParams, AddressToU256CostParams},
     crypto::{
@@ -44,27 +67,6 @@ use crate::crypto::{
     zklogin,
     zklogin::{CheckZkloginIdCostParams, CheckZkloginIssuerCostParams},
 };
-use better_any::{Tid, TidAble};
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{
-    annotated_value as A,
-    gas_algebra::InternalGas,
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
-    runtime_value as R,
-    vm_status::StatusCode,
-};
-use move_stdlib_natives::{GasParameters, NurseryGasParameters};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction, NativeFunctionTable};
-use move_vm_types::{
-    loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    values::{Struct, Value},
-};
-use std::sync::Arc;
-use sui_protocol_config::ProtocolConfig;
-use sui_types::{MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS};
-use transfer::TransferReceiveObjectInternalCostParams;
 
 mod address;
 mod crypto;
@@ -518,7 +520,7 @@ impl NativesCostTable {
                 bls12381_g2_msm_base_cost_per_input: protocol_config
                     .group_ops_bls12381_g2_msm_base_cost_per_input_as_option()
                     .map(Into::into),
-                bls12381_msm_max_len: protocol_config.group_ops_bls12381_msm_max_len_as_option().map(Into::into),
+                bls12381_msm_max_len: protocol_config.group_ops_bls12381_msm_max_len_as_option(),
                 bls12381_pairing_cost: protocol_config.group_ops_bls12381_pairing_cost_as_option().map(Into::into),
             },
         }

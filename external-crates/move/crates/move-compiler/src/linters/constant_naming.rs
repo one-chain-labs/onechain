@@ -14,10 +14,16 @@ use crate::{
 
 simple_visitor!(
     ConstantNaming,
-    fn visit_constant_custom(&mut self, _module: ModuleIdent, constant_name: ConstantName, cdef: &T::Constant) -> bool {
+    fn visit_constant_custom(
+        &mut self,
+        _module: ModuleIdent,
+        constant_name: ConstantName,
+        cdef: &T::Constant,
+    ) -> bool {
         let name = constant_name.0.value.as_str();
         if !is_valid_name(name) {
-            let uid_msg = format!("'{name}' should be ALL_CAPS. Or for error constants, use PascalCase",);
+            let uid_msg =
+                format!("'{name}' should be ALL_CAPS. Or for error constants, use PascalCase",);
             let diagnostic = diag!(StyleCodes::ConstantNaming.diag_info(), (cdef.loc, uid_msg));
             self.add_diag(diagnostic);
         }

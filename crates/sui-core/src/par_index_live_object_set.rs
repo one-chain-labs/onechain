@@ -1,10 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::{authority_store_tables::LiveObject, AuthorityStore};
 use std::time::Instant;
+
 use sui_types::{base_types::ObjectID, object::Object, storage::error::Error as StorageError};
 use tracing::info;
+
+use crate::authority::{authority_store_tables::LiveObject, AuthorityStore};
 
 /// Make `LiveObjectIndexer`s for parallel indexing of the live object set
 pub trait ParMakeLiveObjectIndexer: Sync {
@@ -39,7 +41,7 @@ pub fn par_index_live_object_set<T: ParMakeLiveObjectIndexer>(
     std::thread::scope(|s| -> Result<(), StorageError> {
         let mut threads = Vec::new();
         const BITS: u8 = 5;
-        for index in 0u8..(1 << BITS) {
+        for index in 0u8 .. (1 << BITS) {
             threads.push(s.spawn(move || {
                 let object_indexer = make_indexer.make_live_object_indexer();
                 live_object_set_index_task(index, BITS, authority_store, object_indexer)

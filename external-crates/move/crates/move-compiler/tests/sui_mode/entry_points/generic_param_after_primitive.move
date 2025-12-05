@@ -1,5 +1,5 @@
 module a::m {
-    use one::object;
+    use sui::object;
     struct Obj has key {
         id: object::UID,
     }
@@ -9,7 +9,7 @@ module a::m {
 
 }
 
-module one::object {
+module sui::object {
     struct UID has store {
         id: address,
     }

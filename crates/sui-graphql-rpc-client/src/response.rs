@@ -1,15 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ClientError;
+use std::{collections::BTreeMap, net::SocketAddr};
+
 use async_graphql::{Response, ServerError, Value};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Response as ReqwestResponse,
 };
 use serde_json::json;
-use std::{collections::BTreeMap, net::SocketAddr};
 use sui_graphql_rpc_headers::VERSION_HEADER;
+
+use super::ClientError;
 
 #[derive(Debug)]
 pub struct GraphqlResponse {
@@ -31,6 +33,7 @@ impl GraphqlResponse {
         Ok(Self { headers, remote_address, http_version, status, full_response })
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn graphql_version(&self) -> Result<String, ClientError> {
         Ok(self
             .headers
@@ -81,6 +84,7 @@ impl GraphqlResponse {
         self.full_response.errors.clone()
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn usage(&self) -> Result<Option<BTreeMap<String, u64>>, ClientError> {
         Ok(match self.full_response.extensions.get("usage").cloned() {
             Some(Value::Object(obj)) => Some(

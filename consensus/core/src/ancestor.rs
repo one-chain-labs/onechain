@@ -272,7 +272,7 @@ mod test {
         context.protocol_config.set_consensus_round_prober_probe_accepted_rounds(false);
         let context = Arc::new(context);
 
-        let scores = ReputationScores::new((1..=300).into(), vec![1, 2, 4, 3]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![1, 2, 4, 3]);
         let mut ancestor_state_manager = AncestorStateManager::new(context.clone());
         ancestor_state_manager.set_propagation_scores(scores);
 
@@ -299,7 +299,7 @@ mod test {
         context.protocol_config.set_consensus_round_prober_probe_accepted_rounds(true);
         let context = Arc::new(context);
 
-        let scores = ReputationScores::new((1..=300).into(), vec![1, 2, 4, 3]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![1, 2, 4, 3]);
         let mut ancestor_state_manager = AncestorStateManager::new(context.clone());
         ancestor_state_manager.set_propagation_scores(scores);
 
@@ -331,7 +331,7 @@ mod test {
         context.protocol_config.set_consensus_round_prober_probe_accepted_rounds(true);
         let context = Arc::new(context);
 
-        let scores = ReputationScores::new((1..=300).into(), vec![1, 2, 4, 3]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![1, 2, 4, 3]);
         let mut ancestor_state_manager = AncestorStateManager::new(context);
         ancestor_state_manager.set_propagation_scores(scores);
 
@@ -347,7 +347,7 @@ mod test {
             assert_eq!(*state, AncestorState::Include);
         }
 
-        let scores = ReputationScores::new((1..=300).into(), vec![10, 10, 100, 100]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![10, 10, 100, 100]);
         ancestor_state_manager.set_propagation_scores(scores);
         ancestor_state_manager.update_all_ancestors_state();
 
@@ -355,7 +355,7 @@ mod test {
         // 2 authorities should be excluded in with this threshold
         let state_map = ancestor_state_manager.get_ancestor_states();
         for (authority, state) in state_map.iter().enumerate() {
-            if (0..=1).contains(&authority) {
+            if (0 ..= 1).contains(&authority) {
                 assert_eq!(*state, AncestorState::Exclude(10));
             } else {
                 assert_eq!(*state, AncestorState::Include);
@@ -368,7 +368,7 @@ mod test {
         // quorum round updates have been set to expire the locks.
         let state_map = ancestor_state_manager.get_ancestor_states();
         for (authority, state) in state_map.iter().enumerate() {
-            if (0..=1).contains(&authority) {
+            if (0 ..= 1).contains(&authority) {
                 assert_eq!(*state, AncestorState::Exclude(10));
             } else {
                 assert_eq!(*state, AncestorState::Include);
@@ -409,7 +409,7 @@ mod test {
         }
 
         // Updating the scores will expire the lock as we only need 1 update for tests.
-        let scores = ReputationScores::new((1..=300).into(), vec![100, 10, 100, 100]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![100, 10, 100, 100]);
         ancestor_state_manager.set_propagation_scores(scores);
         ancestor_state_manager.update_all_ancestors_state();
 
@@ -438,7 +438,7 @@ mod test {
         context.protocol_config.set_consensus_round_prober_probe_accepted_rounds(false);
         let context = Arc::new(context);
 
-        let scores = ReputationScores::new((1..=300).into(), vec![1, 2, 4, 3]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![1, 2, 4, 3]);
         let mut ancestor_state_manager = AncestorStateManager::new(context);
         ancestor_state_manager.set_propagation_scores(scores);
 
@@ -454,7 +454,7 @@ mod test {
             assert_eq!(*state, AncestorState::Include);
         }
 
-        let scores = ReputationScores::new((1..=300).into(), vec![10, 10, 100, 100]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![10, 10, 100, 100]);
         ancestor_state_manager.set_propagation_scores(scores);
         ancestor_state_manager.update_all_ancestors_state();
 
@@ -462,7 +462,7 @@ mod test {
         // 2 authorities should be excluded in with this threshold
         let state_map = ancestor_state_manager.get_ancestor_states();
         for (authority, state) in state_map.iter().enumerate() {
-            if (0..=1).contains(&authority) {
+            if (0 ..= 1).contains(&authority) {
                 assert_eq!(*state, AncestorState::Exclude(10));
             } else {
                 assert_eq!(*state, AncestorState::Include);
@@ -475,7 +475,7 @@ mod test {
         // quorum round updates have been set to expire the locks.
         let state_map = ancestor_state_manager.get_ancestor_states();
         for (authority, state) in state_map.iter().enumerate() {
-            if (0..=1).contains(&authority) {
+            if (0 ..= 1).contains(&authority) {
                 assert_eq!(*state, AncestorState::Exclude(10));
             } else {
                 assert_eq!(*state, AncestorState::Include);
@@ -516,7 +516,7 @@ mod test {
         }
 
         // Updating the scores will expire the lock as we only need 1 update for tests.
-        let scores = ReputationScores::new((1..=300).into(), vec![100, 10, 100, 100]);
+        let scores = ReputationScores::new((1 ..= 300).into(), vec![100, 10, 100, 100]);
         ancestor_state_manager.set_propagation_scores(scores);
         ancestor_state_manager.update_all_ancestors_state();
 

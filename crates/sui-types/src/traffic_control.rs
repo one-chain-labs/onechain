@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::path::PathBuf;
 
 // These values set to loosely attempt to limit
 // memory usage for a single sketch to ~20MB
@@ -76,7 +77,7 @@ pub struct Weight(f32);
 
 impl Weight {
     pub fn new(value: f32) -> Result<Self, &'static str> {
-        if (0.0..=1.0).contains(&value) {
+        if (0.0 ..= 1.0).contains(&value) {
             Ok(Self(value))
         } else {
             Err("Weight must be between 0.0 and 1.0")

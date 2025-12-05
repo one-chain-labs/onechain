@@ -3,7 +3,6 @@
 
 use fastcrypto::encoding::Base64;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-
 use sui_json::SuiJsonValue;
 use sui_json_rpc_types::{
     RPCTransactionRequestParams,
@@ -25,7 +24,7 @@ pub trait TransactionBuilder {
     #[method(name = "transferObject")]
     async fn transfer_object(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the ID of the object to be transferred
         object_id: ObjectID,
@@ -33,21 +32,21 @@ pub trait TransactionBuilder {
         gas: Option<ObjectID>,
         /// the gas budget, the transaction will fail if the gas cost exceed the budget
         gas_budget: BigInt<u64>,
-        /// the recipient's OneChain address
+        /// the recipient's Sui address
         recipient: SuiAddress,
     ) -> RpcResult<TransactionBlockBytes>;
 
-    /// Create an unsigned transaction to send OCT coin object to a OneChain address. The object is also used as the gas object.
-    #[method(name = "transferOct")]
-    async fn transfer_oct(
+    /// Create an unsigned transaction to send SUI coin object to a Sui address. The SUI object is also used as the gas object.
+    #[method(name = "transferSui")]
+    async fn transfer_sui(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the Sui coin object to be used in this transaction
         sui_object_id: ObjectID,
         /// the gas budget, the transaction will fail if the gas cost exceed the budget
         gas_budget: BigInt<u64>,
-        /// the recipient's OneChain address
+        /// the recipient's Sui address
         recipient: SuiAddress,
         /// the amount to be split out and transferred
         amount: Option<BigInt<u64>>,
@@ -60,7 +59,7 @@ pub trait TransactionBuilder {
     #[method(name = "pay")]
     async fn pay(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the Sui coins to be used in this transaction
         input_coins: Vec<ObjectID>,
@@ -83,10 +82,10 @@ pub trait TransactionBuilder {
     /// input coin, then use the first input coin as the gas coin object.
     /// 3. the balance of the first input coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost
     /// 4. all other input coints other than the first one are deleted.
-    #[method(name = "payOct")]
-    async fn pay_oct(
+    #[method(name = "paySui")]
+    async fn pay_sui(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the Sui coins to be used in this transaction, including the coin for gas payment.
         input_coins: Vec<ObjectID>,
@@ -105,10 +104,10 @@ pub trait TransactionBuilder {
     /// 2. transfer the updated first coin to the recipient and also use this first coin as gas coin object.
     /// 3. the balance of the first input coin after tx is sum(input_coins) - actual_gas_cost.
     /// 4. all other input coins other than the first are deleted.
-    #[method(name = "payAllOct")]
-    async fn pay_all_oct(
+    #[method(name = "payAllSui")]
+    async fn pay_all_sui(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the Sui coins to be used in this transaction, including the coin for gas payment.
         input_coins: Vec<ObjectID>,
@@ -122,7 +121,7 @@ pub trait TransactionBuilder {
     #[method(name = "moveCall")]
     async fn move_call(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the Move package ID, e.g. `0x2`
         package_object_id: ObjectID,
@@ -146,7 +145,7 @@ pub trait TransactionBuilder {
     #[method(name = "publish")]
     async fn publish(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         sender: SuiAddress,
         /// the compiled bytes of a Move package
         compiled_modules: Vec<Base64>,
@@ -162,7 +161,7 @@ pub trait TransactionBuilder {
     #[method(name = "splitCoin")]
     async fn split_coin(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the coin object to be spilt
         coin_object_id: ObjectID,
@@ -178,7 +177,7 @@ pub trait TransactionBuilder {
     #[method(name = "splitCoinEqual")]
     async fn split_coin_equal(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the coin object to be spilt
         coin_object_id: ObjectID,
@@ -194,7 +193,7 @@ pub trait TransactionBuilder {
     #[method(name = "mergeCoins")]
     async fn merge_coin(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// the coin object to merge into, this coin will remain after the transaction
         primary_coin: ObjectID,
@@ -210,7 +209,7 @@ pub trait TransactionBuilder {
     #[method(name = "batchTransaction")]
     async fn batch_transaction(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
         /// list of transaction request parameters
         single_transaction_params: Vec<RPCTransactionRequestParams>,
@@ -226,13 +225,13 @@ pub trait TransactionBuilder {
     #[method(name = "requestAddStake")]
     async fn request_add_stake(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
-        /// Coin<OCT> object to stake
+        /// Coin<SUI> object to stake
         coins: Vec<ObjectID>,
         /// stake amount
         amount: Option<BigInt<u64>>,
-        /// the validator's OneChain address
+        /// the validator's Sui address
         validator: SuiAddress,
         /// gas object to be used in this transaction, node will pick one from the signer's possession if not provided
         gas: Option<ObjectID>,
@@ -244,10 +243,10 @@ pub trait TransactionBuilder {
     #[method(name = "requestWithdrawStake")]
     async fn request_withdraw_stake(
         &self,
-        /// the transaction signer's OneChain address
+        /// the transaction signer's Sui address
         signer: SuiAddress,
-        /// StakedOct object ID
-        staked_oct: ObjectID,
+        /// StakedSui object ID
+        staked_sui: ObjectID,
         /// gas object to be used in this transaction, node will pick one from the signer's possession if not provided
         gas: Option<ObjectID>,
         /// the gas budget, the transaction will fail if the gas cost exceed the budget

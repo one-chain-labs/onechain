@@ -1,17 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::{
-    authority_tests::send_and_confirm_transaction_,
-    move_integration_tests::build_and_try_publish_test_package,
-    test_authority_builder::TestAuthorityBuilder,
-    AuthorityState,
-};
+use std::sync::Arc;
+
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
 };
-use std::sync::Arc;
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
     base_types::{dbg_addr, ObjectID, ObjectRef, SuiAddress},
@@ -23,6 +18,13 @@ use sui_types::{
     transaction::{CallArg, ObjectArg, TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
     SUI_DENY_LIST_OBJECT_ID,
     SUI_FRAMEWORK_PACKAGE_ID,
+};
+
+use crate::authority::{
+    authority_tests::send_and_confirm_transaction_,
+    move_integration_tests::build_and_try_publish_test_package,
+    test_authority_builder::TestAuthorityBuilder,
+    AuthorityState,
 };
 
 // Test that a regulated coin can be created and all the necessary objects are created with the right types.

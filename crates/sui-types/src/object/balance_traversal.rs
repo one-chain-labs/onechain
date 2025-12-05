@@ -65,16 +65,15 @@ fn is_balance(s: &StructTag) -> Option<TypeTag> {
 mod tests {
     use std::str::FromStr;
 
-    use crate::id::UID;
-
-    use super::*;
-
     use move_core_types::{
         account_address::AccountAddress,
         annotated_value as A,
         identifier::Identifier,
         language_storage::StructTag,
     };
+
+    use super::*;
+    use crate::id::UID;
 
     #[test]
     fn test_traverse_balance() {
@@ -234,7 +233,7 @@ mod tests {
             .map(|(name, layout)| A::MoveFieldLayout::new(Identifier::new(name).unwrap(), layout))
             .collect();
 
-        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields: Box::new(fields) }))
+        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields }))
     }
 
     /// BCS encode Move value.

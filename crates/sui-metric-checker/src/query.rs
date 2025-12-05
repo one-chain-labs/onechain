@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::unix_seconds_to_timestamp_string;
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
 use prometheus_http_query::Client;
 use reqwest::header::{HeaderValue, AUTHORIZATION};
 use tracing::{debug, info};
+
+use crate::unix_seconds_to_timestamp_string;
 
 pub async fn instant_query(auth_header: &str, client: Client, query: &str) -> Result<f64, anyhow::Error> {
     debug!("Executing {query}");
@@ -74,7 +75,7 @@ pub async fn range_query(
     }
     samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    assert!((1..=100).contains(&percentile), "Invalid percentile {percentile}");
+    assert!((1 ..= 100).contains(&percentile), "Invalid percentile {percentile}");
     let index = samples.len() * percentile as usize / 100;
     let result = samples[index];
     info!(

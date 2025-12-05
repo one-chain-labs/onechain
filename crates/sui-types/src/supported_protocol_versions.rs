@@ -3,10 +3,11 @@
 
 use std::ops::RangeInclusive;
 
-use crate::{crypto::DefaultHash, digests::Digest};
 use fastcrypto::hash::HashFunction;
 use serde::{Deserialize, Serialize};
 pub use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+
+use crate::{crypto::DefaultHash, digests::Digest};
 
 /// Models the set of protocol versions supported by a validator.
 /// The `sui-node` binary will always use the SYSTEM_DEFAULT constant, but for testing we need
@@ -39,7 +40,7 @@ impl SupportedProtocolVersions {
     }
 
     pub fn as_range(&self) -> RangeInclusive<u64> {
-        self.min.as_u64()..=self.max.as_u64()
+        self.min.as_u64() ..= self.max.as_u64()
     }
 
     pub fn truncate_below(self, v: ProtocolVersion) -> Self {

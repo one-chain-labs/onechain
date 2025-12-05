@@ -4,8 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    annotated_value as A,
-    ident_str,
+    annotated_value as A, ident_str,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     runtime_value as R,
@@ -29,27 +28,34 @@ fn struct_deserialization() {
     let values = vec![R::MoveValue::U64(7), R::MoveValue::Bool(true)];
     let avalues = vec![A::MoveValue::U64(7), A::MoveValue::Bool(true)];
     let fields = vec![ident_str!("f").to_owned(), ident_str!("g").to_owned()];
-    let field_values: Vec<(Identifier, A::MoveValue)> = fields.into_iter().zip(avalues.clone()).collect();
+    let field_values: Vec<(Identifier, A::MoveValue)> =
+        fields.into_iter().zip(avalues.clone()).collect();
 
     // test each deserialization scheme
     let runtime_value = R::MoveStruct(values);
-    let ser = R::MoveValue::Struct(runtime_value.clone()).simple_serialize().unwrap();
-    assert_eq!(serde_json::to_value(runtime_value).unwrap(), json!([7, true]));
+    let ser = R::MoveValue::Struct(runtime_value.clone())
+        .simple_serialize()
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(runtime_value).unwrap(),
+        json!([7, true])
+    );
 
     let struct_type_layout = A::MoveStructLayout {
         type_: struct_type.clone(),
-        fields: Box::new(
-            vec![
-                A::MoveFieldLayout::new(ident_str!("f").to_owned(), A::MoveTypeLayout::U64),
-                A::MoveFieldLayout::new(ident_str!("g").to_owned(), A::MoveTypeLayout::Bool),
-            ]
-            .into_iter()
-            .collect(),
-        ),
+        fields: vec![
+            A::MoveFieldLayout::new(ident_str!("f").to_owned(), A::MoveTypeLayout::U64),
+            A::MoveFieldLayout::new(ident_str!("g").to_owned(), A::MoveTypeLayout::Bool),
+        ]
+        .into_iter()
+        .collect(),
     };
 
-    let deser_typed_value =
-        A::MoveValue::simple_deserialize(&ser, &A::MoveTypeLayout::Struct(Box::new(struct_type_layout))).unwrap();
+    let deser_typed_value = A::MoveValue::simple_deserialize(
+        &ser,
+        &A::MoveTypeLayout::Struct(Box::new(struct_type_layout)),
+    )
+    .unwrap();
     let typed_value = A::MoveStruct::new(struct_type, field_values);
 
     assert_eq!(
@@ -75,25 +81,48 @@ fn enum_deserialization() {
 
     let values1 = vec![A::MoveValue::U64(7), A::MoveValue::Bool(true)];
     let fields1 = vec![ident_str!("f").to_owned(), ident_str!("g").to_owned()];
-    let field_values1: Vec<(Identifier, A::MoveValue)> = fields1.into_iter().zip(values1.clone()).collect();
+    let field_values1: Vec<(Identifier, A::MoveValue)> =
+        fields1.into_iter().zip(values1.clone()).collect();
 
-    let values2 = vec![A::MoveValue::U64(8), A::MoveValue::Bool(false), A::MoveValue::U8(0)];
-    let fields2 = vec![ident_str!("f2").to_owned(), ident_str!("g2").to_owned(), ident_str!("h2").to_owned()];
-    let field_values2: Vec<(Identifier, A::MoveValue)> = fields2.into_iter().zip(values2.clone()).collect();
+    let values2 = vec![
+        A::MoveValue::U64(8),
+        A::MoveValue::Bool(false),
+        A::MoveValue::U8(0),
+    ];
+    let fields2 = vec![
+        ident_str!("f2").to_owned(),
+        ident_str!("g2").to_owned(),
+        ident_str!("h2").to_owned(),
+    ];
+    let field_values2: Vec<(Identifier, A::MoveValue)> =
+        fields2.into_iter().zip(values2.clone()).collect();
 
     let enum_runtime_layout = {
         let variant_layout1 = vec![R::MoveTypeLayout::U64, R::MoveTypeLayout::Bool];
-        let variant_layout2 = vec![R::MoveTypeLayout::U64, R::MoveTypeLayout::Bool, R::MoveTypeLayout::U8];
+        let variant_layout2 = vec![
+            R::MoveTypeLayout::U64,
+            R::MoveTypeLayout::Bool,
+            R::MoveTypeLayout::U8,
+        ];
         let enum_layout = R::MoveEnumLayout(Box::new(vec![variant_layout1, variant_layout2]));
         R::MoveTypeLayout::Enum(Box::new(enum_layout))
     };
 
     // test each deserialization scheme
-    let runtime_value = R::MoveVariant { tag: 0, fields: values1.clone().into_iter().map(|v| v.undecorate()).collect() };
+    let runtime_value = R::MoveVariant {
+        tag: 0,
+        fields: values1
+            .clone()
+            .into_iter()
+            .map(|v| v.undecorate())
+            .collect(),
+    };
     let v = serde_json::to_value(&runtime_value).unwrap();
     assert_eq!(v, json!([0, [7, true]]));
 
-    let ser = R::MoveValue::Variant(runtime_value.clone()).simple_serialize().unwrap();
+    let ser = R::MoveValue::Variant(runtime_value.clone())
+        .simple_serialize()
+        .unwrap();
     assert_eq!(
         R::MoveValue::simple_deserialize(&ser, &enum_runtime_layout).unwrap(),
         R::MoveValue::Variant(runtime_value),
@@ -102,25 +131,44 @@ fn enum_deserialization() {
     let enum_type_layout = A::MoveEnumLayout {
         type_: enum_type.clone(),
         variants: vec![
-            ((ident_str!("Variant1").to_owned(), 0u16), vec![
-                A::MoveFieldLayout::new(ident_str!("f").to_owned(), A::MoveTypeLayout::U64),
-                A::MoveFieldLayout::new(ident_str!("g").to_owned(), A::MoveTypeLayout::Bool),
-            ]),
-            ((ident_str!("Variant2").to_owned(), 1u16), vec![
-                A::MoveFieldLayout::new(ident_str!("f2").to_owned(), A::MoveTypeLayout::U64),
-                A::MoveFieldLayout::new(ident_str!("g2").to_owned(), A::MoveTypeLayout::Bool),
-                A::MoveFieldLayout::new(ident_str!("h2").to_owned(), A::MoveTypeLayout::U8),
-            ]),
+            (
+                (ident_str!("Variant1").to_owned(), 0u16),
+                vec![
+                    A::MoveFieldLayout::new(ident_str!("f").to_owned(), A::MoveTypeLayout::U64),
+                    A::MoveFieldLayout::new(ident_str!("g").to_owned(), A::MoveTypeLayout::Bool),
+                ],
+            ),
+            (
+                (ident_str!("Variant2").to_owned(), 1u16),
+                vec![
+                    A::MoveFieldLayout::new(ident_str!("f2").to_owned(), A::MoveTypeLayout::U64),
+                    A::MoveFieldLayout::new(ident_str!("g2").to_owned(), A::MoveTypeLayout::Bool),
+                    A::MoveFieldLayout::new(ident_str!("h2").to_owned(), A::MoveTypeLayout::U8),
+                ],
+            ),
         ]
         .into_iter()
         .collect(),
     };
 
-    let runtime_value = R::MoveVariant { tag: 1, fields: values2.clone().into_iter().map(|v| v.undecorate()).collect() };
-    assert_eq!(serde_json::to_value(&runtime_value).unwrap(), json!([1, [8, false, 0]]));
+    let runtime_value = R::MoveVariant {
+        tag: 1,
+        fields: values2
+            .clone()
+            .into_iter()
+            .map(|v| v.undecorate())
+            .collect(),
+    };
+    assert_eq!(
+        serde_json::to_value(&runtime_value).unwrap(),
+        json!([1, [8, false, 0]])
+    );
 
-    let deser_typed_value =
-        A::MoveValue::simple_deserialize(&ser, &A::MoveTypeLayout::Enum(Box::new(enum_type_layout.clone()))).unwrap();
+    let deser_typed_value = A::MoveValue::simple_deserialize(
+        &ser,
+        &A::MoveTypeLayout::Enum(Box::new(enum_type_layout.clone())),
+    )
+    .unwrap();
     let typed_value = A::MoveVariant {
         type_: enum_type.clone(),
         variant_name: ident_str!("Variant1").to_owned(),
@@ -141,9 +189,14 @@ fn enum_deserialization() {
     );
     assert_eq!(deser_typed_value, A::MoveValue::Variant(typed_value));
 
-    let ser1 = R::MoveValue::Variant(runtime_value.clone()).simple_serialize().unwrap();
-    let deser1_typed_value =
-        A::MoveValue::simple_deserialize(&ser1, &A::MoveTypeLayout::Enum(Box::new(enum_type_layout))).unwrap();
+    let ser1 = R::MoveValue::Variant(runtime_value.clone())
+        .simple_serialize()
+        .unwrap();
+    let deser1_typed_value = A::MoveValue::simple_deserialize(
+        &ser1,
+        &A::MoveTypeLayout::Enum(Box::new(enum_type_layout)),
+    )
+    .unwrap();
     let typed_value = A::MoveVariant {
         type_: enum_type,
         variant_name: ident_str!("Variant2").to_owned(),
@@ -171,13 +224,18 @@ fn enum_deserialization() {
 fn enum_deserialization_vec_option_runtime_layout_equiv() {
     let value = vec![R::MoveValue::U64(42)];
     let vec_option = R::MoveValue::Struct(R::MoveStruct(vec![R::MoveValue::Vector(value.clone())]));
-    let enum_option = R::MoveValue::Variant(R::MoveVariant { tag: 1, fields: value });
+    let enum_option = R::MoveValue::Variant(R::MoveVariant {
+        tag: 1,
+        fields: value,
+    });
 
     let vec_ser = vec_option.simple_serialize().unwrap();
     let enum_ser = enum_option.simple_serialize().unwrap();
 
-    let enum_layout =
-        R::MoveTypeLayout::Enum(Box::new(R::MoveEnumLayout(Box::new(vec![vec![], vec![R::MoveTypeLayout::U64]]))));
+    let enum_layout = R::MoveTypeLayout::Enum(Box::new(R::MoveEnumLayout(Box::new(vec![
+        vec![],
+        vec![R::MoveTypeLayout::U64],
+    ]))));
 
     let vec_layout = R::MoveTypeLayout::Vector(Box::new(R::MoveTypeLayout::U64));
 
@@ -202,11 +260,15 @@ fn struct_formatted_display() {
     let values = vec![R::MoveValue::U64(7), R::MoveValue::Bool(true)];
     let avalues = vec![A::MoveValue::U64(7), A::MoveValue::Bool(true)];
     let fields = vec![ident_str!("f").to_owned(), ident_str!("g").to_owned()];
-    let field_values: Vec<(Identifier, A::MoveValue)> = fields.into_iter().zip(avalues.clone()).collect();
+    let field_values: Vec<(Identifier, A::MoveValue)> =
+        fields.into_iter().zip(avalues.clone()).collect();
 
     // test each deserialization scheme
     let runtime_value = R::MoveStruct(values);
-    assert_eq!(serde_json::to_value(runtime_value).unwrap(), json!([7, true]));
+    assert_eq!(
+        serde_json::to_value(runtime_value).unwrap(),
+        json!([7, true])
+    );
 
     let typed_value = A::MoveStruct::new(struct_type, field_values);
     assert_eq!(
@@ -232,13 +294,24 @@ fn struct_one_field_equiv_value() {
         R::MoveValue::U8(13),
         R::MoveValue::U8(99),
     ]);
-    let s1 = R::MoveValue::Struct(R::MoveStruct(vec![val.clone()])).simple_serialize().unwrap();
+    let s1 = R::MoveValue::Struct(R::MoveStruct(vec![val.clone()]))
+        .simple_serialize()
+        .unwrap();
     let s2 = val.simple_serialize().unwrap();
     assert_eq!(s1, s2);
 
     let utf8_str = "çå∞≠¢õß∂ƒ∫";
-    let vec_u8 = R::MoveValue::Vector(utf8_str.as_bytes().iter().map(|c| R::MoveValue::U8(*c)).collect());
-    assert_eq!(bcs::to_bytes(utf8_str).unwrap(), vec_u8.simple_serialize().unwrap())
+    let vec_u8 = R::MoveValue::Vector(
+        utf8_str
+            .as_bytes()
+            .iter()
+            .map(|c| R::MoveValue::U8(*c))
+            .collect(),
+    );
+    assert_eq!(
+        bcs::to_bytes(utf8_str).unwrap(),
+        vec_u8.simple_serialize().unwrap()
+    )
 }
 
 #[test]
@@ -261,11 +334,14 @@ fn nested_typed_struct_deserialization() {
     let runtime_value = R::MoveStruct(vec![nested_runtime_struct]);
     assert_eq!(serde_json::to_value(runtime_value).unwrap(), json!([[7]]));
 
-    let nested_typed_struct = A::MoveValue::Struct(A::MoveStruct::new(nested_struct_type, vec![(
-        ident_str!("f").to_owned(),
-        A::MoveValue::U64(7),
-    )]));
-    let typed_value = A::MoveStruct::new(struct_type, vec![(ident_str!("inner").to_owned(), nested_typed_struct)]);
+    let nested_typed_struct = A::MoveValue::Struct(A::MoveStruct::new(
+        nested_struct_type,
+        vec![(ident_str!("f").to_owned(), A::MoveValue::U64(7))],
+    ));
+    let typed_value = A::MoveStruct::new(
+        struct_type,
+        vec![(ident_str!("inner").to_owned(), nested_typed_struct)],
+    );
     assert_eq!(
         serde_json::to_value(&typed_value).unwrap(),
         json!({
@@ -300,11 +376,14 @@ fn nested_typed_struct_formatted_display() {
     let runtime_value = R::MoveStruct(vec![nested_runtime_struct]);
     assert_eq!(serde_json::to_value(runtime_value).unwrap(), json!([[7]]));
 
-    let nested_typed_struct = A::MoveValue::Struct(A::MoveStruct::new(nested_struct_type, vec![(
-        ident_str!("f").to_owned(),
-        A::MoveValue::U64(7),
-    )]));
-    let typed_value = A::MoveStruct::new(struct_type, vec![(ident_str!("inner").to_owned(), nested_typed_struct)]);
+    let nested_typed_struct = A::MoveValue::Struct(A::MoveStruct::new(
+        nested_struct_type,
+        vec![(ident_str!("f").to_owned(), A::MoveValue::U64(7))],
+    ));
+    let typed_value = A::MoveStruct::new(
+        struct_type,
+        vec![(ident_str!("inner").to_owned(), nested_typed_struct)],
+    );
     assert_eq!(
         format!("{:#}", typed_value),
         r#"0x0::MyModule::MyStruct {

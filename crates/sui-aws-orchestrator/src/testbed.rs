@@ -7,6 +7,7 @@ use futures::future::try_join_all;
 use prettytable::{row, Table};
 use tokio::time::{self, Instant};
 
+use super::client::Instance;
 use crate::{
     client::ServerProviderClient,
     display,
@@ -14,8 +15,6 @@ use crate::{
     settings::Settings,
     ssh::SshConnection,
 };
-
-use super::client::Instance;
 
 /// Represents a testbed running on a cloud provider.
 pub struct Testbed<C> {
@@ -107,13 +106,13 @@ impl<C: ServerProviderClient> Testbed<C> {
         display::action(format!("Deploying instances ({quantity} per region)"));
 
         let instances = match region {
-            Some(x) => try_join_all((0..quantity).map(|_| self.client.create_instance(x.clone()))).await?,
+            Some(x) => try_join_all((0 .. quantity).map(|_| self.client.create_instance(x.clone()))).await?,
             None => {
                 try_join_all(
                     self.settings
                         .regions
                         .iter()
-                        .flat_map(|region| (0..quantity).map(|_| self.client.create_instance(region.clone()))),
+                        .flat_map(|region| (0 .. quantity).map(|_| self.client.create_instance(region.clone()))),
                 )
                 .await?
             }

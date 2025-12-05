@@ -5,7 +5,7 @@
 
 //# publish --upgradeable --sender A
 module A0::m {
-    use one::package;
+    use sui::package;
 
     public struct A {}
     public struct M has drop {}
@@ -17,7 +17,7 @@ module A0::m {
 
 //# upgrade --package A0 --upgrade-capability 1,2 --sender A
 module A1::m {
-    use one::package::{Self, Publisher};
+    use sui::package::{Self, Publisher};
 
     public struct A {}
     public struct B {}

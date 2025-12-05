@@ -5,7 +5,7 @@
 module groth16::example_tests;
 
 use groth16::example::{create_verifying_key, create_proof, verify};
-use one::bls12381;
+use sui::bls12381;
 
 #[test]
 fun test_verification() {

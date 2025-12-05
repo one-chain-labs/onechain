@@ -8,9 +8,11 @@ pub mod programmable_transaction_gen;
 pub mod transaction_data_gen;
 pub mod type_arg_fuzzer;
 
-use executor::Executor;
-use proptest::{collection::vec, test_runner::TestRunner};
 use std::fmt::Debug;
+
+use executor::Executor;
+use proptest::{collection::vec, prelude::*, test_runner::TestRunner};
+use rand::{rngs::StdRng, SeedableRng};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
@@ -20,9 +22,6 @@ use sui_types::{
     object::{MoveObject, Object, Owner, OBJECT_START_VERSION},
     transaction::GasData,
 };
-
-use proptest::prelude::*;
-use rand::{rngs::StdRng, SeedableRng};
 
 fn new_gas_coin_with_balance_and_owner(balance: u64, owner: Owner) -> Object {
     Object::new_move(
@@ -46,7 +45,7 @@ fn generate_random_gas_data(
 
     let max_gas_balance = TOTAL_SUPPLY_MIST;
 
-    let total_gas_balance = rng.gen_range(0..=max_gas_balance);
+    let total_gas_balance = rng.gen_range(0 ..= max_gas_balance);
     let mut remaining_gas_balance = total_gas_balance;
     let num_gas_objects = gas_coin_owners.len();
     let gas_coin_owners = gas_coin_owners
@@ -57,7 +56,7 @@ fn generate_random_gas_data(
         })
         .collect::<Vec<_>>();
     for owner in gas_coin_owners.iter().take(num_gas_objects - 1) {
-        let gas_balance = rng.gen_range(0..=remaining_gas_balance);
+        let gas_balance = rng.gen_range(0 ..= remaining_gas_balance);
         let gas_object = new_gas_coin_with_balance_and_owner(gas_balance, owner.clone());
         remaining_gas_balance -= gas_balance;
         object_refs.push(gas_object.compute_object_reference());
@@ -79,8 +78,8 @@ fn generate_random_gas_data(
         gas_data: GasData {
             payment: object_refs,
             owner: sender,
-            price: rng.gen_range(0..=ProtocolConfig::get_for_max_version_UNSAFE().max_gas_price()),
-            budget: rng.gen_range(0..=ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas()),
+            price: rng.gen_range(0 ..= ProtocolConfig::get_for_max_version_UNSAFE().max_gas_price()),
+            budget: rng.gen_range(0 ..= ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas()),
         },
         objects: gas_objects,
         sender_key,
@@ -122,7 +121,7 @@ impl proptest::arbitrary::Arbitrary for GasDataWithObjects {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
-        (any::<[u8; 32]>(), vec(any::<Owner>(), 1..=params.max_num_gas_objects))
+        (any::<[u8; 32]>(), vec(any::<Owner>(), 1 ..= params.max_num_gas_objects))
             .prop_map(move |(seed, owners)| generate_random_gas_data(seed, owners, params.owned_by_sender))
             .boxed()
     }

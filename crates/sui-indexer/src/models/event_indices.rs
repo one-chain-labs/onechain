@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use diesel::prelude::*;
+
 use crate::{
     schema::{
         event_emit_module,
@@ -13,7 +15,6 @@ use crate::{
     },
     types::EventIndex,
 };
-use diesel::prelude::*;
 
 #[derive(Queryable, Insertable, Selectable, Debug, Clone, Default)]
 #[diesel(table_name = event_emit_package)]

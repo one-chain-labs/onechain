@@ -317,8 +317,9 @@ impl Display for TypeInput {
 
 #[cfg(test)]
 mod test {
-    use super::TypeInput;
     use sui_enum_compat_util::*;
+
+    use super::TypeInput;
 
     #[test]
     fn enforce_order_test() {

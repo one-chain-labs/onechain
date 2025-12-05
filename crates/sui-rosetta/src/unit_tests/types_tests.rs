@@ -1,17 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::types::{AccountBalanceRequest, Amount, ConstructionMetadata, Currency, CurrencyMetadata};
 use quick_js::Context;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sui_types::base_types::{ObjectRef, SuiAddress};
+
+use crate::types::{AccountBalanceRequest, Amount, ConstructionMetadata, Currency, CurrencyMetadata};
 
 #[tokio::test]
 async fn test_currency_defaults() {
     let expected = Currency {
         symbol: "SUI".to_string(),
         decimals: 9,
-        metadata: CurrencyMetadata { coin_type: "0x2::oct::OCT".to_string() },
+        metadata: CurrencyMetadata { coin_type: "0x2::sui::SUI".to_string() },
     };
 
     let currency: Currency = serde_json::from_value(json!(

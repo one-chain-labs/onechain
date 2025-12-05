@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Error;
-use tracing::{info, warn};
-
 use sui_bridge::events::{
     EmergencyOpEvent,
     MoveBlocklistValidatorEvent,
@@ -24,6 +22,7 @@ use sui_types::{
     BRIDGE_ADDRESS,
     SUI_BRIDGE_OBJECT_ID,
 };
+use tracing::{info, warn};
 
 use crate::{
     metrics::BridgeIndexerMetrics,

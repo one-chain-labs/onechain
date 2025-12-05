@@ -1,6 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, Weak},
+    time::Instant,
+};
+
 use anemo::PeerId;
 use fastcrypto::{
     encoding::{Encoding, Hex},
@@ -11,18 +17,12 @@ use fastcrypto::{
 };
 use fastcrypto_tbls::{dkg_v1, dkg_v1::Output, nodes, nodes::PartyId};
 use futures::{stream::FuturesUnordered, StreamExt};
-use narwhal_types::{Round, TimestampMs};
 use parking_lot::Mutex;
 use rand::{
     rngs::{OsRng, StdRng},
     SeedableRng,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::{Arc, Weak},
-    time::Instant,
-};
 use sui_macros::fail_point_if;
 use sui_network::randomness;
 use sui_types::{
@@ -30,7 +30,7 @@ use sui_types::{
     committee::{Committee, EpochId, StakeUnit},
     crypto::{AuthorityKeyPair, RandomnessRound},
     error::{SuiError, SuiResult},
-    messages_consensus::{ConsensusTransaction, VersionedDkgConfirmation, VersionedDkgMessage},
+    messages_consensus::{ConsensusTransaction, Round, TimestampMs, VersionedDkgConfirmation, VersionedDkgMessage},
     sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait,
 };
 use tokio::{sync::OnceCell, task::JoinHandle};
@@ -39,7 +39,7 @@ use typed_store::Map;
 
 use crate::{
     authority::{
-        authority_per_epoch_store::{AuthorityPerEpochStore, ConsensusCommitOutput},
+        authority_per_epoch_store::{consensus_quarantine::ConsensusCommitOutput, AuthorityPerEpochStore},
         epoch_start_configuration::EpochStartConfigTrait,
     },
     consensus_adapter::SubmitToConsensus,
@@ -314,7 +314,7 @@ impl RandomnessManager {
                 first_incomplete_round,
                 rm.next_randomness_round - 1,
             );
-            for r in first_incomplete_round.0..rm.next_randomness_round.0 {
+            for r in first_incomplete_round.0 .. rm.next_randomness_round.0 {
                 network_handle.send_partial_signatures(committee.epoch(), RandomnessRound(r));
             }
         }
@@ -357,7 +357,7 @@ impl RandomnessManager {
             fail_point_skip_sending = true;
         });
         if !fail_point_skip_sending {
-            self.consensus_adapter.submit_to_consensus(&[transaction], &epoch_store).await?;
+            self.consensus_adapter.submit_to_consensus(&[transaction], &epoch_store)?;
         }
 
         epoch_store.metrics.epoch_random_beacon_dkg_message_time_ms.set(
@@ -407,7 +407,7 @@ impl RandomnessManager {
                         fail_point_skip_sending = true;
                     });
                     if !fail_point_skip_sending {
-                        self.consensus_adapter.submit_to_consensus(&[transaction], &epoch_store).await?;
+                        self.consensus_adapter.submit_to_consensus(&[transaction], &epoch_store)?;
                     }
 
                     let elapsed = self.dkg_start_time.get().map(|t| t.elapsed().as_millis());
@@ -552,10 +552,9 @@ impl RandomnessManager {
         output: &mut ConsensusCommitOutput,
     ) -> SuiResult<Option<RandomnessRound>> {
         let epoch_store = self.epoch_store()?;
-        let tables = epoch_store.tables()?;
 
-        let last_round_timestamp =
-            tables.randomness_last_round_timestamp.get(&SINGLETON_KEY).expect("typed_store should not fail");
+        let last_round_timestamp = epoch_store.get_randomness_last_round_timestamp().expect("read should not fail");
+
         if let Some(last_round_timestamp) = last_round_timestamp {
             if commit_timestamp - last_round_timestamp
                 < epoch_store.protocol_config().random_beacon_min_round_interval_ms()
@@ -660,8 +659,19 @@ pub enum DkgStatus {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
+    use consensus_core::{BlockRef, BlockStatus};
+    use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+    use sui_types::messages_consensus::ConsensusTransactionKind;
+    use tokio::sync::mpsc;
+
     use crate::{
-        authority::test_authority_builder::TestAuthorityBuilder,
+        authority::{
+            authority_per_epoch_store::{ExecutionIndices, ExecutionIndicesWithStats},
+            test_authority_builder::TestAuthorityBuilder,
+        },
+        checkpoints::CheckpointStore,
         consensus_adapter::{
             ConnectionMonitorStatusForTests,
             ConsensusAdapter,
@@ -671,11 +681,6 @@ mod tests {
         epoch::randomness::*,
         mock_consensus::with_block_status,
     };
-    use consensus_core::{BlockRef, BlockStatus};
-    use std::num::NonZeroUsize;
-    use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-    use sui_types::messages_consensus::ConsensusTransactionKind;
-    use tokio::sync::mpsc;
 
     #[tokio::test]
     async fn test_dkg_v1() {
@@ -716,6 +721,7 @@ mod tests {
                 .await;
             let consensus_adapter = Arc::new(ConsensusAdapter::new(
                 Arc::new(mock_consensus_client),
+                CheckpointStore::new_for_tests(),
                 state.name,
                 Arc::new(ConnectionMonitorStatusForTests {}),
                 100_000,
@@ -755,8 +761,12 @@ mod tests {
                 _ => panic!("wrong type of message sent"),
             }
         }
-        for i in 0..randomness_managers.len() {
+        for i in 0 .. randomness_managers.len() {
             let mut output = ConsensusCommitOutput::new(0);
+            output.record_consensus_commit_stats(ExecutionIndicesWithStats {
+                index: ExecutionIndices { last_committed_round: 0, ..Default::default() },
+                ..Default::default()
+            });
             for (j, dkg_message) in dkg_messages.iter().cloned().enumerate() {
                 randomness_managers[i].add_message(&epoch_stores[j].name, dkg_message).unwrap();
             }
@@ -768,7 +778,7 @@ mod tests {
 
         // Generate and distribute Confirmations.
         let mut dkg_confirmations = Vec::new();
-        for _ in 0..randomness_managers.len() {
+        for _ in 0 .. randomness_managers.len() {
             let mut dkg_confirmation = rx_consensus.recv().await.unwrap();
             assert!(dkg_confirmation.len() == 1);
             match dkg_confirmation.remove(0).kind {
@@ -780,8 +790,12 @@ mod tests {
                 _ => panic!("wrong type of message sent"),
             }
         }
-        for i in 0..randomness_managers.len() {
+        for i in 0 .. randomness_managers.len() {
             let mut output = ConsensusCommitOutput::new(0);
+            output.record_consensus_commit_stats(ExecutionIndicesWithStats {
+                index: ExecutionIndices { last_committed_round: 1, ..Default::default() },
+                ..Default::default()
+            });
             for (j, dkg_confirmation) in dkg_confirmations.iter().cloned().enumerate() {
                 randomness_managers[i].add_confirmation(&mut output, &epoch_stores[j].name, dkg_confirmation).unwrap();
             }
@@ -836,6 +850,7 @@ mod tests {
                 .await;
             let consensus_adapter = Arc::new(ConsensusAdapter::new(
                 Arc::new(mock_consensus_client),
+                CheckpointStore::new_for_tests(),
                 state.name,
                 Arc::new(ConnectionMonitorStatusForTests {}),
                 100_000,
@@ -875,8 +890,12 @@ mod tests {
                 _ => panic!("wrong type of message sent"),
             }
         }
-        for i in 0..randomness_managers.len() {
+        for i in 0 .. randomness_managers.len() {
             let mut output = ConsensusCommitOutput::new(0);
+            output.record_consensus_commit_stats(ExecutionIndicesWithStats {
+                index: ExecutionIndices { last_committed_round: 0, ..Default::default() },
+                ..Default::default()
+            });
             for (j, dkg_message) in dkg_messages.iter().cloned().enumerate() {
                 randomness_managers[i].add_message(&epoch_stores[j].name, dkg_message).unwrap();
             }

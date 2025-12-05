@@ -36,7 +36,8 @@ async fn main() {
 
     let app_metrics = AppMetrics::new(&prometheus_registry);
 
-    let app_state = AppState::new(client, config.read_peer.clone(), config.execution_peer.clone(), app_metrics);
+    let app_state =
+        AppState::new(client, config.read_peer.clone(), config.execution_peer.clone(), app_metrics, config.logging);
 
     let app = Router::new().fallback(any(proxy_handler)).with_state(app_state);
 

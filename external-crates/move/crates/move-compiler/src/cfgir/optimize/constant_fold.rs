@@ -7,19 +7,8 @@ use crate::{
     diagnostics::DiagnosticReporter,
     expansion::ast::Mutability,
     hlir::ast::{
-        BaseType,
-        BaseType_,
-        Command,
-        Command_,
-        Exp,
-        FunctionSignature,
-        SingleType,
-        TypeName,
-        TypeName_,
-        UnannotatedExp_,
-        Value,
-        Value_,
-        Var,
+        BaseType, BaseType_, Command, Command_, Exp, FunctionSignature, SingleType, TypeName,
+        TypeName_, UnannotatedExp_, Value, Value_, Var,
     },
     naming::ast::{BuiltinTypeName, BuiltinTypeName_},
     parser::ast::{BinOp, BinOp_, ConstantName, UnaryOp, UnaryOp_},
@@ -37,7 +26,10 @@ pub fn optimize(
     constants: &UniqueMap<ConstantName, Value>,
     cfg: &mut MutForwardCFG,
 ) -> bool {
-    let context = Context { reporter, constants };
+    let context = Context {
+        reporter,
+        constants,
+    };
     let mut changed = false;
     for block_ref in cfg.blocks_mut().values_mut() {
         let block = std::mem::take(block_ref);
@@ -80,9 +72,10 @@ fn optimize_cmd(context: &Context, sp!(_, cmd_): &mut Command) -> Option<bool> {
             let c2 = optimize_exp(context, el);
             c1 || c2
         }
-        C::Return { exp: e, .. } | C::Abort(_, e) | C::JumpIf { cond: e, .. } | C::VariantSwitch { subject: e, .. } => {
-            optimize_exp(context, e)
-        }
+        C::Return { exp: e, .. }
+        | C::Abort(_, e)
+        | C::JumpIf { cond: e, .. }
+        | C::VariantSwitch { subject: e, .. } => optimize_exp(context, e),
         C::IgnoreAndPop { exp: e, .. } => {
             let c = optimize_exp(context, e);
             if ignorable_exp(e) {
@@ -116,7 +109,9 @@ fn optimize_exp(context: &Context, e: &mut Exp) -> bool {
         | E::Unreachable => false,
 
         e_ @ E::Constant(_) => {
-            let E::Constant(name) = e_ else { unreachable!() };
+            let E::Constant(name) = e_ else {
+                unreachable!()
+            };
             if let Some(value) = context.constants.get(name) {
                 *e_ = E::Value(value.clone());
                 true
@@ -125,15 +120,15 @@ fn optimize_exp(context: &Context, e: &mut Exp) -> bool {
             }
         }
 
-        E::ModuleCall(mcall) => mcall.arguments.iter_mut().map(optimize_exp).any(|x| x),
+        E::ModuleCall(mcall) => mcall.arguments.iter_mut().any(optimize_exp),
 
         E::Freeze(e) | E::Dereference(e) | E::Borrow(_, e, _, _) => optimize_exp(e),
 
-        E::Pack(_, _, fields) => fields.iter_mut().map(|(_, _, e)| optimize_exp(e)).any(|changed| changed),
+        E::Pack(_, _, fields) => fields.iter_mut().any(|(_, _, e)| optimize_exp(e)),
 
-        E::PackVariant(_, _, _, fields) => fields.iter_mut().map(|(_, _, e)| optimize_exp(e)).any(|changed| changed),
+        E::PackVariant(_, _, _, fields) => fields.iter_mut().any(|(_, _, e)| optimize_exp(e)),
 
-        E::Multiple(es) => es.iter_mut().map(optimize_exp).any(|changed| changed),
+        E::Multiple(es) => es.iter_mut().any(optimize_exp),
 
         //************************************
         // Foldable cases
@@ -200,7 +195,7 @@ fn optimize_exp(context: &Context, e: &mut Exp) -> bool {
                 E::Vector(_, n, ty, eargs) => (*n, ty, eargs),
                 _ => unreachable!(),
             };
-            let changed = eargs.iter_mut().map(optimize_exp).any(|changed| changed);
+            let changed = eargs.iter_mut().any(optimize_exp);
             if !is_valid_const_type(ty) {
                 return changed;
             }
@@ -223,7 +218,9 @@ fn optimize_exp(context: &Context, e: &mut Exp) -> bool {
 fn is_valid_const_type(sp!(_, ty_): &BaseType) -> bool {
     use BaseType_ as T;
     match ty_ {
-        T::Apply(_, tn, ty_args) if is_valid_const_type_name(tn) => ty_args.iter().all(is_valid_const_type),
+        T::Apply(_, tn, ty_args) if is_valid_const_type_name(tn) => {
+            ty_args.iter().all(is_valid_const_type)
+        }
         T::Apply(_, _, _) | T::Param(_) | T::Unreachable | T::UnresolvedError => false,
     }
 }
@@ -239,7 +236,9 @@ fn is_valid_const_type_name(sp!(_, tn_): &TypeName) -> bool {
 fn is_valid_const_builtin_type(sp!(_, bt_): &BuiltinTypeName) -> bool {
     use BuiltinTypeName_ as N;
     match bt_ {
-        N::Address | N::U8 | N::U16 | N::U32 | N::U64 | N::U128 | N::U256 | N::Vector | N::Bool => true,
+        N::Address | N::U8 | N::U16 | N::U32 | N::U64 | N::U128 | N::U256 | N::Vector | N::Bool => {
+            true
+        }
         N::Signer => false,
     }
 }
@@ -258,7 +257,12 @@ fn fold_unary_op(loc: Loc, sp!(_, op_): &UnaryOp, v: Value_) -> UnannotatedExp_ 
     evalue_(loc, folded)
 }
 
-fn fold_binary_op(loc: Loc, sp!(_, op_): &BinOp, v1: Value_, v2: Value_) -> Option<UnannotatedExp_> {
+fn fold_binary_op(
+    loc: Loc,
+    sp!(_, op_): &BinOp,
+    v1: Value_,
+    v2: Value_,
+) -> Option<UnannotatedExp_> {
     use BinOp_ as B;
     use Value_ as V;
     let v = match (op_, v1, v2) {
@@ -378,7 +382,10 @@ fn fold_binary_op(loc: Loc, sp!(_, op_): &BinOp, v1: Value_, v2: Value_) -> Opti
         (B::Eq, v1, v2) => V::Bool(v1 == v2),
         (B::Neq, v1, v2) => V::Bool(v1 != v2),
 
-        (op_, v1, v2) => panic!("ICE unknown binary op. combo while folding: {:?} {} {:?}", v1, op_, v2),
+        (op_, v1, v2) => panic!(
+            "ICE unknown binary op. combo while folding: {:?} {} {:?}",
+            v1, op_, v2
+        ),
     };
     Some(evalue_(loc, v))
 }

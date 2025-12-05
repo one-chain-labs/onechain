@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeMap;
+
+use fastcrypto::{ed25519::Ed25519KeyPair, hash::HashFunction, traits::KeyPair as KeypairTraits};
+use rand::{rngs::StdRng, SeedableRng};
+use serde::Deserialize;
+use shared_crypto::intent::{Intent, IntentMessage};
+
 use crate::{
     base_types::{dbg_addr, ObjectID},
     committee::Committee,
@@ -24,11 +31,6 @@ use crate::{
     zk_login_authenticator::ZkLoginAuthenticator,
     SuiAddress,
 };
-use fastcrypto::{ed25519::Ed25519KeyPair, hash::HashFunction, traits::KeyPair as KeypairTraits};
-use rand::{rngs::StdRng, SeedableRng};
-use serde::Deserialize;
-use shared_crypto::intent::{Intent, IntentMessage};
-use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
 pub struct TestData {
@@ -53,7 +55,7 @@ where
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
     let mut keys = Vec::new();
 
-    for _ in 0..num {
+    for _ in 0 .. num {
         let (_, inner_authority_key): (_, AuthorityKeyPair) = get_key_pair_from_rng(rand);
         authorities.insert(
             /* address */ AuthorityPublicKeyBytes::from(inner_authority_key.public()),
@@ -75,7 +77,7 @@ pub fn create_fake_transaction() -> Transaction {
     let object = Object::immutable_with_id_for_testing(object_id);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_oct(recipient, None);
+        builder.transfer_sui(recipient, None);
         builder.finish()
     };
     let data = TransactionData::new_programmable(
@@ -92,7 +94,7 @@ pub fn make_transaction_data(sender: SuiAddress) -> TransactionData {
     let object = Object::immutable_with_id_for_testing(ObjectID::random_from_rng(&mut StdRng::from_seed([0; 32])));
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_oct(dbg_addr(2), None);
+        builder.transfer_sui(dbg_addr(2), None);
         builder.finish()
     };
     TransactionData::new_programmable(
@@ -127,9 +129,8 @@ mod zk_login {
     use fastcrypto_zkp::bn254::zk_login::ZkLoginInputs;
     use shared_crypto::intent::PersonalMessage;
 
-    use crate::{crypto::PublicKey, zk_login_util::get_zklogin_inputs};
-
     use super::*;
+    use crate::{crypto::PublicKey, zk_login_util::get_zklogin_inputs};
     pub static DEFAULT_ADDRESS_SEED: &str =
         "20794788559620669596206457022966176986688727876128223628113916380927502737911";
     pub static SHORT_ADDRESS_SEED: &str = "380704556853533152350240698167704405529973457670972223618755249929828551006";

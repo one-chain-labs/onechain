@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use fastcrypto::vrf::{
     ecvrf::{ECVRFProof, ECVRFPublicKey},
     VRFProof,
@@ -15,7 +16,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 pub const INVALID_ECVRF_HASH_LENGTH: u64 = 1;
 pub const INVALID_ECVRF_PUBLIC_KEY: u64 = 2;
@@ -66,7 +68,7 @@ pub fn ecvrf_verify(
         context,
         ecvrf_ecvrf_verify_cost_params.ecvrf_ecvrf_verify_alpha_string_cost_per_byte * (alpha_string_len as u64).into()
             + ecvrf_ecvrf_verify_cost_params.ecvrf_ecvrf_verify_alpha_string_cost_per_block
-                * (((alpha_string_len + ECVRF_SHA512_BLOCK_SIZE - 1) / ECVRF_SHA512_BLOCK_SIZE) as u64).into()
+                * (alpha_string_len.div_ceil(ECVRF_SHA512_BLOCK_SIZE) as u64).into()
     );
 
     let cost = context.gas_used();

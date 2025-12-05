@@ -52,8 +52,12 @@ pub(crate) struct DatatypeEntry {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) enum DatatypeData {
-    Struct { fields: Option<BTreeMap<Symbol, (usize, Type)>> },
-    Enum { variants: BTreeMap<Symbol, Option<BTreeMap<Symbol, (usize, Type)>>> },
+    Struct {
+        fields: Option<BTreeMap<Symbol, (usize, Type)>>,
+    },
+    Enum {
+        variants: BTreeMap<Symbol, Option<BTreeMap<Symbol, (usize, Type)>>>,
+    },
 }
 
 /// A declaration of a function.
@@ -106,11 +110,18 @@ impl<'env> ModelBuilder<'env> {
         type_params: Vec<(Symbol, Type)>,
         fields: Option<BTreeMap<Symbol, (usize, Type)>>,
     ) {
-        let entry =
-            DatatypeEntry { loc, attributes, module_id, struct_id, type_params, data: DatatypeData::Struct { fields } };
+        let entry = DatatypeEntry {
+            loc,
+            attributes,
+            module_id,
+            struct_id,
+            type_params,
+            data: DatatypeData::Struct { fields },
+        };
         // Duplicate declarations have been checked by the Move compiler.
         assert!(self.datatype_table.insert(name.clone(), entry).is_none());
-        self.reverse_datatype_table.insert((module_id, struct_id), name);
+        self.reverse_datatype_table
+            .insert((module_id, struct_id), name);
     }
 
     pub fn define_enum(
@@ -123,11 +134,18 @@ impl<'env> ModelBuilder<'env> {
         type_params: Vec<(Symbol, Type)>,
         variants: BTreeMap<Symbol, Option<BTreeMap<Symbol, (usize, Type)>>>,
     ) {
-        let entry =
-            DatatypeEntry { loc, attributes, module_id, struct_id, type_params, data: DatatypeData::Enum { variants } };
+        let entry = DatatypeEntry {
+            loc,
+            attributes,
+            module_id,
+            struct_id,
+            type_params,
+            data: DatatypeData::Enum { variants },
+        };
         // Duplicate declarations have been checked by the Move compiler.
         assert!(self.datatype_table.insert(name.clone(), entry).is_none());
-        self.reverse_datatype_table.insert((module_id, struct_id), name);
+        self.reverse_datatype_table
+            .insert((module_id, struct_id), name);
     }
 
     /// Defines a function.
@@ -139,7 +157,12 @@ impl<'env> ModelBuilder<'env> {
         type_params: Vec<(Symbol, Type)>,
         params: Vec<(Symbol, Type)>,
     ) {
-        let entry = FunEntry { loc, attributes, type_params, params };
+        let entry = FunEntry {
+            loc,
+            attributes,
+            type_params,
+            params,
+        };
         // Duplicate declarations have been checked by the Move compiler.
         assert!(self.fun_table.insert(name, entry).is_none());
     }
@@ -167,7 +190,10 @@ impl<'env> ModelBuilder<'env> {
             .cloned()
             .map(|e| Type::Datatype(e.module_id, e.struct_id, project_2nd(&e.type_params)))
             .unwrap_or_else(|| {
-                self.error(loc, &format!("undeclared `{}`", name.display_full(self.env.symbol_pool())));
+                self.error(
+                    loc,
+                    &format!("undeclared `{}`", name.display_full(self.env.symbol_pool())),
+                );
                 Type::Error
             })
     }

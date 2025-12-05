@@ -58,17 +58,22 @@ mod rstd {
     pub use core::*;
     pub mod collections {
         pub use alloc::collections::*;
+
         pub use vec_deque::VecDeque;
     }
 }
-
-#[cfg(feature = "std")]
-use std::sync::Arc;
 
 #[cfg(not(feature = "std"))]
 pub use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
 use core::ffi::c_void;
+#[cfg(feature = "std")]
+use std::hash::BuildHasher;
+#[cfg(feature = "std")]
+use std::os::raw::c_void;
+#[cfg(feature = "std")]
+use std::sync::Arc;
+
 #[cfg(feature = "std")]
 use rstd::hash::Hash;
 use rstd::{
@@ -76,10 +81,6 @@ use rstd::{
     mem::size_of,
     ops::{Deref, DerefMut, Range},
 };
-#[cfg(feature = "std")]
-use std::hash::BuildHasher;
-#[cfg(feature = "std")]
-use std::os::raw::c_void;
 
 /// A C function that takes a pointer to a heap allocation and returns its size.
 pub type VoidPtrToSizeFn = unsafe extern "C" fn(ptr: *const c_void) -> usize;
@@ -703,9 +704,11 @@ malloc_size_of_is_0!(std::time::Duration);
 
 #[cfg(all(test, feature = "std"))] // tests are using std implementations
 mod tests {
-    use crate::{allocators::new_malloc_size_ops, MallocSizeOf, MallocSizeOfOps};
-    use smallvec::SmallVec;
     use std::{collections::BTreeSet, mem};
+
+    use smallvec::SmallVec;
+
+    use crate::{allocators::new_malloc_size_ops, MallocSizeOf, MallocSizeOfOps};
     impl_smallvec!(3);
 
     #[test]
@@ -769,7 +772,7 @@ mod tests {
     #[test]
     fn btree_set() {
         let mut set = BTreeSet::new();
-        for t in 0..100 {
+        for t in 0 .. 100 {
             set.insert(vec![t]);
         }
         // ~36 per value

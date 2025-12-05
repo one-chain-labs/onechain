@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::*;
+
 use crate::types::{
     digest::Digest,
     sui_address::SuiAddress,
     type_filter::{ModuleFilter, TypeFilter},
 };
-use async_graphql::*;
 
 #[derive(InputObject, Clone, Default)]
 pub(crate) struct EventFilter {
@@ -36,7 +37,7 @@ pub(crate) struct EventFilter {
     ///
     /// Generic types can be queried by either the generic type name, e.g.
     /// `0x2::coin::Coin`, or by the full type name, such as
-    /// `0x2::coin::Coin<0x2::oct::OCT>`.
+    /// `0x2::coin::Coin<0x2::sui::SUI>`.
     pub event_type: Option<TypeFilter>,
     // Enhancement (post-MVP)
     // pub start_time

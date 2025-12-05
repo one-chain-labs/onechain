@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use bytes::{Buf, BufMut};
 use std::{io::Read, marker::PhantomData};
+
+use bytes::{Buf, BufMut};
 use tonic::{
     codec::{Codec, DecodeBuf, Decoder, EncodeBuf, Encoder},
     Status,
@@ -135,9 +136,10 @@ where
 
 // Anemo variant of BCS codec using Snappy for compression.
 pub mod anemo {
+    use std::{io::Read, marker::PhantomData};
+
     use ::anemo::rpc::codec::{Codec, Decoder, Encoder};
     use bytes::Buf;
-    use std::{io::Read, marker::PhantomData};
 
     #[derive(Debug)]
     pub struct BcsSnappyEncoder<T>(PhantomData<T>);

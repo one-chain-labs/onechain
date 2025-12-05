@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_runtime::LocalProtocolConfig;
+use std::{
+    collections::{btree_map, BTreeMap},
+    sync::Arc,
+};
+
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{annotated_value as A, effects::Op, runtime_value as R, vm_status::StatusCode};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, StructRef, Value},
-};
-use std::{
-    collections::{btree_map, BTreeMap},
-    sync::Arc,
 };
 use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed};
 use sui_types::{
@@ -22,6 +22,7 @@ use sui_types::{
 };
 
 use super::get_all_uids;
+use crate::object_runtime::LocalProtocolConfig;
 pub(super) struct ChildObject {
     pub(super) owner: ObjectID,
     pub(super) ty: Type,
@@ -78,7 +79,7 @@ pub(crate) enum ObjectResult<V> {
     Loaded(V),
 }
 
-impl<'a> Inner<'a> {
+impl Inner<'_> {
     fn get_or_fetch_object_from_store(
         &mut self,
         parent: ObjectID,

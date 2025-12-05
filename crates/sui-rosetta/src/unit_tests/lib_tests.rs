@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::CoinMetadataCache;
+use std::{num::NonZeroUsize, path::PathBuf};
+
 use anyhow::anyhow;
 use rand::{prelude::IteratorRandom, rngs::OsRng};
 use shared_crypto::intent::Intent;
-use std::{num::NonZeroUsize, path::PathBuf};
 use sui_json_rpc_types::{
     ObjectChange,
     SuiObjectDataOptions,
@@ -30,6 +30,8 @@ use sui_types::{
     },
 };
 use test_cluster::TestClusterBuilder;
+
+use crate::CoinMetadataCache;
 
 #[tokio::test]
 async fn test_cache() {

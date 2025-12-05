@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{str::FromStr, time::Duration};
+
 use anyhow::Result;
 use object_store::{aws::AmazonS3ConfigKey, gcp::GoogleConfigKey, ClientOptions, ObjectStore, RetryConfig};
-use std::{str::FromStr, time::Duration};
 use url::Url;
 
 pub fn create_remote_store_client(

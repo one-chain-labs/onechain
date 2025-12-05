@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{collections::HashMap, path::Path, sync::Arc};
-use sui_types::Identifier;
 
-use sui_types::event::EventID;
+use sui_types::{event::EventID, Identifier};
 use typed_store::{
     rocks::{DBMap, MetricConf},
     traits::{TableSummary, TypedStoreDebug},
@@ -96,9 +95,8 @@ mod tests {
 
     use sui_types::digests::TransactionDigest;
 
-    use crate::test_utils::get_test_sui_to_eth_bridge_action;
-
     use super::*;
+    use crate::test_utils::get_test_sui_to_eth_bridge_action;
 
     // async: existing runtime is required with typed-store
     #[tokio::test]

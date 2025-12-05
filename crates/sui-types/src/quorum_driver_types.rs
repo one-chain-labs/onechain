@@ -4,6 +4,10 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+use strum::AsRefStr;
+use thiserror::Error;
+
 use crate::{
     base_types::{AuthorityName, EpochId, ObjectRef, TransactionDigest},
     committee::StakeUnit,
@@ -14,9 +18,6 @@ use crate::{
     object::Object,
     transaction::{Transaction, VerifiedTransaction},
 };
-use serde::{Deserialize, Serialize};
-use strum::AsRefStr;
-use thiserror::Error;
 
 pub type QuorumDriverResult = Result<QuorumDriverResponse, QuorumDriverError>;
 
@@ -33,16 +34,8 @@ pub enum QuorumDriverError {
     QuorumDriverInternalError(SuiError),
     #[error("Invalid user signature: {0}.")]
     InvalidUserSignature(SuiError),
-    #[error(
-        "Failed to sign transaction by a quorum of validators because of locked objects: {:?}, retried a conflicting transaction {:?}, success: {:?}",
-        conflicting_txes,
-        .retried_tx_status.map(|(tx, success)| tx),
-        .retried_tx_status.map(|(tx, success)| success),
-    )]
-    ObjectsDoubleUsed {
-        conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)>,
-        retried_tx_status: Option<(TransactionDigest, bool)>,
-    },
+    #[error("Failed to sign transaction by a quorum of validators because of locked objects: {conflicting_txes:?}")]
+    ObjectsDoubleUsed { conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)> },
     #[error("Transaction timed out before reaching finality")]
     TimeoutBeforeFinality,
     #[error("Transaction failed to reach finality with transient error after {total_attempts} attempts.")]

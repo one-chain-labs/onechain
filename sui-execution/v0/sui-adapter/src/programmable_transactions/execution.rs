@@ -12,11 +12,6 @@ mod checked {
         sync::Arc,
     };
 
-    use crate::{
-        execution_mode::ExecutionMode,
-        execution_value::{CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value},
-        gas_charger::GasCharger,
-    };
     use move_binary_format::{
         compatibility::{Compatibility, InclusionCheck},
         errors::{Location, PartialVMResult, VMResult},
@@ -41,6 +36,7 @@ mod checked {
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::{
+            MoveLegacyTxContext,
             MoveObjectType,
             ObjectID,
             SuiAddress,
@@ -56,7 +52,7 @@ mod checked {
         error::{command_argument_error, ExecutionError, ExecutionErrorKind},
         execution_config_utils::to_binary_config,
         execution_status::{CommandArgumentError, PackageUpgradeError},
-        id::{RESOLVED_SUI_ID, UID},
+        id::RESOLVED_SUI_ID,
         metrics::LimitsMetrics,
         move_package::{
             normalize_deserialized_modules,
@@ -76,7 +72,13 @@ mod checked {
         INIT_FN_NAME,
     };
 
-    use crate::{adapter::substitute_package_id, programmable_transactions::context::*};
+    use crate::{
+        adapter::substitute_package_id,
+        execution_mode::ExecutionMode,
+        execution_value::{CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value},
+        gas_charger::GasCharger,
+        programmable_transactions::context::*,
+    };
 
     pub fn execute<Mode: ExecutionMode>(
         protocol_config: &ProtocolConfig,
@@ -197,7 +199,7 @@ mod checked {
                     .map(|amount_arg| {
                         let amount: u64 = context.by_value_arg(CommandKind::SplitCoins, 1, amount_arg)?;
                         let new_coin_id = context.fresh_id()?;
-                        let new_coin = coin.split(amount, UID::new(new_coin_id))?;
+                        let new_coin = coin.split(amount, new_coin_id)?;
                         let coin_type = obj.type_.clone();
                         // safe because we are propagating the coin type, and relying on the internal
                         // invariant that coin values have a coin type
@@ -691,7 +693,7 @@ mod checked {
         match tx_context_kind {
             TxContextKind::None => (),
             TxContextKind::Mutable | TxContextKind::Immutable => {
-                serialized_arguments.push(context.tx_context.to_vec());
+                serialized_arguments.push(context.tx_context.to_bcs_legacy_context());
             }
         }
         // script visibility checked manually for entry points
@@ -717,7 +719,7 @@ mod checked {
             let Some((_, ctx_bytes, _)) = result.mutable_reference_outputs.pop() else {
                 invariant_violation!("Missing TxContext in reference outputs");
             };
-            let updated_ctx: TxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
+            let updated_ctx: MoveLegacyTxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
                 ExecutionError::invariant_violation(format!("Unable to deserialize TxContext bytes. {e}"))
             })?;
             context.tx_context.update_state(updated_ctx)?;
@@ -749,7 +751,7 @@ mod checked {
         package_id: ObjectID,
         modules: &[CompiledModule],
     ) -> Result<(), ExecutionError> {
-        // TODO(https://github.com/one-chain-labs/onechain/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
+        // TODO(https://github.com/MystenLabs/sui/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
         let new_module_bytes: Vec<_> = modules
             .iter()
             .map(|m| {
@@ -1016,14 +1018,14 @@ mod checked {
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::NonEntryFunctionInvoked,
-                format!("Cannot directly call functions in one::{}", EVENT_MODULE),
+                format!("Cannot directly call functions in sui::{}", EVENT_MODULE),
             ));
         }
 
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) && PRIVATE_TRANSFER_FUNCTIONS.contains(&function) {
             let msg = format!(
-                "Cannot directly call one::{m}::{f}. \
-            Use the public variant instead, one::{m}::public_{f}",
+                "Cannot directly call sui::{m}::{f}. \
+            Use the public variant instead, sui::{m}::public_{f}",
                 m = TRANSFER_MODULE,
                 f = function
             );
@@ -1390,7 +1392,7 @@ mod checked {
 
     struct VectorElementVisitor<'a>(&'a PrimitiveArgumentLayout);
 
-    impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
+    impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1408,7 +1410,7 @@ mod checked {
 
     struct OptionElementVisitor<'a>(&'a PrimitiveArgumentLayout);
 
-    impl<'d, 'a> serde::de::Visitor<'d> for OptionElementVisitor<'a> {
+    impl<'d> serde::de::Visitor<'d> for OptionElementVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

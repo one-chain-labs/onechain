@@ -5,19 +5,13 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use crate::{
-        execution_mode::{self, ExecutionMode},
-        gas_charger::GasCharger,
-        programmable_transactions,
-        temporary_store::TemporaryStore,
-        type_layout_resolver::TypeLayoutResolver,
-    };
+    use std::{collections::HashSet, sync::Arc};
+
     use move_binary_format::CompiledModule;
     use move_vm_runtime::move_vm::MoveVM;
-    use std::{collections::HashSet, sync::Arc};
     use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
     #[cfg(msim)]
-    use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result;
+    use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result_legacy;
     use sui_types::{
         balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
         base_types::{ObjectRef, SuiAddress, TransactionDigest, TxContext},
@@ -58,6 +52,14 @@ mod checked {
     };
     use tracing::{info, instrument, trace, warn};
 
+    use crate::{
+        execution_mode::{self, ExecutionMode},
+        gas_charger::GasCharger,
+        programmable_transactions,
+        temporary_store::TemporaryStore,
+        type_layout_resolver::TypeLayoutResolver,
+    };
+
     #[instrument(name = "tx_execute_to_effects", level = "debug", skip_all)]
     pub fn execute_transaction_to_effects<Mode: ExecutionMode>(
         store: &dyn BackingStore,
@@ -81,8 +83,15 @@ mod checked {
         let mut temporary_store = TemporaryStore::new(store, input_objects, transaction_digest, protocol_config);
         let mut gas_charger = GasCharger::new(transaction_digest, gas_coins, gas_status, protocol_config);
 
-        let mut tx_ctx =
-            TxContext::new_from_components(&transaction_signer, &transaction_digest, epoch_id, epoch_timestamp_ms);
+        let mut tx_ctx = TxContext::new_from_components(
+            &transaction_signer,
+            &transaction_digest,
+            epoch_id,
+            epoch_timestamp_ms,
+            // Those values are unused in execution versions before 3 (or latest)
+            1,
+            None,
+        );
 
         let is_epoch_change = matches!(transaction_kind, TransactionKind::ChangeEpoch(_));
 
@@ -428,6 +437,19 @@ mod checked {
                 .expect("ConsensusCommitPrologue cannot fail");
                 Ok(Mode::empty_results())
             }
+            TransactionKind::ConsensusCommitPrologueV4(prologue) => {
+                setup_consensus_commit(
+                    prologue.commit_timestamp_ms,
+                    temporary_store,
+                    tx_ctx,
+                    move_vm,
+                    gas_charger,
+                    protocol_config,
+                    metrics,
+                )
+                .expect("ConsensusCommitPrologue cannot fail");
+                Ok(Mode::empty_results())
+            }
             TransactionKind::ProgrammableTransaction(pt) => programmable_transactions::execution::execute::<Mode>(
                 protocol_config,
                 metrics,
@@ -596,7 +618,7 @@ mod checked {
         );
 
         #[cfg(msim)]
-        let result = maybe_modify_result(result, change_epoch.epoch);
+        let result = maybe_modify_result_legacy(result, change_epoch.epoch);
 
         if result.is_err() {
             tracing::error!(

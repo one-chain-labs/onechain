@@ -6,7 +6,7 @@ The Analytics Watchdog Service is designed to monitor and analyze data changes o
 ## Running the Service
 Execute the compiled binary to start the service:
 ```shell
-cargo run --release -p one-security-watchdog
+cargo run --release -p sui-security-watchdog
 ```
 ## Usage
 The service will automatically start downloading the configured GitHub repository, parsing the configuration file, and scheduling SQL queries as specified. Metrics will be updated in Prometheus according to the results of these queries.

@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::connection::ScanConnection;
+use async_graphql::{connection::Connection, *};
 
 use super::{
     balance::{self, Balance},
@@ -10,13 +10,13 @@ use super::{
     move_object::MoveObject,
     object::{self, ObjectFilter},
     owner::OwnerImpl,
-    stake::StakedOct,
+    stake::StakedSui,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
     type_filter::ExactTypeFilter,
 };
-use async_graphql::{connection::Connection, *};
+use crate::connection::ScanConnection;
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub(crate) struct Address {
@@ -56,7 +56,7 @@ impl Address {
     }
 
     /// Total balance of all coins with marker type owned by this address. If type is not supplied,
-    /// it defaults to `0x2::oct::OCT`.
+    /// it defaults to `0x2::sui::SUI`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(self).balance(ctx, type_).await
     }
@@ -75,7 +75,7 @@ impl Address {
 
     /// The coin objects for this address.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -88,16 +88,16 @@ impl Address {
         OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this address.
-    pub(crate) async fn staked_octs(
+    /// The `0x3::staking_pool::StakedSui` objects owned by this address.
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(self).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this address.

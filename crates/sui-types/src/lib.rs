@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![warn(future_incompatible, nonstandard_style, rust_2018_idioms, rust_2021_compatibility)]
 
-use base_types::{SequenceNumber, SuiAddress};
+use base_types::{ObjectID, SequenceNumber, SuiAddress};
 use move_binary_format::{
     file_format::{AbilitySet, SignatureToken},
     CompiledModule,
@@ -13,11 +13,8 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
 };
 pub use move_core_types::{identifier::Identifier, language_storage::TypeTag};
-use object::OBJECT_START_VERSION;
-
-use base_types::ObjectID;
-
 pub use mysten_network::multiaddr;
+use object::OBJECT_START_VERSION;
 
 use crate::{
     base_types::{RESOLVED_ASCII_STR, RESOLVED_STD_OPTION, RESOLVED_UTF8_STR},
@@ -69,6 +66,7 @@ pub mod mock_checkpoint_builder;
 pub mod move_package;
 pub mod multisig;
 pub mod multisig_legacy;
+pub mod nitro_attestation;
 pub mod object;
 pub mod passkey_authenticator;
 pub mod programmable_transaction_builder;
@@ -81,6 +79,7 @@ pub mod sui_sdk_types_conversions;
 pub mod sui_serde;
 pub mod sui_system_state;
 pub mod supported_protocol_versions;
+pub mod test_checkpoint_data_builder;
 pub mod traffic_control;
 pub mod transaction;
 pub mod transaction_executor;
@@ -140,7 +139,7 @@ pub fn sui_framework_address_concat_string(suffix: &str) -> String {
 /// Parses `s` as an address. Valid formats for addresses are:
 ///
 /// - A 256bit number, encoded in decimal, or hexadecimal with a leading "0x" prefix.
-/// - One of a number of pre-defined named addresses: std, one, one_system, deepbook.
+/// - One of a number of pre-defined named addresses: std, sui, sui_system, deepbook.
 ///
 /// Parsing succeeds if and only if `s` matches one of these formats exactly, with no remaining
 /// suffix. This function is intended for use within the authority codebases.
@@ -188,8 +187,8 @@ pub fn resolve_address(addr: &str) -> Option<AccountAddress> {
     match addr {
         "deepbook" => Some(DEEPBOOK_ADDRESS),
         "std" => Some(MOVE_STDLIB_ADDRESS),
-        "one" => Some(SUI_FRAMEWORK_ADDRESS),
-        "one_system" => Some(SUI_SYSTEM_ADDRESS),
+        "sui" => Some(SUI_FRAMEWORK_ADDRESS),
+        "sui_system" => Some(SUI_SYSTEM_ADDRESS),
         "bridge" => Some(BRIDGE_ADDRESS),
         _ => None,
     }
@@ -304,8 +303,9 @@ fn is_object_struct(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_parse_sui_numeric_address() {
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_parse_sui_named_address() {
-        let result = parse_sui_address("one").expect("should not error");
+        let result = parse_sui_address("sui").expect("should not error");
 
         let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002"];
         expected.assert_eq(&result.to_string());
@@ -325,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_parse_sui_module_id() {
-        let result = parse_sui_module_id("0x2::one").expect("should not error");
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::one"];
+        let result = parse_sui_module_id("0x2::sui").expect("should not error");
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::sui"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
@@ -339,72 +339,72 @@ mod tests {
 
     #[test]
     fn test_parse_sui_struct_tag_short_account_addr() {
-        let result = parse_sui_struct_tag("0x2::oct::OCT").expect("should not error");
+        let result = parse_sui_struct_tag("0x2::sui::SUI").expect("should not error");
 
-        let expected = expect!["0x2::oct::OCT"];
+        let expected = expect!["0x2::sui::SUI"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_parse_sui_struct_tag_long_account_addr() {
         let result =
-            parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT")
+            parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI")
                 .expect("should not error");
 
-        let expected = expect!["0x2::oct::OCT"];
+        let expected = expect!["0x2::sui::SUI"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_parse_sui_struct_with_type_param_short_addr() {
-        let result = parse_sui_struct_tag("0x2::coin::COIN<0x2::oct::OCT>").expect("should not error");
+        let result = parse_sui_struct_tag("0x2::coin::COIN<0x2::sui::SUI>").expect("should not error");
 
-        let expected = expect!["0x2::coin::COIN<0x2::oct::OCT>"];
+        let expected = expect!["0x2::coin::COIN<0x2::sui::SUI>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_parse_sui_struct_with_type_param_long_addr() {
-        let result = parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>")
+        let result = parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>")
             .expect("should not error");
 
-        let expected = expect!["0x2::coin::COIN<0x2::oct::OCT>"];
+        let expected = expect!["0x2::coin::COIN<0x2::sui::SUI>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_complex_struct_tag_with_short_addr() {
-        let result = parse_sui_struct_tag("0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>")
+        let result = parse_sui_struct_tag("0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::sui::SUI>>>")
             .expect("should not error");
 
-        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>"];
+        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::sui::SUI>>>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>"];
+        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>>>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_complex_struct_tag_with_long_addr() {
-        let result = parse_sui_struct_tag("0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>")
+        let result = parse_sui_struct_tag("0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>>>")
             .expect("should not error");
 
-        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>"];
+        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::sui::SUI>>>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>"];
+        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>>>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 

@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::object_runtime::{ObjectRuntime, TransferResult};
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -13,8 +13,10 @@ use move_core_types::{
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
 use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
 use smallvec::smallvec;
-use std::collections::VecDeque;
 use sui_types::{base_types::SequenceNumber, object::Owner};
+
+use super::object_runtime::{ObjectRuntime, TransferResult};
+use crate::NativesCostTable;
 
 const E_SHARED_NON_NEW_OBJECT: u64 = 0;
 

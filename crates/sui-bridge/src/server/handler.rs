@@ -3,6 +3,18 @@
 
 #![allow(clippy::type_complexity)]
 
+use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
+
+use async_trait::async_trait;
+use axum::Json;
+use ethers::{providers::JsonRpcClient, types::TxHash};
+use lru::LruCache;
+use sui_types::digests::TransactionDigest;
+use tap::TapFallible;
+use tokio::sync::{oneshot, Mutex};
+use tracing::info;
+
+use super::governance_verifier::GovernanceVerifier;
 use crate::{
     crypto::{BridgeAuthorityKeyPair, BridgeAuthoritySignInfo},
     error::{BridgeError, BridgeResult},
@@ -11,17 +23,6 @@ use crate::{
     sui_client::{SuiClient, SuiClientInner},
     types::{BridgeAction, SignedBridgeAction},
 };
-use async_trait::async_trait;
-use axum::Json;
-use ethers::{providers::JsonRpcClient, types::TxHash};
-use lru::LruCache;
-use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
-use sui_types::digests::TransactionDigest;
-use tap::TapFallible;
-use tokio::sync::{oneshot, Mutex};
-use tracing::info;
-
-use super::governance_verifier::GovernanceVerifier;
 
 #[async_trait]
 pub trait BridgeRequestHandlerTrait {
@@ -295,6 +296,14 @@ impl BridgeRequestHandlerTrait for BridgeRequestHandler {
 mod tests {
     use std::collections::HashSet;
 
+    use ethers::types::{Address as EthAddress, TransactionReceipt};
+    use sui_json_rpc_types::{BcsEvent, SuiEvent};
+    use sui_types::{
+        base_types::SuiAddress,
+        bridge::{BridgeChainId, TOKEN_ID_USDC},
+        crypto::get_key_pair,
+    };
+
     use super::*;
     use crate::{
         eth_mock_provider::EthMockProvider,
@@ -302,13 +311,6 @@ mod tests {
         sui_mock_client::SuiMockClient,
         test_utils::{get_test_log_and_action, get_test_sui_to_eth_bridge_action, mock_last_finalized_block},
         types::{EmergencyAction, EmergencyActionType, LimitUpdateAction},
-    };
-    use ethers::types::{Address as EthAddress, TransactionReceipt};
-    use sui_json_rpc_types::{BcsEvent, SuiEvent};
-    use sui_types::{
-        base_types::SuiAddress,
-        bridge::{BridgeChainId, TOKEN_ID_USDC},
-        crypto::get_key_pair,
     };
 
     #[tokio::test]

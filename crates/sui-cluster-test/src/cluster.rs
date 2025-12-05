@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::config::{ClusterTestOpt, Env};
-use async_trait::async_trait;
 use std::{net::SocketAddr, path::Path};
+
+use async_trait::async_trait;
 use sui_config::{
     local_ip_utils::get_available_port,
     Config,
@@ -17,7 +17,7 @@ use sui_graphql_rpc::{
 };
 use sui_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
-use sui_pg_temp_db::TempDb;
+use sui_pg_db::temp::TempDb;
 use sui_sdk::{
     sui_client_config::{SuiClientConfig, SuiEnv},
     wallet_context::WalletContext,
@@ -32,16 +32,18 @@ use tempfile::tempdir;
 use test_cluster::{TestCluster, TestClusterBuilder};
 use tracing::info;
 
-const DEVNET_FAUCET_ADDR: &str = "https://faucet-devnet.onelabs.cc:443";
+use super::config::{ClusterTestOpt, Env};
+
+const DEVNET_FAUCET_ADDR: &str = "https://faucet.devnet.sui.io:443";
 const STAGING_FAUCET_ADDR: &str = "https://faucet.staging.sui.io:443";
 const CONTINUOUS_FAUCET_ADDR: &str = "https://faucet.ci.sui.io:443";
 const CONTINUOUS_NOMAD_FAUCET_ADDR: &str = "https://faucet.nomad.ci.sui.io:443";
-const TESTNET_FAUCET_ADDR: &str = "https://faucet-testnet.onelabs.cc:443";
-const DEVNET_FULLNODE_ADDR: &str = "https://rpc-devnet.onelabs.cc:443";
+const TESTNET_FAUCET_ADDR: &str = "https://faucet.testnet.sui.io:443";
+const DEVNET_FULLNODE_ADDR: &str = "https://rpc.devnet.sui.io:443";
 const STAGING_FULLNODE_ADDR: &str = "https://fullnode.staging.sui.io:443";
 const CONTINUOUS_FULLNODE_ADDR: &str = "https://fullnode.ci.sui.io:443";
 const CONTINUOUS_NOMAD_FULLNODE_ADDR: &str = "https://fullnode.nomad.ci.sui.io:443";
-const TESTNET_FULLNODE_ADDR: &str = "https://rpc-testnet.onelabs.cc:443";
+const TESTNET_FULLNODE_ADDR: &str = "https://fullnode.testnet.sui.io:443";
 
 pub struct ClusterFactory;
 

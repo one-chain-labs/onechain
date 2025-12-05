@@ -6,7 +6,7 @@
 /// with SUI.
 module examples::sword {
     use examples::gem::GEM;
-    use one::token::{Self, Token, ActionRequest};
+    use sui::token::{Self, Token, ActionRequest};
 
     /// Trying to purchase a sword with an incorrect amount.
     const EWrongAmount: u64 = 0;
@@ -28,10 +28,10 @@ module examples::sword {
 /// SUI and used to buy swords (in the `sword` module).
 module examples::gem {
     use std::{option::none, string::{Self, String}};
-    use one::{
+    use sui::{
         balance::{Self, Balance},
         coin::{Self, Coin, TreasuryCap},
-        oct::OCT,
+        sui::SUI,
         token::{Self, Token, ActionRequest},
         tx_context::sender
     };
@@ -57,7 +57,7 @@ module examples::gem {
     public struct GemStore has key {
         id: UID,
         /// Profits from selling Gems.
-        profits: Balance<OCT>,
+        profits: Balance<SUI>,
         /// The Treasury Cap for the in-game currency.
         gem_treasury: TreasuryCap<GEM>,
     }
@@ -101,7 +101,7 @@ module examples::gem {
     /// constants...
     public fun buy_gems(
         self: &mut GemStore,
-        payment: Coin<OCT>,
+        payment: Coin<SUI>,
         ctx: &mut TxContext,
     ): (Token<GEM>, ActionRequest<GEM>) {
         let amount = coin::value(&payment);

@@ -1,10 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::displays::Pretty;
 use std::fmt::{Display, Formatter};
 
+use sui_types::transaction::write_sep;
+use tabled::{
+    builder::Builder as TableBuilder,
+    settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
+};
+
 use crate::{
+    displays::Pretty,
     SuiArgument,
     SuiCallArg,
     SuiCommand,
@@ -12,13 +18,8 @@ use crate::{
     SuiProgrammableMoveCall,
     SuiProgrammableTransactionBlock,
 };
-use sui_types::transaction::write_sep;
-use tabled::{
-    builder::Builder as TableBuilder,
-    settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
-};
 
-impl<'a> Display for Pretty<'a, SuiProgrammableTransactionBlock> {
+impl Display for Pretty<'_, SuiProgrammableTransactionBlock> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(ptb) = self;
         let SuiProgrammableTransactionBlock { inputs, commands } = ptb;
@@ -77,7 +78,7 @@ impl<'a> Display for Pretty<'a, SuiProgrammableTransactionBlock> {
     }
 }
 
-impl<'a> Display for Pretty<'a, SuiCommand> {
+impl Display for Pretty<'_, SuiCommand> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(command) = self;
         match command {
@@ -128,7 +129,7 @@ impl<'a> Display for Pretty<'a, SuiCommand> {
     }
 }
 
-impl<'a> Display for Pretty<'a, SuiProgrammableMoveCall> {
+impl Display for Pretty<'_, SuiProgrammableMoveCall> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(move_call) = self;
         let SuiProgrammableMoveCall { package, module, function, type_arguments, arguments } = move_call;
@@ -148,7 +149,7 @@ impl<'a> Display for Pretty<'a, SuiProgrammableMoveCall> {
     }
 }
 
-impl<'a> Display for Pretty<'a, SuiArgument> {
+impl Display for Pretty<'_, SuiArgument> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(argument) = self;
 

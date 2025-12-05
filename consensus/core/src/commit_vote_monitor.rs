@@ -76,7 +76,7 @@ mod test {
         let monitor = CommitVoteMonitor::new(context.clone());
 
         // Observe commit votes for indices 5, 6, 7, 8 from blocks.
-        let blocks = (0..4)
+        let blocks = (0 .. 4)
             .map(|i| {
                 VerifiedBlock::new_for_test(
                     TestBlock::new(10, i).set_commit_votes(vec![CommitRef::new(5 + i, CommitDigest::MIN)]).build(),
@@ -91,7 +91,7 @@ mod test {
         assert_eq!(monitor.quorum_commit_index(), 6);
 
         // Observe new blocks with new votes from authority 0 and 1.
-        let blocks = (0..2)
+        let blocks = (0 .. 2)
             .map(|i| {
                 VerifiedBlock::new_for_test(
                     TestBlock::new(11, i)

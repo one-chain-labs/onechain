@@ -1,13 +1,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::parsing::{
+    address::ParsedAddress,
+    parser::{Parser, Token},
+};
 use crate::{
     account_address::AccountAddress,
     identifier,
-    parsing::{
-        address::ParsedAddress,
-        parser::{Parser, Token},
-    },
     runtime_value::{MoveStruct, MoveValue},
 };
 use anyhow::bail;
@@ -69,13 +69,11 @@ pub trait ParsableValue: Sized + Send + Sync + Clone + 'static {
 
 impl ParsableValue for () {
     type ConcreteValue = MoveValue;
-
     fn parse_value<'a, I: Iterator<Item = (ValueToken, &'a str)>>(
         _: &mut Parser<'a, ValueToken, I>,
     ) -> Option<anyhow::Result<Self>> {
         None
     }
-
     fn move_value_into_concrete(v: MoveValue) -> anyhow::Result<Self::ConcreteValue> {
         Ok(v)
     }
@@ -87,7 +85,6 @@ impl ParsableValue for () {
     fn concrete_struct(values: Vec<Self::ConcreteValue>) -> anyhow::Result<Self::ConcreteValue> {
         Ok(MoveValue::Struct(MoveStruct(values)))
     }
-
     fn into_concrete_value(
         self,
         _mapping: &impl Fn(&str) -> Option<AccountAddress>,
@@ -133,7 +130,8 @@ impl Token for ValueToken {
             let rest = &text[num_text_len..];
             if rest.starts_with("u8") {
                 (ValueToken::NumberTyped, num_text_len + 2)
-            } else if rest.starts_with("u64") || rest.starts_with("u16") || rest.starts_with("u32") {
+            } else if rest.starts_with("u64") || rest.starts_with("u16") || rest.starts_with("u32")
+            {
                 (ValueToken::NumberTyped, num_text_len + 3)
             } else if rest.starts_with("u128") || rest.starts_with("u256") {
                 (ValueToken::NumberTyped, num_text_len + 4)
@@ -169,7 +167,9 @@ impl Token for ValueToken {
                 chars.next().unwrap();
                 match chars.next() {
                     Some(c) if c.is_ascii_hexdigit() => {
-                        let len = 3 + chars.take_while(|c| char::is_ascii_hexdigit(c) || *c == '_').count();
+                        let len = 3 + chars
+                            .take_while(|c| char::is_ascii_hexdigit(c) || *c == '_')
+                            .count();
                         number_maybe_with_suffix(s, len)
                     }
                     _ => bail!("unrecognized token: {}", s),
@@ -184,14 +184,19 @@ impl Token for ValueToken {
                     match chars.next() {
                         Some('"') => break,
                         Some(c) if c.is_ascii() => (),
-                        Some(c) => {
-                            bail!("Unexpected non-ascii character '{}' in byte string: {}", c.escape_default(), s)
-                        }
+                        Some(c) => bail!(
+                            "Unexpected non-ascii character '{}' in byte string: {}",
+                            c.escape_default(),
+                            s
+                        ),
                         None => bail!("Unexpected end of string before end quote: {}", s),
                     }
                 }
                 if s[..len].chars().any(|c| c == '\\') {
-                    bail!("Escape characters not yet supported in byte string: {}", &s[..len])
+                    bail!(
+                        "Escape characters not yet supported in byte string: {}",
+                        &s[..len]
+                    )
                 }
                 (ValueToken::ByteString, len)
             }
@@ -204,14 +209,21 @@ impl Token for ValueToken {
                     match chars.next() {
                         Some('"') => break,
                         Some(c) if c.is_ascii_hexdigit() => (),
-                        Some(c) => bail!("Unexpected non-hexdigit '{}' in hex string: {}", c.escape_default(), s),
+                        Some(c) => bail!(
+                            "Unexpected non-hexdigit '{}' in hex string: {}",
+                            c.escape_default(),
+                            s
+                        ),
                         None => bail!("Unexpected end of string before end quote: {}", s),
                     }
                 }
                 assert!(len >= 3);
                 let num_digits = len - 3;
                 if num_digits % 2 != 0 {
-                    bail!("Expected an even number of hex digits in hex string: {}", &s[..len])
+                    bail!(
+                        "Expected an even number of hex digits in hex string: {}",
+                        &s[..len]
+                    )
                 }
                 (ValueToken::HexString, len)
             }
@@ -231,13 +243,18 @@ impl Token for ValueToken {
                 // ending double quote (in the whole string) plus 1
                 let len = s[..1].len() + end_quote_byte_offset + 1;
                 if s[..len].chars().any(|c| c == '\\') {
-                    bail!("Escape characters not yet supported in utf8 string: {}", &s[..len])
+                    bail!(
+                        "Escape characters not yet supported in utf8 string: {}",
+                        &s[..len]
+                    )
                 }
                 (ValueToken::Utf8String, len)
             }
             c if c.is_ascii_digit() => {
                 // c + remaining
-                let len = 1 + chars.take_while(|c| char::is_ascii_digit(c) || *c == '_').count();
+                let len = 1 + chars
+                    .take_while(|c| char::is_ascii_digit(c) || *c == '_')
+                    .count();
                 number_maybe_with_suffix(s, len)
             }
             c if c.is_ascii_whitespace() => {
@@ -248,7 +265,9 @@ impl Token for ValueToken {
             c if c.is_ascii_alphabetic() => {
                 // c + remaining
                 // TODO be more permissive
-                let len = 1 + chars.take_while(|c| identifier::is_valid_identifier_char(*c)).count();
+                let len = 1 + chars
+                    .take_while(|c| identifier::is_valid_identifier_char(*c))
+                    .count();
                 (Self::Ident, len)
             }
             _ => bail!("unrecognized token: {}", s),
@@ -262,9 +281,9 @@ impl<Extra: ParsableValue> ParsedValue<Extra> {
         mapping: &impl Fn(&str) -> Option<AccountAddress>,
     ) -> anyhow::Result<Extra::ConcreteValue> {
         match self {
-            ParsedValue::Address(a) => {
-                Extra::move_value_into_concrete(MoveValue::Address(a.into_account_address(mapping)?))
-            }
+            ParsedValue::Address(a) => Extra::move_value_into_concrete(MoveValue::Address(
+                a.into_account_address(mapping)?,
+            )),
             ParsedValue::U8(u) => Extra::move_value_into_concrete(MoveValue::U8(u)),
             ParsedValue::U16(u) => Extra::move_value_into_concrete(MoveValue::U16(u)),
             ParsedValue::U32(u) => Extra::move_value_into_concrete(MoveValue::U32(u)),
@@ -273,13 +292,21 @@ impl<Extra: ParsableValue> ParsedValue<Extra> {
                 Extra::move_value_into_concrete(MoveValue::U64(u.try_into()?))
             }
             ParsedValue::U128(u) => Extra::move_value_into_concrete(MoveValue::U128(u)),
-            ParsedValue::InferredNum(u) | ParsedValue::U256(u) => Extra::move_value_into_concrete(MoveValue::U256(u)),
+            ParsedValue::InferredNum(u) | ParsedValue::U256(u) => {
+                Extra::move_value_into_concrete(MoveValue::U256(u))
+            }
             ParsedValue::Bool(b) => Extra::move_value_into_concrete(MoveValue::Bool(b)),
             ParsedValue::Vector(values) => Extra::concrete_vector(
-                values.into_iter().map(|value| value.into_concrete_value(mapping)).collect::<anyhow::Result<_>>()?,
+                values
+                    .into_iter()
+                    .map(|value| value.into_concrete_value(mapping))
+                    .collect::<anyhow::Result<_>>()?,
             ),
             ParsedValue::Struct(values) => Extra::concrete_struct(
-                values.into_iter().map(|value| value.into_concrete_value(mapping)).collect::<anyhow::Result<_>>()?,
+                values
+                    .into_iter()
+                    .map(|value| value.into_concrete_value(mapping))
+                    .collect::<anyhow::Result<_>>()?,
             ),
             ParsedValue::Custom(c) => Extra::into_concrete_value(c, mapping),
         }

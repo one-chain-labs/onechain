@@ -11,27 +11,6 @@ mod checked {
         sync::Arc,
     };
 
-    use crate::{
-        adapter::new_native_extensions,
-        error::convert_vm_error,
-        execution_mode::ExecutionMode,
-        execution_value::{
-            CommandKind,
-            ExecutionState,
-            InputObjectMetadata,
-            InputValue,
-            ObjectContents,
-            ObjectValue,
-            RawValueType,
-            ResultValue,
-            TryFromValue,
-            UsageKind,
-            Value,
-        },
-        gas_charger::GasCharger,
-        programmable_transactions::linkage_view::LinkageView,
-        type_resolver::TypeTagResolver,
-    };
     use move_binary_format::{
         errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
         file_format::{CodeOffset, FunctionDefinitionIndex, TypeParameterIndex},
@@ -44,6 +23,7 @@ mod checked {
         resolver::ModuleResolver,
         vm_status::StatusCode,
     };
+    use move_trace_format::format::MoveTraceBuilder;
     use move_vm_runtime::{
         move_vm::MoveVM,
         native_extensions::NativeContextExtensions,
@@ -74,6 +54,28 @@ mod checked {
         transaction::{Argument, CallArg, ObjectArg},
     };
     use tracing::instrument;
+
+    use crate::{
+        adapter::new_native_extensions,
+        error::convert_vm_error,
+        execution_mode::ExecutionMode,
+        execution_value::{
+            CommandKind,
+            ExecutionState,
+            InputObjectMetadata,
+            InputValue,
+            ObjectContents,
+            ObjectValue,
+            RawValueType,
+            ResultValue,
+            TryFromValue,
+            UsageKind,
+            Value,
+        },
+        gas_charger::GasCharger,
+        programmable_transactions::linkage_view::LinkageView,
+        type_resolver::TypeTagResolver,
+    };
 
     /// Maintains all runtime state specific to programmable transactions
     pub struct ExecutionContext<'vm, 'state, 'a> {
@@ -844,6 +846,7 @@ mod checked {
             function_name: &IdentStr,
             ty_args: Vec<Type>,
             args: Vec<impl Borrow<[u8]>>,
+            tracer: &mut Option<MoveTraceBuilder>,
         ) -> VMResult<SerializedReturnValues> {
             let gas_status = self.gas_charger.move_gas_status_mut();
             let mut data_store = SuiDataStore::new(&self.linkage_view, &self.new_packages);
@@ -855,6 +858,7 @@ mod checked {
                 &mut data_store,
                 gas_status,
                 &mut self.native_extensions,
+                tracer.as_mut(),
             )
         }
 
@@ -900,7 +904,7 @@ mod checked {
         }
     }
 
-    impl<'vm, 'state, 'a> TypeTagResolver for ExecutionContext<'vm, 'state, 'a> {
+    impl TypeTagResolver for ExecutionContext<'_, '_, '_> {
         fn get_type_tag(&self, type_: &Type) -> Result<TypeTag, ExecutionError> {
             self.vm.get_runtime().get_type_tag(type_).map_err(|e| self.convert_vm_error(e))
         }
@@ -1118,7 +1122,7 @@ mod checked {
         Ok(InputValue::new_object(object_metadata, obj_value))
     }
 
-    /// Load an a CallArg, either an object or a raw set of BCS bytes
+    /// Load a CallArg, either an object or a raw set of BCS bytes
     fn load_call_arg(
         protocol_config: &ProtocolConfig,
         vm: &MoveVM,
@@ -1275,7 +1279,7 @@ mod checked {
 
     // TODO: `DataStore` will be reworked and this is likely to disappear.
     //       Leaving this comment around until then as testament to better days to come...
-    impl<'state, 'a> DataStore for SuiDataStore<'state, 'a> {
+    impl DataStore for SuiDataStore<'_, '_> {
         fn link_context(&self) -> AccountAddress {
             self.linkage_view.link_context()
         }

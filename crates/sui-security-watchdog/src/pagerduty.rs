@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::info;
 
 #[derive(Serialize, Deserialize, Debug)]

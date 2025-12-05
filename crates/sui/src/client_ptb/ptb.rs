@@ -1,19 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    client_commands::{dry_run_or_execute_or_serialize, Opts, OptsWithGas, SuiClientCommandResult},
-    client_ptb::{
-        ast::{ParsedProgram, Program},
-        builder::PTBBuilder,
-        error::{build_error_reports, PTBError},
-        token::{Lexeme, Token},
-    },
-    displays::Pretty,
-    sp,
-};
-
-use super::{ast::ProgramMetadata, lexer::Lexer, parser::ProgramParser};
 use anyhow::{anyhow, ensure, Error};
 use clap::{arg, Args, ValueHint};
 use move_core_types::account_address::AccountAddress;
@@ -25,6 +12,19 @@ use sui_types::{
     digests::TransactionDigest,
     gas::GasCostSummary,
     transaction::{ProgrammableTransaction, TransactionKind},
+};
+
+use super::{ast::ProgramMetadata, lexer::Lexer, parser::ProgramParser};
+use crate::{
+    client_commands::{dry_run_or_execute_or_serialize, Opts, OptsWithGas, SuiClientCommandResult},
+    client_ptb::{
+        ast::{ParsedProgram, Program},
+        builder::PTBBuilder,
+        error::{build_error_reports, PTBError},
+        token::{Lexeme, Token},
+    },
+    displays::Pretty,
+    sp,
 };
 
 #[derive(Clone, Debug, Args)]
@@ -159,6 +159,10 @@ impl PTB {
                 return Ok(());
             }
             SuiClientCommandResult::TransactionBlock(response) => response,
+            SuiClientCommandResult::DevInspect(response) => {
+                println!("{}", Pretty(&response));
+                return Ok(());
+            }
             _ => anyhow::bail!("Internal error, unexpected response from PTB execution."),
         };
 
@@ -252,7 +256,7 @@ pub fn to_source_string(strings: Vec<String>) -> String {
 }
 
 pub fn ptb_description() -> clap::Command {
-    clap::Command::new("one_chian client ptb")
+    clap::Command::new("sui client ptb")
         .about(
             "Build, preview, and execute programmable transaction blocks. Depending on your \
             shell, you might have to use quotes around arrays or other passed values. \
@@ -310,7 +314,7 @@ pub fn ptb_description() -> clap::Command {
             \n --make-move-vec <u64> []\
             \n --make-move-vec <u64> [1, 2, 3, 4]\
             \n --make-move-vec <std::option::Option<u64>> [none,none]\
-            \n --make-move-vec <sui::coin::Coin<sui::oct::OCT>> [gas]",
+            \n --make-move-vec <sui::coin::Coin<sui::sui::SUI>> [gas]",
             )
             .value_names(["TYPE", "[VALUES]"]),
         )

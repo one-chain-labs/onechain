@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use clap::*;
-use ethers::types::Address as EthAddress;
-use prometheus::Registry;
 use std::{
     collections::HashSet,
     env,
@@ -13,20 +9,15 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+
+use anyhow::Result;
+use clap::*;
+use ethers::types::Address as EthAddress;
+use mysten_metrics::{metered_channel::channel, spawn_logged_monitored_task, start_prometheus_server};
+use prometheus::Registry;
 use sui_bridge::{
     eth_client::EthClient,
     metered_eth_provider::{new_metered_eth_provider, MeteredEthHttpProvier},
-    sui_bridge_watchdog::Observable,
-    sui_client::SuiBridgeClient,
-    utils::get_eth_contract_addresses,
-};
-use sui_config::Config;
-use tokio::task::JoinHandle;
-use tracing::info;
-
-use mysten_metrics::{metered_channel::channel, spawn_logged_monitored_task, start_prometheus_server};
-
-use sui_bridge::{
     metrics::BridgeMetrics,
     sui_bridge_watchdog::{
         eth_bridge_status::EthBridgeStatus,
@@ -34,7 +25,10 @@ use sui_bridge::{
         metrics::WatchdogMetrics,
         sui_bridge_status::SuiBridgeStatus,
         BridgeWatchDog,
+        Observable,
     },
+    sui_client::SuiBridgeClient,
+    utils::get_eth_contract_addresses,
 };
 use sui_bridge_indexer::{
     config::IndexerConfig,
@@ -46,8 +40,11 @@ use sui_bridge_indexer::{
     sui_transaction_handler::handle_sui_transactions_loop,
     sui_transaction_queries::start_sui_tx_polling_task,
 };
+use sui_config::Config;
 use sui_data_ingestion_core::DataIngestionMetrics;
 use sui_sdk::SuiClientBuilder;
+use tokio::task::JoinHandle;
+use tracing::info;
 
 #[derive(Parser, Clone, Debug)]
 struct Args {
@@ -125,7 +122,7 @@ async fn start_watchdog(
 ) -> Result<()> {
     let watchdog_metrics = WatchdogMetrics::new(registry);
     let eth_provider = Arc::new(new_metered_eth_provider(&config.eth_rpc_url, bridge_metrics.clone()).unwrap());
-    let (_committee_address, _limiter_address, vault_address, _config_address, weth_address, usdt_address) =
+    let (_committee_address, _limiter_address, vault_address, _config_address, weth_address, usdt_address, wbtc_address) =
         get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider).await?;
 
     let eth_vault_balance = EthereumVaultBalance::new(
@@ -137,6 +134,7 @@ async fn start_watchdog(
     )
     .await
     .unwrap_or_else(|e| panic!("Failed to create eth vault balance: {}", e));
+
     let usdt_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
         vault_address,
@@ -147,6 +145,16 @@ async fn start_watchdog(
     .await
     .unwrap_or_else(|e| panic!("Failed to create usdt vault balance: {}", e));
 
+    let wbtc_vault_balance = EthereumVaultBalance::new(
+        eth_provider.clone(),
+        vault_address,
+        wbtc_address,
+        VaultAsset::WBTC,
+        watchdog_metrics.wbtc_vault_balance.clone(),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("Failed to create wbtc vault balance: {}", e));
+
     let eth_bridge_status =
         EthBridgeStatus::new(eth_provider, eth_bridge_proxy_address, watchdog_metrics.eth_bridge_paused.clone());
 
@@ -154,6 +162,7 @@ async fn start_watchdog(
     let observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
         Box::new(eth_vault_balance),
         Box::new(usdt_vault_balance),
+        Box::new(wbtc_vault_balance),
         Box::new(eth_bridge_status),
         Box::new(sui_bridge_status),
     ];

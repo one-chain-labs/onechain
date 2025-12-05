@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::authority_per_epoch_store::{AuthorityPerEpochStore, LockDetails};
 use dashmap::{mapref::entry::Entry as DashMapEntry, DashMap};
 use mysten_common::*;
 use sui_types::{
@@ -15,6 +14,7 @@ use sui_types::{
 use tracing::{debug, info, instrument, trace};
 
 use super::writeback_cache::WritebackCache;
+use crate::authority::authority_per_epoch_store::{AuthorityPerEpochStore, LockDetails};
 
 type RefCount = usize;
 
@@ -95,7 +95,7 @@ impl ObjectLocks {
         };
 
         if prev_lock != new_lock {
-            debug!("lock conflict detected: {:?} != {:?}", prev_lock, new_lock);
+            debug!("lock conflict detected for {:?}: {:?} != {:?}", obj_ref, prev_lock, new_lock);
             Err(SuiError::ObjectLockConflict { obj_ref: *obj_ref, pending_transaction: prev_lock })
         } else {
             Ok(())
@@ -171,7 +171,7 @@ impl ObjectLocks {
     }
 
     #[instrument(level = "debug", skip_all)]
-    pub(crate) async fn acquire_transaction_locks(
+    pub(crate) fn acquire_transaction_locks(
         &self,
         cache: &WritebackCache,
         epoch_store: &AuthorityPerEpochStore,
@@ -235,7 +235,6 @@ impl ObjectLocks {
 #[cfg(test)]
 mod tests {
     use crate::execution_cache::{writeback_cache::writeback_cache_tests::Scenario, ExecutionCacheWrite};
-    use futures::FutureExt;
 
     #[tokio::test]
     async fn test_transaction_locks_are_exclusive() {
@@ -258,7 +257,6 @@ mod tests {
 
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx1.digest(), Some(tx1))
-                .await
                 .expect("locks should be available");
 
             // this tx doesn't use the actual objects in question, but we just need something
@@ -270,19 +268,16 @@ mod tests {
             // both locks are held by tx1, so this should fail
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx2.digest(), Some(tx2.clone()))
-                .await
                 .unwrap_err();
 
             // new3 is lockable, but new2 is not, so this should fail
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new3, new2], *tx2.digest(), Some(tx2.clone()))
-                .await
                 .unwrap_err();
 
             // new3 is unlocked
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new3], *tx2.digest(), Some(tx2.clone()))
-                .await
                 .expect("new3 should be unlocked");
         })
         .await;
@@ -311,14 +306,12 @@ mod tests {
             // fails because we are referring to an old object
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, old2], *tx.digest(), Some(tx.clone()))
-                .await
                 .unwrap_err();
 
             // succeeds because the above call releases the lock on new1 after failing
             // to get the lock on old2
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx.digest(), Some(tx.clone()))
-                .await
                 .expect("new1 should be unlocked after revert");
         })
         .await;
@@ -347,7 +340,6 @@ mod tests {
             // fails because we are referring to an old object
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, old2], *tx.digest(), Some(tx.clone()))
-                .await
                 .unwrap_err();
 
             // this tx doesn't use the actual objects in question, but we just need something
@@ -360,7 +352,6 @@ mod tests {
             // to get the lock on old2
             s.cache
                 .acquire_transaction_locks(&s.epoch_store, &[new1, new2], *tx2.digest(), Some(tx2))
-                .await
                 .expect("new1 should be unlocked after revert");
         })
         .await;
@@ -382,11 +373,7 @@ mod tests {
             let tx2 = s.make_signed_transaction(&outputs.transaction);
             // assert that acquire_transaction_locks is sync in non-simtest, which causes the
             // fail_point_async! macros above to be elided
-            s.cache
-                .acquire_transaction_locks(&s.epoch_store, &objects, *tx2.digest(), Some(tx2.clone()))
-                .now_or_never()
-                .unwrap()
-                .unwrap();
+            s.cache.acquire_transaction_locks(&s.epoch_store, &objects, *tx2.digest(), Some(tx2.clone())).unwrap();
         })
         .await;
     }

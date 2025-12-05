@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use jsonrpsee::core::RpcResult;
 use simulacrum::Simulacrum;
-use std::sync::Arc;
 use sui_indexer::{
     apis::read_api::ReadApi,
     indexer_reader::IndexerReader,

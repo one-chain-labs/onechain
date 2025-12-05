@@ -122,6 +122,11 @@ pub(crate) enum ConsensusError {
     #[error("Received unexpected block from peer {peer}: {requested:?} vs {received:?}")]
     UnexpectedBlockForCommit { peer: AuthorityIndex, requested: BlockRef, received: BlockRef },
 
+    #[error(
+        "Unexpected certified commit index and last committed index. Expected next commit index to be {expected_commit_index}, but found {commit_index}"
+    )]
+    UnexpectedCertifiedCommitIndex { expected_commit_index: CommitIndex, commit_index: CommitIndex },
+
     #[error("RocksDB failure: {0}")]
     RocksDBFailure(#[from] TypedStoreError),
 
@@ -136,9 +141,6 @@ pub(crate) enum ConsensusError {
 
     #[error("Failed to connect as client: {0:?}")]
     NetworkClientConnection(String),
-
-    #[error("Failed to connect as server: {0:?}")]
-    NetworkServerConnection(String),
 
     #[error("Failed to send request: {0:?}")]
     NetworkRequest(String),

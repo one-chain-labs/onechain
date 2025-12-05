@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ClientError;
+use std::collections::BTreeMap;
+
 use reqwest::{header, header::HeaderValue, Response};
 use serde_json::Value;
-use std::collections::BTreeMap;
 use sui_graphql_rpc_headers::LIMITS_HEADER;
 
 use super::response::GraphqlResponse;
+use crate::ClientError;
 
 #[derive(Clone, Debug)]
 pub struct GraphqlQueryVariable {
@@ -97,7 +98,7 @@ impl SimpleClient {
     }
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::result_large_err)]
 pub fn resolve_variables(
     vars: &[GraphqlQueryVariable],
 ) -> Result<(BTreeMap<String, String>, BTreeMap<String, Value>), ClientError> {
@@ -143,7 +144,7 @@ pub fn is_valid_variable_name(s: &str) -> bool {
 
     match fst {
         '_' => if s.len() > 1 {},
-        'a'..='z' | 'A'..='Z' => {}
+        'a' ..= 'z' | 'A' ..= 'Z' => {}
         _ => return false,
     }
 

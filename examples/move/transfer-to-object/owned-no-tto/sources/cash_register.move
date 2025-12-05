@@ -18,11 +18,11 @@
 module owned_no_tto::cash_register;
 
 use common::identified_payment::{Self, IdentifiedPayment};
-use one::{coin::{Self, Coin}, event, oct::OCT};
+use sui::{coin::{Self, Coin}, event, sui::SUI};
 
 public struct PaymentProcessed has copy, drop { payment_id: u64, amount: u64 }
 
-public fun process_payment(payment: IdentifiedPayment): Coin<OCT> {
+public fun process_payment(payment: IdentifiedPayment): Coin<SUI> {
     let (payment_id, coin) = identified_payment::unpack(payment);
     event::emit(PaymentProcessed { payment_id, amount: coin::value(&coin) });
     coin

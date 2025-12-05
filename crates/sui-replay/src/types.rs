@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use jsonrpsee::core::Error as JsonRpseeError;
+use std::fmt::Debug;
+
+use jsonrpsee::core::ClientError as JsonRpseeError;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use sui_json_rpc_types::{SuiEvent, SuiTransactionBlockEffects};
 use sui_protocol_config::{Chain, ProtocolVersion};
 use sui_sdk::error::Error as SuiRpcError;
@@ -45,6 +46,8 @@ pub struct OnChainTransactionInfo {
     pub modified_at_versions: Vec<(ObjectID, SequenceNumber)>,
     pub shared_object_refs: Vec<ObjectRef>,
     pub gas: Vec<(ObjectID, SequenceNumber, ObjectDigest)>,
+    #[serde(default)]
+    pub gas_owner: Option<SuiAddress>,
     pub gas_budget: u64,
     pub gas_price: u64,
     pub executed_epoch: u64,

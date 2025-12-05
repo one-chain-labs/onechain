@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TestCaseImpl, TestContext};
 use async_trait::async_trait;
 use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::{emit_new_random_u128, publish_basics_package};
 use tracing::info;
+
+use crate::{TestCaseImpl, TestContext};
 
 pub struct RandomBeaconTest;
 

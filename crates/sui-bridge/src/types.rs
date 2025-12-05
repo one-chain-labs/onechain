@@ -1,18 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    abi::EthToSuiTokenBridgeV1,
-    crypto::{
-        BridgeAuthorityPublicKey,
-        BridgeAuthorityPublicKeyBytes,
-        BridgeAuthorityRecoverableSignature,
-        BridgeAuthoritySignInfo,
-    },
-    encoding::BridgeMessageEncoding,
-    error::{BridgeError, BridgeResult},
-    events::EmittedSuiToEthTokenBridgeV1,
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
 };
+
 use enum_dispatch::enum_dispatch;
 pub use ethers::types::H256 as EthTransactionHash;
 use ethers::types::{Address as EthAddress, Log, H256};
@@ -24,10 +17,6 @@ use num_enum::TryFromPrimitive;
 use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::IntentScope;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt::Debug,
-};
 use strum_macros::Display;
 use sui_types::{
     base_types::SuiAddress,
@@ -52,6 +41,19 @@ use sui_types::{
     digests::{Digest, TransactionDigest},
     message_envelope::{Envelope, Message, VerifiedEnvelope},
     TypeTag,
+};
+
+use crate::{
+    abi::EthToSuiTokenBridgeV1,
+    crypto::{
+        BridgeAuthorityPublicKey,
+        BridgeAuthorityPublicKeyBytes,
+        BridgeAuthorityRecoverableSignature,
+        BridgeAuthoritySignInfo,
+    },
+    encoding::BridgeMessageEncoding,
+    error::{BridgeError, BridgeResult},
+    events::EmittedSuiToEthTokenBridgeV1,
 };
 
 pub const BRIDGE_AUTHORITY_TOTAL_VOTING_POWER: u64 = 10000;
@@ -587,17 +589,18 @@ impl TryFrom<MoveTypeParsedTokenTransferMessage> for ParsedTokenTransferMessage 
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
+    use ethers::types::Address as EthAddress;
+    use fastcrypto::traits::KeyPair;
+    use sui_types::{bridge::TOKEN_ID_BTC, crypto::get_key_pair};
+
+    use super::*;
     use crate::test_utils::{
         get_test_authority_and_key,
         get_test_eth_to_sui_bridge_action,
         get_test_sui_to_eth_bridge_action,
     };
-    use ethers::types::Address as EthAddress;
-    use fastcrypto::traits::KeyPair;
-    use std::collections::HashSet;
-    use sui_types::{bridge::TOKEN_ID_BTC, crypto::get_key_pair};
-
-    use super::*;
 
     #[test]
     fn test_bridge_committee_construction() -> anyhow::Result<()> {

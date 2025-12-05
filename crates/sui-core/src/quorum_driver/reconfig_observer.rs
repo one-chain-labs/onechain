@@ -1,6 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use sui_types::sui_system_state::{
+    epoch_start_sui_system_state::EpochStartSystemStateTrait,
+    SuiSystemState,
+    SuiSystemStateTrait,
+};
+use tokio::sync::broadcast::error::RecvError;
+use tracing::{info, warn};
+
 use super::AuthorityAggregatorUpdatable;
 use crate::{
     authority_aggregator::AuthAggMetrics,
@@ -9,15 +20,6 @@ use crate::{
     execution_cache::ObjectCacheRead,
     safe_client::SafeClientMetricsBase,
 };
-use async_trait::async_trait;
-use std::sync::Arc;
-use sui_types::sui_system_state::{
-    epoch_start_sui_system_state::EpochStartSystemStateTrait,
-    SuiSystemState,
-    SuiSystemStateTrait,
-};
-use tokio::sync::broadcast::error::RecvError;
-use tracing::{info, warn};
 
 #[async_trait]
 pub trait ReconfigObserver<A: Clone> {

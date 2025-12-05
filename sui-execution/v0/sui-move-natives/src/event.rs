@@ -1,14 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use std::collections::VecDeque;
+
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{gas_algebra::InternalGas, language_storage::TypeTag, vm_status::StatusCode};
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
 use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value};
 use smallvec::smallvec;
-use std::collections::VecDeque;
 use sui_types::error::VMMemoryLimitExceededSubStatusCode;
+
+use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 
 #[derive(Clone, Debug)]
 pub struct EventEmitCostParams {

@@ -166,6 +166,7 @@ mod tests {
     use reqwest::StatusCode;
     use wiremock::{MockServer, Request};
 
+    use super::*;
     use crate::{
         ingestion::{
             remote_client::tests::{respond_with, status},
@@ -173,8 +174,6 @@ mod tests {
         },
         metrics::tests::test_metrics,
     };
-
-    use super::*;
 
     async fn test_ingestion(
         uri: String,
@@ -185,7 +184,7 @@ mod tests {
         IngestionService::new(
             ClientArgs { remote_store_url: Some(Url::parse(&uri).unwrap()), local_ingestion_path: None },
             IngestionConfig { checkpoint_buffer_size, ingest_concurrency, ..Default::default() },
-            Arc::new(test_metrics()),
+            test_metrics(),
             cancel,
         )
         .unwrap()
@@ -198,7 +197,7 @@ mod tests {
     ) -> JoinHandle<Vec<u64>> {
         tokio::spawn(async move {
             let mut seqs = vec![];
-            for _ in 0..stop_after {
+            for _ in 0 .. stop_after {
                 tokio::select! {
                     _ = cancel.cancelled() => break,
                     Some(checkpoint) = rx.recv() => {
@@ -226,7 +225,7 @@ mod tests {
         let cancel = CancellationToken::new();
         let ingestion_service = test_ingestion(server.uri(), 1, 1, cancel.clone()).await;
 
-        let err = ingestion_service.run(0..).await.unwrap_err();
+        let err = ingestion_service.run(0 ..).await.unwrap_err();
         assert!(matches!(err, Error::NoSubscribers));
     }
 
@@ -244,7 +243,7 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(usize::MAX, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0..).await.unwrap();
+        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         cancel.cancel();
         subscriber.await.unwrap();
@@ -266,7 +265,7 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(1, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0..).await.unwrap();
+        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         cancel.cancelled().await;
         subscriber.await.unwrap();
@@ -288,7 +287,7 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(usize::MAX, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0..).await.unwrap();
+        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         cancel.cancelled().await;
         subscriber.await.unwrap();
@@ -308,8 +307,8 @@ mod tests {
             let mut times = times.lock().unwrap();
             *times += 1;
             match *times {
-                1..4 => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(*times)),
-                4..6 => status(StatusCode::NOT_FOUND),
+                1 .. 4 => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(*times)),
+                4 .. 6 => status(StatusCode::NOT_FOUND),
                 _ => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(*times)),
             }
         })
@@ -320,7 +319,7 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(5, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0..).await.unwrap();
+        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         cancel.cancelled().await;
         let seqs = subscriber.await.unwrap();
@@ -341,8 +340,8 @@ mod tests {
             let mut times = times.lock().unwrap();
             *times += 1;
             match *times {
-                1..4 => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(*times)),
-                4..6 => status(StatusCode::REQUEST_TIMEOUT),
+                1 .. 4 => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(*times)),
+                4 .. 6 => status(StatusCode::REQUEST_TIMEOUT),
                 _ => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(*times)),
             }
         })
@@ -353,7 +352,7 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(5, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0..).await.unwrap();
+        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         cancel.cancelled().await;
         let seqs = subscriber.await.unwrap();
@@ -391,7 +390,7 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(5, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0..).await.unwrap();
+        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         // At this point, the service will have been able to pass 3 checkpoints to the non-lagging
         // subscriber, while the laggard's buffer fills up. Now the laggard will pull two

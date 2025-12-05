@@ -1,6 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
+
 use anemo::{
     types::{PeerEvent, PeerInfo},
     Network,
@@ -14,11 +20,6 @@ use futures::StreamExt;
 use mysten_common::debug_fatal;
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::IntentScope;
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
 use sui_config::p2p::{AccessType, DiscoveryConfig, P2pConfig, SeedPeer};
 use sui_types::{
     crypto::{NetworkKeyPair, Signer, ToFromBytes, VerifyingKey},

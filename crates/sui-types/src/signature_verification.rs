@@ -1,7 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{hash::Hash, sync::Arc};
+
+use lru::LruCache;
 use nonempty::NonEmpty;
+use parking_lot::RwLock;
+use prometheus::IntCounter;
 use shared_crypto::intent::Intent;
 
 use crate::{
@@ -11,10 +16,6 @@ use crate::{
     signature::VerifyParams,
     transaction::{SenderSignedData, TransactionDataAPI},
 };
-use lru::LruCache;
-use parking_lot::RwLock;
-use prometheus::IntCounter;
-use std::{hash::Hash, sync::Arc};
 
 // Cache up to 20000 verified certs. We will need to tune this number in the future - a decent
 // guess to start with is that it should be 10-20 times larger than peak transactions per second,

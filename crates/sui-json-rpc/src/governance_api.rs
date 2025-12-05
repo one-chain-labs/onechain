@@ -7,8 +7,6 @@ use async_trait::async_trait;
 use cached::{proc_macro::cached, SizedCache};
 use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use tracing::{info, instrument};
-
 use mysten_metrics::spawn_monitored_task;
 use sui_core::authority::AuthorityState;
 use sui_json_rpc_api::{GovernanceReadApiOpenRpc, GovernanceReadApiServer, JsonRpcMetrics};
@@ -19,7 +17,7 @@ use sui_types::{
     committee::EpochId,
     dynamic_field::get_dynamic_field_from_store,
     error::{SuiError, UserInputError},
-    governance::StakedOct,
+    governance::StakedSui,
     id::ID,
     object::ObjectRead,
     sui_serde::BigInt,
@@ -31,6 +29,7 @@ use sui_types::{
         SuiSystemStateTrait,
     },
 };
+use tracing::{info, instrument};
 
 use crate::{
     authority_state::StateRead,
@@ -51,19 +50,19 @@ impl GovernanceReadApi {
         Self { state, metrics }
     }
 
-    async fn get_staked_oct(&self, owner: SuiAddress) -> Result<Vec<StakedOct>, Error> {
+    async fn get_staked_sui(&self, owner: SuiAddress) -> Result<Vec<StakedSui>, Error> {
         let state = self.state.clone();
-        let result = spawn_monitored_task!(async move { state.get_staked_oct(owner).await }).await??;
+        let result = spawn_monitored_task!(async move { state.get_staked_sui(owner).await }).await??;
 
         self.metrics.get_stake_sui_result_size.observe(result.len() as f64);
         self.metrics.get_stake_sui_result_size_total.inc_by(result.len() as u64);
         Ok(result)
     }
 
-    async fn get_stakes_by_ids(&self, staked_oct_ids: Vec<ObjectID>) -> Result<Vec<DelegatedStake>, Error> {
+    async fn get_stakes_by_ids(&self, staked_sui_ids: Vec<ObjectID>) -> Result<Vec<DelegatedStake>, Error> {
         let state = self.state.clone();
         let stakes_read = spawn_monitored_task!(async move {
-            staked_oct_ids.iter().map(|id| state.get_object_read(id)).collect::<Result<Vec<_>, _>>()
+            staked_sui_ids.iter().map(|id| state.get_object_read(id)).collect::<Result<Vec<_>, _>>()
         })
         .await??;
 
@@ -71,13 +70,13 @@ impl GovernanceReadApi {
             return Ok(vec![]);
         }
 
-        let mut stakes: Vec<(StakedOct, bool)> = vec![];
+        let mut stakes: Vec<(StakedSui, bool)> = vec![];
         for stake in stakes_read.into_iter() {
             match stake {
-                ObjectRead::Exists(_, o, _) => stakes.push((StakedOct::try_from(&o)?, true)),
+                ObjectRead::Exists(_, o, _) => stakes.push((StakedSui::try_from(&o)?, true)),
                 ObjectRead::Deleted(oref) => {
                     match self.state.find_object_lt_or_eq_version(&oref.0, &oref.1.one_before().unwrap()).await? {
-                        Some(o) => stakes.push((StakedOct::try_from(&o)?, false)),
+                        Some(o) => stakes.push((StakedSui::try_from(&o)?, false)),
                         None => Err(SuiRpcInputError::UserInputError(UserInputError::ObjectNotFound {
                             object_id: oref.0,
                             version: None,
@@ -96,7 +95,7 @@ impl GovernanceReadApi {
 
     async fn get_stakes(&self, owner: SuiAddress) -> Result<Vec<DelegatedStake>, Error> {
         let timer = self.metrics.get_stake_sui_latency.start_timer();
-        let stakes = self.get_staked_oct(owner).await?;
+        let stakes = self.get_staked_sui(owner).await?;
         if stakes.is_empty() {
             return Ok(vec![]);
         }
@@ -108,7 +107,7 @@ impl GovernanceReadApi {
         spawn_monitored_task!(self_clone.get_delegated_stakes(stakes.into_iter().map(|s| (s, true)).collect())).await?
     }
 
-    async fn get_delegated_stakes(&self, stakes: Vec<(StakedOct, bool)>) -> Result<Vec<DelegatedStake>, Error> {
+    async fn get_delegated_stakes(&self, stakes: Vec<(StakedSui, bool)>) -> Result<Vec<DelegatedStake>, Error> {
         let pools = stakes.into_iter().fold(BTreeMap::<_, Vec<_>>::new(), |mut pools, (stake, exists)| {
             pools.entry(stake.pool_id()).or_default().push((stake, exists));
             pools
@@ -162,12 +161,11 @@ impl GovernanceReadApi {
                     StakeStatus::Pending
                 };
                 delegations.push(Stake {
-                    staked_oct_id: stake.id(),
+                    staked_sui_id: stake.id(),
                     // TODO: this might change when we implement warm up period.
                     stake_request_epoch: stake.activation_epoch() - 1,
                     stake_active_epoch: stake.activation_epoch(),
                     principal: stake.principal(),
-                    lock: stake.lock(),
                     status,
                 })
             }
@@ -188,8 +186,8 @@ impl GovernanceReadApi {
 #[async_trait]
 impl GovernanceReadApiServer for GovernanceReadApi {
     #[instrument(skip(self))]
-    async fn get_stakes_by_ids(&self, staked_oct_ids: Vec<ObjectID>) -> RpcResult<Vec<DelegatedStake>> {
-        with_tracing!(async move { self.get_stakes_by_ids(staked_oct_ids).await })
+    async fn get_stakes_by_ids(&self, staked_sui_ids: Vec<ObjectID>) -> RpcResult<Vec<DelegatedStake>> {
+        with_tracing!(async move { self.get_stakes_by_ids(staked_sui_ids).await })
     }
 
     #[instrument(skip(self))]
@@ -224,7 +222,7 @@ impl GovernanceReadApiServer for GovernanceReadApi {
         info!("get_validator_apy");
         let system_state_summary: SuiSystemStateSummary = self.get_latest_sui_system_state().await?;
 
-        let exchange_rate_table = exchange_rates(&self.state, system_state_summary.epoch).await.map_err(Error::from)?;
+        let exchange_rate_table = exchange_rates(&self.state, system_state_summary.epoch).await?;
 
         let apys = calculate_apys(system_state_summary.stake_subsidy_start_epoch, exchange_rate_table);
 
@@ -396,7 +394,7 @@ fn backfill_rates(rates: Vec<(EpochId, PoolTokenExchangeRate)>) -> Vec<(EpochId,
     let mut filled_rates = Vec::new();
     let mut prev_rate = None;
 
-    for epoch in min_epoch..=max_epoch {
+    for epoch in min_epoch ..= max_epoch {
         match rates.iter().find(|(e, _)| *e == epoch) {
             Some((e, rate)) => {
                 prev_rate = Some(rate.clone());
@@ -425,8 +423,9 @@ impl SuiRpcModule for GovernanceReadApi {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sui_types::sui_system_state::PoolTokenExchangeRate;
+
+    use super::*;
 
     #[test]
     fn test_backfill_rates_empty() {

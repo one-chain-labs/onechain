@@ -8,9 +8,9 @@
 //!   so its on the bottom of the dependency relation, and there is no `utility` crate
 //!   where it could belong to.
 
-use std::collections::{BTreeMap, Bound};
+use std::collections::BTreeMap;
 
-use codespan::{ByteIndex, ByteOffset, ColumnIndex, Files, LineIndex, RawIndex, RawOffset};
+use codespan::{ByteIndex, ByteOffset, RawIndex, RawOffset};
 
 use crate::model::Loc;
 use std::cell::RefCell;
@@ -90,7 +90,13 @@ impl CodeWriter {
             .collect();
         data.output_location_map = std::mem::take(&mut data.output_location_map)
             .into_iter()
-            .map(|(i, loc)| if i > index { (i + shift, loc) } else { (i, loc) })
+            .map(|(i, loc)| {
+                if i > index {
+                    (i + shift, loc)
+                } else {
+                    (i, loc)
+                }
+            })
             .collect();
         // Insert text.
         data.output.insert_str(index.0 as usize, s);
@@ -134,32 +140,6 @@ impl CodeWriter {
         }
     }
 
-    /// Given a byte index in the written output, return the best approximation of the source
-    /// which generated this output.
-    pub fn get_source_location(&self, output_index: ByteIndex) -> Option<Loc> {
-        let data = self.0.borrow();
-        if let Some(loc) = data
-            .output_location_map
-            .range((Bound::Unbounded, Bound::Included(&output_index)))
-            .next_back()
-            .map(|(_, v)| v)
-        {
-            return Some(loc.clone());
-        }
-        None
-    }
-
-    /// Given line/column location, determine ByteIndex of that location.
-    pub fn get_output_byte_index(&self, line: LineIndex, column: ColumnIndex) -> Option<ByteIndex> {
-        self.process_result(|s| {
-            let mut fmap = Files::new();
-            let id = fmap.add("dummy", s);
-            fmap.line_span(id, line)
-                .ok()
-                .map(|line_span| ByteIndex((line_span.start().to_usize() + column.to_usize()) as u32))
-        })
-    }
-
     /// Indents any subsequently written output. The current line of output and any subsequent ones
     /// will be indented. Note this works after the last output was `\n` but the line is still
     /// empty.
@@ -188,7 +168,11 @@ impl CodeWriter {
     /// Emit a string. The string will be broken down into lines to apply current indentation.
     pub fn emit(&self, s: &str) {
         let rewritten = (*self.0.borrow().emit_hook)(s);
-        let s = if let Some(r) = &rewritten { r.as_str() } else { s };
+        let s = if let Some(r) = &rewritten {
+            r.as_str()
+        } else {
+            s
+        };
         let mut first = true;
         // str::lines ignores trailing newline, so deal with this ad-hoc
         let end_newl = s.ends_with('\n');

@@ -2,6 +2,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use move_core_types::ident_str;
+use sui_macros::{register_fail_point_arg, sim_test};
+use sui_protocol_config::{Chain, PerObjectCongestionControlMode, ProtocolConfig, ProtocolVersion};
+use sui_types::{
+    base_types::{ConsensusObjectSequenceKey, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
+    crypto::{get_key_pair, AccountKeyPair},
+    digests::TransactionDigest,
+    effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
+    executable_transaction::VerifiedExecutableTransaction,
+    execution_status::{CongestedObjects, ExecutionFailureStatus, ExecutionStatus},
+    object::Object,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
+    transaction::{ObjectArg, Transaction},
+};
+
 use crate::{
     authority::{
         authority_tests::{
@@ -16,21 +33,6 @@ use crate::{
         AuthorityState,
     },
     move_call,
-};
-use move_core_types::ident_str;
-use std::sync::Arc;
-use sui_macros::{register_fail_point_arg, sim_test};
-use sui_protocol_config::{Chain, PerObjectCongestionControlMode, ProtocolConfig, ProtocolVersion};
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    crypto::{get_key_pair, AccountKeyPair},
-    digests::TransactionDigest,
-    effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
-    executable_transaction::VerifiedExecutableTransaction,
-    execution_status::{CongestedObjects, ExecutionFailureStatus, ExecutionStatus},
-    object::Object,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{ObjectArg, Transaction},
 };
 
 pub const TEST_ONLY_GAS_PRICE: u64 = 1000;
@@ -117,7 +119,7 @@ impl TestSetup {
         create_shared_object_effects.created()[0].0
     }
 
-    // Creates a owned object in `setup_authority_state` and returns the object reference.
+    // Creates an owned object in `setup_authority_state` and returns the object reference.
     async fn create_owned_object(&self) -> ObjectRef {
         let mut builder = ProgrammableTransactionBuilder::new();
         move_call! {
@@ -179,8 +181,8 @@ async fn update_objects(
     sender: &SuiAddress,
     sender_key: &AccountKeyPair,
     gas_object_id: &ObjectID,
-    shared_object_1: &(ObjectID, SequenceNumber),
-    shared_object_2: &(ObjectID, SequenceNumber),
+    shared_object_1: &ConsensusObjectSequenceKey,
+    shared_object_2: &ConsensusObjectSequenceKey,
     owned_object: &ObjectRef,
 ) -> (Transaction, TransactionEffects) {
     let mut txn_builder = ProgrammableTransactionBuilder::new();
@@ -249,10 +251,11 @@ async fn test_congestion_control_execution_cancellation() {
             Some(1000), // Not used.
             None,       // Not used.
             0,          // Disable overage.
+            0,
         ))
     });
 
-    // Runs a transaction that touches shared_object_1, shared_object_2 and a owned object.
+    // Runs a transaction that touches shared_object_1, shared_object_2 and an owned object.
     let (congested_tx, effects) = update_objects(
         &authority_state,
         &test_setup.package,
@@ -283,12 +286,11 @@ async fn test_congestion_control_execution_cancellation() {
     let cert = certify_shared_obj_transaction_no_execution(&authority_state_2, congested_tx).await.unwrap();
     authority_state_2
         .epoch_store_for_testing()
-        .acquire_shared_locks_from_effects(
+        .acquire_shared_version_assignments_from_effects(
             &VerifiedExecutableTransaction::new_from_certificate(cert.clone()),
             &effects,
             authority_state_2.get_object_cache_reader().as_ref(),
         )
-        .await
         .unwrap();
     let (effects_2, execution_error) = authority_state_2.try_execute_for_test(&cert).await.unwrap();
 

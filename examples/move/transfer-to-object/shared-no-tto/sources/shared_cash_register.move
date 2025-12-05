@@ -5,7 +5,7 @@ module shared_no_tto::shared_cash_register;
 
 use common::identified_payment::{Self, IdentifiedPayment};
 use std::string::String;
-use one::{coin::Coin, dynamic_field, oct::OCT, vec_set::{Self, VecSet}};
+use sui::{coin::Coin, dynamic_field, sui::SUI, vec_set::{Self, VecSet}};
 
 const EInvalidOwner: u64 = 0;
 const EInvalidPaymentID: u64 = 1;
@@ -76,12 +76,12 @@ public fun update_authorized_individuals(
 
 /// Process a payment that has been made, removing it from the register and
 /// returning the coin that can then be combined or sent elsewhere by the authorized individual.
-/// Payments can only be processed by either an account in the / `authorized_individuals` set or by the owner of the cash register.
+/// Payments can only be processed by either an account in the `authorized_individuals` set or by the owner of the cash register.
 public fun process_payment(
     register: &mut CashRegister,
     payment_id: u64,
     ctx: &TxContext,
-): Coin<OCT> {
+): Coin<SUI> {
     let sender = tx_context::sender(ctx);
     assert!(
         vec_set::contains(&register.authorized_individuals, &sender) || sender == register.register_owner,
@@ -95,6 +95,6 @@ public fun process_payment(
 
 /// Make a payment to the cash register -- this is the function that the
 /// customer will use to make a payment to the cash register.
-public fun pay(register: &mut CashRegister, payment_id: u64, coin: Coin<OCT>, ctx: &mut TxContext) {
+public fun pay(register: &mut CashRegister, payment_id: u64, coin: Coin<SUI>, ctx: &mut TxContext) {
     identified_payment::make_shared_payment(&mut register.id, payment_id, coin, ctx);
 }

@@ -53,7 +53,7 @@ impl Default for RandomMutator {
 
 impl TransactionKindMutator for RandomMutator {
     fn mutate(&mut self, transaction_kind: &TransactionKind) -> Option<TransactionKind> {
-        for _ in 0..self.num_tries {
+        for _ in 0 .. self.num_tries {
             if let Some(mutator) = self.select_mutator() {
                 return mutator.mutate(transaction_kind);
             }

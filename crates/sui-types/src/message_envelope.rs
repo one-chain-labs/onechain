@@ -1,6 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    fmt::{Debug, Display, Formatter},
+    ops::{Deref, DerefMut},
+};
+
+use fastcrypto::traits::KeyPair;
+use once_cell::sync::OnceCell;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_name::{DeserializeNameAdapter, SerializeNameAdapter};
+use shared_crypto::intent::{Intent, IntentScope};
+
 use crate::{
     base_types::AuthorityName,
     committee::{Committee, EpochId},
@@ -18,15 +29,6 @@ use crate::{
     executable_transaction::CertificateProof,
     messages_checkpoint::CheckpointSequenceNumber,
     transaction::SenderSignedData,
-};
-use fastcrypto::traits::KeyPair;
-use once_cell::sync::OnceCell;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_name::{DeserializeNameAdapter, SerializeNameAdapter};
-use shared_crypto::intent::{Intent, IntentScope};
-use std::{
-    fmt::{Debug, Display, Formatter},
-    ops::{Deref, DerefMut},
 };
 
 pub trait Message {

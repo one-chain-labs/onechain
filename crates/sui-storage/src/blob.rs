@@ -1,15 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    io::{Read, Write},
+    marker::PhantomData,
+};
+
 use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;
 use integer_encoding::{VarInt, VarIntReader};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    io::{Read, Write},
-    marker::PhantomData,
-};
 
 pub const MAX_VARINT_LENGTH: usize = 10;
 pub const BLOB_ENCODING_BYTES: usize = 1;
@@ -58,10 +59,10 @@ impl Blob {
         let mut buf = [0u8; MAX_VARINT_LENGTH];
         let mut counter = 0;
         let n = (self.data.len() as u64).encode_var(&mut buf);
-        wbuf.write_all(&buf[0..n])?;
+        wbuf.write_all(&buf[0 .. n])?;
         counter += n;
         buf[0] = self.encoding.into();
-        wbuf.write_all(&buf[0..BLOB_ENCODING_BYTES])?;
+        wbuf.write_all(&buf[0 .. BLOB_ENCODING_BYTES])?;
         counter += 1;
         wbuf.write_all(&self.data)?;
         counter += self.data.len();

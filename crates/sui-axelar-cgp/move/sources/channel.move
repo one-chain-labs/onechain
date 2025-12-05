@@ -3,9 +3,9 @@
 
 module axelar::channel {
     use std::string::String;
-    use one::linked_table::{Self, LinkedTable};
-    use one::object::{Self, UID};
-    use one::tx_context::TxContext;
+    use sui::linked_table::{Self, LinkedTable};
+    use sui::object::{Self, UID};
+    use sui::tx_context::TxContext;
 
     /// Generic target for the messaging system.
     ///
@@ -160,7 +160,7 @@ module axelar::channel {
 
     /// Get the bytes of the Channel address
     public fun source_id<T: store>(self: &Channel<T>): vector<u8> {
-        one::bcs::to_bytes(&self.id)
+        sui::bcs::to_bytes(&self.id)
     }
 
     // === Testing ===

@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{base_types::SuiAddress, ObjectID};
+use std::fmt::{self, Display, Formatter};
+
 use move_binary_format::file_format::{CodeOffset, TypeParameterIndex};
 use move_core_types::language_storage::ModuleId;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display, Formatter};
 use sui_macros::EnumVariantOrder;
 use thiserror::Error;
+
+use crate::{base_types::SuiAddress, ObjectID};
 
 #[cfg(test)]
 #[path = "unit_tests/execution_status_tests.rs"]
@@ -341,6 +343,18 @@ impl ExecutionStatus {
                 panic!("Unable to unwrap() on {:?}", self);
             }
             ExecutionStatus::Failure { error, command } => (error, command),
+        }
+    }
+
+    pub fn get_congested_objects(&self) -> Option<&CongestedObjects> {
+        if let ExecutionStatus::Failure {
+            error: ExecutionFailureStatus::ExecutionCancelledDueToSharedObjectCongestion { congested_objects },
+            ..
+        } = self
+        {
+            Some(congested_objects)
+        } else {
+            None
         }
     }
 }

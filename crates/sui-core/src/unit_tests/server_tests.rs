@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use sui_types::{
+    base_types::{dbg_addr, dbg_object_id},
+    messages_grpc::LayoutGenerationOption,
+};
+
 use super::*;
 use crate::{
     authority::authority_tests::init_state_with_object_id,
     authority_client::{AuthorityAPI, NetworkAuthorityClient},
-};
-use sui_types::{
-    base_types::{dbg_addr, dbg_object_id},
-    messages_grpc::LayoutGenerationOption,
 };
 
 //This is the most basic example of how to test the server logic

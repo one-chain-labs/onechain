@@ -32,7 +32,7 @@ pub const TRANSFER_IMPL_FUNCTIONS: &[&IdentStr] = &[
     ident_str!("receive_impl"),
 ];
 
-/// All transfer functions (the functions in `one::transfer`) are "private" in that they are
+/// All transfer functions (the functions in `sui::transfer`) are "private" in that they are
 /// restricted to the module.
 /// For example, with `transfer::transfer<T>(...)`, either:
 /// - `T` must be a type declared in the current module or
@@ -48,7 +48,7 @@ pub fn verify_module(module: &CompiledModule, verifier_config: &VerifierConfig) 
         // transactional execution and needs to allow test code to bypass private generics
         return Ok(());
     }
-    // do not need to check the one::transfer module itself
+    // do not need to check the sui::transfer module itself
     for func_def in &module.function_defs {
         verify_function(module, func_def, verifier_config.allow_receiving_object_id).map_err(|error| {
             verification_failure(format!(
@@ -100,7 +100,7 @@ fn verify_private_transfer(
         PUBLIC_TRANSFER_FUNCTIONS
     } else {
         // Before protocol version 33, the `receiving_object_id` function was not public
-        &PUBLIC_TRANSFER_FUNCTIONS[..PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
+        &PUBLIC_TRANSFER_FUNCTIONS[.. PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
     };
     let self_handle = view.module_handle_at(view.self_handle_idx());
     if addr_module(view, self_handle) == (SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) {

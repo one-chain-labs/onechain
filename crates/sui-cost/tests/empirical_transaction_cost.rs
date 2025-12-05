@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeMap, path::PathBuf};
+
 use insta::assert_json_snapshot;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::PathBuf};
 use strum_macros::{Display, EnumString};
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
@@ -94,10 +95,10 @@ async fn create_txes(test_cluster: &TestCluster) -> BTreeMap<CommonTransactionCo
     // Transfer Whole Sui Coin and Transfer Portion of Sui Coin
     //
     let whole_sui_coin_tx = TestTransactionBuilder::new(sender, gas_objects.pop().unwrap(), gas_price)
-        .transfer_oct(None, SuiAddress::default())
+        .transfer_sui(None, SuiAddress::default())
         .build();
     let partial_sui_coin_tx = TestTransactionBuilder::new(sender, gas_objects.pop().unwrap(), gas_price)
-        .transfer_oct(Some(10), SuiAddress::default())
+        .transfer_sui(Some(10), SuiAddress::default())
         .build();
     ret.insert(CommonTransactionCosts::TransferWholeSuiCoin, whole_sui_coin_tx);
     ret.insert(CommonTransactionCosts::TransferPortionSuiCoin, partial_sui_coin_tx);
@@ -130,7 +131,7 @@ async fn create_txes(test_cluster: &TestCluster) -> BTreeMap<CommonTransactionCo
     // Split A Coin Into N Specific Amounts
     // Note splitting complexity does not depend on the amounts but only on the number of amounts
     //
-    for n in 0..4 {
+    for n in 0 .. 4 {
         let gas = gas_objects.pop().unwrap();
         let coin = gas_objects.pop().unwrap();
         let split_tx = split_n_tx(n, gas, coin, gas_price, sender).await.clone();

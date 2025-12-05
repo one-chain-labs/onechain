@@ -257,13 +257,12 @@ impl<T: BenchmarkType> MeasurementsCollection<T> {
 mod test {
     use std::{collections::HashMap, time::Duration};
 
+    use super::{BenchmarkParameters, Measurement, MeasurementsCollection};
     use crate::{
         benchmark::test::TestBenchmarkType,
         protocol::test_protocol_metrics::TestProtocolMetrics,
         settings::Settings,
     };
-
-    use super::{BenchmarkParameters, Measurement, MeasurementsCollection};
 
     #[test]
     fn average_latency() {

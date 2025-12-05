@@ -2,8 +2,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use shared_crypto::intent::{Intent, IntentMessage};
 use std::net::SocketAddr;
+
+use shared_crypto::intent::{Intent, IntentMessage};
 use sui_core::authority_client::AuthorityAPI;
 use sui_macros::sim_test;
 use sui_protocol_config::ProtocolConfig;
@@ -44,7 +45,7 @@ async fn build_zklogin_tx(test_cluster: &TestCluster, max_epoch: EpochId) -> Tra
 
     let rgp = test_cluster.get_reference_gas_price().await;
     let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_sui(None, SuiAddress::ZERO).build();
 
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);
@@ -145,7 +146,7 @@ async fn test_expired_zklogin_sig() {
     let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
     let context = &test_cluster.wallet;
 
-    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_sui(None, SuiAddress::ZERO).build();
 
     let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
     let eph_sig = Signature::new_secure(&msg, kp);
@@ -214,11 +215,12 @@ async fn test_create_authenticator_state_object() {
 #[cfg(msim)]
 #[sim_test]
 async fn test_conflicting_jwks() {
-    use futures::StreamExt;
     use std::{
         collections::HashSet,
         sync::{Arc, Mutex},
     };
+
+    use futures::StreamExt;
     use sui_json_rpc_types::{SuiTransactionBlockEffectsAPI, TransactionFilter};
     use sui_types::{
         base_types::ObjectID,
@@ -260,7 +262,7 @@ async fn test_conflicting_jwks() {
         });
     });
 
-    for _ in 0..5 {
+    for _ in 0 .. 5 {
         test_cluster.wait_for_epoch(None).await;
     }
 

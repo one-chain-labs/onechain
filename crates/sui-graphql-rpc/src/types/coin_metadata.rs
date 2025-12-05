@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::{connection::Connection, *};
+use sui_types::{
+    coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap},
+    gas_coin::{GAS, TOTAL_SUPPLY_SUI},
+    TypeTag,
+};
+
 use super::{
     balance::{self, Balance},
     base64::Base64,
@@ -12,7 +19,7 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedOct,
+    stake::StakedSui,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -20,12 +27,6 @@ use super::{
     uint53::UInt53,
 };
 use crate::{connection::ScanConnection, data::Db, error::Error};
-use async_graphql::{connection::Connection, *};
-use sui_types::{
-    coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap},
-    gas_coin::{GAS, TOTAL_SUPPLY_OCT},
-    TypeTag,
-};
 
 pub(crate) struct CoinMetadata {
     pub super_: MoveObject,
@@ -58,7 +59,7 @@ impl CoinMetadata {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::oct::OCT`.
+    /// it defaults to `0x2::sui::SUI`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
@@ -77,7 +78,7 @@ impl CoinMetadata {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -90,16 +91,16 @@ impl CoinMetadata {
         OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
-    pub(crate) async fn staked_octs(
+    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(&self.super_.super_).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -343,7 +344,7 @@ impl CoinMetadata {
         };
 
         Ok(Some(if GAS::is_gas(coin_struct.as_ref()) {
-            TOTAL_SUPPLY_OCT
+            TOTAL_SUPPLY_SUI
         } else {
             let cap_type = TreasuryCap::type_(*coin_struct);
             let Some(object) = Object::query_singleton(db, cap_type, checkpoint_viewed_at).await? else {

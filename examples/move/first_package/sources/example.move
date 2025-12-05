@@ -5,9 +5,9 @@
 module my_first_package::example;
 
 // Part 1: These imports are provided by default
-// use one::object::{Self, UID};
-// use one::transfer;
-// use one::tx_context::{Self, TxContext};
+// use sui::object::{Self, UID};
+// use sui::transfer;
+// use sui::tx_context::{Self, TxContext};
 
 // Part 2: struct definitions
 public struct Sword has key, store {
@@ -95,7 +95,7 @@ fun test_sword_create() {
 
 #[test]
 fun test_sword_transactions() {
-    use one::test_scenario;
+    use sui::test_scenario;
 
     // Create test addresses representing users
     let initial_owner = @0xCAFE;
@@ -133,7 +133,7 @@ fun test_sword_transactions() {
 
 #[test]
 fun test_module_init() {
-    use one::test_scenario;
+    use sui::test_scenario;
 
     // Create test addresses representing users
     let admin = @0xAD;

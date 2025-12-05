@@ -12,22 +12,25 @@ mod pay_sui;
 mod query_transactions;
 mod rpc_command_processor;
 mod validation;
-use strum_macros::EnumString;
+use core::default::Default;
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use core::default::Default;
-use std::time::Duration;
-use sui_types::{base_types::SuiAddress, digests::TransactionDigest, messages_checkpoint::CheckpointSequenceNumber};
-
-use crate::load_test::LoadTestConfig;
 pub use rpc_command_processor::{
     load_addresses_from_file,
     load_digests_from_file,
     load_objects_from_file,
     RpcCommandProcessor,
 };
-use sui_types::base_types::ObjectID;
+use strum_macros::EnumString;
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    digests::TransactionDigest,
+    messages_checkpoint::CheckpointSequenceNumber,
+};
+
+use crate::load_test::LoadTestConfig;
 
 #[derive(Default, Clone)]
 pub struct SignerInfo {
@@ -66,8 +69,8 @@ impl Command {
         Self { data: CommandData::DryRun(DryRun {}), ..Default::default() }
     }
 
-    pub fn new_pay_oct() -> Self {
-        Self { data: CommandData::PayOct(PayOct {}), ..Default::default() }
+    pub fn new_pay_sui() -> Self {
+        Self { data: CommandData::PaySui(PaySui {}), ..Default::default() }
     }
 
     pub fn new_get_checkpoints(
@@ -135,7 +138,7 @@ impl Command {
 pub enum CommandData {
     DryRun(DryRun),
     GetCheckpoints(GetCheckpoints),
-    PayOct(PayOct),
+    PaySui(PaySui),
     QueryTransactionBlocks(QueryTransactionBlocks),
     MultiGetTransactionBlocks(MultiGetTransactionBlocks),
     MultiGetObjects(MultiGetObjects),
@@ -165,7 +168,7 @@ pub struct GetCheckpoints {
 }
 
 #[derive(Clone)]
-pub struct PayOct {}
+pub struct PaySui {}
 
 #[derive(Clone, Default)]
 pub struct QueryTransactionBlocks {

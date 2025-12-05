@@ -5,7 +5,7 @@
 /// associated logic.
 module hero::example;
 
-use one::{balance::{Self, Balance}, coin::{Self, Coin}, event, oct::OCT};
+use sui::{balance::{Self, Balance}, coin::{Self, Coin}, event, sui::SUI};
 
 /// Our hero!
 public struct Hero has key, store {
@@ -56,7 +56,7 @@ public struct Boar has key, store {
 /// payments for player actions for the admin to collect.
 public struct Game has key {
     id: UID,
-    payments: Balance<OCT>,
+    payments: Balance<SUI>,
 }
 
 /// Capability conveying the authority to create boars and potions, and take
@@ -122,7 +122,7 @@ const ENotEquipped: u64 = 7;
 /// It all starts with the sword. Anyone can buy a sword, and proceeds are
 /// stored in the `Game`. Amount of magic in the sword depends on how much
 /// you pay for it.
-public fun new_sword(game: &mut Game, payment: Coin<OCT>, ctx: &mut TxContext): Sword {
+public fun new_sword(game: &mut Game, payment: Coin<SUI>, ctx: &mut TxContext): Sword {
     let value = coin::value(&payment);
     // ensure the user pays enough for the sword
     assert!(value >= MIN_SWORD_COST, EInsufficientFunds);
@@ -292,14 +292,14 @@ public fun unequip(hero: &mut Hero): Sword {
 // === Payments ===
 
 /// The owner of the `Admin` object can extract payment from the `Game`.
-public fun take_payment(admin: &Admin, game: &mut Game, ctx: &mut TxContext): Coin<OCT> {
+public fun take_payment(admin: &Admin, game: &mut Game, ctx: &mut TxContext): Coin<SUI> {
     assert!(admin.game_id == object::id(game), ENotAdmin);
     coin::from_balance(balance::withdraw_all(&mut game.payments), ctx)
 }
 
 // === Tests ===
 #[test_only]
-use one::test_scenario as ts;
+use sui::test_scenario as ts;
 
 #[test]
 fun slay_boar_test() {

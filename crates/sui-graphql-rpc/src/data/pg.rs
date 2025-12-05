@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::QueryExecutor;
-use crate::{config::Limits, error::Error, metrics::Metrics};
+use std::{fmt, time::Instant};
+
 use async_trait::async_trait;
 use diesel::{
     pg::Pg,
@@ -14,10 +14,11 @@ use diesel_async::{
     scoped_futures::{ScopedBoxFuture, ScopedFutureExt},
     RunQueryDsl,
 };
-use std::{fmt, time::Instant};
 use sui_indexer::indexer_reader::IndexerReader;
-
 use tracing::error;
+
+use super::QueryExecutor;
+use crate::{config::Limits, error::Error, metrics::Metrics};
 
 #[derive(Clone)]
 pub(crate) struct PgExecutor {
@@ -111,7 +112,7 @@ impl QueryExecutor for PgExecutor {
 }
 
 #[async_trait]
-impl<'c> super::DbConnection for PgConnection<'c> {
+impl super::DbConnection for PgConnection<'_> {
     type Backend = Pg;
     type Connection = diesel_async::AsyncPgConnection;
 
@@ -152,13 +153,13 @@ pub(crate) fn bytea_literal(slice: &[u8]) -> ByteaLiteral<'_> {
 
 /// Support for calculating estimated query cost using EXPLAIN and then logging it.
 mod query_cost {
-    use super::*;
-
     use diesel::{query_builder::AstPass, sql_types::Text, QueryResult};
     use diesel_async::AsyncPgConnection;
     use serde_json::Value;
     use tap::{TapFallible, TapOptional};
     use tracing::{debug, info, warn};
+
+    use super::*;
 
     #[derive(Debug, Clone, Copy, QueryId)]
     struct Explained<Q> {
@@ -215,7 +216,6 @@ mod query_cost {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use diesel::QueryDsl;
     use sui_framework::BuiltInFramework;
     use sui_indexer::{
@@ -225,7 +225,9 @@ mod tests {
         schema::objects,
         types::IndexedObject,
     };
-    use sui_pg_temp_db::TempDb;
+    use sui_pg_db::temp::TempDb;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_query_cost() {

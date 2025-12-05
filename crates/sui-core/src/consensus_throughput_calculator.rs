@@ -1,17 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::authority::AuthorityMetrics;
-use arc_swap::ArcSwap;
-use narwhal_types::TimestampMs;
-use parking_lot::Mutex;
+
 use std::{
     collections::{BTreeMap, VecDeque},
     num::NonZeroU64,
     sync::Arc,
 };
+
+use arc_swap::ArcSwap;
+use parking_lot::Mutex;
 use sui_protocol_config::Chain;
-use sui_types::digests::ChainIdentifier;
+use sui_types::{digests::ChainIdentifier, messages_consensus::TimestampMs};
 use tracing::{debug, warn};
+
+use crate::authority::AuthorityMetrics;
 
 const DEFAULT_OBSERVATIONS_WINDOW: u64 = 120; // number of observations to use to calculate the past throughput
 const DEFAULT_THROUGHPUT_PROFILE_UPDATE_INTERVAL_SECS: u64 = 60; // seconds that need to pass between two consecutive throughput profile updates
@@ -188,7 +190,7 @@ impl ConsensusThroughputProfiler {
         assert!(throughput_profile_update_interval > 0, "throughput_profile_update_interval should be >= 0");
 
         assert!(
-            (0..=30).contains(&throughput_profile_cool_down_threshold),
+            (0 ..= 30).contains(&throughput_profile_cool_down_threshold),
             "Out of bounds provided cool down threshold offset"
         );
 
@@ -378,9 +380,10 @@ impl ConsensusThroughputCalculator {
 
 #[cfg(test)]
 mod tests {
+    use prometheus::Registry;
+
     use super::*;
     use crate::consensus_throughput_calculator::Level::{High, Low};
-    use prometheus::Registry;
 
     #[test]
     pub fn test_throughput_profile_ranges() {
@@ -450,7 +453,7 @@ mod tests {
 
         // Adding observations with same timestamp should fall under the same bucket and won't lead
         // to throughput update.
-        for _ in 0..10 {
+        for _ in 0 .. 10 {
             calculator.add_transactions(2_340, 100);
         }
         assert_eq!(calculator.current_throughput(), (0, 0));
@@ -603,7 +606,7 @@ mod tests {
         );
 
         // Adding 4 observations of 3_000 tx/sec, so in the end throughput profile should be flagged as high
-        for i in 1..=4 {
+        for i in 1 ..= 4 {
             calculator.add_transactions(i * 1_000, 3_000);
         }
         assert_eq!(profiler.throughput_level(), (High, 3_000));

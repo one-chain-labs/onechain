@@ -6,37 +6,6 @@ use std::{
     fmt::Write,
 };
 
-use super::{
-    available_range::AvailableRange,
-    balance::{self, Balance},
-    big_int::BigInt,
-    coin::Coin,
-    coin_metadata::CoinMetadata,
-    cursor::{self, Page, RawPaginated, ScanLimited, Target},
-    digest::Digest,
-    display::{Display, DisplayEntry},
-    dynamic_field::{DynamicField, DynamicFieldName},
-    move_object::MoveObject,
-    move_package::MovePackage,
-    owner::{Owner, OwnerImpl},
-    stake::StakedOct,
-    sui_address::{addr, SuiAddress},
-    suins_registration::{DomainFormat, SuinsRegistration},
-    transaction_block,
-    transaction_block::{TransactionBlock, TransactionBlockFilter},
-    type_filter::{ExactTypeFilter, TypeFilter},
-    uint53::UInt53,
-};
-use crate::{
-    connection::ScanConnection,
-    consistency::{build_objects_query, Checkpointed, View},
-    data::{package_resolver::PackageResolver, DataLoader, Db, DbConnection, QueryExecutor},
-    error::Error,
-    filter,
-    or_filter,
-    raw_query::RawQuery,
-    types::{base64::Base64, intersect},
-};
 use async_graphql::{
     connection::{Connection, CursorType, Edge},
     dataloader::Loader,
@@ -65,6 +34,38 @@ use sui_types::{
         Owner as NativeOwner,
     },
     TypeTag,
+};
+
+use super::{
+    available_range::AvailableRange,
+    balance::{self, Balance},
+    big_int::BigInt,
+    coin::Coin,
+    coin_metadata::CoinMetadata,
+    cursor::{self, Page, RawPaginated, ScanLimited, Target},
+    digest::Digest,
+    display::{Display, DisplayEntry},
+    dynamic_field::{DynamicField, DynamicFieldName},
+    move_object::MoveObject,
+    move_package::MovePackage,
+    owner::{Owner, OwnerImpl},
+    stake::StakedSui,
+    sui_address::{addr, SuiAddress},
+    suins_registration::{DomainFormat, SuinsRegistration},
+    transaction_block,
+    transaction_block::{TransactionBlock, TransactionBlockFilter},
+    type_filter::{ExactTypeFilter, TypeFilter},
+    uint53::UInt53,
+};
+use crate::{
+    connection::ScanConnection,
+    consistency::{build_objects_query, Checkpointed, View},
+    data::{package_resolver::PackageResolver, DataLoader, Db, DbConnection, QueryExecutor},
+    error::Error,
+    filter,
+    or_filter,
+    raw_query::RawQuery,
+    types::{base64::Base64, intersect},
 };
 
 #[derive(Clone, Debug)]
@@ -135,7 +136,7 @@ pub(crate) struct ObjectFilter {
     /// name.
     ///
     /// Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by
-    /// the full type name, such as `0x2::coin::Coin<0x2::oct::OCT>`.
+    /// the full type name, such as `0x2::coin::Coin<0x2::sui::SUI>`.
     pub type_: Option<TypeFilter>,
 
     /// Filter for live objects by their current owners.
@@ -144,7 +145,9 @@ pub(crate) struct ObjectFilter {
     /// Filter for live objects by their IDs.
     pub object_ids: Option<Vec<SuiAddress>>,
 
-    /// Filter for live or potentially historical objects by their ID and version.
+    /// Filter for live objects by their ID and version. NOTE:  this input filter has been
+    /// deprecated in favor of `multiGetObjects` query as it does not make sense to query for live
+    /// objects by their versions. This filter will be removed with v1.42.0 release.
     pub object_keys: Option<Vec<ObjectKey>>,
 }
 
@@ -288,7 +291,7 @@ pub(crate) enum IObject {
     MoveObject(MoveObject),
     Coin(Coin),
     CoinMetadata(CoinMetadata),
-    StakedOct(StakedOct),
+    StakedSui(StakedSui),
     SuinsRegistration(SuinsRegistration),
 }
 
@@ -351,7 +354,7 @@ impl Object {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::oct::OCT`.
+    /// it defaults to `0x2::sui::SUI`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(self).balance(ctx, type_).await
     }
@@ -370,7 +373,7 @@ impl Object {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -383,16 +386,16 @@ impl Object {
         OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
-    pub(crate) async fn staked_octs(
+    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<Cursor>,
         last: Option<u64>,
         before: Option<Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(self).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -731,6 +734,29 @@ impl Object {
     /// Check [`Object::root_version`] for details.
     pub(crate) fn root_version(&self) -> u64 {
         self.root_version
+    }
+
+    /// Fetch objects by their id and version. If you need to query for live objects, use the
+    /// `objects` field.
+    pub(crate) async fn query_many(
+        ctx: &Context<'_>,
+        keys: Vec<ObjectKey>,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Vec<Self>, Error> {
+        let DataLoader(loader) = &ctx.data_unchecked();
+
+        let keys: Vec<PointLookupKey> =
+            keys.into_iter().map(|key| PointLookupKey { id: key.object_id, version: key.version.into() }).collect();
+
+        let data = loader.load_many(keys).await?;
+        let objects: Vec<_> = data
+            .into_iter()
+            .filter_map(|(lookup_key, bcs)| {
+                Object::new_serialized(lookup_key.id, lookup_key.version, bcs, checkpoint_viewed_at, lookup_key.version)
+            })
+            .collect();
+
+        Ok(objects)
     }
 
     /// Query the database for a `page` of objects, optionally `filter`-ed.
@@ -1482,8 +1508,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn test_owner_filter_intersection() {
@@ -1533,7 +1560,7 @@ mod tests {
                 object_ids: Some(vec![i1]),
                 object_keys: Some(vec![ObjectKey { object_id: i2, version: 1.into() }, ObjectKey {
                     object_id: i4,
-                    version: 2.into()
+                    version: 2.into(),
                 },]),
                 ..Default::default()
             })
@@ -1549,7 +1576,7 @@ mod tests {
             Some(ObjectFilter {
                 object_keys: Some(vec![ObjectKey { object_id: i2, version: 2.into() }, ObjectKey {
                     object_id: i4,
-                    version: 2.into()
+                    version: 2.into(),
                 },]),
                 ..Default::default()
             })

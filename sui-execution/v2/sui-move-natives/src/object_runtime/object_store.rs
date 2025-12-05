@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_runtime::get_all_uids;
+use std::{
+    collections::{btree_map, BTreeMap},
+    sync::Arc,
+};
+
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{annotated_value as A, effects::Op, runtime_value as R, vm_status::StatusCode};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, StructRef, Value},
-};
-use std::{
-    collections::{btree_map, BTreeMap},
-    sync::Arc,
 };
 use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
 use sui_types::{
@@ -22,6 +22,8 @@ use sui_types::{
     object::{Data, MoveObject, Object, Owner},
     storage::ChildObjectResolver,
 };
+
+use crate::object_runtime::get_all_uids;
 
 pub(super) struct ChildObject {
     pub(super) owner: ObjectID,
@@ -82,7 +84,7 @@ pub(crate) enum ObjectResult<V> {
 
 type LoadedWithMetadataResult<V> = Option<(V, DynamicallyLoadedObjectMetadata)>;
 
-impl<'a> Inner<'a> {
+impl Inner<'_> {
     fn receive_object_from_store(
         &self,
         owner: ObjectID,
@@ -91,7 +93,13 @@ impl<'a> Inner<'a> {
     ) -> PartialVMResult<LoadedWithMetadataResult<MoveObject>> {
         let child_opt = self
             .resolver
-            .get_object_received_at_version(&owner, &child, version, self.current_epoch_id)
+            .get_object_received_at_version(
+                &owner,
+                &child,
+                version,
+                self.current_epoch_id,
+                self.protocol_config.use_object_per_epoch_marker_table_v2_as_option().unwrap_or(false),
+            )
             .map_err(|msg| PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!("{msg}")))?;
         let obj_opt = if let Some(object) = child_opt {
             // guard against bugs in `receive_object_at_version`: if it returns a child object such that

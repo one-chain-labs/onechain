@@ -1,8 +1,8 @@
 [package]
-name = "One"
+name = "Sui"
 version = "0.0.1"
 published-at = "0x2"
 edition = "development"
 
 [addresses]
-one = "0x2"
+sui = "0x2"

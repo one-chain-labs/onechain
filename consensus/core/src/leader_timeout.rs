@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{block::Round, context::Context, core::CoreSignalsReceivers, core_thread::CoreThreadDispatcher};
 use std::{sync::Arc, time::Duration};
+
 use tokio::{
     sync::{
         oneshot::{Receiver, Sender},
@@ -11,6 +11,8 @@ use tokio::{
     time::{sleep_until, Instant},
 };
 use tracing::{debug, warn};
+
+use crate::{block::Round, context::Context, core::CoreSignalsReceivers, core_thread::CoreThreadDispatcher};
 
 pub(crate) struct LeaderTimeoutTaskHandle {
     handle: JoinHandle<()>,
@@ -125,6 +127,7 @@ mod tests {
 
     use crate::{
         block::{BlockRef, Round, VerifiedBlock},
+        commit::CertifiedCommits,
         context::Context,
         core::CoreSignals,
         core_thread::{CoreError, CoreThreadDispatcher},
@@ -140,7 +143,7 @@ mod tests {
     impl MockCoreThreadDispatcher {
         async fn get_new_block_calls(&self) -> Vec<(Round, bool, Instant)> {
             let mut binding = self.new_block_calls.lock();
-            let all_calls = binding.drain(0..);
+            let all_calls = binding.drain(0 ..);
             all_calls.into_iter().collect()
         }
     }
@@ -148,6 +151,14 @@ mod tests {
     #[async_trait]
     impl CoreThreadDispatcher for MockCoreThreadDispatcher {
         async fn add_blocks(&self, _blocks: Vec<VerifiedBlock>) -> Result<BTreeSet<BlockRef>, CoreError> {
+            todo!()
+        }
+
+        async fn check_block_refs(&self, _block_refs: Vec<BlockRef>) -> Result<BTreeSet<BlockRef>, CoreError> {
+            todo!()
+        }
+
+        async fn add_certified_commits(&self, _commits: CertifiedCommits) -> Result<BTreeSet<BlockRef>, CoreError> {
             todo!()
         }
 

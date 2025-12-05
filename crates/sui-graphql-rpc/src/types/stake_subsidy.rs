@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::big_int::BigInt;
 use async_graphql::*;
+
+use super::big_int::BigInt;
 
 /// Parameters that control the distribution of the stake subsidy.
 #[derive(Clone, Debug, PartialEq, Eq, SimpleObject)]

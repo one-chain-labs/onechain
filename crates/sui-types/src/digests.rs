@@ -3,7 +3,6 @@
 
 use std::{env, fmt};
 
-use crate::{error::SuiError, sui_serde::Readable};
 use fastcrypto::encoding::{Base58, Encoding, Hex};
 use once_cell::sync::{Lazy, OnceCell};
 use schemars::JsonSchema;
@@ -11,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, Bytes};
 use sui_protocol_config::Chain;
 use tracing::info;
+
+use crate::{error::SuiError, sui_serde::Readable};
 
 /// A representation of a 32 byte digest
 #[serde_as]
@@ -135,8 +136,8 @@ impl fmt::UpperHex for Digest {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ChainIdentifier(CheckpointDigest);
 
-pub const MAINNET_CHAIN_IDENTIFIER_BASE58: &str = "82BXqhKfNQ11TPtEnG7UfToCDRH5mGMYZoUkREW46Tz6";
-pub const TESTNET_CHAIN_IDENTIFIER_BASE58: &str = "7kb4vByy1gDLyRg22otcCwLXBdA4wqBt3XQPxYoLFrPy";
+pub const MAINNET_CHAIN_IDENTIFIER_BASE58: &str = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S";
+pub const TESTNET_CHAIN_IDENTIFIER_BASE58: &str = "69WiPg3DAQiwdxfncX6wYQ2siKwAe6L9BZthQea3JNMD";
 
 pub static MAINNET_CHAIN_IDENTIFIER: OnceCell<ChainIdentifier> = OnceCell::new();
 pub static TESTNET_CHAIN_IDENTIFIER: OnceCell<ChainIdentifier> = OnceCell::new();
@@ -230,7 +231,7 @@ pub fn get_testnet_chain_identifier() -> ChainIdentifier {
 
 impl fmt::Display for ChainIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for byte in self.0 .0 .0[0..4].iter() {
+        for byte in self.0 .0 .0[0 .. 4].iter() {
             write!(f, "{:02x}", byte)?;
         }
 
@@ -512,7 +513,7 @@ impl TransactionDigest {
     /// ie. for an object there is no parent digest.
     /// Note that this is not the same as the digest of the genesis transaction,
     /// which cannot be known ahead of time.
-    // TODO(https://github.com/one-chain-labs/onechain/issues/65): we can pick anything here
+    // TODO(https://github.com/MystenLabs/sui/issues/65): we can pick anything here
     pub const fn genesis_marker() -> Self {
         Self::ZERO
     }
@@ -1016,6 +1017,27 @@ impl fmt::Display for ConsensusCommitDigest {
 impl fmt::Debug for ConsensusCommitDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("ConsensusCommitDigest").field(&self.0).finish()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct AdditionalConsensusStateDigest(Digest);
+
+impl AdditionalConsensusStateDigest {
+    pub const fn new(digest: [u8; 32]) -> Self {
+        Self(Digest::new(digest))
+    }
+}
+
+impl fmt::Display for AdditionalConsensusStateDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Debug for AdditionalConsensusStateDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("AdditionalConsensusStateDigest").field(&self.0).finish()
     }
 }
 

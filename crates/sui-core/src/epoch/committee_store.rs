@@ -1,12 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use parking_lot::RwLock;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use parking_lot::RwLock;
+use sui_macros::nondeterministic;
 use sui_types::{
     base_types::ObjectID,
     committee::{Committee, EpochId},
@@ -16,11 +18,9 @@ use typed_store::{
     rocks::{default_db_options, DBMap, DBOptions, MetricConf},
     rocksdb::Options,
     traits::{TableSummary, TypedStoreDebug},
+    DBMapUtils,
+    Map,
 };
-
-use typed_store::{DBMapUtils, Map};
-
-use sui_macros::nondeterministic;
 
 pub struct CommitteeStore {
     tables: CommitteeStoreTables,
@@ -86,16 +86,17 @@ impl CommitteeStore {
     }
 
     // todo - make use of cache or remove this method
-    pub fn get_latest_committee(&self) -> Committee {
-        self.tables
+    pub fn get_latest_committee(&self) -> SuiResult<Committee> {
+        Ok(self
+            .tables
             .committee_map
-            .unbounded_iter()
-            .skip_to_last()
+            .reversed_safe_iter_with_bounds(None, None)?
             .next()
+            .transpose()?
             // unwrap safe because we guarantee there is at least a genesis epoch
             // when initializing the store.
             .unwrap()
-            .1
+            .1)
     }
 
     /// Return the committee specified by `epoch`. If `epoch` is `None`, return the latest committee.
@@ -106,7 +107,7 @@ impl CommitteeStore {
                 .get_committee(&epoch)?
                 .ok_or(SuiError::MissingCommitteeAtEpoch(epoch))
                 .map(|c| Committee::clone(&*c))?,
-            None => self.get_latest_committee(),
+            None => self.get_latest_committee()?,
         })
     }
 

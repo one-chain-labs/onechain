@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{command::Component, mock_storage::InMemoryObjectStore};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
+
 use sui_core::{
     authority::{
         authority_per_epoch_store::AuthorityPerEpochStore,
@@ -39,7 +39,8 @@ use sui_types::{
         DEFAULT_VALIDATOR_GAS_PRICE,
     },
 };
-use tokio::sync::broadcast;
+
+use crate::{command::Component, mock_storage::InMemoryObjectStore};
 
 #[derive(Clone)]
 pub struct SingleValidator {
@@ -63,6 +64,7 @@ impl SingleValidator {
         };
         let consensus_adapter = Arc::new(ConsensusAdapter::new(
             Arc::new(MockConsensusClient::new(Arc::downgrade(&validator), consensus_mode)),
+            validator.checkpoint_store.clone(),
             validator.name,
             Arc::new(ConnectionMonitorStatusForTests {}),
             100_000,
@@ -126,7 +128,6 @@ impl SingleValidator {
         let effects = self
             .get_validator()
             .dry_exec_transaction_for_benchmark(transaction.data().intent_message().value.clone(), *transaction.digest())
-            .await
             .unwrap()
             .2;
         assert!(effects.status().is_ok());
@@ -166,7 +167,7 @@ impl SingleValidator {
         transaction: CertifiedTransaction,
     ) -> TransactionEffects {
         let input_objects = transaction.transaction_data().input_objects().unwrap();
-        let objects = store.read_objects_for_execution(&*self.epoch_store, &transaction.key(), &input_objects).unwrap();
+        let objects = store.read_objects_for_execution(&self.epoch_store, &transaction.key(), &input_objects).unwrap();
 
         let executable =
             VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(transaction));
@@ -177,8 +178,8 @@ impl SingleValidator {
             self.epoch_store.reference_gas_price(),
         )
         .unwrap();
-        let (kind, signer, gas) = executable.transaction_data().execution_parts();
-        let (inner_temp_store, _, effects, _) = self.epoch_store.executor().execute_transaction_to_effects(
+        let (kind, signer, gas_data) = executable.transaction_data().execution_parts();
+        let (inner_temp_store, _, effects, _timings, _) = self.epoch_store.executor().execute_transaction_to_effects(
             &store,
             self.epoch_store.protocol_config(),
             self.get_validator().metrics.limits_metrics.clone(),
@@ -187,11 +188,12 @@ impl SingleValidator {
             &self.epoch_store.epoch(),
             0,
             input_objects,
-            gas,
+            gas_data,
             gas_status,
             kind,
             signer,
             *executable.digest(),
+            &mut None,
         );
         assert!(effects.status().is_ok());
         store.commit_objects(inner_temp_store);
@@ -209,7 +211,7 @@ impl SingleValidator {
         checkpoint_size: usize,
     ) -> Vec<(VerifiedCheckpoint, VerifiedCheckpointContents)> {
         let mut builder = MockCheckpointBuilder::new(
-            self.get_validator().get_checkpoint_store().get_latest_certified_checkpoint().unwrap(),
+            self.get_validator().get_checkpoint_store().get_latest_certified_checkpoint().unwrap().unwrap(),
         );
         let mut checkpoints = vec![];
         for transaction in transactions {
@@ -227,16 +229,14 @@ impl SingleValidator {
         checkpoints
     }
 
-    pub fn create_checkpoint_executor(&self) -> (CheckpointExecutor, broadcast::Sender<VerifiedCheckpoint>) {
+    pub fn create_checkpoint_executor(&self) -> CheckpointExecutor {
         let validator = self.get_validator();
-        let (ckpt_sender, ckpt_receiver) = broadcast::channel(1000000);
-        let checkpoint_executor = CheckpointExecutor::new_for_tests(
-            ckpt_receiver,
+        CheckpointExecutor::new_for_tests(
+            self.epoch_store.clone(),
             validator.get_checkpoint_store().clone(),
             validator.clone(),
-            Arc::new(StateAccumulator::new_for_tests(validator.get_accumulator_store().clone(), self.get_epoch_store())),
-        );
-        (checkpoint_executor, ckpt_sender)
+            Arc::new(StateAccumulator::new_for_tests(validator.get_accumulator_store().clone())),
+        )
     }
 
     pub(crate) fn create_in_memory_store(&self) -> InMemoryObjectStore {
@@ -264,7 +264,6 @@ impl SingleValidator {
                 self.get_validator().get_object_cache_reader().as_ref(),
                 &transactions,
             )
-            .await
             .unwrap();
     }
 }

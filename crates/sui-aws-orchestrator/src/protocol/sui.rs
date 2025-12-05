@@ -11,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use sui_swarm_config::genesis_config::GenesisConfig;
 use sui_types::{base_types::SuiAddress, multiaddr::Multiaddr};
 
+use super::{ProtocolCommands, ProtocolMetrics};
 use crate::{
     benchmark::{BenchmarkParameters, BenchmarkType},
     client::Instance,
     settings::Settings,
 };
-
-use super::{ProtocolCommands, ProtocolMetrics};
 
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SuiBenchmarkType {
@@ -48,7 +47,7 @@ impl FromStr for SuiBenchmarkType {
 
 impl BenchmarkType for SuiBenchmarkType {}
 
-/// All configurations information to run a OneChain client or validator.
+/// All configurations information to run a Sui client or validator.
 pub struct SuiProtocol {
     working_dir: PathBuf,
 }

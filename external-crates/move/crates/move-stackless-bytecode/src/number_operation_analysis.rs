@@ -11,10 +11,7 @@ use crate::{
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::FunctionTarget,
     function_target_pipeline::{
-        FunctionTargetPipeline,
-        FunctionTargetProcessor,
-        FunctionTargetsHolder,
-        FunctionVariant,
+        FunctionTargetPipeline, FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant,
     },
     number_operation::{
         GlobalNumberOperationState,
@@ -156,7 +153,7 @@ fn table_funs_name_propogate_to_srcs(callee_name: &str) -> bool {
     callee_name == "add" || callee_name == "borrow_mut_with_default" || callee_name == "upsert"
 }
 
-impl<'a> NumberOperationAnalysis<'a> {
+impl NumberOperationAnalysis<'_> {
     /// Check whether operations in s conflicting
     fn check_conflict_set(&self, s: &BTreeSet<&NumOperation>) -> bool {
         if self.ban_int_2_bv_conversion {
@@ -198,17 +195,29 @@ impl<'a> NumberOperationAnalysis<'a> {
         baseline_flag: bool,
     ) {
         // Each TempIndex has a default operation in the map, can unwrap
-        let dest_oper = global_state.get_temp_index_oper(mid, fid, *dest, baseline_flag).unwrap();
-        let src_oper = global_state.get_temp_index_oper(mid, fid, *src, baseline_flag).unwrap();
+        let dest_oper = global_state
+            .get_temp_index_oper(mid, fid, *dest, baseline_flag)
+            .unwrap();
+        let src_oper = global_state
+            .get_temp_index_oper(mid, fid, *src, baseline_flag)
+            .unwrap();
         if self.check_conflict(dest_oper, src_oper) {
-            self.func_target.func_env.module_env.env.error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+            self.func_target
+                .func_env
+                .module_env
+                .env
+                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
         } else {
             let merged_oper = dest_oper.merge(src_oper);
             if merged_oper != *dest_oper || merged_oper != *src_oper {
                 state.changed = true;
             }
-            *global_state.get_mut_temp_index_oper(mid, fid, *dest, baseline_flag).unwrap() = merged_oper;
-            *global_state.get_mut_temp_index_oper(mid, fid, *src, baseline_flag).unwrap() = merged_oper;
+            *global_state
+                .get_mut_temp_index_oper(mid, fid, *dest, baseline_flag)
+                .unwrap() = merged_oper;
+            *global_state
+                .get_mut_temp_index_oper(mid, fid, *src, baseline_flag)
+                .unwrap() = merged_oper;
         }
     }
 
@@ -225,24 +234,40 @@ impl<'a> NumberOperationAnalysis<'a> {
         global_state: &mut GlobalNumberOperationState,
         baseline_flag: bool,
     ) {
-        let op_srcs_0 = global_state.get_temp_index_oper(mid, fid, srcs[0], baseline_flag).unwrap();
-        let op_srcs_1 = global_state.get_temp_index_oper(mid, fid, srcs[1], baseline_flag).unwrap();
-        let op_dests_0 = global_state.get_temp_index_oper(mid, fid, dests[0], baseline_flag).unwrap();
+        let op_srcs_0 = global_state
+            .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
+            .unwrap();
+        let op_srcs_1 = global_state
+            .get_temp_index_oper(mid, fid, srcs[1], baseline_flag)
+            .unwrap();
+        let op_dests_0 = global_state
+            .get_temp_index_oper(mid, fid, dests[0], baseline_flag)
+            .unwrap();
         // Check conflicts among dests and srcs
         let mut state_set = BTreeSet::new();
         state_set.insert(op_srcs_0);
         state_set.insert(op_srcs_1);
         state_set.insert(op_dests_0);
         if self.check_conflict_set(&state_set) {
-            self.func_target.func_env.module_env.env.error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+            self.func_target
+                .func_env
+                .module_env
+                .env
+                .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
             return;
         }
         if oper != *op_srcs_0 || oper != *op_srcs_1 || oper != *op_dests_0 {
             state.changed = true;
         }
-        *global_state.get_mut_temp_index_oper(mid, fid, srcs[0], baseline_flag).unwrap() = oper;
-        *global_state.get_mut_temp_index_oper(mid, fid, srcs[1], baseline_flag).unwrap() = oper;
-        *global_state.get_mut_temp_index_oper(mid, fid, dests[0], baseline_flag).unwrap() = oper;
+        *global_state
+            .get_mut_temp_index_oper(mid, fid, srcs[0], baseline_flag)
+            .unwrap() = oper;
+        *global_state
+            .get_mut_temp_index_oper(mid, fid, srcs[1], baseline_flag)
+            .unwrap() = oper;
+        *global_state
+            .get_mut_temp_index_oper(mid, fid, dests[0], baseline_flag)
+            .unwrap() = oper;
     }
 
     fn check_and_update_oper_dest(
@@ -255,11 +280,15 @@ impl<'a> NumberOperationAnalysis<'a> {
         global_state: &mut GlobalNumberOperationState,
         baseline_flag: bool,
     ) {
-        let op_dests_0 = global_state.get_temp_index_oper(mid, fid, dests[0], baseline_flag).unwrap();
+        let op_dests_0 = global_state
+            .get_temp_index_oper(mid, fid, dests[0], baseline_flag)
+            .unwrap();
         if oper != *op_dests_0 {
             state.changed = true;
         }
-        *global_state.get_mut_temp_index_oper(mid, fid, dests[0], baseline_flag).unwrap() = oper;
+        *global_state
+            .get_mut_temp_index_oper(mid, fid, dests[0], baseline_flag)
+            .unwrap() = oper;
     }
 
     /// Generate default num_oper for all non-parameter locals
@@ -269,37 +298,60 @@ impl<'a> NumberOperationAnalysis<'a> {
         let non_param_range = self.func_target.get_non_parameter_locals();
         let baseline_flag = self.func_target.data.variant == FunctionVariant::Baseline;
         for i in non_param_range {
-            if !global_state.get_non_param_local_map(mid, fid, baseline_flag).contains_key(&i) {
-                global_state.get_mut_non_param_local_map(mid, fid, baseline_flag).insert(i, Bottom);
+            if !global_state
+                .get_non_param_local_map(mid, fid, baseline_flag)
+                .contains_key(&i)
+            {
+                global_state
+                    .get_mut_non_param_local_map(mid, fid, baseline_flag)
+                    .insert(i, Bottom);
             }
         }
     }
 }
 
-impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
+impl TransferFunctions for NumberOperationAnalysis<'_> {
     type State = NumberOperationState;
-
     const BACKWARD: bool = false;
 
     /// Update global state of num_operation by analyzing each instruction
     fn execute(&self, state: &mut NumberOperationState, instr: &Bytecode, _offset: CodeOffset) {
         use Bytecode::*;
         use Operation::*;
-        let mut global_state = self.func_target.global_env().get_cloned_extension::<GlobalNumberOperationState>();
+        let mut global_state = self
+            .func_target
+            .global_env()
+            .get_cloned_extension::<GlobalNumberOperationState>();
         self.populate_non_param_oper(&mut global_state);
         let baseline_flag = self.func_target.data.variant == FunctionVariant::Baseline;
         let cur_mid = self.func_target.func_env.module_env.get_id();
         let cur_fid = self.func_target.func_env.get_id();
         match instr {
             Assign(id, dest, src, _) => {
-                self.check_and_propagate(id, state, dest, src, cur_mid, cur_fid, &mut global_state, baseline_flag);
+                self.check_and_propagate(
+                    id,
+                    state,
+                    dest,
+                    src,
+                    cur_mid,
+                    cur_fid,
+                    &mut global_state,
+                    baseline_flag,
+                );
             }
             // Check and update operations of rets in temp_index_operation_map and operations in ret_operation_map
             Ret(id, rets) => {
                 let ret_types = self.func_target.get_return_types();
                 for ((i, _), ret) in ret_types.iter().enumerate().zip(rets) {
-                    let ret_oper = global_state.get_ret_map().get(&(cur_mid, cur_fid)).unwrap().get(&i).unwrap();
-                    let idx_oper = global_state.get_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag).unwrap();
+                    let ret_oper = global_state
+                        .get_ret_map()
+                        .get(&(cur_mid, cur_fid))
+                        .unwrap()
+                        .get(&i)
+                        .unwrap();
+                    let idx_oper = global_state
+                        .get_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag)
+                        .unwrap();
 
                     if self.check_conflict(idx_oper, ret_oper) {
                         self.func_target
@@ -312,14 +364,21 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                         if merged != *idx_oper || merged != *ret_oper {
                             state.changed = true;
                         }
-                        *global_state.get_mut_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag).unwrap() = merged;
-                        global_state.get_mut_ret_map().get_mut(&(cur_mid, cur_fid)).unwrap().insert(i, merged);
+                        *global_state
+                            .get_mut_temp_index_oper(cur_mid, cur_fid, *ret, baseline_flag)
+                            .unwrap() = merged;
+                        global_state
+                            .get_mut_ret_map()
+                            .get_mut(&(cur_mid, cur_fid))
+                            .unwrap()
+                            .insert(i, merged);
                     }
                 }
             }
             Call(id, dests, oper, srcs, _) => {
                 match oper {
-                    BorrowLoc | ReadRef | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
+                    BorrowLoc | ReadRef | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
+                    | CastU256 => {
                         self.check_and_propagate(
                             id,
                             state,
@@ -346,12 +405,15 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                     Add | Sub | Mul | Div | Mod => {
                         let mut num_oper = Arithmetic;
                         if !self.ban_int_2_bv_conversion {
-                            let op_srcs_0 =
-                                global_state.get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag).unwrap();
-                            let op_srcs_1 =
-                                global_state.get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag).unwrap();
-                            let op_dests_0 =
-                                global_state.get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag).unwrap();
+                            let op_srcs_0 = global_state
+                                .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
+                                .unwrap();
+                            let op_srcs_1 = global_state
+                                .get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag)
+                                .unwrap();
+                            let op_dests_0 = global_state
+                                .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                                .unwrap();
                             // If there is conflict among operations, merged will not be used for updating
                             num_oper = op_srcs_0.merge(op_srcs_1).merge(op_dests_0);
                         }
@@ -393,12 +455,15 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                         }
                     }
                     Shl | Shr => {
-                        let op_srcs_0 =
-                            global_state.get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag).unwrap();
-                        let op_srcs_1 =
-                            global_state.get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag).unwrap();
-                        let op_dests_0 =
-                            global_state.get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag).unwrap();
+                        let op_srcs_0 = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
+                            .unwrap();
+                        let op_srcs_1 = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag)
+                            .unwrap();
+                        let op_dests_0 = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                            .unwrap();
                         // If there is conflict among operations, merged will not be used for updating
                         let merged = op_srcs_0.merge(op_srcs_1).merge(op_dests_0);
                         self.check_and_update_oper(
@@ -415,7 +480,11 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                     }
                     // Checking and operations in the struct_operation_map when packing
                     Pack(msid, sid, _) => {
-                        let struct_env = self.func_target.global_env().get_module(*msid).into_struct(*sid);
+                        let struct_env = self
+                            .func_target
+                            .global_env()
+                            .get_module(*msid)
+                            .into_struct(*sid);
                         for (i, field) in struct_env.get_fields().enumerate() {
                             let current_field_oper = global_state
                                 .struct_operation_map
@@ -423,21 +492,26 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                 .unwrap()
                                 .get(&field.get_id())
                                 .unwrap();
-                            let pack_oper =
-                                global_state.get_temp_index_oper(cur_mid, cur_fid, srcs[i], baseline_flag).unwrap();
+                            let pack_oper = global_state
+                                .get_temp_index_oper(cur_mid, cur_fid, srcs[i], baseline_flag)
+                                .unwrap();
                             if self.check_conflict(current_field_oper, pack_oper) {
-                                self.func_target
-                                    .func_env
-                                    .module_env
-                                    .env
-                                    .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                                self.func_target.func_env.module_env.env.error(
+                                    &self.func_target.get_bytecode_loc(*id),
+                                    CONFLICT_ERROR_MSG,
+                                );
                             } else {
                                 let merged = current_field_oper.merge(pack_oper);
                                 if merged != *current_field_oper || merged != *pack_oper {
                                     state.changed = true;
                                 }
                                 *global_state
-                                    .get_mut_temp_index_oper(cur_mid, cur_fid, srcs[i], baseline_flag)
+                                    .get_mut_temp_index_oper(
+                                        cur_mid,
+                                        cur_fid,
+                                        srcs[i],
+                                        baseline_flag,
+                                    )
                                     .unwrap() = merged;
                                 global_state
                                     .struct_operation_map
@@ -449,7 +523,11 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                     }
                     // Checking and operations in the struct_operation_map when unpacking
                     Unpack(msid, sid, _) => {
-                        let struct_env = self.func_target.global_env().get_module(*msid).into_struct(*sid);
+                        let struct_env = self
+                            .func_target
+                            .global_env()
+                            .get_module(*msid)
+                            .into_struct(*sid);
                         for (i, field) in struct_env.get_fields().enumerate() {
                             let current_field_oper = global_state
                                 .struct_operation_map
@@ -457,21 +535,26 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                 .unwrap()
                                 .get(&field.get_id())
                                 .unwrap();
-                            let pack_oper =
-                                global_state.get_temp_index_oper(cur_mid, cur_fid, dests[i], baseline_flag).unwrap();
+                            let pack_oper = global_state
+                                .get_temp_index_oper(cur_mid, cur_fid, dests[i], baseline_flag)
+                                .unwrap();
                             if self.check_conflict(current_field_oper, pack_oper) {
-                                self.func_target
-                                    .func_env
-                                    .module_env
-                                    .env
-                                    .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                                self.func_target.func_env.module_env.env.error(
+                                    &self.func_target.get_bytecode_loc(*id),
+                                    CONFLICT_ERROR_MSG,
+                                );
                             } else {
                                 let merged = current_field_oper.merge(pack_oper);
                                 if merged != *current_field_oper || merged != *pack_oper {
                                     state.changed = true;
                                 }
                                 *global_state
-                                    .get_mut_temp_index_oper(cur_mid, cur_fid, dests[i], baseline_flag)
+                                    .get_mut_temp_index_oper(
+                                        cur_mid,
+                                        cur_fid,
+                                        dests[i],
+                                        baseline_flag,
+                                    )
                                     .unwrap() = merged;
                                 global_state
                                     .struct_operation_map
@@ -482,8 +565,9 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                         }
                     }
                     GetField(msid, sid, _, offset) | BorrowField(msid, sid, _, offset) => {
-                        let dests_oper =
-                            global_state.get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag).unwrap();
+                        let dests_oper = global_state
+                            .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                            .unwrap();
                         let field_oper = global_state
                             .struct_operation_map
                             .get(&(*msid, *sid))
@@ -510,17 +594,22 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             if merged_oper != *field_oper || merged_oper != *dests_oper {
                                 state.changed = true;
                             }
-                            *global_state.get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag).unwrap() =
-                                merged_oper;
-                            global_state.struct_operation_map.get_mut(&(*msid, *sid)).unwrap().insert(
-                                self.func_target
-                                    .func_env
-                                    .module_env
-                                    .get_struct(*sid)
-                                    .get_field_by_offset(*offset)
-                                    .get_id(),
-                                merged_oper,
-                            );
+                            *global_state
+                                .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                                .unwrap() = merged_oper;
+                            global_state
+                                .struct_operation_map
+                                .get_mut(&(*msid, *sid))
+                                .unwrap()
+                                .insert(
+                                    self.func_target
+                                        .func_env
+                                        .module_env
+                                        .get_struct(*sid)
+                                        .get_field_by_offset(*offset)
+                                        .get_id(),
+                                    merged_oper,
+                                );
                         }
                     }
                     Function(msid, fsid, _) => {
@@ -528,47 +617,69 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                         // Vector functions are handled separately
                         if !module_env.is_std_vector() && !module_env.is_table() {
                             for (i, src) in srcs.iter().enumerate() {
-                                let cur_oper =
-                                    global_state.get_temp_index_oper(cur_mid, cur_fid, *src, baseline_flag).unwrap();
-                                let callee_oper = global_state.get_temp_index_oper(*msid, *fsid, i, true).unwrap();
+                                let cur_oper = global_state
+                                    .get_temp_index_oper(cur_mid, cur_fid, *src, baseline_flag)
+                                    .unwrap();
+                                let callee_oper = global_state
+                                    .get_temp_index_oper(*msid, *fsid, i, true)
+                                    .unwrap();
 
                                 if self.check_conflict(cur_oper, callee_oper) {
-                                    self.func_target
-                                        .func_env
-                                        .module_env
-                                        .env
-                                        .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                                    self.func_target.func_env.module_env.env.error(
+                                        &self.func_target.get_bytecode_loc(*id),
+                                        CONFLICT_ERROR_MSG,
+                                    );
                                 } else {
                                     let merged = cur_oper.merge(callee_oper);
                                     if merged != *cur_oper || merged != *callee_oper {
                                         state.changed = true;
                                     }
                                     *global_state
-                                        .get_mut_temp_index_oper(cur_mid, cur_fid, *src, baseline_flag)
+                                        .get_mut_temp_index_oper(
+                                            cur_mid,
+                                            cur_fid,
+                                            *src,
+                                            baseline_flag,
+                                        )
                                         .unwrap() = merged;
-                                    *global_state.get_mut_temp_index_oper(*msid, *fsid, i, true).unwrap() = merged;
+                                    *global_state
+                                        .get_mut_temp_index_oper(*msid, *fsid, i, true)
+                                        .unwrap() = merged;
                                 }
                             }
                             for (i, dest) in dests.iter().enumerate() {
-                                let cur_oper =
-                                    global_state.get_temp_index_oper(cur_mid, cur_fid, *dest, baseline_flag).unwrap();
-                                let callee_oper =
-                                    global_state.get_ret_map().get(&(*msid, *fsid)).unwrap().get(&i).unwrap();
+                                let cur_oper = global_state
+                                    .get_temp_index_oper(cur_mid, cur_fid, *dest, baseline_flag)
+                                    .unwrap();
+                                let callee_oper = global_state
+                                    .get_ret_map()
+                                    .get(&(*msid, *fsid))
+                                    .unwrap()
+                                    .get(&i)
+                                    .unwrap();
                                 if self.check_conflict(cur_oper, callee_oper) {
-                                    self.func_target
-                                        .func_env
-                                        .module_env
-                                        .env
-                                        .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                                    self.func_target.func_env.module_env.env.error(
+                                        &self.func_target.get_bytecode_loc(*id),
+                                        CONFLICT_ERROR_MSG,
+                                    );
                                 } else {
                                     let merged = cur_oper.merge(callee_oper);
                                     if merged != *cur_oper || merged != *callee_oper {
                                         state.changed = true;
                                     }
                                     *global_state
-                                        .get_mut_temp_index_oper(cur_mid, cur_fid, *dest, baseline_flag)
+                                        .get_mut_temp_index_oper(
+                                            cur_mid,
+                                            cur_fid,
+                                            *dest,
+                                            baseline_flag,
+                                        )
                                         .unwrap() = merged;
-                                    global_state.get_mut_ret_map().get_mut(&(*msid, *fsid)).unwrap().insert(i, merged);
+                                    global_state
+                                        .get_mut_ret_map()
+                                        .get_mut(&(*msid, *fsid))
+                                        .unwrap()
+                                        .insert(i, merged);
                                 }
                             }
                         } else {
@@ -578,53 +689,83 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                 |idx: &TempIndex,
                                  global_state: &mut GlobalNumberOperationState,
                                  state: &mut NumberOperationState| {
-                                    let cur_oper =
-                                        global_state.get_temp_index_oper(cur_mid, cur_fid, *idx, baseline_flag).unwrap();
+                                    let cur_oper = global_state
+                                        .get_temp_index_oper(cur_mid, cur_fid, *idx, baseline_flag)
+                                        .unwrap();
 
                                     if self.check_conflict(cur_oper, &Bitwise) {
-                                        self.func_target
-                                            .func_env
-                                            .module_env
-                                            .env
-                                            .error(&self.func_target.get_bytecode_loc(*id), CONFLICT_ERROR_MSG);
+                                        self.func_target.func_env.module_env.env.error(
+                                            &self.func_target.get_bytecode_loc(*id),
+                                            CONFLICT_ERROR_MSG,
+                                        );
                                     } else if *cur_oper != Bitwise {
                                         state.changed = true;
                                         *global_state
-                                            .get_mut_temp_index_oper(cur_mid, cur_fid, *idx, baseline_flag)
+                                            .get_mut_temp_index_oper(
+                                                cur_mid,
+                                                cur_fid,
+                                                *idx,
+                                                baseline_flag,
+                                            )
                                             .unwrap() = Bitwise;
                                     }
                                 };
                             if !srcs.is_empty() {
                                 // First element
-                                let first_oper =
-                                    global_state.get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag).unwrap();
+                                let first_oper = global_state
+                                    .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
+                                    .unwrap();
                                 // Bitwise is specified explicitly in the fun or struct spec
                                 if vector_table_funs_name_propogate_to_dest(&callee_name) {
                                     if *first_oper == Bitwise {
                                         // Do not consider the method remove_return_key where the first return value is k
                                         for dest in dests.iter() {
-                                            check_and_update_bitwise(dest, &mut global_state, state);
+                                            check_and_update_bitwise(
+                                                dest,
+                                                &mut global_state,
+                                                state,
+                                            );
                                         }
                                     }
                                 } else {
                                     let mut second_oper = first_oper;
                                     let mut src_idx = 0;
-                                    if module_env.is_std_vector() && vector_funs_name_propogate_to_srcs(&callee_name) {
+                                    if module_env.is_std_vector()
+                                        && vector_funs_name_propogate_to_srcs(&callee_name)
+                                    {
                                         assert!(srcs.len() > 1);
                                         second_oper = global_state
-                                            .get_temp_index_oper(cur_mid, cur_fid, srcs[1], baseline_flag)
+                                            .get_temp_index_oper(
+                                                cur_mid,
+                                                cur_fid,
+                                                srcs[1],
+                                                baseline_flag,
+                                            )
                                             .unwrap();
                                         src_idx = 1;
                                     } else if table_funs_name_propogate_to_srcs(&callee_name) {
                                         assert!(srcs.len() > 2);
                                         second_oper = global_state
-                                            .get_temp_index_oper(cur_mid, cur_fid, srcs[2], baseline_flag)
+                                            .get_temp_index_oper(
+                                                cur_mid,
+                                                cur_fid,
+                                                srcs[2],
+                                                baseline_flag,
+                                            )
                                             .unwrap();
                                         src_idx = 2;
                                     }
                                     if *first_oper == Bitwise || *second_oper == Bitwise {
-                                        check_and_update_bitwise(&srcs[0], &mut global_state, state);
-                                        check_and_update_bitwise(&srcs[src_idx], &mut global_state, state);
+                                        check_and_update_bitwise(
+                                            &srcs[0],
+                                            &mut global_state,
+                                            state,
+                                        );
+                                        check_and_update_bitwise(
+                                            &srcs[src_idx],
+                                            &mut global_state,
+                                            state,
+                                        );
                                     }
                                 }
                             } // empty, do nothing
@@ -639,7 +780,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for NumberOperationAnalysis<'a> {}
+impl DataflowAnalysis for NumberOperationAnalysis<'_> {}
 
 impl AbstractDomain for NumberOperationState {
     fn join(&mut self, other: &Self) -> JoinResult {

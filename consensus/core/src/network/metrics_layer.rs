@@ -7,9 +7,9 @@ use prometheus::HistogramTimer;
 
 use super::metrics::NetworkRouteMetrics;
 
-/// Tower layer adapters that allow specifying callbacks for request and response handling
-/// exist for both anemo and http. So the metrics layer implementation can be reused across
-/// networking stacks.
+// Tower layer adapters that allow specifying callbacks for request and response handling
+// exist for both anemo and http. So the metrics layer implementation can be reused across
+// networking stacks.
 
 pub(crate) trait SizedRequest {
     fn size(&self) -> usize;
@@ -69,7 +69,7 @@ pub(crate) struct MetricsResponseCallback {
 
 impl MetricsResponseCallback {
     // Update response metrics.
-    pub(crate) fn on_response(self, response: &dyn SizedResponse) {
+    pub(crate) fn on_response(&mut self, response: &dyn SizedResponse) {
         let response_size = response.size();
         if response_size > 0 {
             self.metrics.response_size.with_label_values(&[&self.route]).observe(response_size as f64);
@@ -83,7 +83,7 @@ impl MetricsResponseCallback {
         }
     }
 
-    pub(crate) fn on_error<E>(self, _error: &E) {
+    pub(crate) fn on_error<E>(&mut self, _error: &E) {
         self.metrics.errors.with_label_values(&[&self.route, "unknown"]).inc();
     }
 }

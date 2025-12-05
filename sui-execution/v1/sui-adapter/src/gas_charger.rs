@@ -7,7 +7,6 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 pub mod checked {
 
-    use crate::{sui_types::gas::SuiGasStatusAPI, temporary_store::TemporaryStore};
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::{ObjectID, ObjectRef},
@@ -22,6 +21,8 @@ pub mod checked {
         object::Data,
     };
     use tracing::trace;
+
+    use crate::{sui_types::gas::SuiGasStatusAPI, temporary_store::TemporaryStore};
 
     /// Tracks all gas operations for a single transaction.
     /// This is the main entry point for gas accounting.
@@ -169,7 +170,7 @@ pub mod checked {
                 })
                 .clone();
             // delete all gas objects except the primary_gas_object
-            for (id, _version, _digest) in &self.gas_coins[1..] {
+            for (id, _version, _digest) in &self.gas_coins[1 ..] {
                 debug_assert_ne!(*id, primary_gas_object.id());
                 temporary_store.delete_input_object(id);
             }

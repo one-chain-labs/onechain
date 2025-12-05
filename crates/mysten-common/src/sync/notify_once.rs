@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use parking_lot::Mutex;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 use tokio::sync::{futures::Notified, Notify};
 
 /// Notify once allows waiter to register for certain conditions and unblocks waiter

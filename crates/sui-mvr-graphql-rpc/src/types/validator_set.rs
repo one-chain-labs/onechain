@@ -1,6 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    *,
+};
+
+use super::{big_int::BigInt, validator::Validator};
 use crate::{
     consistency::ConsistentIndexCursor,
     types::{
@@ -8,10 +14,6 @@ use crate::{
         sui_address::SuiAddress,
     },
 };
-use async_graphql::connection::{Connection, CursorType, Edge};
-
-use super::{big_int::BigInt, validator::Validator};
-use async_graphql::*;
 
 /// Representation of `0x3::validator_set::ValidatorSet`.
 #[derive(Clone, Debug, SimpleObject, Default)]

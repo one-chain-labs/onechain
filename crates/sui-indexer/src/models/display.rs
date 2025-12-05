@@ -3,7 +3,6 @@
 
 use diesel::prelude::*;
 use serde::Deserialize;
-
 use sui_types::display::DisplayVersionUpdatedEvent;
 
 use crate::schema::display;

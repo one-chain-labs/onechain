@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use fastcrypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     traits::{ToFromBytes, VerifyingKey},
@@ -15,7 +16,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 const ED25519_BLOCK_SIZE: usize = 128;
 
@@ -62,7 +64,7 @@ pub fn ed25519_verify(
         context,
         ed25519_verify_cost_params.ed25519_ed25519_verify_msg_cost_per_byte * (msg_ref.len() as u64).into()
             + ed25519_verify_cost_params.ed25519_ed25519_verify_msg_cost_per_block
-                * (((msg_ref.len() + ED25519_BLOCK_SIZE - 1) / ED25519_BLOCK_SIZE) as u64).into()
+                * (msg_ref.len().div_ceil(ED25519_BLOCK_SIZE) as u64).into()
     );
     let cost = context.gas_used();
 

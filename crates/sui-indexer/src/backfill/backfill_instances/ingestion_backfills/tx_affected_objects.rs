@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use diesel_async::RunQueryDsl;
+use sui_types::{effects::TransactionEffectsAPI, full_checkpoint_content::CheckpointData};
+
 use crate::{
     backfill::backfill_instances::ingestion_backfills::IngestionBackfillTrait,
     database::ConnectionPool,
     models::tx_indices::StoredTxAffectedObjects,
     schema::tx_affected_objects,
 };
-use diesel_async::RunQueryDsl;
-use sui_types::{effects::TransactionEffectsAPI, full_checkpoint_content::CheckpointData};
 
 pub struct TxAffectedObjectsBackfill;
 

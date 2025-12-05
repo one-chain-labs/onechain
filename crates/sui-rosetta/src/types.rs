@@ -11,7 +11,6 @@ use fastcrypto::encoding::Hex;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use strum_macros::{EnumIter, EnumString};
-
 use sui_sdk::rpc_types::{SuiExecutionStatus, SuiTransactionBlockKind};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
@@ -440,7 +439,8 @@ impl From<&SuiTransactionBlockKind> for OperationType {
             SuiTransactionBlockKind::Genesis(_) => OperationType::Genesis,
             SuiTransactionBlockKind::ConsensusCommitPrologue(_)
             | SuiTransactionBlockKind::ConsensusCommitPrologueV2(_)
-            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_) => OperationType::ConsensusCommitPrologue,
+            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_)
+            | SuiTransactionBlockKind::ConsensusCommitPrologueV4(_) => OperationType::ConsensusCommitPrologue,
             SuiTransactionBlockKind::ProgrammableTransaction(_) => OperationType::ProgrammableTransaction,
             SuiTransactionBlockKind::AuthenticatorStateUpdate(_) => OperationType::AuthenticatorStateUpdate,
             SuiTransactionBlockKind::RandomnessStateUpdate(_) => OperationType::RandomnessStateUpdate,
@@ -901,7 +901,7 @@ impl InternalOperation {
         let pt = match self {
             Self::PaySui { recipients, amounts, .. } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
-                builder.pay_oct(recipients, amounts)?;
+                builder.pay_sui(recipients, amounts)?;
                 builder.finish()
             }
             Self::PayCoin { recipients, amounts, .. } => {

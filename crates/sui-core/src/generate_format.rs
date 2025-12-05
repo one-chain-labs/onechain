@@ -1,6 +1,8 @@
 // Copyright (c) 2021, Facebook, Inc. and its affiliates
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{fs::File, io::Write, str::FromStr};
+
 use clap::*;
 use fastcrypto_zkp::{bn254::zk_login::OIDCProvider, zk_login_utils::Bn254FrElement};
 use move_core_types::{
@@ -13,7 +15,6 @@ use rand::{rngs::StdRng, SeedableRng};
 use roaring::RoaringBitmap;
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
 use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
-use std::{fs::File, io::Write, str::FromStr};
 use sui_types::{
     base_types::{
         self,
@@ -44,6 +45,7 @@ use sui_types::{
     },
     effects::{IDOperation, ObjectIn, ObjectOut, TransactionEffects, TransactionEvents, UnchangedSharedKind},
     event::Event,
+    execution::ExecutionTimeObservationKey,
     execution_status::{
         CommandArgumentError,
         ExecutionFailureStatus,
@@ -54,12 +56,14 @@ use sui_types::{
     full_checkpoint_content::{CheckpointData, CheckpointTransaction},
     messages_checkpoint::{
         CertifiedCheckpointSummary,
+        CheckpointCommitment,
         CheckpointContents,
         CheckpointContentsDigest,
         CheckpointDigest,
         CheckpointSummary,
         FullCheckpointContents,
     },
+    messages_consensus::ConsensusDeterminedVersionAssignments,
     messages_grpc::ObjectInfoRequestKind,
     move_package::TypeOrigin,
     multisig::{MultiSig, MultiSigPublicKey},
@@ -71,8 +75,10 @@ use sui_types::{
         CallArg,
         Command,
         EndOfEpochTransactionKind,
+        GenesisObject,
         ObjectArg,
         SenderSignedData,
+        StoredExecutionTimeObservations,
         TransactionData,
         TransactionExpiration,
         TransactionKind,
@@ -163,7 +169,7 @@ fn get_registry() -> Result<Registry> {
     let ccd = CheckpointContentsDigest::random();
     tracer.trace_value(&mut samples, &ccd).unwrap();
 
-    let struct_tag = StructTag::from_str("0x2::coin::Coin<0x2::oct::OCT>").unwrap();
+    let struct_tag = StructTag::from_str("0x2::coin::Coin<0x2::sui::SUI>").unwrap();
     tracer.trace_value(&mut samples, &struct_tag).unwrap();
 
     let ccd = CheckpointDigest::random();
@@ -197,6 +203,7 @@ fn get_registry() -> Result<Registry> {
     tracer.trace_type::<TypedStoreError>(&samples).unwrap();
     tracer.trace_type::<ObjectInfoRequestKind>(&samples).unwrap();
     tracer.trace_type::<TransactionKind>(&samples).unwrap();
+    tracer.trace_type::<ConsensusDeterminedVersionAssignments>(&samples).unwrap();
     tracer.trace_type::<MoveObjectType>(&samples).unwrap();
     tracer.trace_type::<MoveObjectType_>(&samples).unwrap();
     tracer.trace_type::<base_types::SuiAddress>(&samples).unwrap();
@@ -207,6 +214,8 @@ fn get_registry() -> Result<Registry> {
     tracer.trace_type::<TypeArgumentError>(&samples).unwrap();
     tracer.trace_type::<PackageUpgradeError>(&samples).unwrap();
     tracer.trace_type::<TransactionExpiration>(&samples).unwrap();
+    tracer.trace_type::<ExecutionTimeObservationKey>(&samples).unwrap();
+    tracer.trace_type::<StoredExecutionTimeObservations>(&samples).unwrap();
     tracer.trace_type::<EndOfEpochTransactionKind>(&samples).unwrap();
 
     tracer.trace_type::<IDOperation>(&samples).unwrap();
@@ -256,6 +265,11 @@ fn get_registry() -> Result<Registry> {
     tracer.trace_type::<CheckpointTransaction>(&samples).unwrap();
 
     tracer.trace_type::<CheckpointData>(&samples).unwrap();
+
+    tracer.trace_type::<TransactionData>(&samples).unwrap();
+    tracer.trace_type::<GenesisObject>(&samples).unwrap();
+    tracer.trace_type::<CheckpointCommitment>(&samples).unwrap();
+    tracer.trace_type::<sui_types::object::Authenticator>(&samples).unwrap();
 
     tracer.registry()
 }

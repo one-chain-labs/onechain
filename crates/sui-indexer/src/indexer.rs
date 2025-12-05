@@ -4,16 +4,15 @@
 use std::{collections::HashMap, env};
 
 use anyhow::Result;
-use prometheus::Registry;
-use tokio::sync::oneshot;
-use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
-
 use async_trait::async_trait;
 use futures::future::try_join_all;
 use mysten_metrics::spawn_monitored_task;
+use prometheus::Registry;
 use sui_data_ingestion_core::{DataIngestionMetrics, IndexerExecutor, ProgressStore, ReaderOptions, WorkerPool};
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
+use tracing::{info, warn};
 
 use crate::{
     build_json_rpc_server,
@@ -133,7 +132,7 @@ impl Indexer {
         info!("Starting data ingestion executor...");
         let futures = executors.into_iter().map(|(executor, exit_receiver)| {
             executor.run(
-                config.sources.data_ingestion_path.clone().unwrap_or(tempfile::tempdir().unwrap().keep()),
+                config.sources.data_ingestion_path.clone().unwrap_or(tempfile::tempdir().unwrap().into_path()),
                 config.sources.remote_store_url.as_ref().map(|url| url.as_str().to_owned()),
                 vec![],
                 extra_reader_options.clone(),

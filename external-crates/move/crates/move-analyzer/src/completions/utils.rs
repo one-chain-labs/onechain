@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::symbols::{
-    mod_ident_to_ide_string,
-    ret_type_to_ide_str,
-    type_args_to_ide_string,
-    type_list_to_ide_string,
-    ModuleDefs,
-    Symbols,
+    mod_ident_to_ide_string, ret_type_to_ide_str, type_args_to_ide_string, type_list_to_ide_string,
+    ModuleDefs, Symbols,
 };
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionItemLabelDetails, InsertTextFormat};
 use move_compiler::{
@@ -21,20 +17,30 @@ use once_cell::sync::Lazy;
 
 /// List of completion items of Move's primitive types.
 pub static PRIMITIVE_TYPE_COMPLETIONS: Lazy<Vec<CompletionItem>> = Lazy::new(|| {
-    let mut primitive_types =
-        PRIMITIVE_TYPES.iter().map(|label| completion_item(label, CompletionItemKind::KEYWORD)).collect::<Vec<_>>();
+    let mut primitive_types = PRIMITIVE_TYPES
+        .iter()
+        .map(|label| completion_item(label, CompletionItemKind::KEYWORD))
+        .collect::<Vec<_>>();
     primitive_types.push(completion_item("address", CompletionItemKind::KEYWORD));
     primitive_types
 });
 
 /// Get definitions for a given module.
 pub fn mod_defs<'a>(symbols: &'a Symbols, mod_ident: &ModuleIdent_) -> Option<&'a ModuleDefs> {
-    symbols.file_mods.values().flatten().find(|mdef| mdef.ident == *mod_ident)
+    symbols
+        .file_mods
+        .values()
+        .flatten()
+        .find(|mdef| mdef.ident == *mod_ident)
 }
 
 /// Constructs an `lsp_types::CompletionItem` with the given `label` and `kind`.
 pub fn completion_item(label: &str, kind: CompletionItemKind) -> CompletionItem {
-    CompletionItem { label: label.to_owned(), kind: Some(kind), ..Default::default() }
+    CompletionItem {
+        label: label.to_owned(),
+        kind: Some(kind),
+        ..Default::default()
+    }
 }
 
 pub fn call_completion_item(
@@ -76,15 +82,25 @@ pub fn call_completion_item(
         .join(", ");
     let macro_suffix = if is_macro { "!" } else { "" };
     let label_details = Some(CompletionItemLabelDetails {
-        detail: Some(format!(" ({}{})", mod_ident_to_ide_string(mod_ident, None, true), function_name)),
+        detail: Some(format!(
+            " ({}{})",
+            mod_ident_to_ide_string(mod_ident, None, true),
+            function_name
+        )),
         description: Some(sig_string),
     });
 
     let method_name = method_name_opt.unwrap_or(function_name);
     let (insert_text, insert_text_format) = if inside_use {
-        (Some(format!("{method_name}")), Some(InsertTextFormat::PLAIN_TEXT))
+        (
+            Some(format!("{method_name}")),
+            Some(InsertTextFormat::PLAIN_TEXT),
+        )
     } else {
-        (Some(format!("{method_name}{macro_suffix}({arg_snippet})")), Some(InsertTextFormat::SNIPPET))
+        (
+            Some(format!("{method_name}{macro_suffix}({arg_snippet})")),
+            Some(InsertTextFormat::SNIPPET),
+        )
     };
 
     CompletionItem {

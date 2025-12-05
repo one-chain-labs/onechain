@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sp;
-
 use super::{
     error::{Span, Spanned},
     token::{Lexeme, Token as T},
 };
+use crate::sp;
 
 pub struct Lexer<'l, I: Iterator<Item = &'l str>> {
     pub buf: &'l str,
@@ -37,7 +36,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         loop {
             if let Some((ix, c)) = self.next_char_boundary() {
                 if c.is_whitespace() {
-                    self.buf = &self.buf[ix..];
+                    self.buf = &self.buf[ix ..];
                     self.offset += ix;
                 } else {
                     break;
@@ -59,7 +58,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         let rest = self.buf.strip_prefix(patt)?;
 
         let len = self.buf.len() - rest.len();
-        let value = &self.buf[..len];
+        let value = &self.buf[.. len];
         self.offset += len;
         self.buf = rest;
 
@@ -79,7 +78,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         };
 
         let len = self.buf.len() - rest.len();
-        let value = &self.buf[..len];
+        let value = &self.buf[.. len];
         self.offset += len;
         self.buf = rest;
 
@@ -104,7 +103,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
         let start = self.offset;
         let (ix, _) = self.next_char_boundary()?;
 
-        let value = &self.buf[..ix];
+        let value = &self.buf[.. ix];
         let span = Span { start, end: start + ix };
         Some(Spanned { span, value })
     }
@@ -112,7 +111,7 @@ impl<'l, I: Iterator<Item = &'l str>> Lexer<'l, I> {
     /// Consume the next character in the current shell token, assuming there is one.
     fn bump(&mut self) {
         if let Some((ix, _)) = self.next_char_boundary() {
-            self.buf = &self.buf[ix..];
+            self.buf = &self.buf[ix ..];
             self.offset += ix;
         }
     }

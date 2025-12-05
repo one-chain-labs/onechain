@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::{future::join_all, join};
-use rand::distributions::Distribution;
 use std::{
     net::SocketAddr,
     ops::Deref,
     time::{Duration, SystemTime},
 };
+
+use futures::{future::join_all, join};
+use rand::distributions::Distribution;
 use sui_config::node::AuthorityOverloadConfig;
 use sui_core::consensus_adapter::position_submit_certificate;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
@@ -479,7 +480,7 @@ async fn shared_object_sync() {
 
     // Let's submit the transaction to the original set of validators, except the first.
     let (effects, _) = test_cluster
-        .submit_transaction_to_validators(increment_counter_transaction.clone(), &validators[1..])
+        .submit_transaction_to_validators(increment_counter_transaction.clone(), &validators[1 ..])
         .await
         .unwrap();
     assert!(effects.status().is_ok());
@@ -487,7 +488,7 @@ async fn shared_object_sync() {
     // Submit transactions to the out-of-date authority.
     // It will succeed because we share owned object certificates through narwhal
     let (effects, _) =
-        test_cluster.submit_transaction_to_validators(increment_counter_transaction, &validators[0..1]).await.unwrap();
+        test_cluster.submit_transaction_to_validators(increment_counter_transaction, &validators[0 .. 1]).await.unwrap();
     assert!(effects.status().is_ok());
 }
 
@@ -503,7 +504,7 @@ async fn replay_shared_object_transaction() {
         .sign_transaction(&test_cluster.test_transaction_builder().await.call_counter_create(package_id).build());
 
     let mut version = None;
-    for _ in 0..2 {
+    for _ in 0 .. 2 {
         let effects = test_cluster.execute_transaction(create_counter_transaction.clone()).await.effects.unwrap();
 
         // Ensure the sequence number of the shared object did not change.

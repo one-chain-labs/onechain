@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::str::FromStr;
+
 use eyre::eyre;
 use fastcrypto::encoding::decode_bytes_hex;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::str::FromStr;
 
 pub const INTENT_PREFIX_LENGTH: usize = 3;
 

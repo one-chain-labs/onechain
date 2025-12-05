@@ -7,6 +7,13 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 pub mod checked {
 
+    use enum_dispatch::enum_dispatch;
+    use itertools::MultiUnzip;
+    use schemars::JsonSchema;
+    use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
+    use sui_protocol_config::ProtocolConfig;
+
     use crate::{
         effects::{TransactionEffects, TransactionEffectsAPI},
         error::{ExecutionError, SuiResult, UserInputError, UserInputResult},
@@ -16,12 +23,6 @@ pub mod checked {
         transaction::ObjectReadResult,
         ObjectID,
     };
-    use enum_dispatch::enum_dispatch;
-    use itertools::MultiUnzip;
-    use schemars::JsonSchema;
-    use serde::{Deserialize, Serialize};
-    use serde_with::serde_as;
-    use sui_protocol_config::ProtocolConfig;
 
     #[enum_dispatch]
     pub trait SuiGasStatusAPI {
@@ -31,6 +32,7 @@ pub mod checked {
         fn bucketize_computation(&mut self) -> Result<(), ExecutionError>;
         fn summary(&self) -> GasCostSummary;
         fn gas_budget(&self) -> u64;
+        fn gas_price(&self) -> u64;
         fn storage_gas_units(&self) -> u64;
         fn storage_rebate(&self) -> u64;
         fn unmetered_storage_rebate(&self) -> u64;
@@ -82,6 +84,12 @@ pub mod checked {
         pub fn check_gas_balance(&self, gas_objs: &[&ObjectReadResult], gas_budget: u64) -> UserInputResult {
             match self {
                 Self::V2(status) => status.check_gas_balance(gas_objs, gas_budget),
+            }
+        }
+
+        pub fn gas_price(&self) -> u64 {
+            match self {
+                Self::V2(status) => status.gas_price(),
             }
         }
     }

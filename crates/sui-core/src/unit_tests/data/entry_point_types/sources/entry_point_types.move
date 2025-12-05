@@ -4,7 +4,7 @@
 module entry_point_types::entry_point_types {
     use std::ascii;
     use std::string;
-    use one::tx_context::TxContext;
+    use sui::tx_context::TxContext;
     use std::vector;
     use std::option::Option;
 

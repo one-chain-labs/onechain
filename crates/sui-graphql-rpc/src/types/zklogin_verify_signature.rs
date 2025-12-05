@@ -3,18 +3,6 @@
 
 use std::sync::Arc;
 
-use crate::{
-    config::ZkLoginConfig,
-    error::Error,
-    server::watermark_task::Watermark,
-    types::{
-        base64::Base64,
-        dynamic_field::{DynamicField, DynamicFieldName},
-        epoch::Epoch,
-        sui_address::SuiAddress,
-        type_filter::ExactTypeFilter,
-    },
-};
 use async_graphql::*;
 use im::hashmap::HashMap as ImHashMap;
 use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage};
@@ -29,6 +17,19 @@ use sui_types::{
     SUI_AUTHENTICATOR_STATE_ADDRESS,
 };
 use tracing::warn;
+
+use crate::{
+    config::ZkLoginConfig,
+    error::Error,
+    server::watermark_task::Watermark,
+    types::{
+        base64::Base64,
+        dynamic_field::{DynamicField, DynamicFieldName},
+        epoch::Epoch,
+        sui_address::SuiAddress,
+        type_filter::ExactTypeFilter,
+    },
+};
 
 /// An enum that specifies the intent scope to be used to parse the bytes for signature
 /// verification.
@@ -109,7 +110,7 @@ pub(crate) async fn verify_zklogin_signature(
             }
         }
     }
-    let verify_params = VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, Some(30));
+    let verify_params = VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, true, Some(30));
 
     let bytes = bytes.0;
     match intent_scope {

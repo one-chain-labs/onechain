@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::{HashMap, HashSet};
+
 use futures::{
     stream::{FuturesOrdered, FuturesUnordered},
     StreamExt,
@@ -10,20 +12,18 @@ use rand::{
     rngs::OsRng,
     Rng,
 };
-use std::collections::{HashMap, HashSet};
+use sui_macros::*;
 use sui_test_transaction_builder::make_transfer_sui_transaction;
+use test_cluster::TestClusterBuilder;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, trace};
 
-use sui_macros::*;
-use test_cluster::TestClusterBuilder;
-
 async fn make_fut(i: usize) -> usize {
-    let count_dist = Uniform::from(1..5);
-    let sleep_dist = Uniform::from(1000..10000);
+    let count_dist = Uniform::from(1 .. 5);
+    let sleep_dist = Uniform::from(1000 .. 10000);
 
     let count = count_dist.sample(&mut OsRng);
-    for _ in 0..count {
+    for _ in 0 .. count {
         let dur = Duration::from_millis(sleep_dist.sample(&mut OsRng));
         trace!("sleeping for {:?}", dur);
         sleep(dur).await;
@@ -37,7 +37,7 @@ async fn make_fut(i: usize) -> usize {
 async fn test_futures_ordered() {
     telemetry_subscribers::init_for_testing();
 
-    let mut futures = FuturesOrdered::from_iter((0..200).map(make_fut));
+    let mut futures = FuturesOrdered::from_iter((0 .. 200).map(make_fut));
 
     while (futures.next().await).is_some() {
         // mix rng state as futures finish
@@ -50,11 +50,11 @@ async fn test_futures_ordered() {
 async fn test_futures_unordered() {
     telemetry_subscribers::init_for_testing();
 
-    let mut futures = FuturesUnordered::from_iter((0..200).map(make_fut));
+    let mut futures = FuturesUnordered::from_iter((0 .. 200).map(make_fut));
 
     while let Some(i) = futures.next().await {
         // mix rng state depending on the order futures finish in
-        for _ in 0..i {
+        for _ in 0 .. i {
             OsRng.gen::<u32>();
         }
     }
@@ -63,8 +63,8 @@ async fn test_futures_unordered() {
 
 #[sim_test(check_determinism)]
 async fn test_select_unbiased() {
-    let mut f1 = FuturesUnordered::from_iter((0..200).map(make_fut));
-    let mut f2 = FuturesUnordered::from_iter((0..200).map(make_fut));
+    let mut f1 = FuturesUnordered::from_iter((0 .. 200).map(make_fut));
+    let mut f2 = FuturesUnordered::from_iter((0 .. 200).map(make_fut));
 
     loop {
         tokio::select! {
@@ -99,7 +99,7 @@ async fn test_hash_collections() {
     let mut map = HashMap::new();
     let mut set = HashSet::new();
 
-    for i in 0..1000 {
+    for i in 0 .. 1000 {
         map.insert(i, i);
         set.insert(i);
     }
@@ -107,13 +107,13 @@ async fn test_hash_collections() {
     // mix the random state according to the first 500 elements of each map
     // so that if iteration order changes, we get different results.
     for (i, _) in map.iter().take(500) {
-        for _ in 0..*i {
+        for _ in 0 .. *i {
             OsRng.gen::<u32>();
         }
     }
 
     for i in set.iter().take(500) {
-        for _ in 0..*i {
+        for _ in 0 .. *i {
             OsRng.gen::<u32>();
         }
     }

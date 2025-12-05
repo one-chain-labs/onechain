@@ -6,16 +6,16 @@ use std::time::Duration;
 
 use anyhow::Result;
 use config::JsonRpcConfig;
+use errors::IndexerError;
 use jsonrpsee::http_client::{HeaderMap, HeaderValue, HttpClient, HttpClientBuilder};
 use metrics::IndexerMetrics;
 use mysten_metrics::spawn_monitored_task;
 use prometheus::Registry;
+use sui_json_rpc::{JsonRpcServerBuilder, ServerHandle, ServerType};
+use sui_json_rpc_api::CLIENT_SDK_TYPE_HEADER;
 use system_package_task::SystemPackageTask;
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
-
-use sui_json_rpc::{JsonRpcServerBuilder, ServerHandle, ServerType};
-use sui_json_rpc_api::CLIENT_SDK_TYPE_HEADER;
 
 use crate::{
     apis::{
@@ -30,7 +30,6 @@ use crate::{
     },
     indexer_reader::IndexerReader,
 };
-use errors::IndexerError;
 
 pub mod apis;
 pub mod backfill;
@@ -80,13 +79,10 @@ fn get_http_client(rpc_client_url: &str) -> Result<HttpClient, IndexerError> {
     let mut headers = HeaderMap::new();
     headers.insert(CLIENT_SDK_TYPE_HEADER, HeaderValue::from_static("indexer"));
 
-    HttpClientBuilder::default()
-        .max_request_body_size(2 << 30)
-        .max_concurrent_requests(usize::MAX)
-        .set_headers(headers.clone())
-        .build(rpc_client_url)
-        .map_err(|e| {
+    HttpClientBuilder::default().max_request_size(2 << 30).set_headers(headers.clone()).build(rpc_client_url).map_err(
+        |e| {
             warn!("Failed to get new Http client with error: {:?}", e);
             IndexerError::HttpClientInitError(format!("Failed to initialize fullnode RPC client with error: {:?}", e))
-        })
+        },
+    )
 }

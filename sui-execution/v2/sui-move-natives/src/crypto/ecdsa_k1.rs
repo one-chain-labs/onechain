@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use fastcrypto::{
     error::FastCryptoError,
     hash::{Keccak256, Sha256},
@@ -17,7 +18,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 pub const FAIL_TO_RECOVER_PUBKEY: u64 = 0;
 pub const INVALID_SIGNATURE: u64 = 1;
@@ -104,7 +106,7 @@ pub fn ecrecover(
     native_charge_gas_early_exit!(
         context,
         cost_per_byte * (msg_ref.len() as u64).into()
-            + cost_per_block * (((msg_ref.len() + block_size - 1) / block_size) as u64).into()
+            + cost_per_block * (msg_ref.len().div_ceil(block_size) as u64).into()
     );
 
     let cost = context.gas_used();
@@ -235,7 +237,7 @@ pub fn secp256k1_verify(
     native_charge_gas_early_exit!(
         context,
         cost_per_byte * (msg_ref.len() as u64).into()
-            + cost_per_block * (((msg_ref.len() + block_size - 1) / block_size) as u64).into()
+            + cost_per_block * (msg_ref.len().div_ceil(block_size) as u64).into()
     );
 
     let cost = context.gas_used();

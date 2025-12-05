@@ -1,16 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    config::ReplayableNetworkConfigSet,
-    types::{ReplayEngineError, MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD},
-    LocalExec,
-};
 use sui_config::node::ExpensiveSafetyCheckConfig;
 use sui_json_rpc_api::QUERY_MAX_RESULT_LIMIT;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_sdk::{SuiClient, SuiClientBuilder};
 use sui_types::{base_types::SuiAddress, digests::TransactionDigest};
+
+use crate::{
+    config::ReplayableNetworkConfigSet,
+    types::{ReplayEngineError, MAX_CONCURRENT_REQUESTS, RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD},
+    LocalExec,
+};
 
 /// Keep searching for non-system TXs in the checkppints for this long
 /// Very unlikely to take this long, but we want to be sure we find one

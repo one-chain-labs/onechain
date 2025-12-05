@@ -6,30 +6,13 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
 
-    use crate::execution_mode::{self, ExecutionMode};
+    use std::{collections::HashSet, sync::Arc};
+
     use move_binary_format::CompiledModule;
     use move_vm_runtime::move_vm::MoveVM;
-    use std::{collections::HashSet, sync::Arc};
-    use sui_types::{
-        balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
-        base_types::SequenceNumber,
-        gas_coin::GAS,
-        messages_checkpoint::CheckpointTimestamp,
-        metrics::LimitsMetrics,
-        object::OBJECT_START_VERSION,
-        programmable_transaction_builder::ProgrammableTransactionBuilder,
-    };
-    use tracing::{info, instrument, trace, warn};
-
-    use crate::{
-        gas_charger::GasCharger,
-        programmable_transactions,
-        temporary_store::TemporaryStore,
-        type_layout_resolver::TypeLayoutResolver,
-    };
     use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
     #[cfg(msim)]
-    use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result;
+    use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result_legacy;
     use sui_types::{
         authenticator_state::{
             AUTHENTICATOR_STATE_CREATE_FUNCTION_NAME,
@@ -37,7 +20,8 @@ mod checked {
             AUTHENTICATOR_STATE_MODULE_NAME,
             AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME,
         },
-        base_types::{ObjectID, ObjectRef, SuiAddress, TransactionDigest, TxContext},
+        balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
+        base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest, TxContext},
         clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME},
         committee::EpochId,
         effects::TransactionEffects,
@@ -46,8 +30,12 @@ mod checked {
         execution_config_utils::to_binary_config,
         execution_status::{CongestedObjects, ExecutionStatus},
         gas::{GasCostSummary, SuiGasStatus},
+        gas_coin::GAS,
         inner_temporary_store::InnerTemporaryStore,
-        object::{Object, ObjectInner},
+        messages_checkpoint::CheckpointTimestamp,
+        metrics::LimitsMetrics,
+        object::{Object, ObjectInner, OBJECT_START_VERSION},
+        programmable_transaction_builder::ProgrammableTransactionBuilder,
         storage::BackingStore,
         sui_system_state::{
             AdvanceEpochParams,
@@ -73,6 +61,15 @@ mod checked {
         SUI_FRAMEWORK_ADDRESS,
         SUI_FRAMEWORK_PACKAGE_ID,
         SUI_SYSTEM_PACKAGE_ID,
+    };
+    use tracing::{info, instrument, trace, warn};
+
+    use crate::{
+        execution_mode::{self, ExecutionMode},
+        gas_charger::GasCharger,
+        programmable_transactions,
+        temporary_store::TemporaryStore,
+        type_layout_resolver::TypeLayoutResolver,
     };
 
     #[instrument(name = "tx_execute_to_effects", level = "debug", skip_all)]
@@ -104,8 +101,15 @@ mod checked {
 
         let mut gas_charger = GasCharger::new(transaction_digest, gas_coins, gas_status, protocol_config);
 
-        let mut tx_ctx =
-            TxContext::new_from_components(&transaction_signer, &transaction_digest, epoch_id, epoch_timestamp_ms);
+        let mut tx_ctx = TxContext::new_from_components(
+            &transaction_signer,
+            &transaction_digest,
+            epoch_id,
+            epoch_timestamp_ms,
+            // Those values are unused in execution versions before 3 (or latest)
+            1,
+            None,
+        );
 
         let is_epoch_change = transaction_kind.is_end_of_epoch_tx();
 
@@ -550,6 +554,19 @@ mod checked {
                 .expect("ConsensusCommitPrologue cannot fail");
                 Ok(Mode::empty_results())
             }
+            TransactionKind::ConsensusCommitPrologueV4(prologue) => {
+                setup_consensus_commit(
+                    prologue.commit_timestamp_ms,
+                    temporary_store,
+                    tx_ctx,
+                    move_vm,
+                    gas_charger,
+                    protocol_config,
+                    metrics,
+                )
+                .expect("ConsensusCommitPrologue cannot fail");
+                Ok(Mode::empty_results())
+            }
             TransactionKind::ProgrammableTransaction(pt) => programmable_transactions::execution::execute::<Mode>(
                 protocol_config,
                 metrics,
@@ -600,6 +617,9 @@ mod checked {
                         }
                         EndOfEpochTransactionKind::BridgeCommitteeInit(_) => {
                             panic!("EndOfEpochTransactionKind::BridgeCommitteeInit should not exist in v1");
+                        }
+                        EndOfEpochTransactionKind::StoreExecutionTimeObservations(_) => {
+                            panic!("EndOfEpochTransactionKind::StoreExecutionTimeEstimates should not exist in v1");
                         }
                     }
                 }
@@ -775,7 +795,7 @@ mod checked {
         );
 
         #[cfg(msim)]
-        let result = maybe_modify_result(result, change_epoch.epoch);
+        let result = maybe_modify_result_legacy(result, change_epoch.epoch);
 
         if result.is_err() {
             tracing::error!(

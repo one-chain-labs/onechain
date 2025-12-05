@@ -161,7 +161,7 @@ fn verify_entry_function_impl(
 
     let all_non_ctx_params = match params.0.last() {
         Some(last_param) if TxContext::kind(module, last_param) != TxContextKind::None => {
-            &params.0[0..params.0.len() - 1]
+            &params.0[0 .. params.0.len() - 1]
         }
         _ => &params.0,
     };
@@ -203,7 +203,7 @@ fn verify_param_type(
     param: &SignatureToken,
     verifier_config: &VerifierConfig,
 ) -> Result<(), String> {
-    // Only `one::one_system` is allowed to expose entry functions that accept a mutable clock
+    // Only `sui::sui_system` is allowed to expose entry functions that accept a mutable clock
     // parameter.
     if Clock::is_mutable(view, param) {
         return Err(format!(
@@ -213,7 +213,7 @@ fn verify_param_type(
         ));
     }
 
-    // Only `one::one_system` is allowed to expose entry functions that accept a mutable Random
+    // Only `sui::sui_system` is allowed to expose entry functions that accept a mutable Random
     // parameter.
     if verifier_config.reject_mutable_random_on_entry_functions && is_mutable_random(view, param) {
         return Err(format!(

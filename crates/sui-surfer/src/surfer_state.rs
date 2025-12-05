@@ -1,21 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use indexmap::IndexSet;
-use move_binary_format::{file_format::Visibility, normalized::Type};
-use move_core_types::language_storage::StructTag;
-use rand::rngs::StdRng;
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
     sync::Arc,
     time::Duration,
 };
+
+use indexmap::IndexSet;
+use move_binary_format::{file_format::Visibility, normalized::Type};
+use move_core_types::language_storage::StructTag;
+use rand::rngs::StdRng;
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::BuildConfig;
 use sui_protocol_config::{Chain, ProtocolConfig};
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
+    base_types::{ConsensusObjectSequenceKey, ObjectID, ObjectRef, SuiAddress},
     execution_config_utils::to_binary_config,
     object::{Object, Owner},
     storage::WriteKind,
@@ -99,7 +100,7 @@ pub type ImmObjects = Arc<RwLock<HashMap<StructTag, Vec<ObjectRef>>>>;
 
 /// Map from StructTag to a vector of shared objects, where each shared object is a tuple of
 /// (object ID, initial shared version).
-pub type SharedObjects = Arc<RwLock<HashMap<StructTag, Vec<(ObjectID, SequenceNumber)>>>>;
+pub type SharedObjects = Arc<RwLock<HashMap<StructTag, Vec<ConsensusObjectSequenceKey>>>>;
 
 pub struct SurferState {
     pub id: usize,
@@ -338,7 +339,7 @@ impl SurferState {
         self.immutable_objects.read().await.get(type_tag).unwrap()[n]
     }
 
-    pub async fn choose_nth_shared_object(&self, type_tag: &StructTag, n: usize) -> (ObjectID, SequenceNumber) {
+    pub async fn choose_nth_shared_object(&self, type_tag: &StructTag, n: usize) -> ConsensusObjectSequenceKey {
         self.shared_objects.read().await.get(type_tag).unwrap()[n]
     }
 }

@@ -4,35 +4,35 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use move_binary_format::CompiledModule;
-use move_vm_config::verifier::{MeterConfig, VerifierConfig};
-use sui_protocol_config::ProtocolConfig;
-use sui_types::{
-    base_types::{ObjectRef, SuiAddress, TxContext},
-    committee::EpochId,
-    digests::TransactionDigest,
-    effects::TransactionEffects,
-    error::{ExecutionError, SuiError, SuiResult},
-    execution::{ExecutionResult, TypeLayoutStore},
-    gas::SuiGasStatus,
-    inner_temporary_store::InnerTemporaryStore,
-    layout_resolver::LayoutResolver,
-    metrics::{BytecodeVerifierMetrics, LimitsMetrics},
-    transaction::{CheckedInputObjects, ProgrammableTransaction, TransactionKind},
-};
-
 use move_bytecode_verifier_meter::Meter;
+use move_trace_format::format::MoveTraceBuilder;
+use move_vm_config::verifier::{MeterConfig, VerifierConfig};
 use move_vm_runtime_v1::move_vm::MoveVM;
 use sui_adapter_v1::{
     adapter::{new_move_vm, run_metered_move_bytecode_verifier},
     execution_engine::{execute_genesis_state_update, execute_transaction_to_effects},
+    execution_mode,
     type_layout_resolver::TypeLayoutResolver,
 };
 use sui_move_natives_v1::all_natives;
-use sui_types::storage::BackingStore;
+use sui_protocol_config::ProtocolConfig;
+use sui_types::{
+    base_types::{SuiAddress, TxContext},
+    committee::EpochId,
+    digests::TransactionDigest,
+    effects::TransactionEffects,
+    error::{ExecutionError, SuiError, SuiResult},
+    execution::{ExecutionResult, ExecutionTiming, TypeLayoutStore},
+    gas::SuiGasStatus,
+    inner_temporary_store::InnerTemporaryStore,
+    layout_resolver::LayoutResolver,
+    metrics::{BytecodeVerifierMetrics, LimitsMetrics},
+    storage::BackingStore,
+    transaction::{CheckedInputObjects, GasData, ProgrammableTransaction, TransactionKind},
+};
 use sui_verifier_v1::meter::SuiVerifierMeter;
 
 use crate::{executor, verifier};
-use sui_adapter_v1::execution_mode;
 
 pub(crate) struct Executor(Arc<MoveVM>);
 
@@ -68,13 +68,15 @@ impl executor::Executor for Executor {
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         input_objects: CheckedInputObjects,
-        gas_coins: Vec<ObjectRef>,
+        gas: GasData,
         gas_status: SuiGasStatus,
         transaction_kind: TransactionKind,
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
-    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<(), ExecutionError>) {
-        execute_transaction_to_effects::<execution_mode::Normal>(
+        _trace_builder_opt: &mut Option<MoveTraceBuilder>,
+    ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Vec<ExecutionTiming>, Result<(), ExecutionError>) {
+        let gas_coins = gas.payment;
+        let (inner_temp_store, gas_status, effects, result) = execute_transaction_to_effects::<execution_mode::Normal>(
             store,
             input_objects,
             gas_coins,
@@ -89,7 +91,9 @@ impl executor::Executor for Executor {
             metrics,
             enable_expensive_checks,
             certificate_deny_set,
-        )
+        );
+        // note: old versions do not report timings.
+        (inner_temp_store, gas_status, effects, vec![], result)
     }
 
     fn dev_inspect_transaction(
@@ -102,13 +106,14 @@ impl executor::Executor for Executor {
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         input_objects: CheckedInputObjects,
-        gas_coins: Vec<ObjectRef>,
+        gas: GasData,
         gas_status: SuiGasStatus,
         transaction_kind: TransactionKind,
         transaction_signer: SuiAddress,
         transaction_digest: TransactionDigest,
         skip_all_checks: bool,
     ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Vec<ExecutionResult>, ExecutionError>) {
+        let gas_coins = gas.payment;
         if skip_all_checks {
             execute_transaction_to_effects::<execution_mode::DevInspect<true>>(
                 store,
@@ -151,10 +156,22 @@ impl executor::Executor for Executor {
         store: &dyn BackingStore,
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
-        tx_context: &mut TxContext,
+        epoch_id: EpochId,
+        epoch_timestamp_ms: u64,
+        transaction_digest: &TransactionDigest,
         input_objects: CheckedInputObjects,
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
+        let tx_context = &mut TxContext::new_from_components(
+            &SuiAddress::default(),
+            transaction_digest,
+            &epoch_id,
+            epoch_timestamp_ms,
+            // genesis transaction: RGP: 1, sponsor: None
+            // Those values are unused anyway in execution versions before 3 (or latest)
+            1,
+            None,
+        );
         execute_genesis_state_update(store, protocol_config, metrics, &self.0, tx_context, input_objects, pt)
     }
 
@@ -166,7 +183,7 @@ impl executor::Executor for Executor {
     }
 }
 
-impl<'m> verifier::Verifier for Verifier<'m> {
+impl verifier::Verifier for Verifier<'_> {
     fn meter(&self, config: MeterConfig) -> Box<dyn Meter> {
         Box::new(SuiVerifierMeter::new(config))
     }

@@ -4,6 +4,7 @@
 use std::{sync::Arc, time::Instant};
 
 use consensus_config::{AuthorityIndex, Committee, NetworkKeyPair, Parameters, ProtocolKeyPair};
+use itertools::Itertools;
 use parking_lot::RwLock;
 use prometheus::Registry;
 use sui_protocol_config::{ConsensusNetwork, ProtocolConfig};
@@ -174,11 +175,18 @@ where
         registry: Registry,
         boot_counter: u64,
     ) -> Self {
+        assert!(committee.is_valid_index(own_index), "Invalid own index {}", own_index);
+        let own_hostname = &committee.authority(own_index).hostname;
         info!(
-            "Starting consensus authority {}\n{:#?}\n{:#?}\n{:?}\nBoot counter: {}",
-            own_index, committee, parameters, protocol_config.version, boot_counter
+            "Starting consensus authority {} {}, {:?}, boot counter {}",
+            own_index, own_hostname, protocol_config.version, boot_counter
         );
-        assert!(committee.is_valid_index(own_index));
+        info!(
+            "Consensus authorities: {}",
+            committee.authorities().map(|(i, a)| format!("{}: {}", i, a.hostname)).join(", ")
+        );
+        info!("Consensus parameters: {:?}", parameters);
+        info!("Consensus committee: {:?}", committee);
         let context = Arc::new(Context::new(
             own_index,
             committee,
@@ -404,7 +412,7 @@ mod tests {
         let registry = Registry::new();
 
         let temp_dir = TempDir::new().unwrap();
-        let parameters = Parameters { db_path: temp_dir.keep(), ..Default::default() };
+        let parameters = Parameters { db_path: temp_dir.into_path(), ..Default::default() };
         let txn_verifier = NoopTransactionVerifier {};
 
         let own_index = committee.to_authority_index(0).unwrap();
@@ -450,7 +458,11 @@ mod tests {
         let mut protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
         protocol_config.set_consensus_gc_depth_for_testing(gc_depth);
 
-        let temp_dirs = (0..NUM_OF_AUTHORITIES).map(|_| TempDir::new().unwrap()).collect::<Vec<_>>();
+        if gc_depth == 0 {
+            protocol_config.set_consensus_linearize_subdag_v2_for_testing(false);
+        }
+
+        let temp_dirs = (0 .. NUM_OF_AUTHORITIES).map(|_| TempDir::new().unwrap()).collect::<Vec<_>>();
 
         let mut output_receivers = Vec::with_capacity(committee.size());
         let mut authorities = Vec::with_capacity(committee.size());
@@ -474,7 +486,7 @@ mod tests {
 
         const NUM_TRANSACTIONS: u8 = 15;
         let mut submitted_transactions = BTreeSet::<Vec<u8>>::new();
-        for i in 0..NUM_TRANSACTIONS {
+        for i in 0 .. NUM_TRANSACTIONS {
             let txn = vec![i; 16];
             submitted_transactions.insert(txn.clone());
             authorities[i as usize % authorities.len()].transaction_client().submit(vec![txn]).await.unwrap();
@@ -540,7 +552,7 @@ mod tests {
         let (committee, keypairs) = local_committee_and_keys(0, vec![1; num_authorities]);
         let protocol_config: ProtocolConfig = ProtocolConfig::get_for_max_version_UNSAFE();
 
-        let temp_dirs = (0..num_authorities).map(|_| TempDir::new().unwrap()).collect::<Vec<_>>();
+        let temp_dirs = (0 .. num_authorities).map(|_| TempDir::new().unwrap()).collect::<Vec<_>>();
 
         let mut output_receivers = Vec::with_capacity(committee.size());
         let mut authorities: Vec<ConsensusAuthority> = Vec::with_capacity(committee.size());
@@ -564,7 +576,7 @@ mod tests {
 
         const NUM_TRANSACTIONS: u8 = 15;
         let mut submitted_transactions = BTreeSet::<Vec<u8>>::new();
-        for i in 0..NUM_TRANSACTIONS {
+        for i in 0 .. NUM_TRANSACTIONS {
             let txn = vec![i; 16];
             submitted_transactions.insert(txn.clone());
             authorities[i as usize % authorities.len()].transaction_client().submit(vec![txn]).await.unwrap();
@@ -637,6 +649,10 @@ mod tests {
 
         let mut protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
         protocol_config.set_consensus_gc_depth_for_testing(gc_depth);
+
+        if gc_depth == 0 {
+            protocol_config.set_consensus_linearize_subdag_v2_for_testing(false);
+        }
 
         for (index, _authority_info) in committee.authorities() {
             let dir = TempDir::new().unwrap();

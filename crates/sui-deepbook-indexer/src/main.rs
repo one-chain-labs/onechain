@@ -1,15 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use clap::*;
-use mysten_metrics::start_prometheus_server;
 use std::{
     env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::Arc,
 };
+
+use anyhow::Result;
+use clap::*;
+use mysten_metrics::start_prometheus_server;
 use sui_config::Config;
 use sui_data_ingestion_core::DataIngestionMetrics;
 use sui_deepbook_indexer::{
@@ -72,7 +73,7 @@ async fn main() -> Result<()> {
         config.remote_store_url,
         sui_client,
         config.concurrency as usize,
-        config.checkpoints_path.map(|p| p.into()).unwrap_or(tempfile::tempdir()?.keep()),
+        config.checkpoints_path.map(|p| p.into()).unwrap_or(tempfile::tempdir()?.into_path()),
         config.deepbook_genesis_checkpoint,
         ingestion_metrics.clone(),
         Box::new(indexer_meterics.clone()),

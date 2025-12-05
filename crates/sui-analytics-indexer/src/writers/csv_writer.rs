@@ -12,7 +12,6 @@ use std::{
 use anyhow::{anyhow, Result};
 use csv::{Writer, WriterBuilder};
 use serde::Serialize;
-
 use sui_storage::object_store::util::path_to_filesystem;
 use sui_types::base_types::EpochId;
 
@@ -29,7 +28,7 @@ pub(crate) struct CSVWriter {
 
 impl CSVWriter {
     pub(crate) fn new(root_dir_path: &Path, file_type: FileType, start_checkpoint_seq_num: u64) -> Result<Self> {
-        let checkpoint_range = start_checkpoint_seq_num..u64::MAX;
+        let checkpoint_range = start_checkpoint_seq_num .. u64::MAX;
         let writer = Self::make_writer(root_dir_path.to_path_buf(), file_type, 0, checkpoint_range.clone())?;
         Ok(CSVWriter { root_dir_path: root_dir_path.to_path_buf(), file_type, writer, epoch: 0, checkpoint_range })
     }
@@ -70,7 +69,7 @@ impl<S: Serialize + ParquetSchema> AnalyticsWriter<S> for CSVWriter {
     fn flush(&mut self, end_checkpoint_seq_num: u64) -> Result<bool> {
         self.writer.flush()?;
         let old_file_path = self.file_path(self.epoch, self.checkpoint_range.clone())?;
-        let new_file_path = self.file_path(self.epoch, self.checkpoint_range.start..end_checkpoint_seq_num)?;
+        let new_file_path = self.file_path(self.epoch, self.checkpoint_range.start .. end_checkpoint_seq_num)?;
         fs::rename(old_file_path, new_file_path)?;
         Ok(true)
     }

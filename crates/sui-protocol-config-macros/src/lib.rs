@@ -57,7 +57,7 @@ pub fn accessors_macro(input: TokenStream) -> TokenStream {
                 // Check if field is of type Option<T>
                 match field_type {
                     Type::Path(type_path)
-                        if type_path.path.segments.last().map_or(false, |segment| segment.ident == "Option") =>
+                        if type_path.path.segments.last().is_some_and(|segment| segment.ident == "Option") =>
                     {
                         // Extract inner type T from Option<T>
                         let inner_type = if let syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) =
@@ -290,7 +290,7 @@ pub fn feature_flag_getters_macro(input: TokenStream) -> TokenStream {
                 // Check if field is of type bool
                 match field_type {
                     Type::Path(type_path)
-                        if type_path.path.segments.last().map_or(false, |segment| segment.ident == "bool") =>
+                        if type_path.path.segments.last().is_some_and(|segment| segment.ident == "bool") =>
                     {
                         Some((
                             quote! {

@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{env, path::PathBuf};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use diesel::{dsl::sql, BoolExpressionMethods, ExpressionMethods};
@@ -8,7 +10,6 @@ use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl
 use dotenvy::dotenv;
 use mysten_service::metrics::start_basic_prometheus_server;
 use prometheus::Registry;
-use std::{env, path::PathBuf};
 use sui_data_ingestion_core::{
     DataIngestionMetrics,
     FileProgressStore,
@@ -18,9 +19,6 @@ use sui_data_ingestion_core::{
     WorkerPool,
 };
 use sui_types::full_checkpoint_content::CheckpointData;
-use tokio::sync::oneshot;
-use tracing::info;
-
 use suins_indexer::{
     get_connection_pool,
     indexer::{format_update_field_query, format_update_subdomain_wrapper_query, SuinsIndexer},
@@ -28,6 +26,8 @@ use suins_indexer::{
     schema::domains,
     PgConnectionPool,
 };
+use tokio::sync::oneshot;
+use tracing::info;
 
 struct SuinsIndexerWorker {
     pg_pool: PgConnectionPool,
@@ -127,6 +127,7 @@ impl Worker for SuinsIndexerWorker {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _guard = mysten_service::logging::init();
     dotenv().ok();
     let (remote_storage, registry_id, subdomain_wrapper_type, name_record_type) = (
         env::var("REMOTE_STORAGE").ok(),
@@ -172,5 +173,6 @@ async fn main() -> Result<()> {
             exit_receiver,
         )
         .await?;
+    drop(_guard);
     Ok(())
 }

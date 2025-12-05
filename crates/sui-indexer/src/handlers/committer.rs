@@ -8,14 +8,13 @@ use tap::tap::TapFallible;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument};
 
+use super::{CheckpointDataToCommit, CommitterTables, CommitterWatermark, EpochToCommit};
 use crate::{
     metrics::IndexerMetrics,
     models::raw_checkpoints::StoredRawCheckpoint,
     store::IndexerStore,
     types::IndexerResult,
 };
-
-use super::{CheckpointDataToCommit, CommitterTables, CommitterWatermark, EpochToCommit};
 
 pub(crate) const CHECKPOINT_COMMIT_BATCH_SIZE: usize = 100;
 

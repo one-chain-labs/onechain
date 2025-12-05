@@ -1,14 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{backfill::BackfillTaskKind, db::ConnectionPoolConfig, handlers::pruner::PrunableTable};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
+
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 use strum::IntoEnumIterator;
-use sui_json_rpc::name_service::NameServiceConfig;
+use sui_name_service::NameServiceConfig;
 use sui_types::base_types::{ObjectID, SuiAddress};
 use url::Url;
+
+use crate::{backfill::BackfillTaskKind, db::ConnectionPoolConfig, handlers::pruner::PrunableTable};
 
 /// The primary purpose of objects_history is to serve consistency query.
 /// A short retention is sufficient.
@@ -122,7 +124,14 @@ pub struct IngestionConfig {
 
     /// Whether to delete processed checkpoint files from the local directory,
     /// when running Fullnode-colocated indexer.
-    #[arg(long, default_value_t = true)]
+    #[arg(
+        long,
+        default_value_t = true,
+        default_missing_value = "true",
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        require_equals = false,
+    )]
     pub gc_checkpoint_files: bool,
 }
 
@@ -392,10 +401,12 @@ pub struct BenchmarkConfig {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::io::Write;
+
     use tap::Pipe;
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     fn parse_args<'a, T>(args: impl IntoIterator<Item = &'a str>) -> Result<T, clap::error::Error>
     where

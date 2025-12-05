@@ -6,6 +6,9 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
+    use move_core_types::vm_status::StatusCode;
+    use sui_protocol_config::*;
+
     use crate::{
         error::{ExecutionError, ExecutionErrorKind, UserInputError, UserInputResult},
         gas::{self, GasCostSummary, SuiGasStatusAPI},
@@ -17,8 +20,6 @@ mod checked {
         transaction::ObjectReadResult,
         ObjectID,
     };
-    use move_core_types::vm_status::StatusCode;
-    use sui_protocol_config::*;
 
     /// A bucket defines a range of units that will be priced the same.
     /// After execution a call to `GasStatus::bucketize` will round the computation
@@ -377,6 +378,10 @@ mod checked {
 
         fn gas_budget(&self) -> u64 {
             self.gas_budget
+        }
+
+        fn gas_price(&self) -> u64 {
+            self.gas_price
         }
 
         fn storage_gas_units(&self) -> u64 {

@@ -56,7 +56,7 @@ impl Context {
         let context = Context::new(
             AuthorityIndex::new_for_test(0),
             committee,
-            Parameters { db_path: temp_dir.keep(), ..Default::default() },
+            Parameters { db_path: temp_dir.into_path(), ..Default::default() },
             ProtocolConfig::get_for_max_version_UNSAFE(),
             metrics,
             clock,
@@ -79,6 +79,12 @@ impl Context {
     #[cfg(test)]
     pub(crate) fn with_parameters(mut self, parameters: Parameters) -> Self {
         self.parameters = parameters;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_protocol_config(mut self, protocol_config: ProtocolConfig) -> Self {
+        self.protocol_config = protocol_config;
         self
     }
 }

@@ -1,6 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use enum_dispatch::enum_dispatch;
+use move_core_types::{ident_str, identifier::IdentStr};
+use num_enum::TryFromPrimitive;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use strum_macros::Display;
+
 use crate::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     collection_types::{Bag, LinkedTable, LinkedTableNode, VecMap},
@@ -13,13 +21,6 @@ use crate::{
     versioned::Versioned,
     SUI_BRIDGE_OBJECT_ID,
 };
-use enum_dispatch::enum_dispatch;
-use move_core_types::{ident_str, identifier::IdentStr};
-use num_enum::TryFromPrimitive;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use strum_macros::Display;
 
 pub type BridgeInnerDynamicField = Field<u64, BridgeInnerV1>;
 pub type BridgeRecordDyanmicField =

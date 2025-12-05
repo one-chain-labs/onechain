@@ -1,28 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    abi::EthBridgeConfig,
-    crypto::BridgeAuthorityKeyPair,
-    error::BridgeError,
-    eth_client::EthClient,
-    metered_eth_provider::{new_metered_eth_provider, MeteredEthHttpProvier},
-    metrics::BridgeMetrics,
-    sui_client::SuiClient,
-    types::{is_route_valid, BridgeAction},
-    utils::get_eth_contract_addresses,
-};
-use anyhow::anyhow;
-use ethers::{providers::Middleware, types::Address as EthAddress};
-use futures::{future, StreamExt};
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use std::{
     collections::{BTreeMap, HashSet},
     path::PathBuf,
     str::FromStr,
     sync::Arc,
 };
+
+use anyhow::anyhow;
+use ethers::{providers::Middleware, types::Address as EthAddress};
+use futures::{future, StreamExt};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use sui_config::Config;
 use sui_json_rpc_types::Coin;
 use sui_keys::keypair_file::read_key;
@@ -36,6 +26,18 @@ use sui_types::{
     object::Owner,
 };
 use tracing::info;
+
+use crate::{
+    abi::EthBridgeConfig,
+    crypto::BridgeAuthorityKeyPair,
+    error::BridgeError,
+    eth_client::EthClient,
+    metered_eth_provider::{new_metered_eth_provider, MeteredEthHttpProvier},
+    metrics::BridgeMetrics,
+    sui_client::SuiClient,
+    types::{is_route_valid, BridgeAction},
+    utils::get_eth_contract_addresses,
+};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -245,8 +247,15 @@ impl BridgeNodeConfig {
                 .interval(std::time::Duration::from_millis(2000)),
         );
         let chain_id = provider.get_chainid().await?;
-        let (committee_address, limiter_address, vault_address, config_address, _weth_address, _usdt_address) =
-            get_eth_contract_addresses(bridge_proxy_address, &provider).await?;
+        let (
+            committee_address,
+            limiter_address,
+            vault_address,
+            config_address,
+            _weth_address,
+            _usdt_address,
+            _wbtc_address,
+        ) = get_eth_contract_addresses(bridge_proxy_address, &provider).await?;
         let config = EthBridgeConfig::new(config_address, provider.clone());
 
         if self.run_client && self.eth.eth_contracts_start_block_fallback.is_none() {
@@ -342,7 +351,7 @@ impl BridgeNodeConfig {
         let (gas_coin, gas_object_ref, owner) = sui_client.get_gas_data_panic_if_not_gas(gas_object_id).await;
         if owner != Owner::AddressOwner(client_sui_address) {
             return Err(anyhow!(
-                "Gas object {:?} is not owned by bridge client key's associated OneChain address {:?}, but {:?}",
+                "Gas object {:?} is not owned by bridge client key's associated sui address {:?}, but {:?}",
                 gas_object_id,
                 client_sui_address,
                 owner

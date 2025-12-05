@@ -3,7 +3,6 @@
 
 use move_core_types::{account_address::AccountAddress, identifier::Identifier, language_storage::StructTag};
 use proptest::{arbitrary::*, prelude::*};
-
 use sui_core::test_utils::send_and_confirm_transaction;
 use sui_types::{
     base_types::ObjectID,

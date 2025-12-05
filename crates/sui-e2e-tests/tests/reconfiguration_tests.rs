@@ -1,17 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::future::join_all;
-use one_node::SuiNodeHandle;
-use rand::rngs::OsRng;
 use std::{
     collections::{BTreeSet, HashSet},
     sync::Arc,
     time::Duration,
 };
+
+use futures::future::join_all;
+use rand::rngs::OsRng;
 use sui_core::consensus_adapter::position_submit_certificate;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::sim_test;
+use sui_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolConfig;
 use sui_swarm_config::genesis_config::{ValidatorGenesisConfig, ValidatorGenesisConfigBuilder};
 use sui_test_transaction_builder::{make_transfer_sui_transaction, TestTransactionBuilder};
@@ -50,6 +51,8 @@ async fn advance_epoch_tx_test() {
                     &GasCostSummary::new(0, 0, 0, 0),
                     0, // checkpoint
                     0, // epoch_start_timestamp_ms
+                    vec![],
+                    0, // last_checkpoint
                 )
                 .await
                 .unwrap();
@@ -81,7 +84,7 @@ async fn test_transaction_expiration() {
 
     let (sender, gas) = test_cluster.wallet.get_one_gas_object().await.unwrap().unwrap();
     let rgp = test_cluster.get_reference_gas_price().await;
-    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(Some(1), sender).build();
+    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(Some(1), sender).build();
     // Expired transaction returns an error
     let mut expired_data = data.clone();
     *expired_data.expiration_mut_for_testing() = TransactionExpiration::Epoch(0);
@@ -108,7 +111,7 @@ async fn reconfig_with_revert_end_to_end_test() {
     let gas1 = gas_objects.pop().unwrap();
     let tx = test_cluster
         .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_oct(None, sender).build());
+        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_sui(None, sender).build());
     let effects1 = test_cluster.execute_transaction(tx).await;
     assert_eq!(0, effects1.effects.unwrap().executed_epoch());
 
@@ -116,7 +119,7 @@ async fn reconfig_with_revert_end_to_end_test() {
     let gas2 = gas_objects.pop().unwrap();
     let tx = test_cluster
         .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_oct(None, sender).build());
+        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_sui(None, sender).build());
     let net = test_cluster.fullnode_handle.sui_node.with(|node| node.clone_authority_aggregator().unwrap());
     let cert = net.process_transaction(tx.clone(), None).await.unwrap().into_cert_for_testing();
 
@@ -233,7 +236,7 @@ async fn test_expired_locks() {
 
     let transfer_sui = |amount| {
         test_cluster.wallet.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_oct(Some(amount), receiver).build(),
+            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_sui(Some(amount), receiver).build(),
         )
     };
 
@@ -265,6 +268,7 @@ async fn test_expired_locks() {
 #[sim_test]
 async fn test_create_advance_epoch_tx_race() {
     use std::sync::Arc;
+
     use sui_macros::{register_fail_point, register_fail_point_async};
     use tokio::sync::broadcast;
     use tracing::info;
@@ -481,7 +485,7 @@ async fn test_reconfig_with_committee_change_stress_determinism() {
 }
 
 async fn do_test_reconfig_with_committee_change_stress() {
-    let mut candidates = (0..6).map(|_| ValidatorGenesisConfigBuilder::new().build(&mut OsRng)).collect::<Vec<_>>();
+    let mut candidates = (0 .. 6).map(|_| ValidatorGenesisConfigBuilder::new().build(&mut OsRng)).collect::<Vec<_>>();
     let addresses = candidates.iter().map(|c| (&c.account_key_pair.public()).into()).collect::<Vec<SuiAddress>>();
     let mut test_cluster = TestClusterBuilder::new()
         .with_num_validators(7)
@@ -541,6 +545,7 @@ async fn do_test_reconfig_with_committee_change_stress() {
 #[sim_test]
 async fn test_epoch_flag_upgrade() {
     use std::sync::Mutex;
+
     use sui_core::authority::epoch_start_configuration::{EpochFlag, EpochStartConfigTrait};
     use sui_macros::register_fail_point_arg;
 
@@ -555,18 +560,21 @@ async fn test_epoch_flag_upgrade() {
             return None;
         }
 
-        // start with no flags set
-        Some(Vec::<EpochFlag>::new())
+        // start with only UseVersionAssignmentTablesV3
+        let flags: Vec<EpochFlag> = vec![EpochFlag::UseVersionAssignmentTablesV3];
+        Some(flags)
     });
 
     let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(30000).build().await;
 
-    let mut any_empty = false;
+    let mut all_flags = vec![];
     for node in test_cluster.all_node_handles() {
-        any_empty = any_empty
-            || node.with(|node| node.state().epoch_store_for_testing().epoch_start_config().flags().is_empty());
+        all_flags.push(node.with(|node| node.state().epoch_store_for_testing().epoch_start_config().flags().to_vec()));
     }
-    assert!(any_empty);
+    all_flags.iter_mut().for_each(|flags| flags.sort());
+    all_flags.sort();
+    all_flags.dedup();
+    assert_eq!(all_flags.len(), 2, "expected 2 different sets of flags: {:?}", all_flags);
 
     test_cluster.wait_for_epoch_all_nodes(1).await;
 

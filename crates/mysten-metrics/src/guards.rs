@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use prometheus::IntGauge;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use prometheus::IntGauge;
 
 /// Increments gauge when acquired, decrements when guard drops
 pub struct GaugeGuard<'a>(&'a IntGauge);
@@ -18,7 +19,7 @@ impl<'a> GaugeGuard<'a> {
     }
 }
 
-impl<'a> Drop for GaugeGuard<'a> {
+impl Drop for GaugeGuard<'_> {
     fn drop(&mut self) {
         self.0.dec();
     }
@@ -40,7 +41,7 @@ pub struct GaugeGuardFuture<'a, F: Sized> {
     _guard: GaugeGuard<'a>,
 }
 
-impl<'a, F: Future> Future for GaugeGuardFuture<'a, F> {
+impl<F: Future> Future for GaugeGuardFuture<'_, F> {
     type Output = F::Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

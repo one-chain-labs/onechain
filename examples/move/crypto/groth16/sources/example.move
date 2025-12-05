@@ -5,7 +5,7 @@
 /// See https://eprint.iacr.org/2016/260.pdf for details.
 module groth16::example;
 
-use one::{bls12381, group_ops::Element};
+use sui::{bls12381, group_ops::Element};
 
 // === Types ===
 

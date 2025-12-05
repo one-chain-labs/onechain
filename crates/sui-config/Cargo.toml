@@ -28,7 +28,6 @@ object_store.workspace = true
 reqwest.workspace = true
 
 consensus-config.workspace = true
-narwhal-config.workspace = true
 sui-keys.workspace = true
 sui-protocol-config.workspace = true
 sui-types.workspace = true
@@ -37,5 +36,4 @@ sui-rpc-api.workspace = true
 mysten-common.workspace = true
 
 [dev-dependencies]
-insta.workspace = true
 tempfile.workspace = true

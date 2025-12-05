@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use core::panic;
+use std::{collections::HashMap, str::from_utf8, sync::Arc, time::Duration};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
-use core::panic;
 use fastcrypto::traits::ToFromBytes;
 use serde::de::DeserializeOwned;
-use std::{collections::HashMap, str::from_utf8, sync::Arc, time::Duration};
 use sui_json_rpc_api::BridgeReadApiClient;
 use sui_json_rpc_types::{
     DevInspectResults,
@@ -535,10 +536,22 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use ethers::types::Address as EthAddress;
+    use move_core_types::account_address::AccountAddress;
+    use serde::{Deserialize, Serialize};
+    use sui_json_rpc_types::BcsEvent;
+    use sui_types::{
+        bridge::{BridgeChainId, TOKEN_ID_SUI, TOKEN_ID_USDC},
+        crypto::get_key_pair,
+    };
+
+    use super::*;
     use crate::{
         crypto::BridgeAuthorityKeyPair,
         e2e_tests::test_utils::TestClusterWrapperBuilder,
-        events::{EmittedSuiToEthTokenBridgeV1, MoveTokenDepositedEvent},
+        events::{init_all_struct_tags, EmittedSuiToEthTokenBridgeV1, MoveTokenDepositedEvent, SuiToEthTokenBridgeV1},
         sui_mock_client::SuiMockClient,
         test_utils::{
             approve_action_with_validator_secrets,
@@ -548,18 +561,6 @@ mod tests {
         },
         types::SuiToEthBridgeAction,
     };
-    use ethers::types::Address as EthAddress;
-    use move_core_types::account_address::AccountAddress;
-    use serde::{Deserialize, Serialize};
-    use std::str::FromStr;
-    use sui_json_rpc_types::BcsEvent;
-    use sui_types::{
-        bridge::{BridgeChainId, TOKEN_ID_SUI, TOKEN_ID_USDC},
-        crypto::get_key_pair,
-    };
-
-    use super::*;
-    use crate::events::{init_all_struct_tags, SuiToEthTokenBridgeV1};
 
     #[tokio::test]
     async fn get_bridge_action_by_tx_digest_and_event_idx_maybe() {
@@ -661,7 +662,7 @@ mod tests {
     async fn test_get_action_onchain_status_for_sui_to_eth_transfer() {
         telemetry_subscribers::init_for_testing();
         let mut bridge_keys = vec![];
-        for _ in 0..=3 {
+        for _ in 0 ..= 3 {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp);
         }

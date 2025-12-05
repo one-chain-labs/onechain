@@ -1,25 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    abi::EthToSuiTokenBridgeV1,
-    crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKey, BridgeAuthoritySignInfo},
-    eth_mock_provider::EthMockProvider,
-    events::{EmittedSuiToEthTokenBridgeV1, SuiBridgeEvent},
-    server::mock_handler::{run_mock_server, BridgeRequestMockHandler},
-    sui_transaction_builder::build_sui_transaction,
-    types::{
-        BridgeAction,
-        BridgeAuthority,
-        BridgeCommittee,
-        BridgeCommitteeValiditySignInfo,
-        CertifiedBridgeAction,
-        EthToSuiBridgeAction,
-        SignedBridgeAction,
-        SuiToEthBridgeAction,
-        VerifiedCertifiedBridgeAction,
-    },
+use std::{
+    collections::{BTreeMap, HashMap},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
 };
+
 use ethers::{
     abi::{long_signature, ParamType},
     types::{
@@ -41,10 +27,6 @@ use fastcrypto::{
 };
 use hex_literal::hex;
 use move_core_types::language_storage::TypeTag;
-use std::{
-    collections::{BTreeMap, HashMap},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-};
 use sui_config::local_ip_utils;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_sdk::wallet_context::WalletContext;
@@ -60,6 +42,26 @@ use sui_types::{
     SUI_BRIDGE_OBJECT_ID,
 };
 use tokio::task::JoinHandle;
+
+use crate::{
+    abi::EthToSuiTokenBridgeV1,
+    crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKey, BridgeAuthoritySignInfo},
+    eth_mock_provider::EthMockProvider,
+    events::{EmittedSuiToEthTokenBridgeV1, SuiBridgeEvent},
+    server::mock_handler::{run_mock_server, BridgeRequestMockHandler},
+    sui_transaction_builder::build_sui_transaction,
+    types::{
+        BridgeAction,
+        BridgeAuthority,
+        BridgeCommittee,
+        BridgeCommitteeValiditySignInfo,
+        CertifiedBridgeAction,
+        EthToSuiBridgeAction,
+        SignedBridgeAction,
+        SuiToEthBridgeAction,
+        VerifiedCertifiedBridgeAction,
+    },
+};
 
 pub const DUMMY_MUTALBE_BRIDGE_OBJECT_ARG: ObjectArg = ObjectArg::SharedObject {
     id: SUI_BRIDGE_OBJECT_ID,
@@ -254,7 +256,7 @@ pub fn get_test_log_and_action(contract_address: EthAddress, tx_hash: TxHash, ev
         eth_event_index: event_index,
         eth_bridge_event: EthToSuiTokenBridgeV1 {
             eth_chain_id: BridgeChainId::try_from(topic_1[topic_1.len() - 1]).unwrap(),
-            nonce: u64::from_be_bytes(log.topics[2].as_ref()[24..32].try_into().unwrap()),
+            nonce: u64::from_be_bytes(log.topics[2].as_ref()[24 .. 32].try_into().unwrap()),
             sui_chain_id: BridgeChainId::try_from(topic_3[topic_3.len() - 1]).unwrap(),
             token_id,
             sui_adjusted_amount,

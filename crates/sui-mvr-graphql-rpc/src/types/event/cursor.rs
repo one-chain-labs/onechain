@@ -1,12 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    consistency::Checkpointed,
-    filter,
-    raw_query::RawQuery,
-    types::cursor::{self, Paginated, RawPaginated, ScanLimited, Target},
-};
 use diesel::{
     backend::Backend,
     deserialize::{self, FromSql, QueryableByName},
@@ -19,6 +13,12 @@ use serde::{Deserialize, Serialize};
 use sui_indexer::{models::events::StoredEvent, schema::events};
 
 use super::Query;
+use crate::{
+    consistency::Checkpointed,
+    filter,
+    raw_query::RawQuery,
+    types::cursor::{self, Paginated, RawPaginated, ScanLimited, Target},
+};
 
 /// Contents of an Event's cursor.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]

@@ -2,18 +2,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, net::IpAddr, sync::Arc};
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap, VecDeque},
+    fmt::Debug,
+    hash::Hash,
+    net::IpAddr,
+    sync::Arc,
+    time::{Duration, Instant, SystemTime},
+};
 
 use count_min_sketch::CountMinSketch32;
 use mysten_metrics::spawn_monitored_task;
 use parking_lot::RwLock;
-use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, VecDeque},
-    fmt::Debug,
-    hash::Hash,
-    time::{Duration, Instant, SystemTime},
-};
 use sui_types::traffic_control::{FreqThresholdConfig, PolicyConfig, PolicyType, Weight};
 use tracing::{info, trace};
 
@@ -102,7 +103,7 @@ impl TrafficSketch {
         );
 
         let mut sketches = VecDeque::with_capacity(num_sketches as usize);
-        for _ in 0..num_sketches {
+        for _ in 0 .. num_sketches {
             sketches.push_back(
                 CountMinSketch32::<SketchKey>::new(sketch_capacity, sketch_probability, sketch_tolerance)
                     .expect("Failed to create CountMinSketch32"),
@@ -465,10 +466,12 @@ impl TestPanicOnInvocationPolicy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::net::{IpAddr, Ipv4Addr};
+
     use sui_macros::sim_test;
     use sui_types::traffic_control::{DEFAULT_SKETCH_CAPACITY, DEFAULT_SKETCH_PROBABILITY, DEFAULT_SKETCH_TOLERANCE};
+
+    use super::*;
 
     #[sim_test]
     async fn test_freq_threshold_policy() {
@@ -508,7 +511,7 @@ mod tests {
         };
 
         // initial 2 tallies for alice, should not block
-        for _ in 0..2 {
+        for _ in 0 .. 2 {
             let response = policy.handle_tally(alice.clone());
             assert_eq!(response.block_proxied_client, None);
             assert_eq!(response.block_client, None);
@@ -522,7 +525,7 @@ mod tests {
         assert!(proxied_rate < 1);
 
         // meanwhile bob spams 10 requests at once and is blocked
-        for _ in 0..9 {
+        for _ in 0 .. 9 {
             let response = policy.handle_tally(bob.clone());
             assert_eq!(response.block_client, None);
             assert_eq!(response.block_proxied_client, None);
@@ -543,7 +546,7 @@ mod tests {
         // per second, but over the average window of 5 seconds
         // we are still below the threshold. Should not block
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        for _ in 0..2 {
+        for _ in 0 .. 2 {
             let response = policy.handle_tally(alice.clone());
             assert_eq!(response.block_client, None);
             assert_eq!(response.block_proxied_client, None);
@@ -567,7 +570,7 @@ mod tests {
 
         // close to threshold for alice, but still below
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        for i in 0..5 {
+        for i in 0 .. 5 {
             let response = policy.handle_tally(alice.clone());
             assert_eq!(response.block_client, None, "Blocked at i = {}", i);
             assert_eq!(response.block_proxied_client, None);
@@ -587,7 +590,7 @@ mod tests {
         assert_eq!(proxied_rate, 2);
 
         // spam through charlie to block connection
-        for i in 0..2 {
+        for i in 0 .. 2 {
             let response = policy.handle_tally(charlie.clone());
             assert_eq!(response.block_client, None, "Blocked at i = {}", i);
             assert_eq!(response.block_proxied_client, None);
@@ -601,7 +604,7 @@ mod tests {
         // as the bursty first second has finally rotated out of the sliding
         // window
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        for i in 0..3 {
+        for i in 0 .. 3 {
             let response = policy.handle_tally(charlie.clone());
             assert_eq!(response.block_client, None, "Blocked at i = {}", i);
             assert_eq!(response.block_proxied_client, None);

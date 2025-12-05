@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use duration_str::parse;
 use std::{fmt::Formatter, str::FromStr, time::Duration};
+
+use duration_str::parse;
 
 pub mod bench_driver;
 pub mod driver;

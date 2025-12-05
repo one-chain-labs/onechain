@@ -1,13 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::payload::{
-    rpc_command_processor::DEFAULT_GAS_BUDGET,
-    PayOct,
-    ProcessPayload,
-    RpcCommandProcessor,
-    SignerInfo,
-};
 use async_trait::async_trait;
 use futures::future::join_all;
 use sui_types::{
@@ -18,9 +11,17 @@ use sui_types::{
 };
 use tracing::debug;
 
+use crate::payload::{
+    rpc_command_processor::DEFAULT_GAS_BUDGET,
+    PaySui,
+    ProcessPayload,
+    RpcCommandProcessor,
+    SignerInfo,
+};
+
 #[async_trait]
-impl<'a> ProcessPayload<'a, &'a PayOct> for RpcCommandProcessor {
-    async fn process(&'a self, _op: &'a PayOct, signer_info: &Option<SignerInfo>) -> anyhow::Result<()> {
+impl<'a> ProcessPayload<'a, &'a PaySui> for RpcCommandProcessor {
+    async fn process(&'a self, _op: &'a PaySui, signer_info: &Option<SignerInfo>) -> anyhow::Result<()> {
         let clients = self.get_clients().await?;
         let SignerInfo { encoded_keypair, gas_budget, gas_payment } = signer_info.clone().unwrap();
         let recipient = SuiAddress::random_for_testing_only();
@@ -38,7 +39,7 @@ impl<'a> ProcessPayload<'a, &'a PayOct> for RpcCommandProcessor {
         let client = clients.first().unwrap();
         let gas_price = client.governance_api().get_reference_gas_price().await.expect("Unable to fetch gas price");
         join_all(gas_payments.iter().map(|gas| async {
-            let tx = TransactionData::new_transfer_oct(
+            let tx = TransactionData::new_transfer_sui(
                 recipient,
                 sender,
                 Some(amount),

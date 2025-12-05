@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module bridge::crypto {
-    use one::ecdsa_k1;
-    use one::hash::keccak256;
+    use sui::ecdsa_k1;
+    use sui::hash::keccak256;
     #[test_only]
-    use one::hex;
+    use sui::hex;
 
     public(package) fun ecdsa_pub_key_to_eth_address(compressed_pub_key: &vector<u8>): vector<u8> {
         // Decompress pub key

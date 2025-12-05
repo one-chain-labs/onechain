@@ -101,7 +101,11 @@ pub struct AstWriter {
 
 impl AstWriter {
     fn new(verbose: bool) -> Self {
-        Self { verbose, margin: 0, lines: vec![String::new()] }
+        Self {
+            verbose,
+            margin: 0,
+            lines: vec![String::new()],
+        }
     }
 
     fn normal() -> Self {
@@ -114,6 +118,10 @@ impl AstWriter {
 
     fn cur(&mut self) -> &mut String {
         self.lines.last_mut().unwrap()
+    }
+
+    pub fn is_verbose(&self) -> bool {
+        self.verbose
     }
 
     pub fn new_line(&mut self) {
@@ -152,7 +160,11 @@ impl AstWriter {
         self.annotate_gen(f, annot, |w, annot| annot.ast_debug(w))
     }
 
-    pub fn annotate_gen<F: FnOnce(&mut AstWriter), Annot, FAnnot: FnOnce(&mut AstWriter, &Annot)>(
+    pub fn annotate_gen<
+        F: FnOnce(&mut AstWriter),
+        Annot,
+        FAnnot: FnOnce(&mut AstWriter, &Annot),
+    >(
         &mut self,
         f: F,
         annot: &Annot,
@@ -194,7 +206,11 @@ impl AstWriter {
         }
     }
 
-    pub fn comma<T, F: FnMut(&mut AstWriter, T)>(&mut self, items: impl std::iter::IntoIterator<Item = T>, mut f: F) {
+    pub fn comma<T, F: FnMut(&mut AstWriter, T)>(
+        &mut self,
+        items: impl std::iter::IntoIterator<Item = T>,
+        mut f: F,
+    ) {
         self.list(items, ", ", |w, item| {
             f(w, item);
             false
@@ -236,7 +252,11 @@ pub struct DisplayWrapper<'a, T: AstDebug>(pub &'a T, /* verbose */ pub bool);
 
 impl<T: AstDebug> Display for DisplayWrapper<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut writer = if self.1 { AstWriter::verbose() } else { AstWriter::normal() };
+        let mut writer = if self.1 {
+            AstWriter::verbose()
+        } else {
+            AstWriter::normal()
+        };
         self.0.ast_debug(&mut writer);
         writer.fmt(f)
     }

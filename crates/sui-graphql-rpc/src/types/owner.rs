@@ -1,13 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::{connection::Connection, *};
+use sui_name_service::NameServiceConfig;
+use sui_types::{dynamic_field::DynamicFieldType, gas_coin::GAS};
+
 use super::{
     address::Address,
     coin_metadata::CoinMetadata,
     cursor::Page,
     dynamic_field::{DynamicField, DynamicFieldName},
     move_package::MovePackage,
-    stake::StakedOct,
+    stake::StakedSui,
     suins_registration::{DomainFormat, NameService, SuinsRegistration},
 };
 use crate::{
@@ -21,10 +25,6 @@ use crate::{
         type_filter::ExactTypeFilter,
     },
 };
-
-use async_graphql::{connection::Connection, *};
-use sui_json_rpc::name_service::NameServiceConfig;
-use sui_types::{dynamic_field::DynamicFieldType, gas_coin::GAS};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Owner {
@@ -79,7 +79,7 @@ pub(crate) struct OwnerImpl {
         arg(name = "type", ty = "Option<ExactTypeFilter>"),
         ty = "Option<Balance>",
         desc = "Total balance of all coins with marker type owned by this object or address. If \
-                type is not supplied, it defaults to `0x2::oct::OCT`."
+                type is not supplied, it defaults to `0x2::sui::SUI`."
     ),
     field(
         name = "balances",
@@ -99,16 +99,16 @@ pub(crate) struct OwnerImpl {
         arg(name = "type", ty = "Option<ExactTypeFilter>"),
         ty = "Connection<String, Coin>",
         desc = "The coin objects for this object or address.\n\n\
-                `type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`."
+                `type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`."
     ),
     field(
-        name = "staked_octs",
+        name = "staked_suis",
         arg(name = "first", ty = "Option<u64>"),
         arg(name = "after", ty = "Option<object::Cursor>"),
         arg(name = "last", ty = "Option<u64>"),
         arg(name = "before", ty = "Option<object::Cursor>"),
-        ty = "Connection<String, StakedOct>",
-        desc = "The `0x3::staking_pool::StakedOct` objects owned by this object or address."
+        ty = "Connection<String, StakedSui>",
+        desc = "The `0x3::staking_pool::StakedSui` objects owned by this object or address."
     ),
     field(
         name = "default_suins_name",
@@ -136,7 +136,7 @@ pub(crate) enum IOwner {
     MoveObject(MoveObject),
     Coin(Coin),
     CoinMetadata(CoinMetadata),
-    StakedOct(StakedOct),
+    StakedSui(StakedSui),
     SuinsRegistration(SuinsRegistration),
 }
 
@@ -170,7 +170,7 @@ impl Owner {
     }
 
     /// Total balance of all coins with marker type owned by this object or address. If type is not
-    /// supplied, it defaults to `0x2::oct::OCT`.
+    /// supplied, it defaults to `0x2::sui::SUI`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(self).balance(ctx, type_).await
     }
@@ -189,7 +189,7 @@ impl Owner {
 
     /// The coin objects for this object or address.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -202,16 +202,16 @@ impl Owner {
         OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this object or address.
-    pub(crate) async fn staked_octs(
+    /// The `0x3::staking_pool::StakedSui` objects owned by this object or address.
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(self).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object or address.
@@ -345,16 +345,16 @@ impl OwnerImpl {
         Coin::paginate(ctx.data_unchecked(), page, coin, Some(self.address), self.checkpoint_viewed_at).await.extend()
     }
 
-    pub(crate) async fn staked_octs(
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
+    ) -> Result<Connection<String, StakedSui>> {
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-        StakedOct::paginate(ctx.data_unchecked(), page, self.address, self.checkpoint_viewed_at).await.extend()
+        StakedSui::paginate(ctx.data_unchecked(), page, self.address, self.checkpoint_viewed_at).await.extend()
     }
 
     pub(crate) async fn default_suins_name(

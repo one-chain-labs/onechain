@@ -1,15 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data::{Db, DbConnection, QueryExecutor},
-    error::Error,
-};
 use async_graphql::*;
 use diesel::{OptionalExtension, QueryDsl};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use sui_indexer::schema::chain_identifier;
 use sui_types::{digests::ChainIdentifier as NativeChainIdentifier, messages_checkpoint::CheckpointDigest};
+
+use crate::{
+    data::{Db, DbConnection, QueryExecutor},
+    error::Error,
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct ChainIdentifier(pub(crate) Option<NativeChainIdentifier>);

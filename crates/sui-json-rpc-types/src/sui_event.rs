@@ -1,28 +1,25 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{fmt, fmt::Display, str::FromStr};
+
 use fastcrypto::encoding::{Base58, Base64};
+use json_to_table::json_to_table;
 use move_core_types::{annotated_value::MoveDatatypeLayout, identifier::Identifier, language_storage::StructTag};
 use mysten_metrics::monitored_scope;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use serde_with::{serde_as, DisplayFromStr};
-use std::{fmt, fmt::Display};
 use sui_types::{
     base_types::{ObjectID, SuiAddress, TransactionDigest},
     error::SuiResult,
     event::{Event, EventEnvelope, EventID},
-    sui_serde::BigInt,
+    sui_serde::{BigInt, SuiStructTag},
 };
-
-use json_to_table::json_to_table;
 use tabled::settings::Style as TableStyle;
 
 use crate::{type_and_fields_from_move_event_data, Page};
-use sui_types::sui_serde::SuiStructTag;
-
-use std::str::FromStr;
 
 pub type EventPage = Page<SuiEvent, EventID>;
 
@@ -42,7 +39,7 @@ pub struct SuiEvent {
     #[serde_as(as = "DisplayFromStr")]
     /// Move module where this event was emitted.
     pub transaction_module: Identifier,
-    /// Sender's OneChain address.
+    /// Sender's Sui address.
     pub sender: SuiAddress,
     #[schemars(with = "String")]
     #[serde_as(as = "SuiStructTag")]

@@ -4,8 +4,8 @@
 //! The Sui Rust SDK
 //!
 //! It aims at providing a similar SDK functionality like the one existing for
-//! [TypeScript](https://github.com/one-chain-labs/onechain/tree/main/sdk/typescript/).
-//! Sui Rust SDK builds on top of the [JSON RPC API](https://docs.onelabs.cc/jsonrpc)
+//! [TypeScript](https://github.com/MystenLabs/sui/tree/main/sdk/typescript/).
+//! Sui Rust SDK builds on top of the [JSON RPC API](https://docs.sui.io/sui-jsonrpc)
 //! and therefore many of the return types are the ones specified in [sui_types].
 //!
 //! The API is split in several parts corresponding to different functionalities
@@ -68,7 +68,7 @@
 //! ## Examples
 //!
 //! For detailed examples, please check the APIs docs and the examples folder
-//! in the [main repository](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples).
+//! in the [main repository](https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk/examples).
 
 use std::{
     fmt::{Debug, Formatter},
@@ -84,9 +84,8 @@ use jsonrpsee::{
     rpc_params,
     ws_client::{WsClient, WsClientBuilder},
 };
-use serde_json::Value;
-
 use move_core_types::language_storage::StructTag;
+use serde_json::Value;
 pub use sui_json as json;
 use sui_json_rpc_api::{CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER, CLIENT_TARGET_API_VERSION_HEADER};
 pub use sui_json_rpc_types as rpc_types;
@@ -110,16 +109,18 @@ pub mod apis;
 pub mod error;
 pub mod json_rpc_error;
 pub mod sui_client_config;
+pub mod verify_personal_message_signature;
 pub mod wallet_context;
 
-pub const SUI_COIN_TYPE: &str = "0x2::oct::OCT";
+pub const SUI_COIN_TYPE: &str = "0x2::sui::SUI";
 pub const SUI_LOCAL_NETWORK_URL: &str = "http://127.0.0.1:9000";
 pub const SUI_LOCAL_NETWORK_URL_0: &str = "http://0.0.0.0:9000";
 pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/gas";
-pub const SUI_DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
-pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
+pub const SUI_DEVNET_URL: &str = "https://fullnode.devnet.sui.io:443";
+pub const SUI_TESTNET_URL: &str = "https://fullnode.testnet.sui.io:443";
+pub const SUI_MAINNET_URL: &str = "https://fullnode.mainnet.sui.io:443";
 
-/// A OneChain client builder for connecting to the OneChain network
+/// A Sui client builder for connecting to the Sui network
 ///
 /// By default the `maximum concurrent requests` is set to 256 and
 /// the `request timeout` is set to 60 seconds. These can be adjusted using the
@@ -144,7 +145,7 @@ pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
 /// ```
 pub struct SuiClientBuilder {
     request_timeout: Duration,
-    max_concurrent_requests: usize,
+    max_concurrent_requests: Option<usize>,
     ws_url: Option<String>,
     ws_ping_interval: Option<Duration>,
     basic_auth: Option<(String, String)>,
@@ -154,7 +155,7 @@ impl Default for SuiClientBuilder {
     fn default() -> Self {
         Self {
             request_timeout: Duration::from_secs(60),
-            max_concurrent_requests: 256,
+            max_concurrent_requests: None,
             ws_url: None,
             ws_ping_interval: None,
             basic_auth: None,
@@ -171,7 +172,7 @@ impl SuiClientBuilder {
 
     /// Set the max concurrent requests allowed
     pub fn max_concurrent_requests(mut self, max_concurrent_requests: usize) -> Self {
-        self.max_concurrent_requests = max_concurrent_requests;
+        self.max_concurrent_requests = Some(max_concurrent_requests);
         self
     }
 
@@ -232,13 +233,16 @@ impl SuiClientBuilder {
 
         let ws = if let Some(url) = self.ws_url {
             let mut builder = WsClientBuilder::default()
-                .max_request_body_size(2 << 30)
-                .max_concurrent_requests(self.max_concurrent_requests)
+                .max_request_size(2 << 30)
                 .set_headers(headers.clone())
                 .request_timeout(self.request_timeout);
 
             if let Some(duration) = self.ws_ping_interval {
-                builder = builder.ping_interval(duration)
+                builder = builder.enable_ws_ping(jsonrpsee::ws_client::PingConfig::new().ping_interval(duration));
+            }
+
+            if let Some(max_concurrent_requests) = self.max_concurrent_requests {
+                builder = builder.max_concurrent_requests(max_concurrent_requests);
             }
 
             builder.build(url).await.ok()
@@ -246,12 +250,16 @@ impl SuiClientBuilder {
             None
         };
 
-        let http = HttpClientBuilder::default()
-            .max_request_body_size(2 << 30)
-            .max_concurrent_requests(self.max_concurrent_requests)
+        let mut http_builder = HttpClientBuilder::default()
+            .max_request_size(2 << 30)
             .set_headers(headers.clone())
-            .request_timeout(self.request_timeout)
-            .build(http)?;
+            .request_timeout(self.request_timeout);
+
+        if let Some(max_concurrent_requests) = self.max_concurrent_requests {
+            http_builder = http_builder.max_concurrent_requests(max_concurrent_requests);
+        }
+
+        let http = http_builder.build(http)?;
 
         let info = Self::get_server_info(&http, &ws).await?;
 
@@ -336,6 +344,29 @@ impl SuiClientBuilder {
     /// ```
     pub async fn build_testnet(self) -> SuiRpcResult<SuiClient> {
         self.build(SUI_TESTNET_URL).await
+    }
+
+    /// Returns a [SuiClient] object that is ready to interact with the Sui mainnet.
+    ///
+    /// For connecting to a custom URI, use the `build` function instead.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use sui_sdk::SuiClientBuilder;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), anyhow::Error> {
+    ///     let sui = SuiClientBuilder::default()
+    ///         .build_mainnet()
+    ///         .await?;
+    ///
+    ///     println!("{:?}", sui.api_version());
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn build_mainnet(self) -> SuiRpcResult<SuiClient> {
+        self.build(SUI_MAINNET_URL).await
     }
 
     /// Return the server information as a `ServerInfo` structure.

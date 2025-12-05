@@ -4,6 +4,7 @@
 #[cfg(msim)]
 mod sim_only_tests {
     use std::{path::PathBuf, time::Duration};
+
     use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
     use sui_macros::sim_test;
     use sui_node::SuiNode;

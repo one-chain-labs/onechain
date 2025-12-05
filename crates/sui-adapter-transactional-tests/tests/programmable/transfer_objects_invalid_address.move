@@ -21,7 +21,7 @@ module test::m1 {
     }
 
     public fun vec(): vector<u8> {
-        one::address::to_bytes(@0)
+        sui::address::to_bytes(@0)
     }
 }
 

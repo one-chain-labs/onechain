@@ -8,7 +8,7 @@
 /// particular, fixed state during escrow.
 module escrow::lock;
 
-use one::{dynamic_object_field as dof, event};
+use sui::{dynamic_object_field as dof, event};
 
 /// The `name` of the DOF that holds the Locked object.
 /// Allows better discoverability for the locked object.
@@ -91,15 +91,15 @@ public struct LockDestroyed has copy, drop {
 
 // === Tests ===
 #[test_only]
-use one::coin::{Self, Coin};
+use sui::coin::{Self, Coin};
 #[test_only]
-use one::oct::OCT;
+use sui::sui::SUI;
 #[test_only]
-use one::test_scenario::{Self as ts, Scenario};
+use sui::test_scenario::{Self as ts, Scenario};
 
 #[test_only]
-fun test_coin(ts: &mut Scenario): Coin<OCT> {
-    coin::mint_for_testing<OCT>(42, ts.ctx())
+fun test_coin(ts: &mut Scenario): Coin<SUI> {
+    coin::mint_for_testing<SUI>(42, ts.ctx())
 }
 
 #[test]

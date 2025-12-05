@@ -3,10 +3,20 @@
 
 use std::{str::FromStr, sync::Arc};
 
-use crate::crypto::{PublicKey, SignatureScheme, ZkLoginPublicIdentifier};
+use fastcrypto::{encoding::Base64, traits::ToFromBytes};
+use fastcrypto_zkp::{
+    bn254::{
+        zk_login::{parse_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK},
+        zk_login_api::ZkLoginEnv,
+    },
+    zk_login_utils::Bn254FrElement,
+};
+use im::hashmap::HashMap as ImHashMap;
+use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
 
 use crate::{
     base_types::SuiAddress,
+    crypto::{PublicKey, SignatureScheme, ZkLoginPublicIdentifier},
     signature::{GenericSignature, VerifyParams},
     signature_verification::VerifiedDigestCache,
     utils::{
@@ -18,17 +28,6 @@ use crate::{
     },
     zk_login_util::DEFAULT_JWK_BYTES,
 };
-use fastcrypto::{encoding::Base64, traits::ToFromBytes};
-
-use fastcrypto_zkp::{
-    bn254::{
-        zk_login::{parse_jwks, JwkId, OIDCProvider, ZkLoginInputs, JWK},
-        zk_login_api::ZkLoginEnv,
-    },
-    zk_login_utils::Bn254FrElement,
-};
-use im::hashmap::HashMap as ImHashMap;
-use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
 
 #[test]
 fn test_serde_zk_login_signature() {
@@ -87,7 +86,7 @@ fn zklogin_sign_personal_message() {
         parse_jwks(DEFAULT_JWK_BYTES, &OIDCProvider::Twitch).unwrap().into_iter().collect();
 
     // Construct the required info to verify a zk login authenticator, jwks, supported providers list and env (prod/test).
-    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, Some(30));
+    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, true, Some(30));
     let res = authenticator.verify_authenticator(
         &intent_msg,
         user_address,

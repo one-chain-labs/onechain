@@ -6,6 +6,15 @@
 //! 2. updates WAL table and cursor tables
 //! 2. hands actions to `BridgeExecutor` for execution
 
+use std::sync::Arc;
+
+use ethers::types::Address as EthAddress;
+use mysten_metrics::spawn_logged_monitored_task;
+use sui_json_rpc_types::SuiEvent;
+use sui_types::Identifier;
+use tokio::task::JoinHandle;
+use tracing::{error, info};
+
 use crate::{
     abi::EthBridgeEvent,
     action_executor::{submit_to_executor, BridgeActionExecutionWrapper, BridgeActionExecutorTrait},
@@ -16,13 +25,6 @@ use crate::{
     sui_client::{SuiClient, SuiClientInner},
     types::EthLog,
 };
-use ethers::types::Address as EthAddress;
-use mysten_metrics::spawn_logged_monitored_task;
-use std::sync::Arc;
-use sui_json_rpc_types::SuiEvent;
-use sui_types::Identifier;
-use tokio::task::JoinHandle;
-use tracing::{error, info};
 
 pub struct BridgeOrchestrator<C> {
     _sui_client: Arc<SuiClient<C>>,
@@ -231,19 +233,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        test_utils::{get_test_eth_to_sui_bridge_action, get_test_log_and_action},
-        types::BridgeActionDigest,
-    };
+    use std::str::FromStr;
+
     use ethers::types::{Address as EthAddress, TxHash};
     use prometheus::Registry;
-    use std::str::FromStr;
 
     use super::*;
     use crate::{
         events::{init_all_struct_tags, tests::get_test_sui_event_and_action},
         sui_mock_client::SuiMockClient,
-        test_utils::get_test_sui_to_eth_bridge_action,
+        test_utils::{get_test_eth_to_sui_bridge_action, get_test_log_and_action, get_test_sui_to_eth_bridge_action},
+        types::BridgeActionDigest,
     };
 
     #[tokio::test]

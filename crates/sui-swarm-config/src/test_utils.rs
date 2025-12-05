@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network_config::NetworkConfig;
-use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 use std::collections::HashMap;
+
+use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 use sui_types::{
     base_types::AuthorityName,
     committee::{Committee, EpochId, StakeUnit},
@@ -21,6 +21,8 @@ use sui_types::{
     },
 };
 
+use crate::network_config::NetworkConfig;
+
 pub struct CommitteeFixture {
     epoch: EpochId,
     validators: HashMap<AuthorityName, (AuthorityKeyPair, StakeUnit)>,
@@ -36,7 +38,7 @@ type MakeCheckpointResults = (
 
 impl CommitteeFixture {
     pub fn generate<R: ::rand::RngCore + ::rand::CryptoRng>(mut rng: R, epoch: EpochId, committee_size: usize) -> Self {
-        let validators = (0..committee_size)
+        let validators = (0 .. committee_size)
             .map(|_| sui_types::crypto::get_key_pair_from_rng::<AuthorityKeyPair, _>(&mut rng).1)
             .map(|keypair| (keypair.public().into(), (keypair, 1)))
             .collect::<HashMap<_, _>>();

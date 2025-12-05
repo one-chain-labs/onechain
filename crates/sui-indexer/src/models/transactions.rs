@@ -4,7 +4,6 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-
 use move_core_types::{
     annotated_value::{MoveDatatypeLayout, MoveTypeLayout},
     language_storage::TypeTag,
@@ -141,8 +140,7 @@ impl StoredTransaction {
         let transaction = if options.show_input {
             let sender_signed_data = self.try_into_sender_signed_data()?;
             let tx_block =
-                SuiTransactionBlock::try_from_with_package_resolver(sender_signed_data, package_resolver.clone())
-                    .await?;
+                SuiTransactionBlock::try_from_with_package_resolver(sender_signed_data, &package_resolver).await?;
             Some(tx_block)
         } else {
             None

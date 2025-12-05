@@ -57,8 +57,8 @@ pub enum StakeStatus {
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Stake {
-    /// ID of the StakedOct receipt object.
-    pub staked_oct_id: ObjectID,
+    /// ID of the StakedSui receipt object.
+    pub staked_sui_id: ObjectID,
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "BigInt<u64>")]
     pub stake_request_epoch: EpochId,
@@ -68,7 +68,6 @@ pub struct Stake {
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "BigInt<u64>")]
     pub principal: u64,
-    pub lock: bool,
     #[serde(flatten)]
     pub status: StakeStatus,
 }

@@ -4,7 +4,7 @@
 module reviews_rating::review;
 
 use std::string::String;
-use one::clock::Clock;
+use sui::clock::Clock;
 
 const EInvalidContentLen: u64 = 1;
 

@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
+
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use sui_types::base_types::TransactionDigest;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

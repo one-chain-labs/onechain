@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::Path;
+
 use clap::Parser;
 use move_cli::base::coverage;
 use move_package::BuildConfig;
-use std::path::Path;
 
 #[derive(Parser)]
 #[group(id = "sui-move-coverage")]

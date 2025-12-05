@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::writer::StateSnapshotWriterV1;
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
+
 use anyhow::Result;
 use bytes::Bytes;
 use object_store::DynObjectStore;
 use prometheus::{register_int_counter_with_registry, register_int_gauge_with_registry, IntCounter, IntGauge, Registry};
-use std::{num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 use sui_core::{
     authority::authority_store_tables::AuthorityPerpetualTables,
@@ -23,8 +23,10 @@ use sui_storage::{
     },
     FileCompression,
 };
-use sui_types::messages_checkpoint::CheckpointCommitment::ECMHLiveObjectSetDigest;
+use sui_types::{digests::ChainIdentifier, messages_checkpoint::CheckpointCommitment::ECMHLiveObjectSetDigest};
 use tracing::{debug, error, info};
+
+use crate::writer::StateSnapshotWriterV1;
 
 pub struct StateSnapshotUploaderMetrics {
     pub first_missing_state_snapshot_epoch: IntGauge,
@@ -67,6 +69,9 @@ pub struct StateSnapshotUploader {
     /// Time interval to check for presence of new db checkpoint
     interval: Duration,
     metrics: Arc<StateSnapshotUploaderMetrics>,
+    /// The chain identifier is derived from the genesis checkpoint and used to identify the
+    /// network.
+    chain_identifier: ChainIdentifier,
 }
 
 impl StateSnapshotUploader {
@@ -77,6 +82,7 @@ impl StateSnapshotUploader {
         interval_s: u64,
         registry: &Registry,
         checkpoint_store: Arc<CheckpointStore>,
+        chain_identifier: ChainIdentifier,
     ) -> Result<Arc<Self>> {
         let db_checkpoint_store_config = ObjectStoreConfig {
             object_store: Some(ObjectStoreType::File),
@@ -97,6 +103,7 @@ impl StateSnapshotUploader {
             snapshot_store: snapshot_store_config.make()?,
             interval: Duration::from_secs(interval_s),
             metrics: StateSnapshotUploaderMetrics::new(registry),
+            chain_identifier,
         }))
     }
 
@@ -134,7 +141,7 @@ impl StateSnapshotUploader {
                     .expect("Expected end of epoch data to be present");
                 let ECMHLiveObjectSetDigest(state_hash_commitment) =
                     commitments.last().expect("Expected at least one commitment").clone();
-                state_snapshot_writer.write(*epoch, db, state_hash_commitment).await?;
+                state_snapshot_writer.write(*epoch, db, state_hash_commitment, self.chain_identifier).await?;
                 info!("State snapshot creation successful for epoch: {}", *epoch);
                 // Drop marker in the output directory that upload completed successfully
                 let bytes = Bytes::from_static(b"success");
@@ -161,17 +168,20 @@ impl StateSnapshotUploader {
             tokio::select! {
                 _now = interval.tick() => {
                     let missing_epochs = self.get_missing_epochs().await;
-                    if let Ok(epochs) = missing_epochs {
-                        let first_missing_epoch = epochs.first().cloned().unwrap_or(0);
-                        self.metrics.first_missing_state_snapshot_epoch.set(first_missing_epoch as i64);
-                        if let Err(err) = self.upload_state_snapshot_to_object_store(epochs).await {
-                            self.metrics.state_snapshot_upload_err.inc();
-                            error!("Failed to upload state snapshot to remote store with err: {:?}", err);
-                        } else {
-                            debug!("Successfully completed snapshot upload loop");
+                    match missing_epochs {
+                        Ok(epochs) => {
+                            let first_missing_epoch = epochs.first().cloned().unwrap_or(0);
+                            self.metrics.first_missing_state_snapshot_epoch.set(first_missing_epoch as i64);
+                            if let Err(err) = self.upload_state_snapshot_to_object_store(epochs).await {
+                                self.metrics.state_snapshot_upload_err.inc();
+                                error!("Failed to upload state snapshot to remote store with err: {:?}", err);
+                            } else {
+                                debug!("Successfully completed snapshot upload loop");
+                            }
                         }
-                    } else {
-                        error!("Failed to find missing state snapshot in remote store");
+                        Err(err) => {
+                            error!("Failed to find missing state snapshot in remote store: {:?}", err);
+                        }
                     }
                 },
                 _ = recv.recv() => break,

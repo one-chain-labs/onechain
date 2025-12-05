@@ -1,12 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{faucet::write_ahead_log, metrics::FaucetMetrics};
-use async_recursion::async_recursion;
-use async_trait::async_trait;
-use mysten_metrics::spawn_monitored_task;
-use prometheus::Registry;
-use shared_crypto::intent::Intent;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
@@ -15,12 +9,12 @@ use std::{
     path::Path,
     sync::{Arc, Weak},
 };
-use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
-use tap::tap::TapFallible;
-use tokio::sync::oneshot;
-use ttl_cache::TtlCache;
-use typed_store::Map;
 
+use async_recursion::async_recursion;
+use async_trait::async_trait;
+use mysten_metrics::spawn_monitored_task;
+use prometheus::Registry;
+use shared_crypto::intent::Intent;
 use sui_json_rpc_types::{
     OwnedObjectRef,
     SuiObjectDataOptions,
@@ -34,21 +28,28 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress, TransactionDigest},
     gas_coin::GasCoin,
     object::Owner,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::{Transaction, TransactionData},
 };
+use tap::tap::TapFallible;
 use tokio::{
     sync::{
         mpsc::{self, Receiver, Sender},
+        oneshot,
         Mutex,
     },
     time::{timeout, Duration},
 };
 use tracing::{error, info, warn};
+use ttl_cache::TtlCache;
+use typed_store::Map;
 use uuid::Uuid;
 
 use super::write_ahead_log::WriteAheadLog;
 use crate::{
+    faucet::write_ahead_log,
+    metrics::FaucetMetrics,
     BatchFaucetReceipt,
     BatchSendStatus,
     BatchSendStatusType,
@@ -114,18 +115,9 @@ impl SimpleFaucet {
         wal_path: &Path,
         config: FaucetConfig,
     ) -> Result<Arc<Self>, FaucetError> {
-        let active_address = wallet.active_address().map_err(|err| FaucetError::Wallet(err.to_string()))?;
-        info!("SimpleFaucet::new with active address: {active_address}");
+        let (coins, active_address) = find_gas_coins_and_address(&mut wallet, &config).await?;
+        info!("Starting faucet with address: {:?}", active_address);
 
-        let coins = wallet
-            .gas_objects(active_address)
-            .await
-            .map_err(|e| FaucetError::Wallet(e.to_string()))?
-            .iter()
-            // Ok to unwrap() since `get_gas_objects` guarantees gas
-            .map(|q| GasCoin::try_from(&q.1).unwrap())
-            .filter(|coin| coin.0.balance.value() >= (config.amount * config.num_coins as u64))
-            .collect::<Vec<GasCoin>>();
         let metrics = FaucetMetrics::new(prometheus_registry);
         // set initial balance when faucet starts
         let balance = coins.iter().map(|coin| coin.0.balance.value()).sum::<u64>();
@@ -612,7 +604,7 @@ impl SimpleFaucet {
         let client = self.wallet.get_client().await?;
         client
             .transaction_builder()
-            .pay_oct(signer, vec![coin_id], recipients, amounts.to_vec(), budget)
+            .pay_sui(signer, vec![coin_id], recipients, amounts.to_vec(), budget)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to build PaySui transaction for coin {:?}, with err {:?}", coin_id, e))
     }
@@ -658,7 +650,7 @@ impl SimpleFaucet {
             let mut builder = ProgrammableTransactionBuilder::new();
             for (_uuid, recipient, amounts) in batch_requests {
                 let recipients = vec![recipient; amounts.len()];
-                builder.pay_oct(recipients, amounts)?;
+                builder.pay_sui(recipients, amounts)?;
             }
             builder.finish()
         };
@@ -709,7 +701,7 @@ impl SimpleFaucet {
                     coins_created_for_address.len()
                 )));
             }
-            let coins_slice = &mut coins_created_for_address[index as usize..(index as usize + number_of_coins)];
+            let coins_slice = &mut coins_created_for_address[index as usize .. (index as usize + number_of_coins)];
 
             request_count.insert(addy, number_of_coins as u64 + index);
 
@@ -841,7 +833,7 @@ pub async fn batch_gather(
     batch_request_size: u64,
 ) -> Result<(), FaucetError> {
     // Gather the rest of the batch after the first item has been taken.
-    for _ in 1..batch_request_size {
+    for _ in 1 .. batch_request_size {
         let Some(req) = request_consumer.recv().await else {
             error!("Request consumer queue closed");
             return Err(FaucetError::ChannelClosed);
@@ -904,7 +896,7 @@ pub async fn batch_transfer_gases(
                     .map_err(FaucetError::internal)?;
 
                 // Because we are batching transactions to faucet, we will just not use a real recipient for
-                // OneChain address, and instead just fill it with the ZERO address.
+                // sui address, and instead just fill it with the ZERO address.
                 let recipient = SuiAddress::ZERO;
                 {
                     // Register the intention to send this transaction before we send it, so that if
@@ -949,15 +941,48 @@ pub async fn batch_transfer_gases(
     }
 }
 
+/// Finds gas coins with sufficient balance and returns the address to use as the active address
+/// for the faucet. If the initial active address in the wallet does not have enough gas coins,
+/// it will iterate through the addresses to find one with sufficient gas coins.
+async fn find_gas_coins_and_address(
+    wallet: &mut WalletContext,
+    config: &FaucetConfig,
+) -> Result<(Vec<GasCoin>, SuiAddress), FaucetError> {
+    let active_address = wallet.active_address().map_err(|e| FaucetError::Wallet(e.to_string()))?;
+
+    for address in std::iter::once(active_address).chain(wallet.get_addresses().into_iter()) {
+        let coins: Vec<_> = wallet
+            .gas_objects(address)
+            .await
+            .map_err(|e| FaucetError::Wallet(e.to_string()))?
+            .iter()
+            .filter_map(|(balance, obj)| {
+                if *balance >= config.amount * config.num_coins as u64 {
+                    GasCoin::try_from(obj).ok()
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !coins.is_empty() {
+            return Ok((coins, address));
+        }
+    }
+
+    Err(FaucetError::Wallet("No address found with sufficient coins".to_string()))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::*;
     use shared_crypto::intent::Intent;
     use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffects};
     use sui_sdk::wallet_context::WalletContext;
     use sui_types::transaction::{SenderSignedData, TransactionDataAPI};
     use test_cluster::TestClusterBuilder;
+
+    use super::*;
 
     async fn execute_tx(
         ctx: &mut WalletContext,
@@ -1054,7 +1079,7 @@ mod tests {
         let number_of_coins = gas_coins.len();
         let amounts = &vec![1; number_of_coins];
         let _ = futures::future::join_all(
-            (0..number_of_coins).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), amounts)),
+            (0 .. number_of_coins).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), amounts)),
         )
         .await
         .into_iter()
@@ -1096,7 +1121,7 @@ mod tests {
         let amounts = &[coin_amount];
 
         // Create a vector containing five randomly generated addresses
-        let target_addresses: Vec<SuiAddress> = (0..5).map(|_| SuiAddress::random_for_testing_only()).collect();
+        let target_addresses: Vec<SuiAddress> = (0 .. 5).map(|_| SuiAddress::random_for_testing_only()).collect();
 
         let response = futures::future::join_all(
             target_addresses.iter().map(|address| faucet.batch_send(Uuid::new_v4(), *address, amounts)),
@@ -1155,7 +1180,7 @@ mod tests {
 
         let amounts = &[1; 1];
         // Create a vector containing five randomly generated addresses
-        let target_addresses: Vec<SuiAddress> = (0..5).map(|_| SuiAddress::random_for_testing_only()).collect();
+        let target_addresses: Vec<SuiAddress> = (0 .. 5).map(|_| SuiAddress::random_for_testing_only()).collect();
 
         let response = futures::future::join_all(
             target_addresses.iter().map(|address| faucet.batch_send(Uuid::new_v4(), *address, amounts)),
@@ -1199,7 +1224,7 @@ mod tests {
         let gas_budget = 50_000_000;
         let tx_data = client
             .transaction_builder()
-            .pay_all_oct(address, vec![bad_gas.0], SuiAddress::random_for_testing_only(), gas_budget)
+            .pay_all_sui(address, vec![bad_gas.0], SuiAddress::random_for_testing_only(), gas_budget)
             .await
             .unwrap();
         execute_tx(faucet.wallet_mut(), tx_data).await.unwrap();
@@ -1208,7 +1233,7 @@ mod tests {
         let amounts = &vec![1; number_of_coins];
         // We traverse the list twice, which must trigger the transferred gas to be kicked out
         futures::future::join_all(
-            (0..2).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), amounts)),
+            (0 .. 2).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), amounts)),
         )
         .await;
 
@@ -1322,7 +1347,7 @@ mod tests {
         let amounts = &vec![tiny_value + 1; number_of_coins];
         // We traverse the list ten times, which must trigger the tiny gas to be examined and then discarded
         futures::future::join_all(
-            (0..10).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), amounts)),
+            (0 .. 10).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), amounts)),
         )
         .await;
         info!(?number_of_coins, "Sent to random addresses: {} {}", amounts[0], amounts.len(),);
@@ -1365,7 +1390,7 @@ mod tests {
         for gas in gas_coins.iter().take(gas_coins.len() - 1) {
             let tx_data = client
                 .transaction_builder()
-                .transfer_oct(address, gas.0, gas_budget, destination_address, None)
+                .transfer_sui(address, gas.0, gas_budget, destination_address, None)
                 .await
                 .unwrap();
             execute_tx(&mut context, tx_data).await.unwrap();
@@ -1382,7 +1407,7 @@ mod tests {
 
         // We traverse the list twice, which must trigger the split gas to be kicked out
         futures::future::join_all(
-            (0..2).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), &[30000000000])),
+            (0 .. 2).map(|_| faucet.send(Uuid::new_v4(), SuiAddress::random_for_testing_only(), &[30000000000])),
         )
         .await;
 
@@ -1425,7 +1450,7 @@ mod tests {
         for gas in gas_coins {
             let tx_data = client
                 .transaction_builder()
-                .transfer_oct(address, gas.0, gas_budget, destination_address, None)
+                .transfer_sui(address, gas.0, gas_budget, destination_address, None)
                 .await
                 .unwrap();
             execute_tx(&mut context, tx_data).await.unwrap();
@@ -1526,7 +1551,7 @@ mod tests {
         let faucet = SimpleFaucet::new(context, &prom_registry, &tmp.path().join("faucet.wal"), config).await.unwrap();
 
         // Create a vector containing two randomly generated addresses
-        let target_addresses: Vec<SuiAddress> = (0..2).map(|_| SuiAddress::random_for_testing_only()).collect();
+        let target_addresses: Vec<SuiAddress> = (0 .. 2).map(|_| SuiAddress::random_for_testing_only()).collect();
 
         // Send 2 coins of 1 sui each. We
         let coins_sent = 2;

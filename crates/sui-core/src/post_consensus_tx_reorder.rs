@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::consensus_handler::{SequencedConsensusTransactionKind, VerifiedSequencedConsensusTransaction};
 use mysten_metrics::monitored_scope;
 use sui_protocol_config::ConsensusTransactionOrdering;
 use sui_types::{
     messages_consensus::{ConsensusTransaction, ConsensusTransactionKind},
     transaction::TransactionDataAPI as _,
 };
+
+use crate::consensus_handler::{SequencedConsensusTransactionKind, VerifiedSequencedConsensusTransaction};
 
 pub struct PostConsensusTxReorder {}
 

@@ -1,9 +1,9 @@
 // tests modules cannot use transfer internal functions outside of the defining module
 
 module a::m {
-    use one::transfer::{Self, Receiving};
+    use sui::transfer::{Self, Receiving};
     use a::other;
-    use one::object::UID;
+    use sui::object::UID;
 
     public fun t1(s: other::S) {
         transfer::transfer(s, @0x100);
@@ -28,11 +28,11 @@ module a::m {
 
 module a::other {
     struct S has key {
-        id: one::object::UID,
+        id: sui::object::UID,
     }
 }
 
-module one::object {
+module sui::object {
     struct UID has store {
         id: address,
     }
@@ -41,8 +41,8 @@ module one::object {
     }
 }
 
-module one::transfer {
-    use one::object::{UID, ID};
+module sui::transfer {
+    use sui::object::{UID, ID};
 
     struct Receiving<phantom T: key> { }
 

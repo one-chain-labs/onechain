@@ -3,14 +3,13 @@
 
 use async_trait::async_trait;
 use jsonrpsee::rpc_params;
-use tracing::info;
-
 use sui_json_rpc_types::SuiTransactionBlockResponse;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
     object::Owner,
 };
+use tracing::info;
 
 use crate::{
     helper::{BalanceChangeChecker, ObjectChecker},
@@ -75,11 +74,11 @@ impl NativeTransferTest {
         }
         BalanceChangeChecker::new()
             .owner(Owner::AddressOwner(recipient))
-            .coin_type("0x2::oct::OCT")
+            .coin_type("0x2::sui::SUI")
             .check(&balance_changes.remove(0));
         BalanceChangeChecker::new()
             .owner(Owner::AddressOwner(signer))
-            .coin_type("0x2::oct::OCT")
+            .coin_type("0x2::sui::SUI")
             .check(&balance_changes.remove(0));
         // Verify fullnode observes the txn
         ctx.let_fullnode_sync(vec![response.digest], 5).await;

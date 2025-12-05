@@ -5,11 +5,12 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+
 use sui_types::{
-    base_types::ObjectRef,
+    base_types::{FullObjectID, ObjectRef},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     inner_temporary_store::{InnerTemporaryStore, WrittenObjects},
-    storage::{MarkerValue, ObjectKey},
+    storage::{FullObjectKey, MarkerValue, ObjectKey},
     transaction::{TransactionDataAPI, VerifiedTransaction},
 };
 
@@ -19,7 +20,7 @@ pub struct TransactionOutputs {
     pub effects: TransactionEffects,
     pub events: TransactionEvents,
 
-    pub markers: Vec<(ObjectKey, MarkerValue)>,
+    pub markers: Vec<(FullObjectKey, MarkerValue)>,
     pub wrapped: Vec<ObjectKey>,
     pub deleted: Vec<ObjectKey>,
     pub locks_to_delete: Vec<ObjectRef>,
@@ -36,6 +37,7 @@ impl TransactionOutputs {
     ) -> TransactionOutputs {
         let InnerTemporaryStore {
             input_objects,
+            deleted_consensus_objects,
             mutable_inputs,
             written,
             events,
@@ -54,20 +56,29 @@ impl TransactionOutputs {
         let modified_at: HashSet<_> = effects.modified_at_versions().into_iter().collect();
         let possible_to_receive = transaction.transaction_data().receiving_objects();
         let received_objects =
-            possible_to_receive.iter().cloned().filter(|obj_ref| modified_at.contains(&(obj_ref.0, obj_ref.1)));
+            possible_to_receive.into_iter().filter(|obj_ref| modified_at.contains(&(obj_ref.0, obj_ref.1)));
 
         // We record any received or deleted objects since they could be pruned, and smear shared
         // object deletions in the marker table. For deleted entries in the marker table we need to
         // make sure we don't accidentally overwrite entries.
         let markers: Vec<_> = {
-            let received = received_objects.clone().map(|objref| (ObjectKey::from(objref), MarkerValue::Received));
+            let received = received_objects.clone().map(|objref| {
+                (
+                    // TODO: Add support for receiving ConsensusV2 objects. For now this assumes fastpath.
+                    FullObjectKey::new(FullObjectID::new(objref.0, None), objref.1),
+                    MarkerValue::Received,
+                )
+            });
 
             let deleted = deleted.into_iter().map(|(object_id, version)| {
-                let object_key = ObjectKey(object_id, version);
-                if input_objects.get(&object_id).is_some_and(|object| object.is_shared()) {
-                    (object_key, MarkerValue::SharedDeleted(tx_digest))
+                let shared_key = input_objects
+                    .get(&object_id)
+                    .filter(|o| o.is_consensus())
+                    .map(|o| FullObjectKey::new(o.full_id(), version));
+                if let Some(shared_key) = shared_key {
+                    (shared_key, MarkerValue::SharedDeleted(tx_digest))
                 } else {
-                    (object_key, MarkerValue::OwnedDeleted)
+                    (FullObjectKey::new(FullObjectID::new(object_id, None), version), MarkerValue::OwnedDeleted)
                 }
             });
 
@@ -76,9 +87,15 @@ impl TransactionOutputs {
             // NB: that we do _not_ smear shared objects that were taken immutably in the
             // transaction.
             let smeared_objects = effects.deleted_mutably_accessed_shared_objects();
-            let shared_smears = smeared_objects
-                .into_iter()
-                .map(move |object_id| (ObjectKey(object_id, lamport_version), MarkerValue::SharedDeleted(tx_digest)));
+            let shared_smears = smeared_objects.into_iter().map(|object_id| {
+                let id = input_objects.get(&object_id).map(|obj| obj.full_id()).unwrap_or_else(|| {
+                    let start_version = deleted_consensus_objects
+                        .get(&object_id)
+                        .expect("deleted object must be in either input_objects or deleted_consensus_objects");
+                    FullObjectID::new(object_id, Some(*start_version))
+                });
+                (FullObjectKey::new(id, lamport_version), MarkerValue::SharedDeleted(tx_digest))
+            });
 
             received.chain(deleted).chain(shared_smears).collect()
         };

@@ -82,7 +82,7 @@ pub fn u16_with_boundaries_strategy() -> impl Strategy<Value = u16> {
 
 pub fn arg_len_strategy() -> impl Strategy<Value = usize> {
     let max_args = PROTOCOL_CONFIG.max_arguments() as usize;
-    1usize..max_args
+    1usize .. max_args
 }
 
 pub fn command_len_strategy() -> impl Strategy<Value = usize> {
@@ -294,7 +294,7 @@ pub fn gen_merge_coins_input(
                 // no useful input
                 create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
                 cmd_inc += 2; // two input calls
-                for i in 0..coins_needed - 1 {
+                for i in 0 .. coins_needed - 1 {
                     coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
                 }
                 Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, *coins_to_merge as u16)
@@ -329,7 +329,7 @@ pub fn gen_merge_coins_input(
         // first command - no input
         create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
         cmd_inc += 2; // two input calls
-        for i in 0..coins_needed - 1 {
+        for i in 0 .. coins_needed - 1 {
             coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
         }
         Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, *coins_to_merge as u16)
@@ -383,7 +383,7 @@ fn gen_enough_arguments(
     coins: &mut Vec<Argument>,
     mut cmd_inc: i64,
 ) -> i64 {
-    for i in available_coins_used..coins_available {
+    for i in available_coins_used .. coins_available {
         coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
     }
     if prev_cmd_out_len < coins_needed {
@@ -391,7 +391,7 @@ fn gen_enough_arguments(
         let remaining_args_num = (coins_needed - prev_cmd_out_len) as u64;
         create_input_calls(builder, package, cap, prev_cmd_num + cmd_inc, 7, remaining_args_num);
         cmd_inc += 2; // two input calls
-        for i in 0..remaining_args_num {
+        for i in 0 .. remaining_args_num {
             coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
         }
     }
@@ -416,7 +416,7 @@ fn gen_transfer_or_move_vec_input_internal(
                 // no useful input
                 create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
                 cmd_inc += 2; // two input calls
-                for i in 0..coins_needed {
+                for i in 0 .. coins_needed {
                     coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
                 }
             }
@@ -447,7 +447,7 @@ fn gen_transfer_or_move_vec_input_internal(
         // first command - no input
         create_input_calls(builder, package, cap, prev_cmd_num, 7, coins_needed as u64);
         cmd_inc += 2; // two input calls
-        for i in 0..coins_needed {
+        for i in 0 .. coins_needed {
             coins.push(Argument::NestedResult((prev_cmd_num + cmd_inc) as u16, i as u16));
         }
     }

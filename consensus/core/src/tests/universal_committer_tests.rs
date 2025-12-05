@@ -29,7 +29,7 @@ async fn direct_commit() {
     // note: waves & rounds are zero-indexed.
     let leader_round_wave_1 = test_setup.committer.committers[0].leader_round(1);
     let voting_round_wave_2 = test_setup.committer.committers[0].leader_round(2) + 1;
-    test_setup.dag_builder.layers(1..=voting_round_wave_2).build().persist_layers(test_setup.dag_state);
+    test_setup.dag_builder.layers(1 ..= voting_round_wave_2).build().persist_layers(test_setup.dag_state);
 
     test_setup.dag_builder.print();
 
@@ -112,7 +112,7 @@ async fn multiple_direct_commit() {
 
     let mut ancestors = None;
     let mut last_decided = Slot::new_for_test(0, 0);
-    for n in 1..=10 {
+    for n in 1 ..= 10 {
         // Build the dag up to the decision round for each wave starting with wave 1.
         // note: waves & rounds are zero-indexed.
         let decision_round = committer.committers[0].decision_round(n);
@@ -174,7 +174,7 @@ async fn no_genesis_commit() {
     // note: waves & rounds are zero-indexed.
     let decision_round_wave_1 = committer.committers[0].decision_round(1);
     let mut ancestors = None;
-    for r in 0..decision_round_wave_1 {
+    for r in 0 .. decision_round_wave_1 {
         ancestors = Some(build_dag(context.clone(), dag_state.clone(), ancestors, r));
 
         let last_committed = Slot::new_for_test(0, 0);
@@ -192,7 +192,7 @@ async fn direct_skip_no_leader_votes() {
     // Add enough blocks to reach the leader round of wave 1.
     // note: waves & rounds are zero-indexed.
     let leader_round_wave_1 = test_setup.committer.committers[0].leader_round(1);
-    test_setup.dag_builder.layers(1..=leader_round_wave_1).build().persist_layers(test_setup.dag_state.clone());
+    test_setup.dag_builder.layers(1 ..= leader_round_wave_1).build().persist_layers(test_setup.dag_state.clone());
 
     // Add enough blocks to reach the decision round of the first leader but without
     // votes for the leader of wave 1.
@@ -232,7 +232,7 @@ async fn direct_skip_missing_leader_block() {
     // Add enough blocks to reach the decision round of wave 0
     // note: waves & rounds are zero-indexed.
     let decision_round_wave_0 = test_setup.committer.committers[0].decision_round(0);
-    test_setup.dag_builder.layers(1..=decision_round_wave_0).build();
+    test_setup.dag_builder.layers(1 ..= decision_round_wave_0).build();
 
     // Create a leader round in the dag without the leader block.
     let leader_round_wave_1 = test_setup.committer.committers[0].leader_round(1);
@@ -241,7 +241,7 @@ async fn direct_skip_missing_leader_block() {
     // Add enough blocks to reach the decision round of wave 1.
     let voting_round_wave_1 = leader_round_wave_1 + 1;
     let decision_round_wave_1 = test_setup.committer.committers[0].decision_round(1);
-    test_setup.dag_builder.layers(voting_round_wave_1..=decision_round_wave_1).build();
+    test_setup.dag_builder.layers(voting_round_wave_1 ..= decision_round_wave_1).build();
 
     test_setup.dag_builder.print();
     test_setup.dag_builder.persist_all_blocks(test_setup.dag_state.clone());

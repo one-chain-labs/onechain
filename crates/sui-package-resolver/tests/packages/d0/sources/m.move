@@ -3,7 +3,7 @@
 
 #[allow(unused_field)]
 module d::m {
-    use one::object::UID;
+    use sui::object::UID;
 
     public struct O<T, phantom U> has key, store {
         id: UID,

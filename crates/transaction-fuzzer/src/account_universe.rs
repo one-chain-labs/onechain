@@ -4,11 +4,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::executor::{ExecutionResult, Executor};
+use std::{fmt, sync::Arc};
+
 use once_cell::sync::Lazy;
 use proptest::{prelude::*, strategy::Union};
-use std::{fmt, sync::Arc};
 use sui_types::{storage::ObjectStore, transaction::Transaction};
+
+use crate::executor::{ExecutionResult, Executor};
 
 mod account;
 mod helpers;
@@ -75,7 +77,7 @@ pub fn log_balance_strategy(min_balance: u64, max_balance: u64) -> impl Strategy
     let mut lower_bound: u64 = 0;
     let mut upper_bound: u64 = min_balance;
     loop {
-        strategies.push(lower_bound..upper_bound);
+        strategies.push(lower_bound .. upper_bound);
         if upper_bound >= max_balance {
             break;
         }
@@ -118,7 +120,7 @@ pub fn assert_accounts_match(universe: &AccountUniverse, executor: &Executor) ->
     for (idx, account) in universe.accounts().iter().enumerate() {
         for (balance_idx, acc_object) in account.current_coins.iter().enumerate() {
             let object = object_store.get_object(&acc_object.id()).unwrap();
-            let total_sui_value = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            let total_sui_value = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
             let account_balance_i = account.current_balances[balance_idx];
             prop_assert_eq!(
                 account_balance_i,

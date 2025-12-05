@@ -3,6 +3,14 @@
 
 use std::str::FromStr;
 
+use async_graphql::{connection::Connection, *};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::{Deserialize, Serialize};
+use sui_indexer::models::objects::StoredHistoryObject;
+use sui_name_service::{Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError};
+use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
+
 use super::{
     available_range::AvailableRange,
     balance::{self, Balance},
@@ -17,7 +25,7 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedOct,
+    stake::StakedSui,
     string_input::impl_string_input,
     sui_address::SuiAddress,
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -30,16 +38,9 @@ use crate::{
     data::{Db, DbConnection, QueryExecutor},
     error::Error,
 };
-use async_graphql::{connection::Connection, *};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
-use serde::{Deserialize, Serialize};
-use sui_indexer::models::objects::StoredHistoryObject;
-use sui_json_rpc::name_service::{Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError};
-use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
 
-const MOD_REGISTRATION: &IdentStr = ident_str!("onens_registration");
-const TYP_REGISTRATION: &IdentStr = ident_str!("OnensRegistration");
+const MOD_REGISTRATION: &IdentStr = ident_str!("suins_registration");
+const TYP_REGISTRATION: &IdentStr = ident_str!("SuinsRegistration");
 
 /// Represents the "core" of the name service (e.g. the on-chain registry and reverse registry). It
 /// doesn't contain any fields because we look them up based on the `NameServiceConfig`.
@@ -50,7 +51,7 @@ pub(crate) struct NameService;
 pub(crate) struct Domain(NativeDomain);
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "sui_json_rpc::name_service::DomainFormat")]
+#[graphql(remote = "sui_name_service::DomainFormat")]
 pub enum DomainFormat {
     At,
     Dot,
@@ -112,7 +113,7 @@ impl SuinsRegistration {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::oct::OCT`.
+    /// it defaults to `0x2::sui::SUI`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
@@ -131,7 +132,7 @@ impl SuinsRegistration {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -144,16 +145,16 @@ impl SuinsRegistration {
         OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
-    pub(crate) async fn staked_octs(
+    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
+    pub(crate) async fn staked_suis(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedOct>> {
-        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedSui>> {
+        OwnerImpl::from(&self.super_.super_).staked_suis(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.

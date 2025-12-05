@@ -1,29 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
-use async_trait::async_trait;
-use move_core_types::account_address::AccountAddress;
-use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponseOptions};
-
-use sui_rpc_api::CheckpointData;
-use sui_types::{
-    base_types::ObjectID,
-    committee::Committee,
-    crypto::AuthorityQuorumSignInfo,
-    digests::TransactionDigest,
-    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
-    message_envelope::Envelope,
-    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSummary, EndOfEpochData},
-    object::{bounded_visitor::BoundedVisitor, Data, Object},
-};
-
-use sui_config::genesis::Genesis;
-
-use sui_package_resolver::{Package, PackageStore, Resolver, Result as ResolverResult};
-use sui_sdk::SuiClientBuilder;
-
-use clap::{Parser, Subcommand};
 use std::{
     collections::HashMap,
     fs,
@@ -33,9 +10,28 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use anyhow::anyhow;
+use async_trait::async_trait;
+use clap::{Parser, Subcommand};
 use log::info;
+use move_core_types::account_address::AccountAddress;
 use object_store::{parse_url, path::Path};
 use serde_json::{json, Value};
+use sui_config::genesis::Genesis;
+use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponseOptions};
+use sui_package_resolver::{Package, PackageStore, Resolver, Result as ResolverResult};
+use sui_sdk::SuiClientBuilder;
+use sui_types::{
+    base_types::ObjectID,
+    committee::Committee,
+    crypto::AuthorityQuorumSignInfo,
+    digests::TransactionDigest,
+    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
+    full_checkpoint_content::CheckpointData,
+    message_envelope::Envelope,
+    messages_checkpoint::{CertifiedCheckpointSummary, CheckpointSummary, EndOfEpochData},
+    object::{bounded_visitor::BoundedVisitor, Data, Object},
+};
 use url::Url;
 
 /// A light client for the Sui blockchain
@@ -541,10 +537,11 @@ pub async fn main() {
 // Make a test namespace
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
+
     use sui_types::messages_checkpoint::FullCheckpointContents;
 
     use super::*;
-    use std::path::{Path, PathBuf};
 
     async fn read_full_checkpoint(checkpoint_path: &PathBuf) -> anyhow::Result<CheckpointData> {
         let mut reader = fs::File::open(checkpoint_path.clone())?;

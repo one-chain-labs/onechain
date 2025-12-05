@@ -4,12 +4,11 @@ use std::{collections::HashSet, sync::Arc};
 
 use anyhow::bail;
 use async_trait::async_trait;
-use futures::{future, Stream};
+use futures::{future, Stream, StreamExt};
 use jsonrpsee::{
-    core::{error::SubscriptionClosed, RpcResult},
-    types::SubscriptionResult,
+    core::{RpcResult, SubscriptionResult},
+    PendingSubscriptionSink,
     RpcModule,
-    SubscriptionSink,
 };
 use move_bytecode_utils::layout::TypeLayoutBuilder;
 use move_core_types::language_storage::TypeTag;
@@ -40,6 +39,7 @@ use sui_json_rpc_types::{
     TransactionBlocksPage,
     TransactionFilter,
 };
+use sui_name_service::{Domain, NameRecord, NameServiceConfig, NameServiceError};
 use sui_open_rpc::Module;
 use sui_storage::key_value_store::TransactionKeyValueStore;
 use sui_types::{
@@ -50,37 +50,49 @@ use sui_types::{
     event::EventID,
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tracing::{debug, instrument, warn};
+use tracing::{instrument, warn};
 
 use crate::{
     authority_state::{StateRead, StateReadResult},
     error::{Error, SuiRpcInputError},
-    name_service::{Domain, NameRecord, NameServiceConfig, NameServiceError},
     with_tracing,
     SuiRpcModule,
 };
 
-pub fn spawn_subscription<S, T>(mut sink: SubscriptionSink, rx: S, permit: Option<OwnedSemaphorePermit>)
+pub fn spawn_subscription<S, T>(sink: PendingSubscriptionSink, mut rx: S, permit: Option<OwnedSemaphorePermit>)
 where
     S: Stream<Item = T> + Unpin + Send + 'static,
-    T: Serialize,
+    T: Serialize + Send,
 {
     spawn_monitored_task!(async move {
-        let _permit = permit;
-        match sink.pipe_from_stream(rx).await {
-            SubscriptionClosed::Success => {
-                debug!("Subscription completed.");
-                sink.close(SubscriptionClosed::Success);
-            }
-            SubscriptionClosed::RemotePeerAborted => {
-                debug!("Subscription aborted by remote peer.");
-                sink.close(SubscriptionClosed::RemotePeerAborted);
-            }
-            SubscriptionClosed::Failed(err) => {
-                debug!("Subscription failed: {err:?}");
-                sink.close(err);
-            }
+        let Ok(sink) = sink.accept().await else {
+            return;
         };
+        let _permit = permit;
+
+        while let Some(item) = rx.next().await {
+            let Ok(message) = jsonrpsee::server::SubscriptionMessage::from_json(&item) else {
+                break;
+            };
+            let Ok(()) = sink.send(message).await else {
+                break;
+            };
+        }
+
+        //         match sink.pipe_from_stream(rx).await {
+        //             SubscriptionClosed::Success => {
+        //                 debug!("Subscription completed.");
+        //                 sink.close(SubscriptionClosed::Success);
+        //             }
+        //             SubscriptionClosed::RemotePeerAborted => {
+        //                 debug!("Subscription aborted by remote peer.");
+        //                 sink.close(SubscriptionClosed::RemotePeerAborted);
+        //             }
+        //             SubscriptionClosed::Failed(err) => {
+        //                 debug!("Subscription failed: {err:?}");
+        //                 sink.close(err);
+        //             }
+        //         };
     });
 }
 const DEFAULT_MAX_SUBSCRIPTIONS: usize = 100;
@@ -254,13 +266,13 @@ impl<R: ReadApiServer> IndexerApiServer for IndexerApi<R> {
     }
 
     #[instrument(skip(self))]
-    fn subscribe_event(&self, sink: SubscriptionSink, filter: EventFilter) -> SubscriptionResult {
+    fn subscribe_event(&self, sink: PendingSubscriptionSink, filter: EventFilter) -> SubscriptionResult {
         let permit = self.acquire_subscribe_permit()?;
         spawn_subscription(sink, self.state.get_subscription_handler().subscribe_events(filter), Some(permit));
         Ok(())
     }
 
-    fn subscribe_transaction(&self, sink: SubscriptionSink, filter: TransactionFilter) -> SubscriptionResult {
+    fn subscribe_transaction(&self, sink: PendingSubscriptionSink, filter: TransactionFilter) -> SubscriptionResult {
         let permit = self.acquire_subscribe_permit()?;
         spawn_subscription(sink, self.state.get_subscription_handler().subscribe_transactions(filter), Some(permit));
         Ok(())

@@ -38,7 +38,7 @@ pub struct CostTable {
 impl CostTable {
     fn get_current_and_future_tier(tiers: &BTreeMap<u64, u64>, current: u64, default: u64) -> (u64, Option<u64>) {
         let current_cost =
-            tiers.get(&current).or_else(|| tiers.range(..current).next_back().map(|(_, v)| v)).unwrap_or(&default);
+            tiers.get(&current).or_else(|| tiers.range(.. current).next_back().map(|(_, v)| v)).unwrap_or(&default);
         let next_tier_start = tiers
             .range::<u64, _>((Bound::Excluded(current), Bound::Unbounded))
             .next()

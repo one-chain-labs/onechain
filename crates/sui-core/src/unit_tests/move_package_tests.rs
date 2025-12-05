@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::{file_format::CompiledModule, file_format_common::VERSION_MAX};
-
 use std::{collections::BTreeMap, path::PathBuf};
+
+use move_binary_format::{file_format::CompiledModule, file_format_common::VERSION_MAX};
 use sui_move_build::{BuildConfig, CompiledPackage};
 use sui_protocol_config::{Chain, ProtocolConfig};
 use sui_types::{

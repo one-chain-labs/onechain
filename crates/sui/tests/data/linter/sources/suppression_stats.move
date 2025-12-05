@@ -6,9 +6,9 @@
 
 #[allow(lint(custom_state_change))]
 module linter::suppression_stats {
-    use one::object::UID;
-    use one::transfer;
-    use one::tx_context::{Self, TxContext};
+    use sui::object::UID;
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
 
     #[allow(unused_field)]
     public struct S1 has key, store {

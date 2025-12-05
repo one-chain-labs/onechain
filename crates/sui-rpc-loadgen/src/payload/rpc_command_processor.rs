@@ -1,12 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use dashmap::{DashMap, DashSet};
-use futures::future::join_all;
-use serde::{de::DeserializeOwned, Serialize};
-use shared_crypto::intent::{Intent, IntentMessage};
 use std::{
     fmt,
     fs::{self, File},
@@ -14,6 +8,13 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use dashmap::{DashMap, DashSet};
+use futures::future::join_all;
+use serde::{de::DeserializeOwned, Serialize};
+use shared_crypto::intent::{Intent, IntentMessage};
 use sui_json_rpc_types::{
     SuiExecutionStatus,
     SuiObjectDataOptions,
@@ -22,37 +23,37 @@ use sui_json_rpc_types::{
     SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
 };
-use sui_types::digests::TransactionDigest;
-use tokio::{sync::RwLock, time::sleep};
-use tracing::{debug, info};
-
-use crate::load_test::LoadTestConfig;
 use sui_sdk::{SuiClient, SuiClientBuilder};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair, EncodeDecodeBase64, Signature, SuiKeyPair},
+    digests::TransactionDigest,
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::{Transaction, TransactionData},
 };
-
-use crate::payload::{
-    checkpoint_utils::get_latest_checkpoint_stats,
-    validation::chunk_entities,
-    Command,
-    CommandData,
-    DryRun,
-    GetAllBalances,
-    GetCheckpoints,
-    GetObject,
-    MultiGetObjects,
-    Payload,
-    ProcessPayload,
-    Processor,
-    QueryTransactionBlocks,
-    SignerInfo,
-};
+use tokio::{sync::RwLock, time::sleep};
+use tracing::{debug, info};
 
 use super::MultiGetTransactionBlocks;
+use crate::{
+    load_test::LoadTestConfig,
+    payload::{
+        checkpoint_utils::get_latest_checkpoint_stats,
+        validation::chunk_entities,
+        Command,
+        CommandData,
+        DryRun,
+        GetAllBalances,
+        GetCheckpoints,
+        GetObject,
+        MultiGetObjects,
+        Payload,
+        ProcessPayload,
+        Processor,
+        QueryTransactionBlocks,
+        SignerInfo,
+    },
+};
 
 pub(crate) const DEFAULT_GAS_BUDGET: u64 = 500_000_000;
 pub(crate) const DEFAULT_LARGE_GAS_BUDGET: u64 = 50_000_000_000;
@@ -93,7 +94,7 @@ impl RpcCommandProcessor {
         match command {
             CommandData::DryRun(ref v) => self.process(v, signer_info).await,
             CommandData::GetCheckpoints(ref v) => self.process(v, signer_info).await,
-            CommandData::PayOct(ref v) => self.process(v, signer_info).await,
+            CommandData::PaySui(ref v) => self.process(v, signer_info).await,
             CommandData::QueryTransactionBlocks(ref v) => self.process(v, signer_info).await,
             CommandData::MultiGetTransactionBlocks(ref v) => self.process(v, signer_info).await,
             CommandData::MultiGetObjects(ref v) => self.process(v, signer_info).await,
@@ -223,7 +224,7 @@ impl Processor for RpcCommandProcessor {
         for command in commands.iter() {
             let repeat_interval = command.repeat_interval;
             let repeat_n_times = command.repeat_n_times;
-            for i in 0..=repeat_n_times {
+            for i in 0 ..= repeat_n_times {
                 let start_time = Instant::now();
 
                 self.process_command_data(&command.data, &payload.signer_info).await?;
@@ -319,7 +320,7 @@ impl Processor for RpcCommandProcessor {
                 commands: vec![command], // note commands is also a vector
                 signer_info: coins_and_keys.as_ref().map(|(coins, encoded_keypair)| SignerInfo {
                     encoded_keypair: encoded_keypair.clone(),
-                    gas_payment: Some(coins[num_chunks * i..(i + 1) * num_chunks].to_vec()),
+                    gas_payment: Some(coins[num_chunks * i .. (i + 1) * num_chunks].to_vec()),
                     gas_budget: None,
                 }),
             })
@@ -394,7 +395,7 @@ fn read_data_from_file<T: DeserializeOwned>(file_path: &str) -> Result<T, anyhow
     let mut path_buf = PathBuf::from(file_path);
 
     // Check if the file has a JSON extension
-    if path_buf.extension().map_or(true, |ext| ext != "json") {
+    if path_buf.extension().is_none_or(|ext| ext != "json") {
         // If not, add .json to the filename
         path_buf.set_extension("json");
     }
@@ -428,7 +429,7 @@ async fn divide_checkpoint_tasks(clients: &[SuiClient], data: &GetCheckpoints, n
     };
 
     let chunk_size = (end - start) / num_chunks as u64;
-    (0..num_chunks)
+    (0 .. num_chunks)
         .map(|i| {
             let start_checkpoint = start + (i as u64) * chunk_size;
             let end_checkpoint = end.min(start + ((i + 1) as u64) * chunk_size);
@@ -520,7 +521,7 @@ async fn prepare_new_signer_and_coins(
 
     debug!("pay_amounts {pay_amounts:?}");
 
-    pay_oct(
+    pay_sui(
         client,
         &primary_keypair,
         vec![coin],
@@ -571,7 +572,7 @@ fn num_transactions_needed(num_coins: usize, new_coins_per_txn: usize) -> usize 
     if num_coins == 1 {
         return 0;
     }
-    (num_coins + new_coins_per_txn - 1) / new_coins_per_txn
+    num_coins.div_ceil(new_coins_per_txn)
 }
 
 /// Calculate the split amounts for a given number of coins, amount per coin, and maximum number of coins per transaction.
@@ -612,7 +613,7 @@ async fn get_sui_coin_ids(client: &SuiClient, address: SuiAddress) -> Vec<(Objec
     // TODO: implement iteration over next page
 }
 
-async fn pay_oct(
+async fn pay_sui(
     client: &SuiClient,
     keypair: &SuiKeyPair,
     input_coins: Vec<ObjectID>,
@@ -694,8 +695,9 @@ pub(crate) async fn sign_and_execute(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{assert_eq, vec};
+
+    use super::*;
 
     #[test]
     fn test_calculate_split_amounts_no_split_needed() {

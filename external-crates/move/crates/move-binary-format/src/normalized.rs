@@ -3,36 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_format::{
-    AbilitySet,
-    Bytecode as FBytecode,
-    CodeOffset,
-    CompiledModule,
-    DatatypeTyParameter,
-    EnumDefinition,
-    FieldDefinition,
-    FieldHandle,
-    FieldHandleIndex,
-    FieldInstantiation,
-    FieldInstantiationIndex,
-    FunctionDefinition,
-    FunctionHandle,
-    FunctionHandleIndex,
-    FunctionInstantiation,
-    JumpTableInner,
-    LocalIndex,
-    SignatureIndex,
-    SignatureToken,
-    StructDefInstantiation,
-    StructDefInstantiationIndex,
-    StructDefinition,
-    StructDefinitionIndex,
-    StructFieldInformation,
-    TypeParameterIndex,
-    VariantDefinition,
-    VariantHandleIndex,
-    VariantInstantiationHandleIndex,
-    VariantJumpTable as FFVariantJumpTable,
-    Visibility,
+    AbilitySet, Bytecode as FBytecode, CodeOffset, CompiledModule, DatatypeTyParameter,
+    EnumDefinition, FieldDefinition, FieldHandle, FieldHandleIndex, FieldInstantiation,
+    FieldInstantiationIndex, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
+    FunctionInstantiation, JumpTableInner, LocalIndex, SignatureIndex, SignatureToken,
+    StructDefInstantiation, StructDefInstantiationIndex, StructDefinition, StructDefinitionIndex,
+    StructFieldInformation, TypeParameterIndex, VariantDefinition, VariantHandleIndex,
+    VariantInstantiationHandleIndex, VariantJumpTable as FFVariantJumpTable, Visibility,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -43,12 +20,12 @@ use move_proc_macros::test_variant_order;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Defines normalized representations of Move types, fields, kinds, structs, functions, and
-/// modules. These representations are useful in situations that require require comparing
-/// functions, resources, and types across modules. This arises in linking, compatibility checks
-/// (e.g., "is it safe to deploy this new module without updating its dependents and/or restarting
-/// genesis?"), defining schemas for resources stored on-chain, and (possibly in the future)
-/// allowing module updates transactions.
+// Defines normalized representations of Move types, fields, kinds, structs, functions, and
+// modules. These representations are useful in situations that require require comparing
+// functions, resources, and types across modules. This arises in linking, compatibility checks
+// (e.g., "is it safe to deploy this new module without updating its dependents and/or restarting
+// genesis?"), defining schemas for resources stored on-chain, and (possibly in the future)
+// allowing module updates transactions.
 
 /// A normalized version of `SignatureToken`, a type expression appearing in struct or function
 /// declarations. Unlike `SignatureToken`s, `normalized::Type`s from different modules can safely be
@@ -274,7 +251,10 @@ pub enum Bytecode {
 
 impl Constant {
     pub fn new(m: &CompiledModule, constant: &crate::file_format::Constant) -> Self {
-        Self { type_: Type::new(m, &constant.type_), data: constant.data.clone() }
+        Self {
+            type_: Type::new(m, &constant.type_),
+            data: constant.data.clone(),
+        }
     }
 }
 
@@ -302,8 +282,16 @@ impl Module {
         let structs = m.struct_defs().iter().map(|d| Struct::new(m, d)).collect();
         let enums = m.enum_defs().iter().map(|d| Enum::new(m, d)).collect();
         let dependencies = m.immediate_dependencies();
-        let constants = m.constant_pool().iter().map(|constant| Constant::new(m, constant)).collect();
-        let functions = m.function_defs().iter().map(|func_def| Function::new(m, func_def)).collect();
+        let constants = m
+            .constant_pool()
+            .iter()
+            .map(|constant| Constant::new(m, constant))
+            .collect();
+        let functions = m
+            .function_defs()
+            .iter()
+            .map(|func_def| Function::new(m, func_def))
+            .collect();
         Self {
             file_format_version: m.version(),
             address: *m.address(),
@@ -399,16 +387,24 @@ impl Type {
                 Address => TypeTag::Address,
                 Signer => TypeTag::Signer,
                 Vector(t) => TypeTag::Vector(Box::new(
-                    t.into_type_tag().expect("Invariant violation: vector type argument contains reference"),
+                    t.into_type_tag()
+                        .expect("Invariant violation: vector type argument contains reference"),
                 )),
-                Struct { address, module, name, type_arguments } => TypeTag::Struct(Box::new(StructTag {
+                Struct {
+                    address,
+                    module,
+                    name,
+                    type_arguments,
+                } => TypeTag::Struct(Box::new(StructTag {
                     address,
                     module,
                     name,
                     type_params: type_arguments
                         .into_iter()
                         .map(|t| {
-                            t.into_type_tag().expect("Invariant violation: struct type argument contains reference")
+                            t.into_type_tag().expect(
+                                "Invariant violation: struct type argument contains reference",
+                            )
                         })
                         .collect(),
                 })),
@@ -433,13 +429,24 @@ impl Type {
             Reference(ty) => Reference(Box::new(ty.subst(type_args))),
             MutableReference(ty) => MutableReference(Box::new(ty.subst(type_args))),
             Vector(t) => Vector(Box::new(t.subst(type_args))),
-            Struct { address, module, name, type_arguments } => Struct {
+            Struct {
+                address,
+                module,
+                name,
+                type_arguments,
+            } => Struct {
                 address: *address,
                 module: module.clone(),
                 name: name.clone(),
-                type_arguments: type_arguments.iter().map(|t| t.subst(type_args)).collect::<Vec<_>>(),
+                type_arguments: type_arguments
+                    .iter()
+                    .map(|t| t.subst(type_args))
+                    .collect::<Vec<_>>(),
             },
-            TypeParameter(i) => type_args.get(*i as usize).expect("Type parameter index out of bound").clone(),
+            TypeParameter(i) => type_args
+                .get(*i as usize)
+                .expect("Type parameter index out of bound")
+                .clone(),
         }
     }
 }
@@ -447,7 +454,10 @@ impl Type {
 impl Field {
     /// Create a `Field` for `FieldDefinition` `f` in module `m`.
     pub fn new(m: &CompiledModule, f: &FieldDefinition) -> Self {
-        Field { name: m.identifier_at(f.name).to_owned(), type_: Type::new(m, &f.signature.0) }
+        Field {
+            name: m.identifier_at(f.name).to_owned(),
+            type_: Type::new(m, &f.signature.0),
+        }
     }
 }
 
@@ -461,10 +471,16 @@ impl Struct {
                 // Pretend for compatibility checking no fields
                 vec![]
             }
-            StructFieldInformation::Declared(fields) => fields.iter().map(|f| Field::new(m, f)).collect(),
+            StructFieldInformation::Declared(fields) => {
+                fields.iter().map(|f| Field::new(m, f)).collect()
+            }
         };
         let name = m.identifier_at(handle.name).to_owned();
-        let s = Struct { abilities: handle.abilities, type_parameters: handle.type_parameters.clone(), fields };
+        let s = Struct {
+            abilities: handle.abilities,
+            type_parameters: handle.type_parameters.clone(),
+            fields,
+        };
         (name, s)
     }
 
@@ -485,14 +501,29 @@ impl Function {
         let code: Vec<_> = def
             .code
             .as_ref()
-            .map(|code| code.code.iter().map(|bytecode| Bytecode::new(m, bytecode, &code.jump_tables)).collect())
+            .map(|code| {
+                code.code
+                    .iter()
+                    .map(|bytecode| Bytecode::new(m, bytecode, &code.jump_tables))
+                    .collect()
+            })
             .unwrap_or_default();
         let f = Function {
             visibility: def.visibility,
             is_entry: def.is_entry,
             type_parameters: fhandle.type_parameters.clone(),
-            parameters: m.signature_at(fhandle.parameters).0.iter().map(|s| Type::new(m, s)).collect(),
-            return_: m.signature_at(fhandle.return_).0.iter().map(|s| Type::new(m, s)).collect(),
+            parameters: m
+                .signature_at(fhandle.parameters)
+                .0
+                .iter()
+                .map(|s| Type::new(m, s))
+                .collect(),
+            return_: m
+                .signature_at(fhandle.return_)
+                .0
+                .iter()
+                .map(|s| Type::new(m, s))
+                .collect(),
             code,
         };
         (name, f)
@@ -535,7 +566,10 @@ impl From<TypeTag> for Type {
 
 impl FieldRef {
     pub fn new(m: &CompiledModule, field_handle: &FieldHandle) -> Self {
-        Self { struct_name: m.struct_name(field_handle.owner).to_owned(), field_index: field_handle.field }
+        Self {
+            struct_name: m.struct_name(field_handle.owner).to_owned(),
+            field_index: field_handle.field,
+        }
     }
 
     pub fn from_idx(m: &CompiledModule, field_handle_idx: &FieldHandleIndex) -> Self {
@@ -557,31 +591,52 @@ impl FunctionRef {
 }
 
 impl VariantHandle {
-    pub fn from_variant_handle(m: &CompiledModule, variant_handle: &VariantHandleIndex) -> VariantHandle {
+    pub fn from_variant_handle(
+        m: &CompiledModule,
+        variant_handle: &VariantHandleIndex,
+    ) -> VariantHandle {
         let variant_handle = m.variant_handle_at(*variant_handle);
         let enum_def = m.enum_def_at(variant_handle.enum_def);
         let enum_handle = m.datatype_handle_at(enum_def.enum_handle);
         let enum_name = m.identifier_at(enum_handle.name).to_owned();
         let type_parameters = vec![];
-        VariantHandle { enum_name, variant_index: variant_handle.variant, type_parameters }
+        VariantHandle {
+            enum_name,
+            variant_index: variant_handle.variant,
+            type_parameters,
+        }
     }
 
     pub fn from_variant_instantiation_handle(
         m: &CompiledModule,
         variant_instantiation_handle: &VariantInstantiationHandleIndex,
     ) -> VariantHandle {
-        let variant_instantiation_handle = m.variant_instantiation_handle_at(*variant_instantiation_handle);
+        let variant_instantiation_handle =
+            m.variant_instantiation_handle_at(*variant_instantiation_handle);
         let enum_inst = m.enum_instantiation_at(variant_instantiation_handle.enum_def);
         let enum_def = m.enum_def_at(enum_inst.def);
         let enum_handle = m.datatype_handle_at(enum_def.enum_handle);
         let enum_name = m.identifier_at(enum_handle.name).to_owned();
-        let type_parameters = m.signature_at(enum_inst.type_parameters).0.iter().map(|tok| Type::new(m, tok)).collect();
-        VariantHandle { enum_name, variant_index: variant_instantiation_handle.variant, type_parameters }
+        let type_parameters = m
+            .signature_at(enum_inst.type_parameters)
+            .0
+            .iter()
+            .map(|tok| Type::new(m, tok))
+            .collect();
+        VariantHandle {
+            enum_name,
+            variant_index: variant_instantiation_handle.variant,
+            type_parameters,
+        }
     }
 }
 
 impl Bytecode {
-    pub fn new(m: &CompiledModule, bytecode: &FBytecode, jump_tables: &[FFVariantJumpTable]) -> Self {
+    pub fn new(
+        m: &CompiledModule,
+        bytecode: &FBytecode,
+        jump_tables: &[FFVariantJumpTable],
+    ) -> Self {
         use Bytecode as B;
         use FBytecode as FB;
         match bytecode {
@@ -634,7 +689,10 @@ impl Bytecode {
             FB::LdConst(const_idx) => B::LdConst(Constant::new(m, m.constant_at(*const_idx))),
             FB::Call(fh_idx) => B::Call(FunctionRef::from_idx(m, fh_idx)),
             FB::CallGeneric(fhi_idx) => {
-                let FunctionInstantiation { handle, type_parameters } = m.function_instantiation_at(*fhi_idx);
+                let FunctionInstantiation {
+                    handle,
+                    type_parameters,
+                } = m.function_instantiation_at(*fhi_idx);
                 let type_params = m.signature_at(*type_parameters);
                 B::CallGeneric((
                     FunctionRef::from_idx(m, handle),
@@ -648,23 +706,39 @@ impl Bytecode {
             FB::MutBorrowLoc(x) => B::MutBorrowLoc(*x),
             FB::ImmBorrowLoc(x) => B::ImmBorrowLoc(*x),
             FB::MutBorrowField(fh_ixd) => B::MutBorrowField(FieldRef::from_idx(m, fh_ixd)),
-            FB::MutBorrowFieldGeneric(fhi_idx) => B::MutBorrowFieldGeneric(field_instantiation(m, fhi_idx)),
+            FB::MutBorrowFieldGeneric(fhi_idx) => {
+                B::MutBorrowFieldGeneric(field_instantiation(m, fhi_idx))
+            }
             FB::ImmBorrowField(fh_idx) => B::ImmBorrowField(FieldRef::from_idx(m, fh_idx)),
-            FB::ImmBorrowFieldGeneric(fhi_idx) => B::ImmBorrowFieldGeneric(field_instantiation(m, fhi_idx)),
-            FB::MutBorrowGlobalDeprecated(s_idx) => B::MutBorrowGlobalDeprecated(m.struct_name(*s_idx).to_owned()),
+            FB::ImmBorrowFieldGeneric(fhi_idx) => {
+                B::ImmBorrowFieldGeneric(field_instantiation(m, fhi_idx))
+            }
+            FB::MutBorrowGlobalDeprecated(s_idx) => {
+                B::MutBorrowGlobalDeprecated(m.struct_name(*s_idx).to_owned())
+            }
             FB::MutBorrowGlobalGenericDeprecated(si_idx) => {
                 B::MutBorrowGlobalGenericDeprecated(struct_instantiation(m, si_idx))
             }
-            FB::ImmBorrowGlobalDeprecated(s_idx) => B::ImmBorrowGlobalDeprecated(m.struct_name(*s_idx).to_owned()),
+            FB::ImmBorrowGlobalDeprecated(s_idx) => {
+                B::ImmBorrowGlobalDeprecated(m.struct_name(*s_idx).to_owned())
+            }
             FB::ImmBorrowGlobalGenericDeprecated(si_idx) => {
                 B::ImmBorrowGlobalGenericDeprecated(struct_instantiation(m, si_idx))
             }
             FB::ExistsDeprecated(s_idx) => B::ExistsDeprecated(m.struct_name(*s_idx).to_owned()),
-            FB::ExistsGenericDeprecated(si_idx) => B::ExistsGenericDeprecated(struct_instantiation(m, si_idx)),
-            FB::MoveFromDeprecated(s_idx) => B::MoveFromDeprecated(m.struct_name(*s_idx).to_owned()),
-            FB::MoveFromGenericDeprecated(si_idx) => B::MoveFromGenericDeprecated(struct_instantiation(m, si_idx)),
+            FB::ExistsGenericDeprecated(si_idx) => {
+                B::ExistsGenericDeprecated(struct_instantiation(m, si_idx))
+            }
+            FB::MoveFromDeprecated(s_idx) => {
+                B::MoveFromDeprecated(m.struct_name(*s_idx).to_owned())
+            }
+            FB::MoveFromGenericDeprecated(si_idx) => {
+                B::MoveFromGenericDeprecated(struct_instantiation(m, si_idx))
+            }
             FB::MoveToDeprecated(s_idx) => B::MoveToDeprecated(m.struct_name(*s_idx).to_owned()),
-            FB::MoveToGenericDeprecated(si_idx) => B::MoveToGenericDeprecated(struct_instantiation(m, si_idx)),
+            FB::MoveToGenericDeprecated(si_idx) => {
+                B::MoveToGenericDeprecated(struct_instantiation(m, si_idx))
+            }
             FB::VecPack(sig_idx, len) => B::VecPack(signature_to_single_type(m, sig_idx), *len),
             FB::VecLen(sig_idx) => B::VecLen(signature_to_single_type(m, sig_idx)),
             FB::VecImmBorrow(sig_idx) => B::VecImmBorrow(signature_to_single_type(m, sig_idx)),
@@ -673,25 +747,35 @@ impl Bytecode {
             FB::VecPopBack(sig_idx) => B::VecPopBack(signature_to_single_type(m, sig_idx)),
             FB::VecUnpack(sig_idx, len) => B::VecUnpack(signature_to_single_type(m, sig_idx), *len),
             FB::VecSwap(sig_idx) => B::VecSwap(signature_to_single_type(m, sig_idx)),
-            FB::PackVariant(handle) => B::PackVariant(VariantHandle::from_variant_handle(m, handle)),
+            FB::PackVariant(handle) => {
+                B::PackVariant(VariantHandle::from_variant_handle(m, handle))
+            }
             FB::PackVariantGeneric(handle) => {
                 B::PackVariantGeneric(VariantHandle::from_variant_instantiation_handle(m, handle))
             }
-            FB::UnpackVariant(handle) => B::UnpackVariant(VariantHandle::from_variant_handle(m, handle)),
+            FB::UnpackVariant(handle) => {
+                B::UnpackVariant(VariantHandle::from_variant_handle(m, handle))
+            }
             FB::UnpackVariantGeneric(handle) => {
                 B::UnpackVariantGeneric(VariantHandle::from_variant_instantiation_handle(m, handle))
             }
-            FB::UnpackVariantImmRef(handle) => B::UnpackVariantImmRef(VariantHandle::from_variant_handle(m, handle)),
-            FB::UnpackVariantGenericImmRef(handle) => {
-                B::UnpackVariantGenericImmRef(VariantHandle::from_variant_instantiation_handle(m, handle))
+            FB::UnpackVariantImmRef(handle) => {
+                B::UnpackVariantImmRef(VariantHandle::from_variant_handle(m, handle))
             }
-            FB::UnpackVariantMutRef(handle) => B::UnpackVariantMutRef(VariantHandle::from_variant_handle(m, handle)),
-            FB::UnpackVariantGenericMutRef(handle) => {
-                B::UnpackVariantGenericMutRef(VariantHandle::from_variant_instantiation_handle(m, handle))
+            FB::UnpackVariantGenericImmRef(handle) => B::UnpackVariantGenericImmRef(
+                VariantHandle::from_variant_instantiation_handle(m, handle),
+            ),
+            FB::UnpackVariantMutRef(handle) => {
+                B::UnpackVariantMutRef(VariantHandle::from_variant_handle(m, handle))
             }
+            FB::UnpackVariantGenericMutRef(handle) => B::UnpackVariantGenericMutRef(
+                VariantHandle::from_variant_instantiation_handle(m, handle),
+            ),
             FB::VariantSwitch(jti) => B::VariantSwitch(VariantJumpTable::new(
                 m,
-                jump_tables.get(jti.0 as usize).expect("Invariant violation: invalid jump table index"),
+                jump_tables
+                    .get(jti.0 as usize)
+                    .expect("Invariant violation: invalid jump table index"),
             )),
         }
     }
@@ -702,7 +786,10 @@ impl VariantJumpTable {
         let e_def = m.enum_def_at(jt.head_enum);
         let e_handle = m.datatype_handle_at(e_def.enum_handle);
         let enum_name = m.identifier_at(e_handle.name).to_owned();
-        Self { enum_name, jump_table: jt.jump_table.clone() }
+        Self {
+            enum_name,
+            jump_table: jt.jump_table.clone(),
+        }
     }
 }
 
@@ -710,8 +797,16 @@ impl Enum {
     pub fn new(m: &CompiledModule, def: &EnumDefinition) -> (Identifier, Self) {
         let handle = m.datatype_handle_at(def.enum_handle);
         let name = m.identifier_at(handle.name).to_owned();
-        let variants = def.variants.iter().map(|v| Variant::new(m, v)).collect::<Vec<_>>();
-        let e = Enum { abilities: handle.abilities, type_parameters: handle.type_parameters.clone(), variants };
+        let variants = def
+            .variants
+            .iter()
+            .map(|v| Variant::new(m, v))
+            .collect::<Vec<_>>();
+        let e = Enum {
+            abilities: handle.abilities,
+            type_parameters: handle.type_parameters.clone(),
+            variants,
+        };
         (name, e)
     }
 }
@@ -720,7 +815,11 @@ impl Variant {
     pub fn new(m: &CompiledModule, v: &VariantDefinition) -> Self {
         Self {
             name: m.identifier_at(v.variant_name).to_owned(),
-            fields: v.fields.iter().map(|f| Field::new(m, f)).collect::<Vec<_>>(),
+            fields: v
+                .fields
+                .iter()
+                .map(|f| Field::new(m, f))
+                .collect::<Vec<_>>(),
         }
     }
 }
@@ -728,8 +827,19 @@ impl Variant {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Type::Struct { address, module, name, type_arguments } => {
-                write!(f, "0x{}::{}::{}", address.short_str_lossless(), module, name)?;
+            Type::Struct {
+                address,
+                module,
+                name,
+                type_arguments,
+            } => {
+                write!(
+                    f,
+                    "0x{}::{}::{}",
+                    address.short_str_lossless(),
+                    module,
+                    name
+                )?;
                 if let Some(first_ty) = type_arguments.first() {
                     write!(f, "<")?;
                     write!(f, "{}", first_ty)?;
@@ -757,17 +867,36 @@ impl std::fmt::Display for Type {
     }
 }
 
-fn struct_instantiation(m: &CompiledModule, si_idx: &StructDefInstantiationIndex) -> (Identifier, Vec<Type>) {
-    let StructDefInstantiation { def, type_parameters } = m.struct_instantiation_at(*si_idx);
+fn struct_instantiation(
+    m: &CompiledModule,
+    si_idx: &StructDefInstantiationIndex,
+) -> (Identifier, Vec<Type>) {
+    let StructDefInstantiation {
+        def,
+        type_parameters,
+    } = m.struct_instantiation_at(*si_idx);
     let (name, _) = Struct::new(m, m.struct_def_at(*def));
-    let types = m.signature_at(*type_parameters).0.iter().map(|tok| Type::new(m, tok)).collect();
+    let types = m
+        .signature_at(*type_parameters)
+        .0
+        .iter()
+        .map(|tok| Type::new(m, tok))
+        .collect();
     (name, types)
 }
 
 fn field_instantiation(m: &CompiledModule, idx: &FieldInstantiationIndex) -> (FieldRef, Vec<Type>) {
-    let FieldInstantiation { handle, type_parameters } = m.field_instantiation_at(*idx);
+    let FieldInstantiation {
+        handle,
+        type_parameters,
+    } = m.field_instantiation_at(*idx);
     let field_ref = FieldRef::new(m, m.field_handle_at(*handle));
-    let types = m.signature_at(*type_parameters).0.iter().map(|tok| Type::new(m, tok)).collect();
+    let types = m
+        .signature_at(*type_parameters)
+        .0
+        .iter()
+        .map(|tok| Type::new(m, tok))
+        .collect();
     (field_ref, types)
 }
 

@@ -2,11 +2,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    io,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::SystemTime,
+};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use fastcrypto::traits::KeyPair;
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::server::SUI_TLS_SERVER_NAME;
+use nonempty::{nonempty, NonEmpty};
 use prometheus::{
     register_histogram_with_registry,
     register_int_counter_vec_with_registry,
@@ -16,12 +24,7 @@ use prometheus::{
     IntCounterVec,
     Registry,
 };
-use std::{
-    io,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-    time::SystemTime,
-};
+use sui_config::local_ip_utils::new_local_tcp_address_for_testing;
 use sui_network::{
     api::{Validator, ValidatorServer},
     tonic,
@@ -54,47 +57,41 @@ use sui_types::{
     transaction::*,
 };
 use tap::TapFallible;
-use tokio::task::JoinHandle;
-use tonic::metadata::{Ascii, MetadataValue};
+use tonic::{
+    metadata::{Ascii, MetadataValue},
+    transport::server::TcpConnectInfo,
+};
 use tracing::{error, error_span, info, Instrument};
 
 use crate::{
     authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
+    checkpoints::CheckpointStore,
     consensus_adapter::{ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics},
     mysticeti_adapter::LazyMysticetiClient,
     traffic_controller::{metrics::TrafficControllerMetrics, parse_ip, policies::TrafficTally, TrafficController},
 };
-use nonempty::{nonempty, NonEmpty};
-use sui_config::local_ip_utils::new_local_tcp_address_for_testing;
-use tonic::transport::server::TcpConnectInfo;
 
 #[cfg(test)]
 #[path = "unit_tests/server_tests.rs"]
 mod server_tests;
 
 pub struct AuthorityServerHandle {
-    tx_cancellation: tokio::sync::oneshot::Sender<()>,
-    local_addr: Multiaddr,
-    handle: JoinHandle<Result<(), tonic::transport::Error>>,
+    server_handle: mysten_network::server::Server,
 }
 
 impl AuthorityServerHandle {
     pub async fn join(self) -> Result<(), io::Error> {
-        // Note that dropping `self.complete` would terminate the server.
-        self.handle.await?.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        self.server_handle.handle().wait_for_shutdown().await;
         Ok(())
     }
 
     pub async fn kill(self) -> Result<(), io::Error> {
-        self.tx_cancellation
-            .send(())
-            .map_err(|_e| io::Error::new(io::ErrorKind::Other, "could not send cancellation signal!"))?;
-        self.handle.await?.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        self.server_handle.handle().shutdown().await;
         Ok(())
     }
 
     pub fn address(&self) -> &Multiaddr {
-        &self.local_addr
+        self.server_handle.local_addr()
     }
 }
 
@@ -119,6 +116,7 @@ impl AuthorityServer {
     pub fn new_for_test(state: Arc<AuthorityState>) -> Self {
         let consensus_adapter = Arc::new(ConsensusAdapter::new(
             Arc::new(LazyMysticetiClient::new()),
+            CheckpointStore::new_for_tests(),
             state.name,
             Arc::new(ConnectionMonitorStatusForTests {}),
             100_000,
@@ -140,9 +138,8 @@ impl AuthorityServer {
         let tls_config = sui_tls::create_rustls_server_config(
             self.state.config.network_key_pair().copy().private(),
             SUI_TLS_SERVER_NAME.to_string(),
-            sui_tls::AllowAll,
         );
-        let mut server = mysten_network::config::Config::new()
+        let server = mysten_network::config::Config::new()
             .server_builder()
             .add_service(ValidatorServer::new(ValidatorService::new_for_tests(
                 self.state,
@@ -154,11 +151,7 @@ impl AuthorityServer {
             .unwrap();
         let local_addr = server.local_addr().to_owned();
         info!("Listening to traffic on {local_addr}");
-        let handle = AuthorityServerHandle {
-            tx_cancellation: server.take_cancel_handle().unwrap(),
-            local_addr,
-            handle: spawn_monitored_task!(server.serve()),
-        };
+        let handle = AuthorityServerHandle { server_handle: server };
         Ok(handle)
     }
 }
@@ -405,7 +398,7 @@ impl ValidatorService {
     }
 
     // When making changes to this function, see if the changes should be applied to
-    // `handle_transaction_v2()` and `SuiTxValidator::vote_transaction()` as well.
+    // `Self::handle_transaction_v2()` and `SuiTxValidator::vote_transaction()` as well.
     async fn handle_transaction(
         &self,
         request: tonic::Request<Transaction>,
@@ -499,22 +492,22 @@ impl ValidatorService {
 
         let _handle_tx_metrics_guard = metrics.handle_transaction_v2_latency.start_timer();
 
-        let tx_verif_metrics_guard = metrics.tx_verification_latency.start_timer();
-        let transaction = epoch_store.verify_transaction(transaction).tap_err(|_| {
-            metrics.signature_errors.inc();
-        })?;
-        drop(tx_verif_metrics_guard);
+        let transaction = {
+            let _metrics_guard = metrics.tx_verification_latency.start_timer();
+            epoch_store.verify_transaction(transaction).tap_err(|_| {
+                metrics.signature_errors.inc();
+            })?
+        };
 
         // Enable Trace Propagation across spans/processes using tx_digest
         let tx_digest = transaction.digest();
-        let span = error_span!("validator_state_process_tx_v2", ?tx_digest);
+        let _span = error_span!("validator_state_handle_tx_v2", ?tx_digest);
 
-        let tx_output =
-            state.handle_transaction_v2(&epoch_store, transaction.clone()).instrument(span).await.tap_err(|e| {
-                if let SuiError::ValidatorHaltedAtEpochEnd = e {
-                    metrics.num_rejected_tx_in_epoch_boundary.inc();
-                }
-            })?;
+        let tx_output = state.handle_vote_transaction(&epoch_store, transaction.clone()).tap_err(|e| {
+            if let SuiError::ValidatorHaltedAtEpochEnd = e {
+                metrics.num_rejected_tx_in_epoch_boundary.inc();
+            }
+        })?;
         // Fetch remaining fields if the transaction has been executed.
         if let Some((effects, events)) = tx_output {
             let input_objects =
@@ -993,8 +986,7 @@ impl ValidatorService {
         };
         let request = request.into_inner();
 
-        let certificates =
-            NonEmpty::from_vec(request.certificates).ok_or_else(|| SuiError::NoCertificateProvidedError)?;
+        let certificates = NonEmpty::from_vec(request.certificates).ok_or(SuiError::NoCertificateProvidedError)?;
         let mut total_size_bytes = 0;
         for certificate in &certificates {
             // We need to check this first because we haven't verified the cert signature.

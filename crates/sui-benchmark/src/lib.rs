@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
+
 use anyhow::bail;
 use async_trait::async_trait;
 use embedded_reconfig_observer::EmbeddedReconfigObserver;
 use fullnode_reconfig_observer::FullNodeReconfigObserver;
 use prometheus::Registry;
 use rand::Rng;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use sui_config::genesis::Genesis;
 use sui_core::{
     authority_aggregator::{AuthorityAggregator, AuthorityAggregatorBuilder},
@@ -299,7 +300,7 @@ impl ValidatorProxy for LocalValidatorAggregatorProxy {
                     bail!(QuorumDriverError::NonRecoverableTransactionError { errors });
                 }
                 Err(err) => {
-                    let delay = Duration::from_millis(rand::thread_rng().gen_range(100..1000));
+                    let delay = Duration::from_millis(rand::thread_rng().gen_range(100 .. 1000));
                     warn!(?tx_digest, retry_cnt, "Transaction failed with err: {:?}. Sleeping for {:?} ...", err, delay,);
                     retry_cnt += 1;
                     sleep(delay).await;

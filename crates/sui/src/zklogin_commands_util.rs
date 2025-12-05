@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{io, io::Write, thread::sleep, time::Duration};
+
 use anyhow::anyhow;
 use fastcrypto::{
     ed25519::Ed25519KeyPair,
@@ -17,7 +19,6 @@ use regex::Regex;
 use reqwest::Client;
 use serde_json::json;
 use shared_crypto::intent::Intent;
-use std::{io, io::Write, thread::sleep, time::Duration};
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::SuiClientBuilder;
@@ -120,7 +121,7 @@ pub async fn perform_zk_login_test_tx(
     let response = sui.coin_read_api().get_coins(sender, None, None, Some(2)).await?;
 
     if response.data.len() != 2 {
-        panic!("Faucet did not work correctly and the provided OneChain address has no coins")
+        panic!("Faucet did not work correctly and the provided Sui address has no coins")
     }
 
     let transfer_coin = response.data[0].coin_object_id;
@@ -177,7 +178,7 @@ pub async fn perform_zk_login_test_tx(
 
 fn get_config(network: &str) -> (&str, &str) {
     match network {
-        "devnet" => ("https://faucet-devnet.onelabs.cc/gas", "https://rpc-devnet.onelabs.cc:443"),
+        "devnet" => ("https://faucet.devnet.sui.io/gas", "https://rpc.devnet.sui.io:443"),
         "localnet" => ("http://127.0.0.1:9123/gas", "http://127.0.0.1:9000"),
         _ => panic!("Invalid network"),
     }

@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use move_core_types::language_storage::StructTag;
 use parking_lot::Mutex;
-use std::sync::Arc;
 use sui_types::{
     base_types::{ObjectID, SuiAddress, TransactionDigest},
     committee::{Committee, EpochId},
@@ -382,8 +383,8 @@ impl RpcStateReader for RestReadStore {
         }
     }
 
-    fn get_chain_identifier(&self) -> sui_types::storage::error::Result<sui_types::digests::ChainIdentifier> {
-        self.state.get_chain_identifier().ok_or_else(|| StorageError::missing("unable to query chain identifier"))
+    fn get_chain_identifier(&self) -> Result<sui_types::digests::ChainIdentifier> {
+        Ok(self.state.get_chain_identifier())
     }
 
     fn indexes(&self) -> Option<&dyn RpcIndexes> {

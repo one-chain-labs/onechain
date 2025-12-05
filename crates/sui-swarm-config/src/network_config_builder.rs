@@ -10,7 +10,7 @@ use std::{
 
 use rand::rngs::OsRng;
 use sui_config::{
-    genesis::{TokenAllocation, TokenDistributionSchedule, TokenDistributionScheduleBuilder},
+    genesis::{TokenAllocation, TokenDistributionScheduleBuilder},
     node::AuthorityOverloadConfig,
     ExecutionCacheConfig,
 };
@@ -92,7 +92,6 @@ pub struct ConfigBuilder<R = OsRng> {
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
     state_accumulator_v2_enabled_config: Option<StateAccumulatorV2EnabledConfig>,
-    custom_distribution_schedule: Option<TokenDistributionSchedule>,
 }
 
 impl ConfigBuilder {
@@ -117,12 +116,11 @@ impl ConfigBuilder {
             max_submit_position: None,
             submit_delay_step_override_millis: None,
             state_accumulator_v2_enabled_config: None,
-            custom_distribution_schedule: None,
         }
     }
 
     pub fn new_with_temp_dir() -> Self {
-        Self::new(nondeterministic!(tempfile::tempdir().unwrap()).keep())
+        Self::new(nondeterministic!(tempfile::tempdir().unwrap()).into_path())
     }
 }
 
@@ -271,11 +269,6 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
-    pub fn with_custom_distribution_schedule(mut self, schedule: TokenDistributionSchedule) -> Self {
-        self.custom_distribution_schedule = Some(schedule);
-        self
-    }
-
     pub fn rng<N: rand::RngCore + rand::CryptoRng>(self, rng: N) -> ConfigBuilder<N> {
         ConfigBuilder {
             rng: Some(rng),
@@ -295,7 +288,6 @@ impl<R> ConfigBuilder<R> {
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
             state_accumulator_v2_enabled_config: self.state_accumulator_v2_enabled_config,
-            custom_distribution_schedule: self.custom_distribution_schedule,
         }
     }
 
@@ -352,7 +344,7 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
             }
             CommitteeConfig::Deterministic((size, keys)) => {
                 // If no keys are provided, generate them.
-                let keys = keys.unwrap_or((0..size.get()).map(|_| get_key_pair_from_rng(&mut rng).1).collect());
+                let keys = keys.unwrap_or((0 .. size.get()).map(|_| get_key_pair_from_rng(&mut rng).1).collect());
 
                 let mut configs = vec![];
                 for (i, key) in keys.into_iter().enumerate() {
@@ -374,9 +366,7 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
 
         let (account_keys, allocations) = genesis_config.generate_accounts(&mut rng).unwrap();
 
-        let token_distribution_schedule = if let Some(schedule) = self.custom_distribution_schedule {
-            schedule
-        } else {
+        let token_distribution_schedule = {
             let mut builder = TokenDistributionScheduleBuilder::new();
             for allocation in allocations {
                 builder.add_allocation(allocation);
@@ -527,6 +517,7 @@ mod tests {
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, sync::Arc};
+
     use sui_config::genesis::Genesis;
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
     use sui_types::{
@@ -574,10 +565,11 @@ mod test {
         let certificate_deny_set = HashSet::new();
         let epoch = EpochData::new_test();
         let transaction_data = &genesis_transaction.data().intent_message().value;
-        let (kind, signer, _) = transaction_data.execution_parts();
+        let (kind, signer, mut gas_data) = transaction_data.execution_parts();
+        gas_data.payment = vec![];
         let input_objects = CheckedInputObjects::new_for_genesis(vec![]);
 
-        let (_inner_temp_store, _, effects, _execution_error) = executor.execute_transaction_to_effects(
+        let (_inner_temp_store, _, effects, _timings, _execution_error) = executor.execute_transaction_to_effects(
             &InMemoryStorage::new(Vec::new()),
             &protocol_config,
             metrics,
@@ -586,11 +578,12 @@ mod test {
             &epoch.epoch_id(),
             epoch.epoch_start_timestamp(),
             input_objects,
-            vec![],
+            gas_data,
             SuiGasStatus::new_unmetered(),
             kind,
             signer,
             genesis_digest,
+            &mut None,
         );
 
         assert_eq!(&effects, genesis.effects());

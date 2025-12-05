@@ -5,11 +5,11 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use sui_json_rpc::{get_balance_changes_from_effect, get_object_changes, ObjectProvider};
-use sui_rpc_api::CheckpointData;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber},
     digests::TransactionDigest,
     effects::{TransactionEffects, TransactionEffectsAPI},
+    full_checkpoint_content::CheckpointData,
     object::Object,
     transaction::{TransactionData, TransactionDataAPI},
 };
@@ -90,7 +90,7 @@ impl TxChangesProcessor {
             self,
             effects,
             tx.input_objects()
-                .unwrap_or_else(|e| panic!("Checkpointed tx {:?} has inavlid input objects: {e}", tx_digest,)),
+                .unwrap_or_else(|e| panic!("Checkpointed tx {:?} has invalid input objects: {e}", tx_digest,)),
             None,
         )
         .await?;
@@ -157,7 +157,7 @@ impl<'a> EpochEndIndexingObjectStore<'a> {
     }
 }
 
-impl<'a> sui_types::storage::ObjectStore for EpochEndIndexingObjectStore<'a> {
+impl sui_types::storage::ObjectStore for EpochEndIndexingObjectStore<'_> {
     fn get_object(&self, object_id: &ObjectID) -> Option<Object> {
         self.objects.iter().find(|o| o.id() == *object_id).cloned().cloned()
     }

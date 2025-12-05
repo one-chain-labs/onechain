@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use async_trait::async_trait;
-use move_core_types::ident_str;
-use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
+
+use anyhow::Result;
+use async_trait::async_trait;
+use move_core_types::ident_str;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use sui_core::authority::AuthorityState;
 use sui_macros::*;
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
@@ -95,7 +96,7 @@ impl StressTestRunner {
     }
 
     pub fn pick_random_sender(&mut self) -> SuiAddress {
-        self.accounts[self.rng.gen_range(0..self.accounts.len())]
+        self.accounts[self.rng.gen_range(0 .. self.accounts.len())]
     }
 
     pub fn system_state(&self) -> SuiSystemStateSummary {
@@ -104,7 +105,11 @@ impl StressTestRunner {
 
     pub fn pick_random_active_validator(&mut self) -> SuiValidatorSummary {
         let system_state = self.system_state();
-        system_state.active_validators.get(self.rng.gen_range(0..system_state.active_validators.len())).unwrap().clone()
+        system_state
+            .active_validators
+            .get(self.rng.gen_range(0 .. system_state.active_validators.len()))
+            .unwrap()
+            .clone()
     }
 
     pub async fn run(&self, sender: SuiAddress, pt: ProgrammableTransaction) -> TransactionEffects {
@@ -132,16 +137,16 @@ impl StressTestRunner {
             let object_opt = state.get_object_store().get_object_by_key(&obj_ref.0, obj_ref.1);
             let Some(object) = object_opt else { continue };
             let struct_tag = object.struct_tag().unwrap();
-            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
+            let total_sui = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_SUI: {total_sui}");
         }
 
         println!("MUTATED:");
         for (obj_ref, _) in effects.mutated() {
             let object = state.get_object_store().get_object_by_key(&obj_ref.0, obj_ref.1).unwrap();
             let struct_tag = object.struct_tag().unwrap();
-            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
+            let total_sui = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_SUI: {total_sui}");
         }
 
         println!("SHARED:");
@@ -149,8 +154,8 @@ impl StressTestRunner {
             let (obj_id, version) = kind.id_and_version();
             let object = state.get_object_store().get_object_by_key(&obj_id, version).unwrap();
             let struct_tag = object.struct_tag().unwrap();
-            let total_oct = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
-            println!(">> {struct_tag} TOTAL_OCT: {total_oct}");
+            let total_sui = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            println!(">> {struct_tag} TOTAL_SUI: {total_sui}");
         }
     }
 
@@ -204,8 +209,9 @@ impl StressTestRunner {
 }
 
 mod add_stake {
-    use super::*;
     use sui_types::effects::TransactionEffects;
+
+    use super::*;
 
     pub struct RequestAddStakeGen;
 
@@ -219,7 +225,7 @@ mod add_stake {
         type StateChange = RequestAddStake;
 
         fn create(&self, runner: &mut StressTestRunner) -> Self::StateChange {
-            let stake_amount = runner.rng.gen_range(MIN_DELEGATION_AMOUNT..=MAX_DELEGATION_AMOUNT);
+            let stake_amount = runner.rng.gen_range(MIN_DELEGATION_AMOUNT ..= MAX_DELEGATION_AMOUNT);
             let staked_with = runner.pick_random_active_validator().sui_address;
             let sender = runner.pick_random_sender();
             RequestAddStake { sender, stake_amount, staked_with }
@@ -246,14 +252,14 @@ mod add_stake {
         }
 
         async fn pre_epoch_post_condition(&mut self, runner: &StressTestRunner, effects: &TransactionEffects) {
-            // Assert that a `StakedOct` object matching the amount delegated is created.
-            // Assert that this staked oct
-            let object = runner.get_created_object_of_type_name(effects, "StakedOct").await.unwrap();
+            // Assert that a `StakedSui` object matching the amount delegated is created.
+            // Assert that this staked sui
+            let object = runner.get_created_object_of_type_name(effects, "StakedSui").await.unwrap();
             let state = runner.state();
             let cache = state.get_backing_package_store();
             let epoch_store = state.load_epoch_store_one_call_per_task();
             let mut layout_resolver = epoch_store.executor().type_layout_resolver(Box::new(cache.as_ref()));
-            let staked_amount = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            let staked_amount = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
             assert_eq!(staked_amount, self.stake_amount);
             assert_eq!(object.owner.get_owner_address().unwrap(), self.sender);
             runner.display_effects(effects);
@@ -274,12 +280,12 @@ async fn fuzz_dynamic_committee() {
 
     let mut runner = StressTestRunner::new().await;
 
-    for i in 0..num_operations {
+    for i in 0 .. num_operations {
         if i == 5 {
             runner.change_epoch().await;
             continue;
         }
-        let index = runner.rng.gen_range(0..actions.len());
+        let index = runner.rng.gen_range(0 .. actions.len());
         let mut task = actions[index].create(&mut runner);
         let effects = task.run(&mut runner).await.unwrap();
         task.pre_epoch_post_condition(&runner, &effects).await;

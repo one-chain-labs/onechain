@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt::{Display, Formatter};
+
 use bigdecimal::BigDecimal;
 use sui_types::base_types::{SuiAddress, TransactionDigest};
-
-use std::fmt::{Display, Formatter};
 
 use crate::models::{
     Balances as DBBalances,

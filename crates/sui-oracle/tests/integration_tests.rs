@@ -48,7 +48,7 @@ async fn test_publish_primitive() {
     let submit_data = Identifier::from_str("submit_data").unwrap();
     let mut builder = ProgrammableTransactionBuilder::new();
 
-    for i in 1..200 {
+    for i in 1 .. 200 {
         let ticker = format!("SUI {}", i);
 
         let value = builder.input(CallArg::Pure(bcs::to_bytes(&rand::random::<u64>()).unwrap())).unwrap();
@@ -127,7 +127,7 @@ async fn test_publish_complex_value() {
 
     let decimal = builder.input(CallArg::Pure(bcs::to_bytes(&6u8).unwrap())).unwrap();
 
-    for i in 1..200 {
+    for i in 1 .. 200 {
         let ticker = format!("SUI {}", i);
 
         let value = builder.input(CallArg::Pure(bcs::to_bytes(&rand::random::<u64>()).unwrap())).unwrap();
@@ -198,7 +198,7 @@ async fn test_consume_oracle_data() {
 
     // create simple oracle
     let mut oracles = vec![];
-    for _ in 0..3 {
+    for _ in 0 .. 3 {
         let (simple_oracle_id, version) = create_oracle(sender, &keystore, &client, package, module.clone()).await;
         oracles.push((simple_oracle_id, version));
 

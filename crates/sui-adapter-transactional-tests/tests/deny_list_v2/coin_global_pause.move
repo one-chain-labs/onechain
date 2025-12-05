@@ -9,8 +9,8 @@
 
 //# publish --sender A
 module test::regulated_coin {
-    use one::coin::{Self, Coin};
-    use one::deny_list::DenyList;
+    use sui::coin::{Self, Coin};
+    use sui::deny_list::DenyList;
 
     public struct REGULATED_COIN has drop {}
 
@@ -70,7 +70,7 @@ module test::regulated_coin {
 }
 
 // Transfer the newly minted coin works normally.
-//# run one::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
+//# run sui::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
 
 // Wrap part of the coin in a wrapper object. We will need this later.
 //# run test::regulated_coin::partial_wrap --args object(1,1) --sender A
@@ -79,19 +79,19 @@ module test::regulated_coin {
 //# run test::regulated_coin::partial_wrap --args object(1,1) --sender A
 
 // Enable global pause.
-//# run one::coin::deny_list_v2_enable_global_pause --args object(0x403) object(1,3) --type-args test::regulated_coin::REGULATED_COIN --sender A
+//# run sui::coin::deny_list_v2_enable_global_pause --args object(0x403) object(1,3) --type-args test::regulated_coin::REGULATED_COIN --sender A
 
 // Assert that global pause is enabled.
 //# run test::regulated_coin::assert_global_pause_status --args immshared(0x403) true --sender A
 
 // Transfer the regulated coin from A no longer works.
-//# run one::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
+//# run sui::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
 
 // Transfer the coin from B also no longer works.
 //# transfer-object 2,0 --sender B --recipient A
 
 // Try using the coin in a Move call. This should also be denied.
-//# run one::pay::split_and_transfer --args object(2,0) 1 @A --type-args test::regulated_coin::REGULATED_COIN --sender B
+//# run sui::pay::split_and_transfer --args object(2,0) 1 @A --type-args test::regulated_coin::REGULATED_COIN --sender B
 
 // Unwrap the wrapper. This still works and A will receive the coin, since global pause check
 // for receiving will only take effect at the new epoch.
@@ -104,19 +104,19 @@ module test::regulated_coin {
 //# run test::regulated_coin::unwrap --args object(4,0) --sender A
 
 // Transfer still doesn't work as the previous epoch.
-//# run one::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
+//# run sui::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
 
 // Assert that global pause is still enabled.
 //# run test::regulated_coin::assert_global_pause_status --args immshared(0x403) true --sender A
 
 // Disable global pause.
-//# run one::coin::deny_list_v2_disable_global_pause --args object(0x403) object(1,3) --type-args test::regulated_coin::REGULATED_COIN --sender A
+//# run sui::coin::deny_list_v2_disable_global_pause --args object(0x403) object(1,3) --type-args test::regulated_coin::REGULATED_COIN --sender A
 
 // Assert that global pause is disabled.
 //# run test::regulated_coin::assert_global_pause_status --args immshared(0x403) false --sender A
 
 // Transfer the regulated coin from A works again.
-//# run one::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
+//# run sui::pay::split_and_transfer --args object(1,1) 1 @B --type-args test::regulated_coin::REGULATED_COIN --sender A
 
 // Create a new wrapper. This works now since spending coin is allowed again.
 //# run test::regulated_coin::full_wrap --args object(1,1) --sender A

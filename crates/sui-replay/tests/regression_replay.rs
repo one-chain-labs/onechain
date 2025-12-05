@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::path::PathBuf;
+
 use sui_replay::{execute_replay_command, ReplayToolCommand};
 
 #[tokio::test]

@@ -22,7 +22,6 @@ use move_core_types::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Number, Value as JsonValue};
-
 use sui_types::{
     base_types::{
         is_primitive_type_tag,
@@ -637,7 +636,7 @@ fn resolve_object_vec_arg(idx: usize, arg: &SuiJsonValue) -> Result<Vec<ObjectID
             // representing a JSON array rather than with the array itself ("[0x42,0x7]" rather than
             // [0x42,0x7]).
             let mut object_ids = vec![];
-            for tok in s[1..s.len() - 1].split(',') {
+            for tok in s[1 .. s.len() - 1].split(',') {
                 let id = JsonValue::String(tok.to_string());
                 object_ids.push(resolve_object_arg(idx, &id)?);
             }

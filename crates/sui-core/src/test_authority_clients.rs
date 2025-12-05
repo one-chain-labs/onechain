@@ -8,10 +8,6 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
-    authority_client::AuthorityAPI,
-};
 use async_trait::async_trait;
 use mysten_metrics::spawn_monitored_task;
 use sui_config::genesis::Genesis;
@@ -35,6 +31,11 @@ use sui_types::{
     },
     sui_system_state::SuiSystemState,
     transaction::{CertifiedTransaction, Transaction, VerifiedTransaction},
+};
+
+use crate::{
+    authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
+    authority_client::AuthorityAPI,
 };
 
 #[derive(Clone, Copy, Default)]

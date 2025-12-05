@@ -3,6 +3,7 @@
 
 #[cfg(not(msim))]
 use std::path::Path;
+
 #[cfg(not(msim))]
 use sui_types::transaction::{CallArg, ObjectArg};
 
@@ -12,7 +13,7 @@ const TEST_DIR: &str = "tests";
 #[cfg(not(msim))]
 #[tokio::main]
 async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
-    use one_chain::client_ptb::{
+    use sui::client_ptb::{
         error::build_error_reports,
         ptb::{to_source_string, PTBPreview, PTB},
     };
@@ -36,7 +37,7 @@ async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
             for e in rendered.iter() {
                 results.push(format!("{:?}", e));
             }
-            insta::assert_display_snapshot!(fname(), results.join("\n"));
+            insta::assert_snapshot!(fname(), results.join("\n"));
             return Ok(());
         }
     };
@@ -83,7 +84,7 @@ async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
     }
 
     // === FINALLY DO THE ASSERTION ===
-    insta::assert_display_snapshot!(fname(), results.join("\n"));
+    insta::assert_snapshot!(fname(), results.join("\n"));
 
     Ok(())
 }

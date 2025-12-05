@@ -4,6 +4,13 @@
 //! `BridgeMonitor` receives all `SuiBridgeEvent` and `EthBridgeEvent`
 //! and handles them accordingly.
 
+use std::{collections::HashMap, sync::Arc};
+
+use arc_swap::ArcSwap;
+use sui_types::TypeTag;
+use tokio::time::Duration;
+use tracing::{error, info, warn};
+
 use crate::{
     abi::{
         EthBridgeCommitteeEvents,
@@ -21,11 +28,6 @@ use crate::{
     sui_client::{SuiClient, SuiClientInner},
     types::{BridgeCommittee, IsBridgePaused},
 };
-use arc_swap::ArcSwap;
-use std::{collections::HashMap, sync::Arc};
-use sui_types::TypeTag;
-use tokio::time::Duration;
-use tracing::{error, info, warn};
 
 const REFRESH_BRIDGE_RETRY_TIMES: u64 = 3;
 
@@ -437,22 +439,21 @@ async fn get_latest_bridge_pause_status_with_emergency_event<C: SuiClientInner>(
 mod tests {
     use std::str::FromStr;
 
-    use super::*;
-    use crate::{
-        events::{init_all_struct_tags, NewTokenEvent},
-        test_utils::{bridge_committee_to_bridge_committee_summary, get_test_authority_and_key},
-        types::{BridgeAuthority, BRIDGE_PAUSED, BRIDGE_UNPAUSED},
-    };
     use fastcrypto::traits::KeyPair;
     use prometheus::Registry;
     use sui_types::{
         base_types::SuiAddress,
         bridge::{BridgeCommitteeSummary, MoveTypeCommitteeMember},
-        crypto::get_key_pair,
+        crypto::{get_key_pair, ToFromBytes},
     };
 
-    use crate::{sui_mock_client::SuiMockClient, types::BridgeCommittee};
-    use sui_types::crypto::ToFromBytes;
+    use super::*;
+    use crate::{
+        events::{init_all_struct_tags, NewTokenEvent},
+        sui_mock_client::SuiMockClient,
+        test_utils::{bridge_committee_to_bridge_committee_summary, get_test_authority_and_key},
+        types::{BridgeAuthority, BridgeCommittee, BRIDGE_PAUSED, BRIDGE_UNPAUSED},
+    };
 
     #[tokio::test]
     async fn test_get_latest_bridge_committee_with_url_update_event() {

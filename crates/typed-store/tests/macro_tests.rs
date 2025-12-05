@@ -2,20 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
+use std::{borrow::Borrow, collections::HashSet, fmt::Debug, sync::Mutex, time::Duration};
+
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, collections::HashSet, fmt::Debug, sync::Mutex, time::Duration};
 use typed_store::{
     metrics::SamplingInterval,
-    rocks::{be_fix_int_ser, list_tables, DBMap, MetricConf, RocksDBAccessType},
-    sally::{SallyColumn, SallyDBOptions, SallyReadOnlyDBOptions},
+    rocks::{be_fix_int_ser, list_tables, DBMap, MetricConf},
     traits::{Map, TableSummary, TypedStoreDebug},
     DBMapUtils,
-    SallyDB,
 };
 
 fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").keep()
+    tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
 /// This struct is used to illustrate how the utility works
 #[derive(DBMapUtils)]
@@ -66,7 +65,7 @@ async fn macro_test() {
     // Write to both tables
     let mut raw_key_bytes1 = 0;
     let mut raw_value_bytes1 = 0;
-    let kv_range = 1..10;
+    let kv_range = 1 .. 10;
     for i in kv_range.clone() {
         let key = i.to_string();
         let value = i.to_string();
@@ -80,7 +79,7 @@ async fn macro_test() {
 
     let mut raw_key_bytes2 = 0;
     let mut raw_value_bytes2 = 0;
-    let kv_range = 3..10;
+    let kv_range = 3 .. 10;
     for i in kv_range.clone() {
         let key = i;
         let value = i.to_string();
@@ -129,7 +128,7 @@ async fn macro_test() {
     }
 
     // Check that catchup logic works
-    let keys_vals_1 = (100..110).map(|i| (i.to_string(), i.to_string()));
+    let keys_vals_1 = (100 .. 110).map(|i| (i.to_string(), i.to_string()));
     tbls_primary.table1.multi_insert(keys_vals_1).expect("Failed to multi-insert");
     // New entries should be present in secondary
     assert_eq!(19, tbls_secondary.count_keys("table1").unwrap());
@@ -183,7 +182,7 @@ async fn deprecate_test() {
         original_db.table1.insert(&key, &value).unwrap();
         original_db.table2.insert(&0, &value).unwrap();
     }
-    for _ in 0..2 {
+    for _ in 0 .. 2 {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         let db = DeprecatedTables::open_tables_read_write_with_deprecation_option(
             dbdir.clone(),
@@ -194,85 +193,6 @@ async fn deprecate_test() {
         );
         assert_eq!(db.table1.get(&key), Ok(Some(value.clone())));
     }
-}
-
-#[derive(SallyDB)]
-pub struct SallyDBExample {
-    col1: SallyColumn<String, String>,
-    col2: SallyColumn<i32, String>,
-}
-
-#[tokio::test]
-async fn test_sallydb() {
-    let primary_path = temp_dir();
-    let example_db = SallyDBExample::init(SallyDBOptions::RocksDB((
-        primary_path.clone(),
-        MetricConf::default(),
-        RocksDBAccessType::Primary,
-        None,
-        None,
-    )));
-
-    // Write to both columns
-    let keys_vals_1 = (1..10).map(|i| (i.to_string(), i.to_string()));
-    let mut wb = example_db.col1.batch();
-    wb.insert_batch(&example_db.col1, keys_vals_1.clone()).expect("Failed to insert");
-
-    let keys_vals_2 = (3..10).map(|i| (i, i.to_string()));
-    wb.insert_batch(&example_db.col2, keys_vals_2.clone()).expect("Failed to insert");
-
-    wb.write().await.expect("Failed to commit write batch");
-
-    // Open in secondary mode
-    let example_db_secondary = SallyDBExample::get_read_only_handle(SallyReadOnlyDBOptions::RocksDB(Box::new((
-        primary_path.clone(),
-        MetricConf::default(),
-        None,
-        None,
-    ))));
-
-    // Check all the tables can be listed
-    let actual_table_names: HashSet<_> = list_tables(primary_path).unwrap().into_iter().collect();
-    let observed_table_names: HashSet<_> = SallyDBExample::describe_tables().iter().map(|q| q.0.clone()).collect();
-
-    let exp: HashSet<String> = HashSet::from_iter(vec!["col1", "col2"].into_iter().map(|s| s.to_owned()));
-    assert_eq!(HashSet::from_iter(actual_table_names), exp);
-    assert_eq!(HashSet::from_iter(observed_table_names), exp);
-
-    // Check the counts
-    assert_eq!(9, example_db_secondary.count_keys("col1").unwrap());
-    assert_eq!(7, example_db_secondary.count_keys("col2").unwrap());
-
-    // Test all entries
-    let m = example_db_secondary.dump("col1", 100, 0).unwrap();
-    for (k, v) in keys_vals_1 {
-        assert_eq!(format!("\"{v}\""), *m.get(&format!("\"{k}\"")).unwrap());
-    }
-
-    let m = example_db_secondary.dump("col2", 100, 0).unwrap();
-    for (k, v) in keys_vals_2 {
-        assert_eq!(format!("\"{v}\""), *m.get(&k.to_string()).unwrap());
-    }
-
-    // Check that catchup logic works
-    let keys_vals_1 = (100..110).map(|i| (i.to_string(), i.to_string()));
-    let mut wb = example_db.col1.batch();
-    wb.insert_batch(&example_db.col1, keys_vals_1.clone()).expect("Failed to insert");
-    wb.write().await.expect("Failed to commit write batch");
-
-    // New entries should be present in secondary
-    assert_eq!(19, example_db_secondary.count_keys("col1").unwrap());
-
-    // Test pagination
-    let m = example_db_secondary.dump("col1", 2, 0).unwrap();
-    assert_eq!(2, m.len());
-    assert_eq!(format!("\"1\""), *m.get("\"1\"").unwrap());
-    assert_eq!(format!("\"2\""), *m.get("\"2\"").unwrap());
-
-    let m = example_db_secondary.dump("col1", 3, 2).unwrap();
-    assert_eq!(3, m.len());
-    assert_eq!(format!("\"7\""), *m.get("\"7\"").unwrap());
-    assert_eq!(format!("\"8\""), *m.get("\"8\"").unwrap());
 }
 
 #[tokio::test]
@@ -358,11 +278,11 @@ struct TablesMemUsage {
 #[tokio::test]
 async fn test_sampling() {
     let sampling_interval = SamplingInterval::new(Duration::ZERO, 10);
-    for _i in 0..10 {
+    for _i in 0 .. 10 {
         assert!(!sampling_interval.sample());
     }
     assert!(sampling_interval.sample());
-    for _i in 0..10 {
+    for _i in 0 .. 10 {
         assert!(!sampling_interval.sample());
     }
     assert!(sampling_interval.sample());
@@ -371,14 +291,14 @@ async fn test_sampling() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn test_sampling_time() {
     let sampling_interval = SamplingInterval::new(Duration::from_secs(1), 10);
-    for _i in 0..10 {
+    for _i in 0 .. 10 {
         assert!(!sampling_interval.sample());
     }
     assert!(!sampling_interval.sample());
     tokio::time::advance(Duration::from_secs(1)).await;
     tokio::task::yield_now().await;
     assert!(sampling_interval.sample());
-    for _i in 0..10 {
+    for _i in 0 .. 10 {
         assert!(!sampling_interval.sample());
     }
     assert!(!sampling_interval.sample());

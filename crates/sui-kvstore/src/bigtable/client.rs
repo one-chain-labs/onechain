@@ -1,6 +1,34 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, RwLock},
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use gcp_auth::{Token, TokenProvider};
+use http::{HeaderValue, Request, Response};
+use sui_types::{
+    base_types::{ObjectID, TransactionDigest},
+    digests::CheckpointDigest,
+    full_checkpoint_content::CheckpointData,
+    messages_checkpoint::CheckpointSequenceNumber,
+    object::Object,
+    storage::ObjectKey,
+};
+use tonic::{
+    body::BoxBody,
+    codegen::Service,
+    transport::{Certificate, Channel, ClientTlsConfig},
+    Streaming,
+};
+use tracing::error;
+
 use crate::{
     bigtable::proto::bigtable::v2::{
         bigtable_client::BigtableClient as BigtableInternalClient,
@@ -21,37 +49,12 @@ use crate::{
     KeyValueStoreWriter,
     TransactionData,
 };
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use gcp_auth::{Token, TokenProvider};
-use http::{HeaderValue, Request, Response};
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, RwLock},
-    task::{Context, Poll},
-    time::Duration,
-};
-use sui_types::{
-    base_types::{ObjectID, TransactionDigest},
-    digests::CheckpointDigest,
-    full_checkpoint_content::CheckpointData,
-    messages_checkpoint::CheckpointSequenceNumber,
-    object::Object,
-    storage::ObjectKey,
-};
-use tonic::{
-    body::BoxBody,
-    codegen::Service,
-    transport::{Certificate, Channel, ClientTlsConfig},
-    Streaming,
-};
-use tracing::error;
 
 const OBJECTS_TABLE: &str = "objects";
 const TRANSACTIONS_TABLE: &str = "transactions";
 const CHECKPOINTS_TABLE: &str = "checkpoints";
 const CHECKPOINTS_BY_DIGEST_TABLE: &str = "checkpoints_by_digest";
+const WATERMARK_TABLE: &str = "watermark";
 
 const COLUMN_FAMILY_NAME: &str = "sui";
 const DEFAULT_COLUMN_QUALIFIER: &str = "";
@@ -122,6 +125,11 @@ impl KeyValueStoreWriter for BigTableClient {
             key,
         )])])
         .await
+    }
+
+    async fn save_watermark(&mut self, watermark: CheckpointSequenceNumber) -> Result<()> {
+        let key = watermark.to_be_bytes().to_vec();
+        self.multi_set(WATERMARK_TABLE, [(key, vec![(DEFAULT_COLUMN_QUALIFIER, vec![])])]).await
     }
 }
 
@@ -210,7 +218,7 @@ impl KeyValueStoreReader for BigTableClient {
 
     async fn get_latest_checkpoint(&mut self) -> Result<CheckpointSequenceNumber> {
         let upper_limit = u64::MAX.to_be_bytes().to_vec();
-        match self.reversed_scan(CHECKPOINTS_TABLE, upper_limit).await?.pop() {
+        match self.reversed_scan(WATERMARK_TABLE, upper_limit).await?.pop() {
             Some((key_bytes, _)) => Ok(u64::from_be_bytes(key_bytes.as_slice().try_into()?)),
             None => Ok(0),
         }

@@ -14,7 +14,8 @@ pub fn is_pascal_case(s: &str) -> bool {
 }
 
 pub fn is_upper_snake_case(s: &str) -> bool {
-    s.chars().all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
+    s.chars()
+        .all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
 }
 
 //**************************************************************************************************
@@ -67,7 +68,9 @@ macro_rules! format_oxford_list {
                 format!($format_str, entries.next().unwrap())
             ),
             _ => {
-                let entries = entries.map(|entry| format!($format_str, entry)).collect::<Vec<_>>();
+                let entries = entries
+                    .map(|entry| format!($format_str, entry))
+                    .collect::<Vec<_>>();
                 if let Some((last, init)) = entries.split_last() {
                     let mut result = init.join(", ");
                     result.push_str(&format!(", {} {}", $sep, last));

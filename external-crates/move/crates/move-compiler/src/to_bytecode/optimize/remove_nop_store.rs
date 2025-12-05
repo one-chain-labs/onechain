@@ -20,7 +20,9 @@ pub fn optimize(
         let mut i = 0;
         while i < block.len() {
             match (&block[i], block.get(i + 1)) {
-                (sp!(_, IR::Bytecode_::StLoc(v1)), Some(sp!(_, IR::Bytecode_::MoveLoc(v2)))) if v1 == v2 => {
+                (sp!(_, IR::Bytecode_::StLoc(v1)), Some(sp!(_, IR::Bytecode_::MoveLoc(v2))))
+                    if v1 == v2 =>
+                {
                     changed = true;
                     i += 2
                 }

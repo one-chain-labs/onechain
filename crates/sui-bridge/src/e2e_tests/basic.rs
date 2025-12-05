@@ -1,6 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashSet, path::Path, sync::Arc};
+
+use ethers::{prelude::*, types::Address as EthAddress};
+use sui_json_rpc_api::BridgeReadApiClient;
+use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
+use sui_types::{
+    bridge::{get_bridge, BridgeChainId, BridgeTokenMetadata, BridgeTrait, TOKEN_ID_ETH},
+    crypto::get_key_pair,
+    SUI_BRIDGE_OBJECT_ID,
+};
+use test_cluster::TestClusterBuilder;
+use tracing::info;
+
 use crate::{
     abi::{eth_sui_bridge, EthSuiBridge},
     client::bridge_authority_aggregator::BridgeAuthorityAggregator,
@@ -21,21 +34,6 @@ use crate::{
     utils::publish_and_register_coins_return_add_coins_on_sui_action,
     BRIDGE_ENABLE_PROTOCOL_VERSION,
 };
-use ethers::{prelude::*, types::Address as EthAddress};
-use std::collections::HashSet;
-use sui_json_rpc_api::BridgeReadApiClient;
-use sui_types::crypto::get_key_pair;
-use test_cluster::TestClusterBuilder;
-
-use std::path::Path;
-
-use std::sync::Arc;
-use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI};
-use sui_types::{
-    bridge::{get_bridge, BridgeChainId, BridgeTokenMetadata, BridgeTrait, TOKEN_ID_ETH},
-    SUI_BRIDGE_OBJECT_ID,
-};
-use tracing::info;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn test_bridge_from_eth_to_sui_to_eth() {
@@ -292,7 +290,7 @@ async fn test_create_bridge_state_object() {
 async fn test_committee_registration() {
     telemetry_subscribers::init_for_testing();
     let mut bridge_keys = vec![];
-    for _ in 0..=3 {
+    for _ in 0 ..= 3 {
         let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
         bridge_keys.push(kp);
     }

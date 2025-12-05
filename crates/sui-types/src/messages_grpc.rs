@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::annotated_value::MoveStructLayout;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     base_types::{ObjectID, SequenceNumber, TransactionDigest},
     crypto::{AuthoritySignInfo, AuthorityStrongQuorumSignInfo},
@@ -8,8 +11,6 @@ use crate::{
     object::Object,
     transaction::{CertifiedTransaction, SenderSignedData, SignedTransaction, Transaction},
 };
-use move_core_types::annotated_value::MoveStructLayout;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum ObjectInfoRequestKind {
@@ -69,7 +70,7 @@ pub struct ObjectInfoResponse {
     pub layout: Option<MoveStructLayout>,
     /// Transaction the object is locked on in this authority.
     /// None if the object is not currently locked by this authority.
-    /// This should be only used for debugging purpose, such as from one-tool. No prod clients should
+    /// This should be only used for debugging purpose, such as from sui-tool. No prod clients should
     /// rely on it.
     pub lock_for_debugging: Option<SignedTransaction>,
 }
@@ -188,7 +189,7 @@ pub struct HandleCertificateResponseV3 {
     /// versions of shared objects.
     //
     // TODO: In the future we may want to include shared objects or child objects which were read
-    // but not modified during exectuion.
+    // but not modified during execution.
     pub input_objects: Option<Vec<Object>>,
 
     /// If requested, will included all changed objects, including mutated, created and unwrapped
@@ -235,7 +236,7 @@ pub struct HandleTransactionResponseV2 {
     /// versions of shared objects.
     //
     // TODO: In the future we may want to include shared objects or child objects which were read
-    // but not modified during exectuion.
+    // but not modified during execution.
     pub input_objects: Option<Vec<Object>>,
 
     /// If requested, will included all changed objects, including mutated, created and unwrapped

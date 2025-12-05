@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use fastcrypto::traits::KeyPair;
+use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage};
 
 use crate::{
     base_types::{dbg_addr, ObjectID},
     committee::EpochId,
     crypto::{
+        get_key_pair,
         AccountKeyPair,
         AuthorityKeyPair,
         AuthoritySignature,
@@ -18,10 +20,6 @@ use crate::{
     object::Object,
     transaction::{Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
 };
-
-use crate::crypto::get_key_pair;
-
-use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVersion, PersonalMessage};
 
 #[test]
 fn test_personal_message_intent() {
@@ -38,10 +36,10 @@ fn test_personal_message_intent() {
     assert_eq!(intent_bcs.len(), p_message_bcs.len() + 3);
 
     // Check that the first 3 bytes are the domain separation information.
-    assert_eq!(&intent_bcs[..3], vec![IntentScope::PersonalMessage as u8, IntentVersion::V0 as u8, AppId::Sui as u8,]);
+    assert_eq!(&intent_bcs[.. 3], vec![IntentScope::PersonalMessage as u8, IntentVersion::V0 as u8, AppId::Sui as u8,]);
 
     // Check that intent's last bytes match the p_message's bsc bytes.
-    assert_eq!(&intent_bcs[3..], &p_message_bcs);
+    assert_eq!(&intent_bcs[3 ..], &p_message_bcs);
 
     // Let's ensure we can sign and verify intents.
     let s = Signature::new_secure(&IntentMessage::new(intent1, p_message), &sec1);
@@ -60,7 +58,7 @@ fn test_authority_signature_intent() {
     let object_id = ObjectID::random();
     let object = Object::immutable_with_id_for_testing(object_id);
     let gas_price = 1000;
-    let data = TransactionData::new_transfer_oct(
+    let data = TransactionData::new_transfer_sui(
         recipient,
         sender,
         None,
@@ -77,11 +75,11 @@ fn test_authority_signature_intent() {
     let intent_bcs = bcs::to_bytes(tx1.intent_message()).unwrap();
 
     // Check that the first 3 bytes are the domain separation information.
-    assert_eq!(&intent_bcs[..3], vec![IntentScope::TransactionData as u8, IntentVersion::V0 as u8, AppId::Sui as u8,]);
+    assert_eq!(&intent_bcs[.. 3], vec![IntentScope::TransactionData as u8, IntentVersion::V0 as u8, AppId::Sui as u8,]);
 
     // Check that intent's last bytes match the signed_data's bsc bytes.
     let signed_data_bcs = bcs::to_bytes(&tx1.data().intent_message().value).unwrap();
-    assert_eq!(&intent_bcs[3..], signed_data_bcs);
+    assert_eq!(&intent_bcs[3 ..], signed_data_bcs);
 
     // Let's ensure we can sign and verify intents.
     let s = AuthoritySignature::new_secure(tx1.data().intent_message(), &epoch, &kp);

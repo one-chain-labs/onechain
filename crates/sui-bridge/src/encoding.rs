@@ -1,6 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use enum_dispatch::enum_dispatch;
+use ethers::types::Address as EthAddress;
+use sui_types::base_types::SUI_ADDRESS_LENGTH;
+
 use crate::types::{
     AddTokensOnEvmAction,
     AddTokensOnSuiAction,
@@ -14,9 +18,6 @@ use crate::types::{
     LimitUpdateAction,
     SuiToEthBridgeAction,
 };
-use enum_dispatch::enum_dispatch;
-use ethers::types::Address as EthAddress;
-use sui_types::base_types::SUI_ADDRESS_LENGTH;
 
 pub const TOKEN_TRANSFER_MESSAGE_VERSION: u8 = 1;
 pub const COMMITTEE_BLOCKLIST_MESSAGE_VERSION: u8 = 1;
@@ -159,7 +160,7 @@ impl BridgeMessageEncoding for BlocklistCommitteeAction {
         bytes.push(u8::try_from(self.members_to_update.len()).unwrap());
 
         // Add list of updated members
-        // Members are represented as pubkey dervied evm addresses (20 bytes)
+        // Members are represented as pubkey derived evm addresses (20 bytes)
         let members_bytes =
             self.members_to_update.iter().map(|m| m.to_eth_address().to_fixed_bytes().to_vec()).collect::<Vec<_>>();
         for members_bytes in members_bytes {
@@ -384,12 +385,8 @@ impl BridgeAction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        abi::EthToSuiTokenBridgeV1,
-        crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes, BridgeAuthoritySignInfo},
-        events::EmittedSuiToEthTokenBridgeV1,
-        types::{BlocklistType, EmergencyActionType, USD_MULTIPLIER},
-    };
+    use std::str::FromStr;
+
     use ethers::{
         abi::ParamType,
         types::{Address as EthAddress, TxHash},
@@ -400,7 +397,6 @@ mod tests {
         traits::ToFromBytes,
     };
     use prometheus::Registry;
-    use std::str::FromStr;
     use sui_types::{
         base_types::{SuiAddress, TransactionDigest},
         bridge::{BridgeChainId, TOKEN_ID_BTC, TOKEN_ID_USDC},
@@ -408,6 +404,12 @@ mod tests {
     };
 
     use super::*;
+    use crate::{
+        abi::EthToSuiTokenBridgeV1,
+        crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes, BridgeAuthoritySignInfo},
+        events::EmittedSuiToEthTokenBridgeV1,
+        types::{BlocklistType, EmergencyActionType, USD_MULTIPLIER},
+    };
 
     #[test]
     fn test_bridge_message_encoding() -> anyhow::Result<()> {
@@ -725,7 +727,7 @@ mod tests {
     fn test_bridge_message_encoding_evm_contract_upgrade_action() {
         // Calldata with only the function selector and no parameters: `function initializeV2()`
         let function_signature = "initializeV2()";
-        let selector = &Keccak256::digest(function_signature).digest[0..4];
+        let selector = &Keccak256::digest(function_signature).digest[0 .. 4];
         let call_data = selector.to_vec();
         assert_eq!(Hex::encode(call_data.clone()), "5cd8a76b");
 
@@ -753,7 +755,7 @@ mod tests {
 
         // Calldata with one parameter: `function newMockFunction(bool)`
         let function_signature = "newMockFunction(bool)";
-        let selector = &Keccak256::digest(function_signature).digest[0..4];
+        let selector = &Keccak256::digest(function_signature).digest[0 .. 4];
         let mut call_data = selector.to_vec();
         call_data.extend(ethers::abi::encode(&[ethers::abi::Token::Bool(true)]));
         assert_eq!(
@@ -785,7 +787,7 @@ mod tests {
 
         // Calldata with two parameters: `function newerMockFunction(bool, uint8)`
         let function_signature = "newMockFunction(bool,uint8)";
-        let selector = &Keccak256::digest(function_signature).digest[0..4];
+        let selector = &Keccak256::digest(function_signature).digest[0 .. 4];
         let mut call_data = selector.to_vec();
         call_data.extend(ethers::abi::encode(&[ethers::abi::Token::Bool(true), ethers::abi::Token::Uint(42u8.into())]));
         assert_eq!(
@@ -840,7 +842,7 @@ mod tests {
         assert_eq!(Hex::encode(data.clone()), "5355495f4252494447455f4d4553534147450501000000000000007b0c0000000000000000000000000606060606060606060606060606060606060606000000000000000000000000090909090909090909090909090909090909090900000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000");
         let types = vec![ParamType::Address, ParamType::Address, ParamType::Bytes];
         // Ensure that the call data (start from bytes 29) can be decoded
-        ethers::abi::decode(&types, &data[29..]).unwrap();
+        ethers::abi::decode(&types, &data[29 ..]).unwrap();
     }
 
     #[test]

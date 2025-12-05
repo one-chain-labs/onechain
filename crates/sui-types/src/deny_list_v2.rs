@@ -1,6 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
+
+use move_core_types::{
+    ident_str,
+    language_storage::{StructTag, TypeTag},
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use crate::{
     base_types::{EpochId, ObjectID, SuiAddress},
     config::{Config, Setting},
@@ -14,15 +25,6 @@ use crate::{
     MoveTypeTagTrait,
     SUI_DENY_LIST_OBJECT_ID,
     SUI_FRAMEWORK_PACKAGE_ID,
-};
-use move_core_types::{
-    ident_str,
-    language_storage::{StructTag, TypeTag},
-};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt,
 };
 
 pub const CONFIG_SETTING_DYNAMIC_FIELD_SIZE_FOR_GAS: usize = 1000;

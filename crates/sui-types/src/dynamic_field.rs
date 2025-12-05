@@ -1,19 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::{ObjectDigest, SuiAddress},
-    crypto::DefaultHash,
-    error::{SuiError, SuiResult},
-    id::UID,
-    object::Object,
-    storage::ObjectStore,
-    sui_serde::{Readable, SuiTypeTag},
-    MoveTypeTagTrait,
-    ObjectID,
-    SequenceNumber,
-    SUI_FRAMEWORK_ADDRESS,
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
 };
+
 use fastcrypto::{encoding::Base64, hash::HashFunction};
 use move_core_types::{
     annotated_value::{MoveStruct, MoveValue},
@@ -26,9 +18,19 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::{serde_as, DisplayFromStr};
 use shared_crypto::intent::HashingIntentScope;
-use std::{
-    fmt,
-    fmt::{Display, Formatter},
+
+use crate::{
+    base_types::{ObjectDigest, SuiAddress},
+    crypto::DefaultHash,
+    error::{SuiError, SuiResult},
+    id::UID,
+    object::Object,
+    storage::ObjectStore,
+    sui_serde::{Readable, SuiTypeTag},
+    MoveTypeTagTrait,
+    ObjectID,
+    SequenceNumber,
+    SUI_FRAMEWORK_ADDRESS,
 };
 
 pub mod visitor;
@@ -269,7 +271,7 @@ where
 
     // truncate into an ObjectID and return
     // OK to access slice because digest should never be shorter than ObjectID::LENGTH.
-    let id = ObjectID::try_from(&hash.as_ref()[0..ObjectID::LENGTH]).unwrap();
+    let id = ObjectID::try_from(&hash.as_ref()[0 .. ObjectID::LENGTH]).unwrap();
     tracing::trace!("derive_dynamic_field_id result: {:?}", id);
     Ok(id)
 }

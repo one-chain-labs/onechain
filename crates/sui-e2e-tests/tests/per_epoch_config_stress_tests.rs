@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{future::Future, path::PathBuf, sync::Arc, time::Duration};
+
 use move_core_types::{ident_str, language_storage::TypeTag};
 use rand::random;
-use std::{future::Future, path::PathBuf, sync::Arc, time::Duration};
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::sim_test;
 use sui_types::{

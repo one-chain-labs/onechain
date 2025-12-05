@@ -1,13 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    crypto::{CompressedSignature, DefaultHash, SignatureScheme},
-    digests::ZKLoginInputsDigest,
-    signature::{AuthenticatorTrait, GenericSignature, VerifyParams},
-    signature_verification::VerifiedDigestCache,
-    zk_login_authenticator::ZkLoginAuthenticator,
+use std::{
+    hash::{Hash, Hasher},
+    str::FromStr,
+    sync::Arc,
 };
+
 pub use enum_dispatch::enum_dispatch;
 use fastcrypto::{
     ed25519::Ed25519PublicKey,
@@ -23,16 +22,16 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use shared_crypto::intent::IntentMessage;
-use std::{
-    hash::{Hash, Hasher},
-    str::FromStr,
-    sync::Arc,
-};
 
 use crate::{
     base_types::{EpochId, SuiAddress},
-    crypto::PublicKey,
+    crypto::{CompressedSignature, DefaultHash, PublicKey, SignatureScheme},
+    digests::ZKLoginInputsDigest,
     error::SuiError,
+    passkey_authenticator::PasskeyAuthenticator,
+    signature::{AuthenticatorTrait, GenericSignature, VerifyParams},
+    signature_verification::VerifiedDigestCache,
+    zk_login_authenticator::ZkLoginAuthenticator,
 };
 
 #[cfg(test)]
@@ -111,6 +110,10 @@ impl AuthenticatorTrait for MultiSig {
             return Err(SuiError::InvalidSignature { error: "zkLogin sig not supported inside multisig".to_string() });
         }
 
+        if self.has_passkey_sigs() && !verify_params.accept_passkey_in_multisig {
+            return Err(SuiError::InvalidSignature { error: "Passkey sig not supported inside multisig".to_string() });
+        }
+
         let mut weight_sum: u16 = 0;
         let message = bcs::to_bytes(&value).expect("Message serialization should not fail");
         let mut hasher = DefaultHash::default();
@@ -168,6 +171,19 @@ impl AuthenticatorTrait for MultiSig {
                         )
                         .map_err(|e| FastCryptoError::GeneralError(e.to_string()))
                 }
+                CompressedSignature::Passkey(bytes) => {
+                    let authenticator = PasskeyAuthenticator::from_bytes(&bytes.0).map_err(|_| {
+                        SuiError::InvalidSignature { error: "Invalid passkey authenticator bytes".to_string() }
+                    })?;
+                    authenticator
+                        .verify_claims(
+                            value,
+                            SuiAddress::from(subsig_pubkey),
+                            verify_params,
+                            zklogin_inputs_cache.clone(),
+                        )
+                        .map_err(|e| FastCryptoError::GeneralError(e.to_string()))
+                }
             };
             if res.is_ok() {
                 weight_sum += *weight as u16;
@@ -199,7 +215,7 @@ pub fn as_indices(bitmap: u16) -> Result<Vec<u8>, SuiError> {
         return Err(SuiError::InvalidSignature { error: "Invalid bitmap".to_string() });
     }
     let mut res = Vec::new();
-    for i in 0..10 {
+    for i in 0 .. 10 {
         if bitmap & (1 << i) != 0 {
             res.push(i as u8);
         }
@@ -279,6 +295,10 @@ impl MultiSig {
     pub fn get_indices(&self) -> Result<Vec<u8>, SuiError> {
         as_indices(self.bitmap)
     }
+
+    pub fn has_passkey_sigs(&self) -> bool {
+        self.sigs.iter().any(|s| matches!(s, CompressedSignature::Passkey(_)))
+    }
 }
 
 impl ToFromBytes for MultiSig {
@@ -287,7 +307,7 @@ impl ToFromBytes for MultiSig {
         if bytes.first().ok_or(FastCryptoError::InvalidInput)? != &SignatureScheme::MultiSig.flag() {
             return Err(FastCryptoError::InvalidInput);
         }
-        let mut multisig: MultiSig = bcs::from_bytes(&bytes[1..]).map_err(|_| FastCryptoError::InvalidSignature)?;
+        let mut multisig: MultiSig = bcs::from_bytes(&bytes[1 ..]).map_err(|_| FastCryptoError::InvalidSignature)?;
         multisig.init_and_validate()
     }
 }

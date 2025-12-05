@@ -2,6 +2,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeMap, fmt::Debug};
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum_macros::{AsRefStr, IntoStaticStr};
+use thiserror::Error;
+use tonic::Status;
+use typed_store_error::TypedStoreError;
+
 use crate::{
     base_types::*,
     committee::{Committee, EpochId, StakeUnit},
@@ -10,14 +19,6 @@ use crate::{
     messages_checkpoint::CheckpointSequenceNumber,
     object::Owner,
 };
-
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug};
-use strum_macros::{AsRefStr, IntoStaticStr};
-use thiserror::Error;
-use tonic::Status;
-use typed_store_error::TypedStoreError;
 
 pub const TRANSACTION_NOT_FOUND_MSG_PREFIX: &str = "Could not find the referenced transaction";
 pub const TRANSACTIONS_NOT_FOUND_MSG_PREFIX: &str = "Could not find the referenced transactions";
@@ -37,11 +38,12 @@ macro_rules! fp_ensure {
         }
     };
 }
+pub(crate) use fp_ensure;
+
 use crate::{
     digests::TransactionEventsDigest,
     execution_status::{CommandIndex, ExecutionFailureStatus},
 };
-pub(crate) use fp_ensure;
 
 #[macro_export]
 macro_rules! exit_main {
@@ -163,7 +165,7 @@ pub enum UserInputError {
     #[error("Empty input coins for Pay related transaction")]
     EmptyInputCoins,
 
-    #[error("OneChain payment transactions use first input coin for gas payment, but found a different gas object")]
+    #[error("SUI payment transactions use first input coin for gas payment, but found a different gas object")]
     UnexpectedGasPaymentObject,
 
     #[error("Wrong initial version given for shared object")]
@@ -560,6 +562,9 @@ pub enum SuiError {
 
     #[error("The request did not contain a certificate")]
     NoCertificateProvidedError,
+
+    #[error("Enclave attestation failed: {0}")]
+    AttestationFailedToVerify(String),
 }
 
 #[repr(u64)]

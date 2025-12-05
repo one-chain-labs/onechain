@@ -1,10 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    key_identity::{get_identity_address_from_keystore, KeyIdentity},
-    zklogin_commands_util::{perform_zk_login_test_tx, read_cli_line},
+use std::{
+    fmt::{Debug, Display, Formatter},
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
+
 use anyhow::anyhow;
+use aws_sdk_kms::{
+    primitives::Blob,
+    types::{MessageType, SigningAlgorithmSpec},
+    Client as KmsClient,
+};
 use bip32::DerivationPath;
 use clap::*;
 use fastcrypto::{
@@ -24,17 +32,9 @@ use im::hashmap::HashMap as ImHashMap;
 use json_to_table::{json_to_table, Orientation};
 use num_bigint::BigUint;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use rusoto_core::Region;
-use rusoto_kms::{Kms, KmsClient, SignRequest};
 use serde::Serialize;
 use serde_json::json;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope, PersonalMessage};
-use std::{
-    fmt::{Debug, Display, Formatter},
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
 use sui_keys::{
     key_derive::generate_new_key,
     keypair_file::{
@@ -71,6 +71,11 @@ use tabled::{
     settings::{object::Rows, Modify, Rotate, Width},
 };
 use tracing::info;
+
+use crate::{
+    key_identity::{get_identity_address_from_keystore, KeyIdentity},
+    zklogin_commands_util::{perform_zk_login_test_tx, read_cli_line},
+};
 #[cfg(test)]
 #[path = "unit_tests/keytool_tests.rs"]
 mod keytool_tests;
@@ -90,8 +95,8 @@ pub enum KeyToolCommand {
     /// Convert private key in Hex or Base64 to new format (Bech32
     /// encoded 33 byte flag || private key starting with "suiprivkey").
     /// Hex private key format import and export are both deprecated in
-    /// OneChain Wallet and OneChain CLI Keystore. Use `one_chain keytool import` if you
-    /// wish to import a key to OneChain Keystore.
+    /// Sui Wallet and Sui CLI Keystore. Use `sui keytool import` if you
+    /// wish to import a key to Sui Keystore.
     Convert { value: String },
     /// Given a Base64 encoded transaction bytes, decode its components. If a signature is provided,
     /// verify the signature against the transaction and output the result.
@@ -122,10 +127,10 @@ pub enum KeyToolCommand {
     /// The keypair file is output to the current directory. The content of the file is
     /// a Base64 encoded string of 33-byte `flag || privkey`.
     ///
-    /// Use `one_chain client new-address` if you want to generate and save the key into one.keystore.
+    /// Use `sui client new-address` if you want to generate and save the key into sui.keystore.
     Generate { key_scheme: SignatureScheme, derivation_path: Option<DerivationPath>, word_length: Option<String> },
 
-    /// Add a new key to OneChain CLI Keystore using either the input mnemonic phrase or a Bech32 encoded 33-byte
+    /// Add a new key to Sui CLI Keystore using either the input mnemonic phrase or a Bech32 encoded 33-byte
     /// `flag || privkey` starting with "suiprivkey", the key scheme flag {ed25519 | secp256k1 | secp256r1}
     /// and an optional derivation path, default to m/44'/784'/0'/0'/0' for ed25519 or m/54'/784'/0'/0/0
     /// for secp256k1 or m/74'/784'/0'/0/0 for secp256r1. Supports mnemonic phrase of word length 12, 15,
@@ -139,14 +144,14 @@ pub enum KeyToolCommand {
         key_scheme: SignatureScheme,
         derivation_path: Option<DerivationPath>,
     },
-    /// Output the private key of the given key identity in OneChain CLI Keystore as Bech32
+    /// Output the private key of the given key identity in Sui CLI Keystore as Bech32
     /// encoded string starting with `suiprivkey`.
     Export {
         #[clap(long)]
         key_identity: KeyIdentity,
     },
-    /// List all keys by its OneChain address, Base64 encoded public key, key scheme name in
-    /// one.keystore.
+    /// List all keys by its Sui address, Base64 encoded public key, key scheme name in
+    /// sui.keystore.
     List {
         /// Sort by alias
         #[clap(long, short = 's')]
@@ -157,7 +162,7 @@ pub enum KeyToolCommand {
     /// (Base64 encoded `privkey`). This prints out the account keypair as Base64 encoded `flag || privkey`,
     /// the network keypair, worker keypair, protocol keypair as Base64 encoded `privkey`.
     LoadKeypair { file: PathBuf },
-    /// To MultiSig OneChain Address. Pass in a list of all public keys `flag || pk` in Base64.
+    /// To MultiSig Sui Address. Pass in a list of all public keys `flag || pk` in Base64.
     /// See `keytool list` for example public keys.
     MultiSigAddress {
         #[clap(long)]
@@ -170,7 +175,7 @@ pub enum KeyToolCommand {
     /// Provides a list of participating signatures (`flag || sig || pk` encoded in Base64),
     /// threshold, a list of all public keys and a list of their weights that define the
     /// MultiSig address. Returns a valid MultiSig signature and its sender address. The
-    /// result can be used as signature field for `one_chain client execute-signed-tx`. The sum
+    /// result can be used as signature field for `sui client execute-signed-tx`. The sum
     /// of weights of all signatures must be >= the threshold.
     ///
     /// The order of `sigs` must be the same as the order of `pks`.
@@ -201,7 +206,7 @@ pub enum KeyToolCommand {
     /// [enum SuiKeyPair] (Base64 encoded of 33-byte `flag || privkey`) or `type AuthorityKeyPair`
     /// (Base64 encoded `privkey`). It prints its Base64 encoded public key and the key scheme flag.
     Show { file: PathBuf },
-    /// Create signature using the private key for for the given address (or its alias) in OneChain keystore.
+    /// Create signature using the private key for the given address (or its alias) in sui keystore.
     /// Any signature commits to a [struct IntentMessage] consisting of the Base64 encoded
     /// of the BCS serialized transaction bytes itself and its intent. If intent is absent,
     /// default will be used.
@@ -231,7 +236,7 @@ pub enum KeyToolCommand {
     },
     /// This takes [enum SuiKeyPair] of Base64 encoded of 33-byte `flag || privkey`). It
     /// outputs the keypair into a file at the current directory where the address is the filename,
-    /// and prints out its OneChain address, Base64 encoded public key, the key scheme, and the key scheme flag.
+    /// and prints out its Sui address, Base64 encoded public key, the key scheme, and the key scheme flag.
     Unpack { keypair: String },
 
     /// Given the max_epoch, generate an OAuth url, ask user to paste the redirect with id_token, call salt server, then call the prover server,
@@ -272,7 +277,7 @@ pub enum KeyToolCommand {
     /// Given a zkLogin signature, parse it if valid. If `bytes` provided,
     /// parse it as either as TransactionData or PersonalMessage based on `intent_scope`.
     /// It verifies the zkLogin signature based its latest JWK fetched.
-    /// Example request: one_chain keytool zk-login-sig-verify --sig $SERIALIZED_ZKLOGIN_SIG --bytes $BYTES --intent-scope 0 --network devnet --curr-epoch 10
+    /// Example request: sui keytool zk-login-sig-verify --sig $SERIALIZED_ZKLOGIN_SIG --bytes $BYTES --intent-scope 0 --network devnet --curr-epoch 10
     ZkLoginSigVerify {
         /// The Base64 of the serialized zkLogin signature.
         #[clap(long)]
@@ -292,7 +297,7 @@ pub enum KeyToolCommand {
     },
 
     /// TESTING ONLY: Generate a fixed ephemeral key and its JWT token with test issuer. Produce a zklogin signature for the given data and max epoch.
-    /// e.g. one_chain keytool zk-login-insecure-sign-personal-message --data "hello" --max-epoch 5
+    /// e.g. sui keytool zk-login-insecure-sign-personal-message --data "hello" --max-epoch 5
     ZkLoginInsecureSignPersonalMessage {
         /// The base64 encoded string of the message to sign, without the intent message wrapping.
         #[clap(long)]
@@ -399,9 +404,9 @@ pub struct MultiSigOutput {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConvertOutput {
-    bech32_with_flag: String, // latest OneChain Keystore and OneChain Wallet import/export format
-    base64_with_flag: String, // OneChain Keystore storage format
-    hex_without_flag: String, // Legacy OneChain Wallet format
+    bech32_with_flag: String, // latest Sui Keystore and Sui Wallet import/export format
+    base64_with_flag: String, // Sui Keystore storage format
+    hex_without_flag: String, // Legacy Sui Wallet format
     scheme: String,
 }
 
@@ -600,9 +605,9 @@ impl KeyToolCommand {
             KeyToolCommand::Import { alias, input_string, key_scheme, derivation_path } => {
                 if Hex::decode(&input_string).is_ok() {
                     return Err(anyhow!(
-                        "Sui Keystore and Sui Wallet no longer support importing
-                    private key as Hex, if you are sure your private key is encoded in Hex, use
-                    `sui keytool convert $HEX` to convert first then import the Bech32 encoded
+                        "Sui Keystore and Sui Wallet no longer support importing 
+                    private key as Hex, if you are sure your private key is encoded in Hex, use 
+                    `sui keytool convert $HEX` to convert first then import the Bech32 encoded 
                     private key starting with `suiprivkey`."
                     ));
                 }
@@ -809,25 +814,22 @@ impl KeyToolCommand {
                 info!("Digest to sign: {:?}", Base64::encode(digest));
 
                 // Set up the KMS client in default region.
-                let region: Region = Region::default();
-                let kms: KmsClient = KmsClient::new(region);
-
-                // Construct the signing request.
-                let request: SignRequest = SignRequest {
-                    key_id: keyid.to_string(),
-                    message: digest.to_vec().into(),
-                    message_type: Some("RAW".to_string()),
-                    signing_algorithm: "ECDSA_SHA_256".to_string(),
-                    ..Default::default()
-                };
+                let config = aws_config::load_from_env().await;
+                let kms = KmsClient::new(&config);
 
                 // Sign the message, normalize the signature and then compacts it
-                // serialize_compact is loaded as bytes for Secp256k1Sinaturere
-                let response = kms.sign(request).await?;
-                let sig_bytes_der =
-                    response.signature.map(|b| b.to_vec()).expect("Requires Asymmetric Key Generated in KMS");
+                // serialize_compact is loaded as bytes for Secp256k1Signature
+                let response = kms
+                    .sign()
+                    .key_id(keyid)
+                    .message_type(MessageType::Raw)
+                    .message(Blob::new(digest))
+                    .signing_algorithm(SigningAlgorithmSpec::EcdsaSha256)
+                    .send()
+                    .await?;
+                let sig_bytes_der = response.signature.expect("Requires Asymmetric Key Generated in KMS");
 
-                let mut external_sig = Secp256k1Sig::from_der(&sig_bytes_der)?;
+                let mut external_sig = Secp256k1Sig::from_der(sig_bytes_der.as_ref())?;
                 external_sig.normalize_s();
                 let sig_compact = external_sig.serialize_compact();
 
@@ -921,7 +923,7 @@ impl KeyToolCommand {
                 let jwt_randomness = if fixed {
                     "100681567828351849884072155819400689117".to_string()
                 } else {
-                    let random_bytes = rand::thread_rng().r#gen::<[u8; 16]>();
+                    let random_bytes = rand::thread_rng().gen::<[u8; 16]>();
                     let jwt_random_bytes = BigUint::from_bytes_be(&random_bytes);
                     jwt_random_bytes.to_string()
                 };
@@ -1130,7 +1132,7 @@ impl KeyToolCommand {
                             "mainnet" | "testnet" => ZkLoginEnv::Prod,
                             _ => return Err(anyhow!("Invalid network")),
                         };
-                        let verify_params = VerifyParams::new(parsed, vec![], env, true, true, Some(2));
+                        let verify_params = VerifyParams::new(parsed, vec![], env, true, true, true, Some(2));
 
                         let (serialized, res) =
                             match IntentScope::try_from(intent_scope).map_err(|_| anyhow!("Invalid scope"))? {
@@ -1235,7 +1237,7 @@ impl Display for CommandOutput {
                 let mut table = builder.build();
                 table.with(Rotate::Left);
                 table.with(tabled::settings::Style::rounded().horizontals([]));
-                table.with(Modify::new(Rows::new(0..)).with(Width::wrap(160).keep_words()));
+                table.with(Modify::new(Rows::new(0 ..)).with(Width::wrap(160).keep_words()));
                 write!(formatter, "{}", table)
             }
             _ => {
@@ -1301,7 +1303,7 @@ fn convert_private_key_to_bech32(value: String) -> Result<ConvertOutput, anyhow:
     Ok(ConvertOutput {
         bech32_with_flag: skp.encode().map_err(|_| anyhow!("Cannot encode keypair"))?,
         base64_with_flag: skp.encode_base64(),
-        hex_without_flag: Hex::encode(&skp.to_bytes()[1..]),
+        hex_without_flag: Hex::encode(&skp.to_bytes()[1 ..]),
         scheme: skp.public().scheme().to_string(),
     })
 }

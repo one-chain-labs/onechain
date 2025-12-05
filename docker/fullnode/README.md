@@ -10,22 +10,22 @@ Follow the steps in this Readme to install and configure a Sui Full node for tes
 
  * [Install Docker](https://docs.docker.com/get-docker/) 
  * [Install Docker Compose](https://docs.docker.com/compose/install/)
- * Download the Full node [docker-compose.yaml](https://github.com/one-chain-labs/onechain/blob/main/docker/fullnode/docker-compose.yaml) file.
+ * Download the Full node [docker-compose.yaml](https://github.com/MystenLabs/sui/blob/main/docker/fullnode/docker-compose.yaml) file.
 
 
 ## Configure Sui Full node
 
-Download the latest version of the Sui Full node configuration file [fullnode-template.yaml](https://github.com/one-chain-labs/onechain/raw/main/crates/sui-config/data/fullnode-template.yaml). Use the following command to download the file:
+Download the latest version of the Sui Full node configuration file [fullnode-template.yaml](https://github.com/MystenLabs/sui/raw/main/crates/sui-config/data/fullnode-template.yaml). Use the following command to download the file:
 
 ```shell
-wget https://github.com/one-chain-labs/onechain/raw/main/crates/sui-config/data/fullnode-template.yaml
+wget https://github.com/MystenLabs/sui/raw/main/crates/sui-config/data/fullnode-template.yaml
 ```
 
 ### Download the Sui genesis blob
 
-The genesis blob contains the information that defined the Sui network configuration. Before you can start the Full node, you need to download the most recent file to ensure compatibility with the version of Sui you use. Use the following command to download the [genesis.blob](https://github.com/one-chain-labs/onechain-genesis/raw/main/devnet/genesis.blob) from the `devnet` branch of the Sui repository:
+The genesis blob contains the information that defined the Sui network configuration. Before you can start the Full node, you need to download the most recent file to ensure compatibility with the version of Sui you use. Use the following command to download the [genesis.blob](https://github.com/MystenLabs/sui-genesis/raw/main/devnet/genesis.blob) from the `devnet` branch of the Sui repository:
 
-```wget https://github.com/one-chain-labs/onechain-genesis/raw/main/devnet/genesis.blob```
+```wget https://github.com/MystenLabs/sui-genesis/raw/main/devnet/genesis.blob```
 
 ## Start your Sui Full node
 
@@ -45,7 +45,7 @@ After the Full node starts you can test the JSON-RPC interfaces.
 
 Sui Explorer supports connecting to a local network. To view activity on your local Full node, open the URL: [https://explorer.sui.io/?network=local](https://explorer.sui.io/?network=local).
 
-You can also change the network that Sui Explorer connects to by select it in the Sui Explorer interface. 
+You can also change the network that Sui Explorer connects to by selecting it in the Sui Explorer interface. 
 
 ### Stop the Full node
 

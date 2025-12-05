@@ -80,7 +80,6 @@ impl ValidatorGenesisConfig {
             worker_key,
             network_key,
             account_address: SuiAddress::from(&account_key),
-            revenue_receiving_address: SuiAddress::from(&account_key),
             gas_price: self.gas_price,
             commission_rate: self.commission_rate,
             network_address,
@@ -228,6 +227,7 @@ impl GenesisConfig {
         &self,
         mut rng: R,
     ) -> Result<(Vec<AccountKeyPair>, Vec<TokenAllocation>)> {
+        let mut addresses = Vec::new();
         let mut allocations = Vec::new();
 
         info!("Creating accounts and token allocations...");
@@ -241,6 +241,8 @@ impl GenesisConfig {
                 keys.push(keypair);
                 address
             };
+
+            addresses.push(address);
 
             // Populate gas itemized objects
             account.gas_amounts.iter().for_each(|a| {
@@ -313,7 +315,7 @@ impl GenesisConfig {
 
     pub fn custom_genesis(num_accounts: usize, num_objects_per_account: usize) -> Self {
         let mut accounts = Vec::new();
-        for _ in 0..num_accounts {
+        for _ in 0 .. num_accounts {
             accounts
                 .push(AccountConfig { address: None, gas_amounts: vec![DEFAULT_GAS_AMOUNT; num_objects_per_account] })
         }
@@ -389,7 +391,7 @@ impl GenesisConfig {
     /// get the same keypair used for genesis (hence the importance of the seedable rng).
     pub fn benchmark_gas_keys(n: usize) -> Vec<SuiKeyPair> {
         let mut rng = StdRng::seed_from_u64(Self::BENCHMARKS_RNG_SEED);
-        (0..n).map(|_| SuiKeyPair::Ed25519(NetworkKeyPair::generate(&mut rng))).collect()
+        (0 .. n).map(|_| SuiKeyPair::Ed25519(NetworkKeyPair::generate(&mut rng))).collect()
     }
 
     pub fn add_faucet_account(mut self) -> Self {

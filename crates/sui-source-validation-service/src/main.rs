@@ -5,12 +5,8 @@ use std::{
     path::PathBuf,
     sync::{Arc, RwLock},
 };
-use tracing::info;
 
 use clap::Parser;
-
-use telemetry_subscribers::TelemetryConfig;
-
 use sui_source_validation_service::{
     host_port,
     initialize,
@@ -26,6 +22,8 @@ use sui_source_validation_service::{
     SourceServiceMetrics,
     METRICS_HOST_PORT,
 };
+use telemetry_subscribers::TelemetryConfig;
+use tracing::info;
 
 #[derive(Parser, Debug)]
 struct Args {

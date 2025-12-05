@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::{BTreeMap, HashMap};
+
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
-use std::collections::{BTreeMap, HashMap};
 use sui_config::genesis;
 use sui_types::{
     base_types::{AuthorityName, ObjectID, SequenceNumber, SuiAddress},
@@ -246,6 +247,8 @@ impl ChildObjectResolver for InMemoryStore {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        _use_object_per_epoch_marker_table_v2: bool,
     ) -> sui_types::error::SuiResult<Option<Object>> {
         let recv_object = match crate::store::SimulatorStore::get_object(self, receiving_object_id) {
             None => return Ok(None),

@@ -12,6 +12,8 @@
 //! 2. Written into a mutable reference
 //! 3. Added to a vector
 //! 4. Passed to a function cal::;
+use std::{collections::BTreeMap, error::Error, num::NonZeroU64};
+
 use move_abstract_stack::AbstractStack;
 use move_binary_format::{
     errors::PartialVMError,
@@ -35,7 +37,6 @@ use move_bytecode_verifier::absint::{
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr, vm_status::StatusCode};
-use std::{collections::BTreeMap, error::Error, num::NonZeroU64};
 use sui_types::{
     authenticator_state::AUTHENTICATOR_STATE_MODULE_NAME,
     bridge::BRIDGE_MODULE_NAME,
@@ -134,7 +135,7 @@ impl AbstractState {
     pub fn new(function_context: &FunctionContext) -> Self {
         let mut state = AbstractState { locals: BTreeMap::new() };
 
-        for param_idx in 0..function_context.parameters().len() {
+        for param_idx in 0 .. function_context.parameters().len() {
             state.locals.insert(param_idx as LocalIndex, AbstractValue::Other);
         }
 
@@ -212,7 +213,7 @@ impl<'a> IDLeakAnalysis<'a> {
     }
 }
 
-impl<'a> TransferFunctions for IDLeakAnalysis<'a> {
+impl TransferFunctions for IDLeakAnalysis<'_> {
     type Error = ExecutionError;
     type State = AbstractState;
 
@@ -237,7 +238,7 @@ impl<'a> TransferFunctions for IDLeakAnalysis<'a> {
     }
 }
 
-impl<'a> AbstractInterpreter for IDLeakAnalysis<'a> {}
+impl AbstractInterpreter for IDLeakAnalysis<'_> {}
 
 fn call(verifier: &mut IDLeakAnalysis, function_handle: &FunctionHandle) -> Result<(), PartialVMError> {
     let parameters = verifier.binary_view.signature_at(function_handle.parameters);
@@ -278,8 +279,8 @@ fn pack(verifier: &mut IDLeakAnalysis, struct_def: &StructDefinition) -> Result<
         let msg = format!(
             "Invalid object creation in {cur_package}::{cur_module}::{cur_function}. \
                 Object created without a newly created UID. \
-                The UID must come directly from one::{}::{}. \
-                Or for tests, it can come from one::{}::{}",
+                The UID must come directly from sui::{}::{}. \
+                Or for tests, it can come from sui::{}::{}",
             OBJECT_NEW.1, OBJECT_NEW.2, TS_NEW_OBJECT.1, TS_NEW_OBJECT.2,
         );
 

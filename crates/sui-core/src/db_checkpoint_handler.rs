@@ -1,6 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{fs, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
+
+use anyhow::Result;
+use bytes::Bytes;
+use futures::future::try_join_all;
+use object_store::{path::Path, DynObjectStore};
+use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
+use sui_config::{
+    node::AuthorityStorePruningConfig,
+    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
+};
+use sui_storage::object_store::util::{
+    copy_recursively,
+    find_all_dirs_with_epoch_prefix,
+    find_missing_epochs_dirs,
+    path_to_filesystem,
+    put,
+    run_manifest_update_loop,
+    write_snapshot_manifest,
+};
+use tracing::{debug, error, info};
+
 use crate::{
     authority::{
         authority_store_pruner::{AuthorityStorePruner, AuthorityStorePruningMetrics, EPOCH_DURATION_MS_FOR_TESTING},
@@ -9,30 +31,6 @@ use crate::{
     checkpoints::CheckpointStore,
     rpc_index::RpcIndexStore,
 };
-use anyhow::Result;
-use bytes::Bytes;
-use futures::future::try_join_all;
-use object_store::{path::Path, DynObjectStore};
-use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
-use std::{fs, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
-use sui_config::{
-    node::AuthorityStorePruningConfig,
-    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
-};
-use sui_storage::{
-    mutex_table::RwLockTable,
-    object_store::util::{
-        copy_recursively,
-        find_all_dirs_with_epoch_prefix,
-        find_missing_epochs_dirs,
-        path_to_filesystem,
-        put,
-        run_manifest_update_loop,
-        write_snapshot_manifest,
-    },
-};
-use tracing::{debug, error, info};
-use typed_store::rocks::MetricConf;
 
 pub const SUCCESS_MARKER: &str = "_SUCCESS";
 pub const TEST_MARKER: &str = "_TEST";
@@ -77,8 +75,6 @@ pub struct DBCheckpointHandler {
     gc_markers: Vec<String>,
     /// Boolean flag to enable/disable object pruning and manual compaction before upload
     prune_and_compact_before_upload: bool,
-    /// Indirect object config for pruner
-    indirect_objects_threshold: usize,
     /// If true, upload will block on state snapshot upload completed marker
     state_snapshot_enabled: bool,
     /// Pruning objects
@@ -92,7 +88,6 @@ impl DBCheckpointHandler {
         output_object_store_config: Option<&ObjectStoreConfig>,
         interval_s: u64,
         prune_and_compact_before_upload: bool,
-        indirect_objects_threshold: usize,
         pruning_config: AuthorityStorePruningConfig,
         registry: &Registry,
         state_snapshot_enabled: bool,
@@ -114,7 +109,6 @@ impl DBCheckpointHandler {
             interval: Duration::from_secs(interval_s),
             gc_markers,
             prune_and_compact_before_upload,
-            indirect_objects_threshold,
             state_snapshot_enabled,
             pruning_config,
             metrics: DBCheckpointMetrics::new(registry),
@@ -136,7 +130,6 @@ impl DBCheckpointHandler {
             interval: Duration::from_secs(interval_s),
             gc_markers: vec![UPLOAD_COMPLETED_MARKER.to_string(), TEST_MARKER.to_string()],
             prune_and_compact_before_upload,
-            indirect_objects_threshold: 0,
             state_snapshot_enabled,
             pruning_config: AuthorityStorePruningConfig::default(),
             metrics: DBCheckpointMetrics::new(&Registry::default()),
@@ -247,24 +240,17 @@ impl DBCheckpointHandler {
 
     async fn prune_and_compact(&self, db_path: PathBuf, epoch: u64, epoch_duration_ms: u64) -> Result<()> {
         let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path.join("store"), None));
-        let checkpoint_store = Arc::new(CheckpointStore::open_tables_read_write(
-            db_path.join("checkpoints"),
-            MetricConf::new("db_checkpoint"),
-            None,
-            None,
-        ));
+        let checkpoint_store = Arc::new(CheckpointStore::new_for_db_checkpoint_handler(&db_path.join("checkpoints")));
         let rpc_index = RpcIndexStore::new_without_init(&db_path);
         let metrics = AuthorityStorePruningMetrics::new(&Registry::default());
-        let lock_table = Arc::new(RwLockTable::new(1));
         info!("Pruning db checkpoint in {:?} for epoch: {epoch}", db_path.display());
         AuthorityStorePruner::prune_objects_for_eligible_epochs(
             &perpetual_db,
             &checkpoint_store,
             Some(&rpc_index),
-            &lock_table,
+            None,
             self.pruning_config.clone(),
             metrics,
-            self.indirect_objects_threshold,
             epoch_duration_ms,
         )
         .await?;
@@ -341,9 +327,9 @@ impl DBCheckpointHandler {
 
 #[cfg(test)]
 mod tests {
-    use crate::db_checkpoint_handler::{DBCheckpointHandler, SUCCESS_MARKER, TEST_MARKER, UPLOAD_COMPLETED_MARKER};
-    use itertools::Itertools;
     use std::fs;
+
+    use itertools::Itertools;
     use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
     use sui_storage::object_store::util::{
         find_all_dirs_with_epoch_prefix,
@@ -351,6 +337,8 @@ mod tests {
         path_to_filesystem,
     };
     use tempfile::TempDir;
+
+    use crate::db_checkpoint_handler::{DBCheckpointHandler, SUCCESS_MARKER, TEST_MARKER, UPLOAD_COMPLETED_MARKER};
 
     #[tokio::test]
     async fn test_basic() -> anyhow::Result<()> {
@@ -603,8 +591,8 @@ mod tests {
         let missing_epochs =
             find_missing_epochs_dirs(db_checkpoint_handler.output_object_store.as_ref().unwrap(), SUCCESS_MARKER)
                 .await?;
-        let mut expected_missing_epochs: Vec<u64> = (0..100).collect();
-        expected_missing_epochs.extend((101..200).collect_vec().iter());
+        let mut expected_missing_epochs: Vec<u64> = (0 .. 100).collect();
+        expected_missing_epochs.extend((101 .. 200).collect_vec().iter());
         expected_missing_epochs.push(201);
         assert_eq!(missing_epochs, expected_missing_epochs);
         Ok(())

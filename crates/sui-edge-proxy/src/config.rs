@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{net::SocketAddr, time::Duration};
+
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use std::{net::SocketAddr, time::Duration};
 use tracing::error;
 use url::Url;
 
@@ -28,6 +29,9 @@ pub struct ProxyConfig {
     #[serde_as(as = "DurationSeconds")]
     #[serde(default = "default_idle_timeout")]
     pub idle_timeout_seconds: Duration,
+    /// Logging configuration for read requests including sample rate and log file path.
+    #[serde(default)]
+    pub logging: LoggingConfig,
 }
 
 fn default_max_idle_connections() -> usize {
@@ -42,6 +46,19 @@ fn default_idle_timeout() -> Duration {
 #[serde(rename_all = "kebab-case")]
 pub struct PeerConfig {
     pub address: Url,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct LoggingConfig {
+    /// The sample rate for read-request logging. 0.0 = no logs;
+    /// 1.0 = log all read requests.
+    #[serde(default = "default_sample_rate")]
+    pub read_request_sample_rate: f64,
+}
+
+fn default_sample_rate() -> f64 {
+    0.0
 }
 
 /// Load and validate configuration

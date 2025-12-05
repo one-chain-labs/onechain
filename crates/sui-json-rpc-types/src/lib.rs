@@ -1,12 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub use balance_changes::*;
 use fastcrypto::encoding::{Base58, Base64};
+pub use object_changes::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-pub use balance_changes::*;
-pub use object_changes::*;
 use serde_with::serde_as;
 pub use sui_checkpoint::*;
 pub use sui_coin::*;

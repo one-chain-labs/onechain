@@ -1,6 +1,26 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    fmt::{Debug, Display, Formatter},
+    slice::Iter,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+use anyhow::Result;
+use fastcrypto::hash::MultisetHash;
+use mysten_metrics::histogram::Histogram as MystenHistogram;
+use once_cell::sync::OnceCell;
+use prometheus::Histogram;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use shared_crypto::intent::{Intent, IntentScope};
+use sui_protocol_config::ProtocolConfig;
+use tap::TapFallible;
+use tracing::warn;
+
+pub use crate::digests::{CheckpointContentsDigest, CheckpointDigest};
 use crate::{
     accumulator::Accumulator,
     base_types::{random_object_ref, AuthorityName, ExecutionData, ExecutionDigests, VerifiedExecutionData},
@@ -25,25 +45,6 @@ use crate::{
     sui_serde::{AsProtocolVersion, BigInt, Readable},
     transaction::{Transaction, TransactionData},
 };
-use anyhow::Result;
-use fastcrypto::hash::MultisetHash;
-use mysten_metrics::histogram::Histogram as MystenHistogram;
-use once_cell::sync::OnceCell;
-use prometheus::Histogram;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use shared_crypto::intent::{Intent, IntentScope};
-use std::{
-    fmt::{Debug, Display, Formatter},
-    slice::Iter,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-use sui_protocol_config::ProtocolConfig;
-use tap::TapFallible;
-use tracing::warn;
-
-pub use crate::digests::{CheckpointContentsDigest, CheckpointDigest};
 
 pub type CheckpointSequenceNumber = u64;
 pub type CheckpointTimestamp = u64;
@@ -457,7 +458,7 @@ impl CheckpointContents {
     pub fn enumerate_transactions(&self, ckpt: &CheckpointSummary) -> impl Iterator<Item = (u64, &ExecutionDigests)> {
         let start = ckpt.network_total_transactions - self.size() as u64;
 
-        (0u64..).zip(self.iter()).map(move |(i, digests)| (i + start, digests))
+        (0u64 ..).zip(self.iter()).map(move |(i, digests)| (i + start, digests))
     }
 
     pub fn into_inner(self) -> Vec<ExecutionDigests> {
@@ -676,15 +677,16 @@ pub struct CheckpointVersionSpecificDataV1 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        digests::{ConsensusCommitDigest, TransactionDigest, TransactionEffectsDigest},
-        transaction::VerifiedTransaction,
-    };
     use fastcrypto::traits::KeyPair;
     use rand::{prelude::StdRng, SeedableRng};
 
     use super::*;
-    use crate::utils::make_committee_key;
+    use crate::{
+        digests::{ConsensusCommitDigest, TransactionDigest, TransactionEffectsDigest},
+        messages_consensus::ConsensusDeterminedVersionAssignments,
+        transaction::VerifiedTransaction,
+        utils::make_committee_key,
+    };
 
     // TODO use the file name as a seed
     const RNG_SEED: [u8; 32] = [
@@ -833,14 +835,14 @@ mod tests {
                 2,
                 100,
                 ConsensusCommitDigest::default(),
-                Vec::new(),
+                ConsensusDeterminedVersionAssignments::empty_for_testing(),
             );
             let t2 = VerifiedTransaction::new_consensus_commit_prologue_v3(
                 1,
                 2,
                 100,
                 ConsensusCommitDigest::default(),
-                Vec::new(),
+                ConsensusDeterminedVersionAssignments::empty_for_testing(),
             );
             let c1 = generate_test_checkpoint_summary_from_digest(*t1.digest());
             let c2 = generate_test_checkpoint_summary_from_digest(*t2.digest());
@@ -854,14 +856,14 @@ mod tests {
                 2,
                 100,
                 ConsensusCommitDigest::default(),
-                Vec::new(),
+                ConsensusDeterminedVersionAssignments::empty_for_testing(),
             );
             let t2 = VerifiedTransaction::new_consensus_commit_prologue_v3(
                 1,
                 2,
                 100,
                 ConsensusCommitDigest::random(),
-                Vec::new(),
+                ConsensusDeterminedVersionAssignments::empty_for_testing(),
             );
             let c1 = generate_test_checkpoint_summary_from_digest(*t1.digest());
             let c2 = generate_test_checkpoint_summary_from_digest(*t2.digest());

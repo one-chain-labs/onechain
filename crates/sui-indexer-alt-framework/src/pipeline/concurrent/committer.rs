@@ -4,19 +4,18 @@
 use std::{sync::Arc, time::Duration};
 
 use backoff::ExponentialBackoff;
+use sui_pg_db::Db;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
+use super::{BatchedRows, Handler};
 use crate::{
-    db::Db,
-    metrics::IndexerMetrics,
+    metrics::{CheckpointLagMetricReporter, IndexerMetrics},
     pipeline::{Break, CommitterConfig, WatermarkPart},
     task::TrySpawnStreamExt,
 };
-
-use super::{Batched, Handler};
 
 /// If the committer needs to retry a commit, it will wait this long initially.
 const INITIAL_RETRY_INTERVAL: Duration = Duration::from_millis(100);
@@ -37,7 +36,7 @@ const MAX_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 pub(super) fn committer<H: Handler + 'static>(
     config: CommitterConfig,
     skip_watermark: bool,
-    rx: mpsc::Receiver<Batched<H>>,
+    rx: mpsc::Receiver<BatchedRows<H>>,
     tx: mpsc::Sender<Vec<WatermarkPart>>,
     db: Db,
     metrics: Arc<IndexerMetrics>,
@@ -45,14 +44,20 @@ pub(super) fn committer<H: Handler + 'static>(
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         info!(pipeline = H::NAME, "Starting committer");
+        let checkpoint_lag_reporter = CheckpointLagMetricReporter::new_for_pipeline::<H>(
+            &metrics.partially_committed_checkpoint_timestamp_lag,
+            &metrics.latest_partially_committed_checkpoint_timestamp_lag_ms,
+            &metrics.latest_partially_committed_checkpoint,
+        );
 
         match ReceiverStream::new(rx)
-            .try_for_each_spawned(config.write_concurrency, |Batched { values, watermark }| {
+            .try_for_each_spawned(config.write_concurrency, |BatchedRows { values, watermark }| {
                 let values = Arc::new(values);
                 let tx = tx.clone();
                 let db = db.clone();
                 let metrics = metrics.clone();
                 let cancel = cancel.clone();
+                let checkpoint_lag_reporter = checkpoint_lag_reporter.clone();
 
                 // Repeatedly try to get a connection to the DB and write the batch. Use an
                 // exponential backoff in case the failure is due to contention over the DB
@@ -65,11 +70,15 @@ pub(super) fn committer<H: Handler + 'static>(
                     ..Default::default()
                 };
 
+                let highest_checkpoint = watermark.iter().map(|w| w.checkpoint()).max();
+                let highest_checkpoint_timestamp = watermark.iter().map(|w| w.timestamp_ms()).max();
+
                 use backoff::Error as BE;
                 let commit = move || {
                     let values = values.clone();
                     let db = db.clone();
                     let metrics = metrics.clone();
+                    let checkpoint_lag_reporter = checkpoint_lag_reporter.clone();
                     async move {
                         if values.is_empty() {
                             return Ok(());
@@ -81,7 +90,10 @@ pub(super) fn committer<H: Handler + 'static>(
 
                         let mut conn = db.connect().await.map_err(|e| {
                             warn!(pipeline = H::NAME, "Committed failed to get connection for DB");
-                            BE::transient(Break::Err(e.into()))
+
+                            metrics.total_committer_batches_failed.with_label_values(&[H::NAME]).inc();
+
+                            BE::transient(Break::Err(e))
                         })?;
 
                         let affected = H::commit(values.as_slice(), &mut conn).await;
@@ -95,6 +107,12 @@ pub(super) fn committer<H: Handler + 'static>(
                                     affected,
                                     committed = values.len(),
                                     "Wrote batch",
+                                );
+
+                                checkpoint_lag_reporter.report_lag(
+                                    // unwrap is safe because we would have returned if values is empty.
+                                    highest_checkpoint.unwrap(),
+                                    highest_checkpoint_timestamp.unwrap(),
                                 );
 
                                 metrics.total_committer_batches_succeeded.with_label_values(&[H::NAME]).inc();
@@ -121,6 +139,8 @@ pub(super) fn committer<H: Handler + 'static>(
                                     committed = values.len(),
                                     "Error writing batch: {e}",
                                 );
+
+                                metrics.total_committer_batches_failed.with_label_values(&[H::NAME]).inc();
 
                                 Err(BE::transient(Break::Err(e)))
                             }

@@ -15,7 +15,6 @@ use diesel::{
     query_dsl::methods::LimitDsl,
     QueryResult,
 };
-
 use diesel_async::{methods::LoadQuery, scoped_futures::ScopedBoxFuture};
 
 use crate::error::Error;

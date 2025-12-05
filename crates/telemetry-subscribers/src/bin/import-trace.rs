@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::io::{self, Cursor, Read};
+
 use bytes::Buf;
 use bytes_varint::VarIntSupport;
 use clap::*;
@@ -9,7 +11,6 @@ use opentelemetry_proto::tonic::{
     common::v1::{any_value, AnyValue, KeyValue},
 };
 use prost::Message;
-use std::io::{self, Cursor, Read};
 use tonic::Request;
 
 #[derive(Parser, Debug)]
@@ -104,8 +105,10 @@ where
         }
 
         // Create a slice for just this message
-        let msg_bytes =
-            cursor.chunk().get(..len).ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "Buffer underflow"))?;
+        let msg_bytes = cursor
+            .chunk()
+            .get(.. len)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "Buffer underflow"))?;
 
         let msg = M::decode(msg_bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Decode error: {}", e)))?;

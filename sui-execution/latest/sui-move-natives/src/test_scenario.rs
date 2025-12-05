@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    get_nth_struct_field,
-    get_tag_and_layouts,
-    legacy_test_cost,
-    object_runtime::{ObjectRuntime, RuntimeResults},
+use std::{
+    borrow::Borrow,
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    thread::LocalKey,
 };
+
 use better_any::{Tid, TidAble};
 use indexmap::{IndexMap, IndexSet};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -25,12 +26,6 @@ use move_vm_types::{
     values::{self, StructRef, Value},
 };
 use smallvec::smallvec;
-use std::{
-    borrow::Borrow,
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet, VecDeque},
-    thread::LocalKey,
-};
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     config,
@@ -42,6 +37,13 @@ use sui_types::{
     object::{MoveObject, Object, Owner},
     storage::ChildObjectResolver,
     TypeTag,
+};
+
+use crate::{
+    get_nth_struct_field,
+    get_tag_and_layouts,
+    legacy_test_cost,
+    object_runtime::{object_store::ChildObjectEffects, ObjectRuntime, RuntimeResults},
 };
 
 const E_COULD_NOT_GENERATE_EFFECTS: u64 = 0;
@@ -76,9 +78,17 @@ impl ChildObjectResolver for InMemoryTestStore {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         epoch_id: sui_types::committee::EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        use_object_per_epoch_marker_table_v2: bool,
     ) -> sui_types::error::SuiResult<Option<Object>> {
         self.0.with_borrow(|store| {
-            store.get_object_received_at_version(owner, receiving_object_id, receive_object_at_version, epoch_id)
+            store.get_object_received_at_version(
+                owner,
+                receiving_object_id,
+                receive_object_at_version,
+                epoch_id,
+                use_object_per_epoch_marker_table_v2,
+            )
         })
     }
 }
@@ -131,7 +141,7 @@ pub fn end_transaction(
     // Determine writes and deletes
     // We pass the received objects since they should be viewed as "loaded" for the purposes of of
     // calculating the effects of the transaction.
-    let results = object_runtime_state.finish(received, BTreeMap::new());
+    let results = object_runtime_state.finish(received, ChildObjectEffects::empty());
     let RuntimeResults { writes, user_events, loaded_child_objects: _, created_object_ids, deleted_object_ids } =
         match results {
             Ok(res) => res,
@@ -723,7 +733,7 @@ fn find_all_wrapped_objects<'a, 'i>(
         uid: &'u MoveStructLayout,
     }
 
-    impl<'i, 'u, 'b, 'l> AV::Traversal<'b, 'l> for Traversal<'i, 'u> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for Traversal<'_, '_> {
         type Error = AV::Error;
 
         fn traverse_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {

@@ -9,19 +9,43 @@ use move_core_types::vm_status::StatusCode;
 fn valid_primitives() {
     let mut module = empty_module();
     module.constant_pool = vec![
-        Constant { type_: SignatureToken::Bool, data: vec![0] },
-        Constant { type_: SignatureToken::U8, data: vec![0] },
-        Constant { type_: SignatureToken::U16, data: vec![0, 0] },
-        Constant { type_: SignatureToken::U32, data: vec![0, 0, 0, 0] },
-        Constant { type_: SignatureToken::U64, data: vec![0, 0, 0, 0, 0, 0, 0, 0] },
-        Constant { type_: SignatureToken::U128, data: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+        Constant {
+            type_: SignatureToken::Bool,
+            data: vec![0],
+        },
+        Constant {
+            type_: SignatureToken::U8,
+            data: vec![0],
+        },
+        Constant {
+            type_: SignatureToken::U16,
+            data: vec![0, 0],
+        },
+        Constant {
+            type_: SignatureToken::U32,
+            data: vec![0, 0, 0, 0],
+        },
+        Constant {
+            type_: SignatureToken::U64,
+            data: vec![0, 0, 0, 0, 0, 0, 0, 0],
+        },
+        Constant {
+            type_: SignatureToken::U128,
+            data: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        },
         Constant {
             type_: SignatureToken::U256,
-            data: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            data: vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
         },
         Constant {
             type_: SignatureToken::Address,
-            data: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            data: vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
         },
     ];
     assert!(constants::verify_module(&module).is_ok());
@@ -36,8 +60,9 @@ fn invalid_primitives() {
     malformed(SignatureToken::U128, vec![0]);
     malformed(SignatureToken::U256, vec![0, 0]);
     let data = vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0,
     ];
     malformed(SignatureToken::Address, data);
 }
@@ -58,19 +83,52 @@ fn valid_vectors() {
     let mut module = empty_module();
     module.constant_pool = vec![
         // empty
-        Constant { type_: tvec(SignatureToken::Bool), data: vec![0] },
-        Constant { type_: tvec(tvec(SignatureToken::Bool)), data: vec![0] },
-        Constant { type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))), data: vec![0] },
-        Constant { type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))), data: double_vec(vec![0]) },
+        Constant {
+            type_: tvec(SignatureToken::Bool),
+            data: vec![0],
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::Bool)),
+            data: vec![0],
+        },
+        Constant {
+            type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))),
+            data: vec![0],
+        },
+        Constant {
+            type_: tvec(tvec(tvec(tvec(SignatureToken::Bool)))),
+            data: double_vec(vec![0]),
+        },
         // small
-        Constant { type_: tvec(SignatureToken::Bool), data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
-        Constant { type_: tvec(SignatureToken::U8), data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+        Constant {
+            type_: tvec(SignatureToken::Bool),
+            data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        Constant {
+            type_: tvec(SignatureToken::U8),
+            data: vec![9, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
         // large
-        Constant { type_: tvec(SignatureToken::Bool), data: large_vec(vec![0]) },
-        Constant { type_: tvec(SignatureToken::U8), data: large_vec(vec![0]) },
-        Constant { type_: tvec(SignatureToken::U16), data: large_vec(vec![0, 0]) },
-        Constant { type_: tvec(SignatureToken::U32), data: large_vec(vec![0, 0, 0, 0]) },
-        Constant { type_: tvec(SignatureToken::U64), data: large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0]) },
+        Constant {
+            type_: tvec(SignatureToken::Bool),
+            data: large_vec(vec![0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U8),
+            data: large_vec(vec![0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U16),
+            data: large_vec(vec![0, 0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U32),
+            data: large_vec(vec![0, 0, 0, 0]),
+        },
+        Constant {
+            type_: tvec(SignatureToken::U64),
+            data: large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0]),
+        },
         Constant {
             type_: tvec(SignatureToken::U128),
             data: large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -78,35 +136,56 @@ fn valid_vectors() {
         Constant {
             type_: tvec(SignatureToken::U256),
             data: large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ]),
         },
         Constant {
             type_: tvec(SignatureToken::Address),
             data: large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ]),
         },
         // double large
-        Constant { type_: tvec(tvec(SignatureToken::Bool)), data: double_vec(large_vec(vec![0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U8)), data: double_vec(large_vec(vec![0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U16)), data: double_vec(large_vec(vec![0, 0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U32)), data: double_vec(large_vec(vec![0, 0, 0, 0])) },
-        Constant { type_: tvec(tvec(SignatureToken::U64)), data: double_vec(large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0])) },
+        Constant {
+            type_: tvec(tvec(SignatureToken::Bool)),
+            data: double_vec(large_vec(vec![0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U8)),
+            data: double_vec(large_vec(vec![0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U16)),
+            data: double_vec(large_vec(vec![0, 0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U32)),
+            data: double_vec(large_vec(vec![0, 0, 0, 0])),
+        },
+        Constant {
+            type_: tvec(tvec(SignatureToken::U64)),
+            data: double_vec(large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0])),
+        },
         Constant {
             type_: tvec(tvec(SignatureToken::U128)),
-            data: double_vec(large_vec(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
+            data: double_vec(large_vec(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ])),
         },
         Constant {
             type_: tvec(tvec(SignatureToken::U256)),
             data: double_vec(large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ])),
         },
         Constant {
             type_: tvec(tvec(SignatureToken::Address)),
             data: double_vec(large_vec(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
             ])),
         },
     ];
@@ -130,10 +209,14 @@ fn invalid_vectors() {
     malformed(tvec(SignatureToken::U16), vec![1, 0]);
     malformed(tvec(SignatureToken::U32), vec![1, 0]);
     malformed(tvec(SignatureToken::U64), vec![1, 0]);
-    malformed(tvec(SignatureToken::Address), vec![
-        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    ]);
+    malformed(
+        tvec(SignatureToken::Address),
+        vec![
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ],
+    );
     // wrong lens
     malformed(tvec(SignatureToken::U8), vec![0, 0]);
     malformed(tvec(SignatureToken::U8), vec![0, 1]);
@@ -173,5 +256,10 @@ fn invalid_type(type_: SignatureToken, data: Vec<u8>) {
 fn error(type_: SignatureToken, data: Vec<u8>, code: StatusCode) {
     let mut module = empty_module();
     module.constant_pool = vec![Constant { type_, data }];
-    assert!(constants::verify_module(&module).unwrap_err().major_status() == code)
+    assert!(
+        constants::verify_module(&module)
+            .unwrap_err()
+            .major_status()
+            == code
+    )
 }

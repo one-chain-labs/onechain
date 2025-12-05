@@ -12,14 +12,12 @@ use std::{
 use anyhow::{Context, Result};
 use object_store::{path::Path, DynObjectStore};
 use serde::Serialize;
-use tokio::sync::{mpsc, oneshot, Mutex};
-use tracing::{error, info};
-
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 use sui_data_ingestion_core::Worker;
-use sui_rpc_api::CheckpointData;
 use sui_storage::object_store::util::{copy_file, path_to_filesystem};
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tracing::{error, info};
 
 use crate::{
     analytics_metrics::AnalyticsMetrics,
@@ -138,7 +136,7 @@ impl<S: Serialize + ParquetSchema + 'static> AnalyticsProcessor<S> {
         ));
         let state = State {
             current_epoch: 0,
-            current_checkpoint_range: next_checkpoint_seq_num..next_checkpoint_seq_num,
+            current_checkpoint_range: next_checkpoint_seq_num .. next_checkpoint_seq_num,
             last_commit_instant: Instant::now(),
             num_checkpoint_iterations: 0,
             writer,
@@ -191,7 +189,7 @@ impl<S: Serialize + ParquetSchema + 'static> AnalyticsProcessor<S> {
     }
 
     fn reset_checkpoint_range(&self, state: &mut State<S>) {
-        state.current_checkpoint_range = state.current_checkpoint_range.end..state.current_checkpoint_range.end
+        state.current_checkpoint_range = state.current_checkpoint_range.end .. state.current_checkpoint_range.end
     }
 
     fn reset_last_commit_ts(&self, state: &mut State<S>) {

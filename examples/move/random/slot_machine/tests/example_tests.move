@@ -5,15 +5,15 @@
 module slot_machine::tests;
 
 use slot_machine::example;
-use one::{
+use sui::{
     coin::{Self, Coin},
     random::{Self, update_randomness_state_for_testing, Random},
-    oct::OCT,
+    sui::SUI,
     test_scenario as ts
 };
 
 fun mint(addr: address, amount: u64, scenario: &mut ts::Scenario) {
-    transfer::public_transfer(coin::mint_for_testing<OCT>(amount, scenario.ctx()), addr);
+    transfer::public_transfer(coin::mint_for_testing<SUI>(amount, scenario.ctx()), addr);
     scenario.next_tx(addr);
 }
 
@@ -35,7 +35,7 @@ fun test_game() {
 
     // Create the game and get back the output objects.
     mint(user1, 1000, &mut ts);
-    let coin = ts.take_from_sender<Coin<OCT>>();
+    let coin = ts.take_from_sender<Coin<SUI>>();
     example::create(coin, ts.ctx());
     ts.next_tx(user1);
     let mut game = ts.take_shared<example::Game>();
@@ -45,7 +45,7 @@ fun test_game() {
     // Play 4 turns (everything here is deterministic)
     ts.next_tx(user2);
     mint(user2, 100, &mut ts);
-    let mut coin: Coin<OCT> = ts.take_from_sender();
+    let mut coin: Coin<SUI> = ts.take_from_sender();
     game.play(&random_state, &mut coin, ts.ctx());
     assert!(game.balance() == 1100, 1); // lost 100
     assert!(coin.value() == 0, 1);
@@ -53,7 +53,7 @@ fun test_game() {
 
     ts.next_tx(user2);
     mint(user2, 200, &mut ts);
-    let mut coin: Coin<OCT> = ts.take_from_sender();
+    let mut coin: Coin<SUI> = ts.take_from_sender();
     game.play(&random_state, &mut coin, ts.ctx());
     assert!(game.balance() == 900, 1); // won 200
     // check that received the right amount
@@ -62,7 +62,7 @@ fun test_game() {
 
     ts.next_tx(user2);
     mint(user2, 300, &mut ts);
-    let mut coin: Coin<OCT> = ts.take_from_sender();
+    let mut coin: Coin<SUI> = ts.take_from_sender();
     game.play(&random_state, &mut coin, ts.ctx());
     assert!(game.balance() == 600, 1); // won 300
     // check that received the remaining amount
@@ -71,7 +71,7 @@ fun test_game() {
 
     ts.next_tx(user2);
     mint(user2, 200, &mut ts);
-    let mut coin: Coin<OCT> = ts.take_from_sender();
+    let mut coin: Coin<SUI> = ts.take_from_sender();
     game.play(&random_state, &mut coin, ts.ctx());
     assert!(game.balance() == 800, 1); // lost 200
     // check that received the right amount

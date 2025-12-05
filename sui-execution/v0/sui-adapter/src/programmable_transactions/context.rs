@@ -11,27 +11,6 @@ mod checked {
         sync::Arc,
     };
 
-    use crate::{
-        adapter::new_native_extensions,
-        error::convert_vm_error,
-        execution_mode::ExecutionMode,
-        execution_value::{
-            CommandKind,
-            ExecutionState,
-            InputObjectMetadata,
-            InputValue,
-            ObjectContents,
-            ObjectValue,
-            RawValueType,
-            ResultValue,
-            TryFromValue,
-            UsageKind,
-            Value,
-        },
-        gas_charger::GasCharger,
-        programmable_transactions::linkage_view::{LinkageInfo, LinkageView, SavedLinkage},
-        type_resolver::TypeTagResolver,
-    };
     use move_binary_format::{
         errors::{Location, VMError, VMResult},
         file_format::{CodeOffset, FunctionDefinitionIndex, TypeParameterIndex},
@@ -66,6 +45,28 @@ mod checked {
             WriteKind,
         },
         transaction::{Argument, CallArg, ObjectArg},
+    };
+
+    use crate::{
+        adapter::new_native_extensions,
+        error::convert_vm_error,
+        execution_mode::ExecutionMode,
+        execution_value::{
+            CommandKind,
+            ExecutionState,
+            InputObjectMetadata,
+            InputValue,
+            ObjectContents,
+            ObjectValue,
+            RawValueType,
+            ResultValue,
+            TryFromValue,
+            UsageKind,
+            Value,
+        },
+        gas_charger::GasCharger,
+        programmable_transactions::linkage_view::{LinkageInfo, LinkageView, SavedLinkage},
+        type_resolver::TypeTagResolver,
     };
 
     /// Maintains all runtime state specific to programmable transactions
@@ -839,7 +840,7 @@ mod checked {
         }
     }
 
-    impl<'vm, 'state, 'a> TypeTagResolver for ExecutionContext<'vm, 'state, 'a> {
+    impl TypeTagResolver for ExecutionContext<'_, '_, '_> {
         fn get_type_tag(&self, type_: &Type) -> Result<TypeTag, ExecutionError> {
             self.session.get_type_tag(type_).map_err(|e| self.convert_vm_error(e))
         }
@@ -1075,7 +1076,7 @@ mod checked {
         Ok(InputValue::new_object(object_metadata, obj_value))
     }
 
-    /// Load an a CallArg, either an object or a raw set of BCS bytes
+    /// Load a CallArg, either an object or a raw set of BCS bytes
     fn load_call_arg<'vm, 'state>(
         vm: &'vm MoveVM,
         state_view: &'state dyn ExecutionState,

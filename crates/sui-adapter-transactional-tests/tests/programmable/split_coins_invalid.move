@@ -8,13 +8,13 @@
 
 //# publish
 module test::m1 {
-    use one::coin;
+    use sui::coin;
 
     public fun ret_one_amount(): address {
         @42
     }
 
-    public fun transfer_(mut v: vector<coin::Coin<one::oct::OCT>>, r: address) {
+    public fun transfer_(mut v: vector<coin::Coin<sui::sui::SUI>>, r: address) {
         while (!vector::is_empty(&v)) {
             let c = vector::pop_back(&mut v);
             transfer::public_transfer(c, r);
@@ -28,7 +28,7 @@ module test::m1 {
 //> TransferObjects([Result(0)], Input(1))
 
 // let's get ourselves a coin worth 1000
-//# run one::pay::split_and_transfer --type-args one::oct::OCT --args object(2,0) 1000 @A --sender A
+//# run sui::pay::split_and_transfer --type-args sui::sui::SUI --args object(2,0) 1000 @A --sender A
 
 //# view-object 3,0
 

@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
-use clap::Parser;
 use std::path::{Path, PathBuf};
 
+use anyhow::bail;
+use clap::Parser;
 use move_cli::base;
 use move_package::{
     lock_file::{self, LockFile},

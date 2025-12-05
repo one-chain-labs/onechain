@@ -1,5 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{
+    cell::RefCell,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+
 use once_cell::sync::OnceCell;
 use prometheus::{
     register_histogram_vec_with_registry,
@@ -11,14 +20,6 @@ use prometheus::{
     Registry,
 };
 use rocksdb::{perf::set_perf_stats, PerfContext, PerfMetric, PerfStatsLevel};
-use std::{
-    cell::RefCell,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
 use tap::TapFallible;
 use tracing::warn;
 
@@ -26,8 +27,12 @@ thread_local! {
     static PER_THREAD_ROCKS_PERF_CONTEXT: std::cell::RefCell<rocksdb::PerfContext>  = RefCell::new(PerfContext::default());
 }
 
-const LATENCY_SEC_BUCKETS: &[f64] =
-    &[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1., 2.5, 5., 10., 20., 30., 60., 90.];
+const LATENCY_SEC_BUCKETS: &[f64] = &[
+    0.00001, 0.00005, // 10 mcs, 50 mcs
+    0.0001, 0.0002, 0.0003, 0.0004, 0.0005, // 100..500 mcs
+    0.001, 0.002, 0.003, 0.004, 0.005, // 1..5ms
+    0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1., 2.5, 5., 10.,
+];
 
 #[derive(Debug, Clone)]
 // A struct for sampling based on number of operations or duration.

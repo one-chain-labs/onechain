@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use serde_json::json;
 use std::{num::NonZeroUsize, time::Duration};
 
 use rosetta_client::start_rosetta_test_server;
+use serde_json::json;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_keys::keystore::AccountKeystore;
 use sui_rosetta::{
@@ -32,7 +32,7 @@ use crate::rosetta_client::RosettaEndpoint;
 mod rosetta_client;
 
 #[tokio::test]
-async fn test_get_staked_oct() {
+async fn test_get_staked_sui() {
     let test_cluster = TestClusterBuilder::new().build().await;
     let address = test_cluster.get_address_0();
     let client = test_cluster.wallet.get_client().await.unwrap();
@@ -346,7 +346,7 @@ async fn test_pay_sui_multiple_times() {
     let (rosetta_client, _handle) = start_rosetta_test_server(client.clone()).await;
     let coin_cache = CoinMetadataCache::new(client.clone(), NonZeroUsize::new(2).unwrap());
 
-    for i in 1..20 {
+    for i in 1 .. 20 {
         println!("Iteration: {}", i);
         let ops = serde_json::from_value(json!(
             [{

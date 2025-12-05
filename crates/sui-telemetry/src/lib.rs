@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+use serde::{Deserialize, Serialize};
 use sui_core::authority::AuthorityState;
 use tracing::trace;
 
@@ -43,10 +44,7 @@ struct IpResponse {
 pub async fn send_telemetry_event(state: Arc<AuthorityState>, is_validator: bool) {
     let git_rev = env!("CARGO_PKG_VERSION").to_string();
     let ip_address = get_ip().await;
-    let chain_identifier = match state.get_chain_identifier() {
-        Some(chain_identifier) => chain_identifier.to_string(),
-        None => "Unknown".to_string(),
-    };
+    let chain_identifier = state.get_chain_identifier().to_string();
     let since_the_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("Now should be later than epoch!");
     let telemetry_event = TelemetryEvent {
         name: GA_EVENT_NAME.into(),
@@ -86,7 +84,7 @@ async fn send_telemetry_event_impl(telemetry_payload: TelemetryPayload) {
     match response_result {
         Ok(response) => {
             let status = response.status().as_u16();
-            if (200..299).contains(&status) {
+            if (200 .. 299).contains(&status) {
                 trace!("SUCCESS: Sent telemetry event: {:?}", &telemetry_payload,);
             } else {
                 trace!(

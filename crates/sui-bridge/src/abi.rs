@@ -1,6 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use ethers::{
+    abi::RawLog,
+    contract::{abigen, EthLogDecode},
+    types::{Address as EthAddress, Log},
+};
+use serde::{Deserialize, Serialize};
+use sui_types::{base_types::SuiAddress, bridge::BridgeChainId};
+
 use crate::{
     encoding::{
         BridgeMessageEncoding,
@@ -28,13 +36,6 @@ use crate::{
         SuiToEthBridgeAction,
     },
 };
-use ethers::{
-    abi::RawLog,
-    contract::{abigen, EthLogDecode},
-    types::{Address as EthAddress, Log},
-};
-use serde::{Deserialize, Serialize};
-use sui_types::{base_types::SuiAddress, bridge::BridgeChainId};
 
 macro_rules! gen_eth_events {
     ($($contract:ident, $contract_event:ident, $abi_path:literal),* $(,)?) => {
@@ -308,16 +309,18 @@ impl From<EvmContractUpgradeAction> for eth_committee_upgradeable_contract::Mess
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use ethers::types::TxHash;
+    use fastcrypto::encoding::{Encoding, Hex};
+    use hex_literal::hex;
+    use sui_types::{bridge::TOKEN_ID_ETH, crypto::ToFromBytes};
+
     use super::*;
     use crate::{
         crypto::BridgeAuthorityPublicKeyBytes,
         types::{BlocklistType, EmergencyActionType},
     };
-    use ethers::types::TxHash;
-    use fastcrypto::encoding::{Encoding, Hex};
-    use hex_literal::hex;
-    use std::str::FromStr;
-    use sui_types::{bridge::TOKEN_ID_ETH, crypto::ToFromBytes};
 
     #[test]
     fn test_eth_message_conversion_emergency_action_regression() -> anyhow::Result<()> {

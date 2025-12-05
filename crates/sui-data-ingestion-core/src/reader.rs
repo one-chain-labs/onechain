@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_remote_store_client, executor::MAX_CHECKPOINTS_IN_PROGRESS};
+use std::{collections::BTreeMap, ffi::OsString, fs, path::PathBuf, sync::Arc, time::Duration};
+
 use anyhow::Result;
 use backoff::backoff::Backoff;
 use futures::StreamExt;
@@ -9,7 +10,6 @@ use mysten_metrics::spawn_monitored_task;
 #[cfg(not(target_os = "macos"))]
 use notify::{RecommendedWatcher, RecursiveMode};
 use object_store::{path::Path, ObjectStore};
-use std::{collections::BTreeMap, ffi::OsString, fs, path::PathBuf, sync::Arc, time::Duration};
 use sui_rpc_api::Client;
 use sui_storage::blob::Blob;
 use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
@@ -19,6 +19,8 @@ use tokio::{
     time::timeout,
 };
 use tracing::{debug, error, info};
+
+use crate::{create_remote_store_client, executor::MAX_CHECKPOINTS_IN_PROGRESS};
 
 pub struct CheckpointReader {
     /// Used to read from a local directory when running with a colocated FN.
@@ -73,7 +75,7 @@ impl CheckpointReader {
     /// Reads files in a local directory, validates them, and forwards `CheckpointData` to the executor.
     async fn read_local_files(&self) -> Result<Vec<Arc<CheckpointData>>> {
         let mut checkpoints = vec![];
-        for offset in 0..MAX_CHECKPOINTS_IN_PROGRESS {
+        for offset in 0 .. MAX_CHECKPOINTS_IN_PROGRESS {
             let sequence_number = self.current_checkpoint_number + offset as u64;
             if self.exceeds_capacity(sequence_number) {
                 break;
@@ -175,7 +177,7 @@ impl CheckpointReader {
         };
 
         spawn_monitored_task!(async move {
-            let mut checkpoint_stream = (start_checkpoint..u64::MAX)
+            let mut checkpoint_stream = (start_checkpoint .. u64::MAX)
                 .map(|checkpoint_number| Self::remote_fetch_checkpoint(&store, checkpoint_number))
                 .pipe(futures::stream::iter)
                 .buffered(batch_size);
@@ -278,7 +280,7 @@ impl CheckpointReader {
     }
 
     fn checkpoint_number_from_file_path(file_name: &OsString) -> Option<CheckpointSequenceNumber> {
-        file_name.to_str().and_then(|s| s.rfind('.').map(|pos| &s[..pos])).and_then(|s| s.parse().ok())
+        file_name.to_str().and_then(|s| s.rfind('.').map(|pos| &s[.. pos])).and_then(|s| s.parse().ok())
     }
 
     pub fn initialize(

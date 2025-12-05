@@ -1,16 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    client_commands::{compile_package, upgrade_package},
-    client_ptb::{
-        ast::{Argument as PTBArg, ASSIGN, GAS_BUDGET},
-        error::{PTBError, PTBResult, Span, Spanned},
-    },
-    err,
-    error,
-    sp,
-};
+use std::{collections::BTreeMap, path::Path};
+
 use anyhow::Result;
 use async_recursion::async_recursion;
 use async_trait::async_trait;
@@ -26,7 +18,6 @@ use move_core_types::{
     },
 };
 use move_package::BuildConfig;
-use std::{collections::BTreeMap, path::Path};
 use sui_json::{is_receiving_argument, primitive_type};
 use sui_json_rpc_types::{SuiObjectData, SuiObjectDataOptions, SuiRawData};
 use sui_move::manage_package::resolve_lock_file_path;
@@ -44,6 +35,16 @@ use sui_types::{
 };
 
 use super::ast::{ModuleAccess as PTBModuleAccess, ParsedPTBCommand, Program};
+use crate::{
+    client_commands::{compile_package, upgrade_package},
+    client_ptb::{
+        ast::{Argument as PTBArg, ASSIGN, GAS_BUDGET},
+        error::{PTBError, PTBResult, Span, Spanned},
+    },
+    err,
+    error,
+    sp,
+};
 
 // ===========================================================================
 // Object Resolution
@@ -826,14 +827,6 @@ impl<'a> PTBBuilder<'a> {
                 } else {
                     None
                 };
-                let compile_result = compile_package(
-                    self.reader,
-                    build_config.clone(),
-                    package_path,
-                    false, /* with_unpublished_dependencies */
-                    false, /* skip_dependency_verification */
-                )
-                .await;
                 // Restore original ID, then check result.
                 if let (Some(chain_id), Some(previous_id)) = (chain_id, previous_id) {
                     let _ = sui_package_management::set_package_id(
@@ -844,9 +837,20 @@ impl<'a> PTBBuilder<'a> {
                     )
                     .map_err(|e| err!(pkg_loc, "{e}"))?;
                 }
-                let (dependencies, compiled_modules, _, _) = compile_result.map_err(|e| err!(pkg_loc, "{e}"))?;
+                let compiled_package = compile_package(
+                    self.reader,
+                    build_config.clone(),
+                    package_path,
+                    false, /* with_unpublished_dependencies */
+                    false, /* skip_dependency_verification */
+                )
+                .await
+                .map_err(|e| err!(pkg_loc, "{e}"))?;
 
-                let res = self.ptb.publish_upgradeable(compiled_modules, dependencies.published.into_values().collect());
+                let compiled_modules = compiled_package.get_package_bytes(false);
+
+                let res =
+                    self.ptb.publish_upgradeable(compiled_modules, compiled_package.get_published_dependencies_ids());
                 self.last_command = Some(res);
             }
             // Update this command to not do as many things. It should result in a single command.
@@ -885,16 +889,6 @@ impl<'a> PTBBuilder<'a> {
                 } else {
                     None
                 };
-                let upgrade_result = upgrade_package(
-                    self.reader,
-                    build_config.clone(),
-                    package_path,
-                    ObjectID::from_address(upgrade_cap_id.into_inner()),
-                    false, /* with_unpublished_dependencies */
-                    false, /* skip_dependency_verification */
-                    None,
-                )
-                .await;
                 // Restore original ID, then check result.
                 if let (Some(chain_id), Some(previous_id)) = (chain_id, previous_id) {
                     let _ = sui_package_management::set_package_id(
@@ -905,11 +899,31 @@ impl<'a> PTBBuilder<'a> {
                     )
                     .map_err(|e| err!(path_loc, "{e}"))?;
                 }
-                let (package_id, compiled_modules, dependencies, package_digest, upgrade_policy, _) =
-                    upgrade_result.map_err(|e| err!(path_loc, "{e}"))?;
+
+                let (upgrade_policy, compiled_package) = upgrade_package(
+                    self.reader,
+                    build_config.clone(),
+                    package_path,
+                    ObjectID::from_address(upgrade_cap_id.into_inner()),
+                    false, /* with_unpublished_dependencies */
+                    false, /* skip_dependency_verification */
+                    None,
+                )
+                .await
+                .map_err(|e| err!(path_loc, "{e}"))?;
+
+                let package_digest = compiled_package.get_package_digest(false);
+                let package_id = compiled_package.published_at.as_ref().map_err(|e| err!(path_loc, "{e}"))?;
+                let compiled_modules = compiled_package.get_package_bytes(false);
+                // let (package_id, compiled_modules, dependencies, package_digest, upgrade_policy, _) =
+                //     upgrade_result.map_err(|e| err!(path_loc, "{e}"))?;
 
                 let upgrade_arg = self.ptb.pure(upgrade_policy).map_err(|e| err!(cmd_span, "{e}"))?;
-                let digest_arg = self.ptb.pure(package_digest).map_err(|e| err!(cmd_span, "{e}"))?;
+                let digest_arg = self
+                    .ptb
+                    // .to_vec() is necessary to get the length prefix
+                    .pure(package_digest.to_vec())
+                    .map_err(|e| err!(cmd_span, "{e}"))?;
                 let upgrade_ticket = self.ptb.command(Tx::Command::move_call(
                     SUI_FRAMEWORK_PACKAGE_ID,
                     ident_str!("package").to_owned(),
@@ -918,9 +932,9 @@ impl<'a> PTBBuilder<'a> {
                     vec![upgrade_cap_arg, upgrade_arg, digest_arg],
                 ));
                 let upgrade_receipt = self.ptb.upgrade(
-                    package_id,
+                    *package_id,
                     upgrade_ticket,
-                    dependencies.published.into_values().collect(),
+                    compiled_package.dependency_ids.published.into_values().collect(),
                     compiled_modules,
                 );
                 let res = self.ptb.command(Tx::Command::move_call(
@@ -945,7 +959,7 @@ impl<'a> PTBBuilder<'a> {
 pub fn to_ordinal_contraction(num: usize) -> String {
     let suffix = match num % 100 {
         // exceptions
-        11..=13 => "th",
+        11 ..= 13 => "th",
         _ => match num % 10 {
             1 => "st",
             2 => "nd",
@@ -1007,11 +1021,11 @@ pub(crate) fn display_did_you_mean<S: AsRef<str> + std::fmt::Display>(possibles:
 fn edit_distance(a: &str, b: &str) -> usize {
     let mut cache = vec![vec![0; b.len() + 1]; a.len() + 1];
 
-    for i in 0..=a.len() {
+    for i in 0 ..= a.len() {
         cache[i][0] = i;
     }
 
-    for j in 0..=b.len() {
+    for j in 0 ..= b.len() {
         cache[0][j] = j;
     }
 

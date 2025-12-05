@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
-use crate::{ParquetSchema, ParquetValue};
 use serde::Serialize;
 use strum_macros::Display;
 use sui_analytics_indexer_derive::SerializeParquet;
 use sui_types::dynamic_field::DynamicFieldType;
+
+use crate::{ParquetSchema, ParquetValue};
 
 //
 // Table entries for the analytics database.

@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+
 use mysten_metrics::init_metrics;
+use simulacrum::Simulacrum;
+use sui_json_rpc_types::SuiTransactionBlockResponse;
+use sui_pg_db::temp::{get_available_port, TempDb};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-
-use simulacrum::Simulacrum;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-use sui_json_rpc_types::SuiTransactionBlockResponse;
-use sui_pg_temp_db::{get_available_port, TempDb};
 
 use crate::{
     config::{IngestionConfig, RetentionConfig, SnapshotLagConfig, UploadOptions},
