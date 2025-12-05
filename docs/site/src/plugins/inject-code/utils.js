@@ -95,7 +95,7 @@ exports.processOptions = (text, options) => {
     .replace(/^\s*\/\/\s*docs::\/?.*\r?$\n?/gm, "")
     .replace(
       /sui\s?=\s?{\s?local\s?=.*sui-framework.*/i,
-      'Sui = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/one-framework", rev = "framework/testnet" }',
+      'One = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/one-framework", rev = "framework/testnet" }',
     );
   processed = removeComments(processed, options);
   processed = removeTests(processed, options);
