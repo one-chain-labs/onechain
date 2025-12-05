@@ -413,7 +413,7 @@ impl SuiNode {
         let prometheus_registry = registry_service.default_registry();
 
         info!(node =? config.protocol_public_key(),
-            "Initializing sui-node listening on {}", config.network_address
+            "Initializing one-node listening on {}", config.network_address
         );
 
         // Initialize metrics to track db usage before creating any stores
@@ -765,7 +765,7 @@ impl SuiNode {
             auth_agg,
         };
 
-        info!("SuiNode started!");
+        info!("OneNode started!");
         let node = Arc::new(node);
         let node_copy = node.clone();
         spawn_monitored_task!(async move {
