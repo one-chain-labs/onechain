@@ -583,10 +583,10 @@ move-abstract-interpreter = { path = "external-crates/move/crates/move-abstract-
 move-abstract-stack = { path = "external-crates/move/crates/move-abstract-stack" }
 move-analyzer = { path = "external-crates/move/crates/move-analyzer" }
 
-fastcrypto = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d13441f8021af5c54fe6c87e2ba6153878d771c6" }
-fastcrypto-tbls = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d13441f8021af5c54fe6c87e2ba6153878d771c6" }
-fastcrypto-zkp = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d13441f8021af5c54fe6c87e2ba6153878d771c6", package = "fastcrypto-zkp" }
-fastcrypto-vdf = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d13441f8021af5c54fe6c87e2ba6153878d771c6", features = [
+fastcrypto = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d8500773862a181f608884b955c96c8b30d45727" }
+fastcrypto-tbls = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d8500773862a181f608884b955c96c8b30d45727" }
+fastcrypto-zkp = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d8500773862a181f608884b955c96c8b30d45727", package = "fastcrypto-zkp" }
+fastcrypto-vdf = { git = "https://github.com/one-chain-labs/fastcrypto", rev = "d8500773862a181f608884b955c96c8b30d45727", features = [
     "experimental",
 ] }
 passkey-types = { version = "0.2.0" }
