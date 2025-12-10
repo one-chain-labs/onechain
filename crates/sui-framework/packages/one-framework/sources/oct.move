@@ -38,7 +38,7 @@ fun new(ctx: &mut TxContext): Balance<OCT> {
         OCT {},
         9,
         b"OCT",
-        b"Oct",
+        b"OCT",
         // TODO: add appropriate description and logo url
         b"",
         option::none(),
