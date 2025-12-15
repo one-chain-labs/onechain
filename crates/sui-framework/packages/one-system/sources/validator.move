@@ -4,10 +4,9 @@
 #[allow(unused_const)]
 module one_system::validator;
 
-use std::bcs;
-use std::string::String;
 use one::bag::{Self, Bag};
 use one::balance::Balance;
+use one::coin_vesting::{Self, CoinVesting};
 use one::event;
 use one::oct::OCT;
 use one::url::{Self, Url};
@@ -19,11 +18,10 @@ use one_system::staking_pool::{
     FungibleStakedOct
 };
 use one_system::validator_cap::{Self, ValidatorOperationCap};
+use std::bcs;
+use std::string::String;
 
 public use fun one_system::validator_wrapper::create_v1 as Validator.wrap_v1;
-
-///add
-use one::coin_vesting::{Self, CoinVesting};
 
 /// Invalid proof_of_possession field in ValidatorMetadata
 const EInvalidProofOfPossession: u64 = 0;
@@ -69,7 +67,7 @@ const MAX_VALIDATOR_METADATA_LENGTH: u64 = 256;
 const MAX_VALIDATOR_GAS_PRICE: u64 = 100_000;
 
 //add
-const LOCK_CLIFF_EPOCH: u64 = 180;  
+const LOCK_CLIFF_EPOCH: u64 = 180;
 const LOCK_INTERVAL_EPOCH: u64 = 30;
 const LOCK_PERIOD: u64 = 24;
 //add
@@ -277,7 +275,13 @@ public(package) fun new(
 
     // Checks that the keys & addresses & PoP are valid.
     metadata.validate();
-    metadata.new_from_metadata(revenue_receiving_address,true, gas_price,commission_rate, ctx)//update
+    metadata.new_from_metadata(
+        revenue_receiving_address,
+        true,
+        gas_price,
+        commission_rate,
+        ctx,
+    ) //update
 }
 
 /// Mark Validator's `StakingPool` as inactive by setting the `deactivation_epoch`.
@@ -295,6 +299,7 @@ public(package) fun adjust_stake_and_gas_price(self: &mut Validator) {
     self.gas_price = self.next_epoch_gas_price;
     self.commission_rate = self.next_epoch_commission_rate;
 }
+
 ///update
 public(package) fun request_set_revenue_receiving_address(
     self: &mut Validator,
@@ -311,21 +316,22 @@ public(package) fun request_add_stake(
     self: &mut Validator,
     stake: Balance<OCT>,
     staker_address: address,
-    is_validator: bool,//add
+    is_validator: bool, //add
     ctx: &mut TxContext,
 ): StakedOct {
     if (self.only_validator_staking) {
         assert!(is_validator, EOnlyValidatorStake);
-    }else {
+    } else {
         assert!(!is_validator, EValidatorStakeClosed);
     };
     self.request_add_stake_no_check(
         stake,
         staker_address,
         is_validator,
-        ctx
+        ctx,
     )
 }
+
 ///add
 public(package) fun request_add_stake_no_check(
     self: &mut Validator,
@@ -333,7 +339,7 @@ public(package) fun request_add_stake_no_check(
     staker_address: address,
     is_validator: bool,
     ctx: &mut TxContext,
-) : StakedOct {
+): StakedOct {
     let stake_amount = stake.value();
     assert!(stake_amount > 0, EInvalidStakeAmount);
     let stake_epoch = ctx.epoch() + 1;
@@ -343,16 +349,14 @@ public(package) fun request_add_stake_no_check(
         self.staking_pool.process_pending_stake();
     };
     self.next_epoch_stake = self.next_epoch_stake + stake_amount;
-    event::emit(
-        StakingRequestEvent {
-            pool_id: staking_pool_id(self),
-            validator_address: self.metadata.sui_address,
-            staker_address,
-            epoch: ctx.epoch(),
-            lock: is_validator,
-            amount: stake_amount,
-        }
-    );
+    event::emit(StakingRequestEvent {
+        pool_id: staking_pool_id(self),
+        validator_address: self.metadata.sui_address,
+        staker_address,
+        epoch: ctx.epoch(),
+        lock: is_validator,
+        amount: stake_amount,
+    });
     staked_oct
 }
 
@@ -400,7 +404,7 @@ public(package) fun request_add_stake_at_genesis(
     self: &mut Validator,
     stake: Balance<OCT>,
     staker_address: address,
-    lock: bool,  //add
+    lock: bool, //add
     ctx: &mut TxContext,
 ) {
     assert!(ctx.epoch() == 0, ECalledDuringNonGenesis);
@@ -422,11 +426,12 @@ public(package) fun request_withdraw_stake(
     self: &mut Validator,
     staked_oct: StakedOct,
     ctx: &mut TxContext,
-): (Balance<OCT>,Option<CoinVesting<OCT>>) { //update
-    let lock = staked_oct.lock();   //add
+): (Balance<OCT>, Option<CoinVesting<OCT>>) {
+    //update
+    let lock = staked_oct.lock(); //add
     let principal_amount = staked_oct.amount();
     let stake_activation_epoch = staked_oct.activation_epoch();
-    let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx);//update
+    let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx); //update
     let withdraw_amount = withdrawn_stake.value();
     let reward_amount = withdraw_amount - principal_amount;
     self.next_epoch_stake = self.next_epoch_stake - withdraw_amount;
@@ -440,7 +445,7 @@ public(package) fun request_withdraw_stake(
         reward_amount,
     });
     //add
-    if(lock){
+    if (lock) {
         let withdrawn_reward = withdrawn_stake.split(reward_amount);
 
         let coin_vesting = coin_vesting::new_form_balance(
@@ -453,16 +458,13 @@ public(package) fun request_withdraw_stake(
         );
 
         (withdrawn_reward, option::some(coin_vesting))
-    }else {
-        (withdrawn_stake,option::none())
+    } else {
+        (withdrawn_stake, option::none())
     }
 }
 
 ///add
-public(package) fun set_only_validator_staking(
-    self: &mut Validator,
-    only_validator_staking: bool
-) {
+public(package) fun set_only_validator_staking(self: &mut Validator, only_validator_staking: bool) {
     self.only_validator_staking = only_validator_staking
 }
 
@@ -994,8 +996,8 @@ public(package) fun get_staking_pool_ref(self: &Validator): &StakingPool {
 /// Create a new validator from the given `ValidatorMetadata`, called by both `new` and `new_for_testing`.
 fun new_from_metadata(
     metadata: ValidatorMetadata,
-    revenue_receiving_address:address,
-    only_validator_staking:bool,
+    revenue_receiving_address: address,
+    only_validator_staking: bool,
     gas_price: u64,
     commission_rate: u64,
     ctx: &mut TxContext,
@@ -1084,7 +1086,7 @@ public(package) fun new_for_testing(
             &mut validator,
             balance,
             sui_address, // give the stake to the validator
-            false,//add
+            false, //add
             ctx,
         );
     });

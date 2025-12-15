@@ -5,13 +5,14 @@ module one_system::validator_set;
 
 use one::bag::{Self, Bag};
 use one::balance::Balance;
+use one::coin_vesting::CoinVesting;
 use one::event;
-use one::priority_queue as pq;
 use one::oct::OCT;
+use one::priority_queue as pq;
 use one::table::{Self, Table};
 use one::table_vec::{Self, TableVec};
 use one::vec_map::{Self, VecMap};
-use one::vec_set::{Self,VecSet};
+use one::vec_set::{Self, VecSet};
 use one_system::staking_pool::{
     PoolTokenExchangeRate,
     StakedOct,
@@ -23,8 +24,6 @@ use one_system::validator::{Validator, staking_pool_id, sui_address};
 use one_system::validator_cap::{UnverifiedValidatorOperationCap, ValidatorOperationCap};
 use one_system::validator_wrapper::ValidatorWrapper;
 use one_system::voting_power;
-use one::coin_vesting::CoinVesting;//add
-
 
 // Errors
 const ENonValidatorInReportRecords: u64 = 0;
@@ -57,7 +56,7 @@ const PHASE_LENGTH: u64 = 14; // phases are 14 days = 14 epochs
 ///add
 const EOnlyTrustValidatorJoin: u64 = 201;
 const EValidatorOnlyStakingSame: u64 = 202;
-const ETrustValidatorExist: u64  = 203;
+const ETrustValidatorExist: u64 = 203;
 const ETrustValidatorNotExist: u64 = 204;
 
 public struct ValidatorSet has store {
@@ -86,28 +85,26 @@ public struct ValidatorSet has store {
     validator_candidates: Table<address, ValidatorWrapper>,
     /// Table storing the number of epochs during which a validator's stake has been below the low stake threshold.
     at_risk_validators: VecMap<address, u64>,
-       /// add
+    /// add
     only_trusted_validator: bool,
-
     trusted_validators: VecSet<address>,
     /// Any extra fields that's not defined statically.
     extra_fields: Bag,
 }
 
 ///add
-public struct UpdateOnlyTrustedValidatorAction has store,copy,drop {
-    only_trusted_validator: bool
+public struct UpdateOnlyTrustedValidatorAction has copy, drop, store {
+    only_trusted_validator: bool,
 }
 
-
-public struct UpdateTrustedValidatorsAction has store,copy,drop {
+public struct UpdateTrustedValidatorsAction has copy, drop, store {
     operate: bool,
-    validator: address
+    validator: address,
 }
 
-public struct UpdateOnlyValidatorStakingAction has store,copy,drop {
+public struct UpdateOnlyValidatorStakingAction has copy, drop, store {
     validator_address: address,
-    only_validator_staking: bool
+    only_validator_staking: bool,
 }
 
 #[allow(unused_field)]
@@ -176,7 +173,7 @@ public(package) fun new(
 
     //update
     let mut trusted_validators = vec_set::empty<address>();
-    init_active_validators.do_ref!(|val|trusted_validators.insert(val.sui_address()) );
+    init_active_validators.do_ref!(|val| trusted_validators.insert(val.sui_address()));
 
     let mut validators = ValidatorSet {
         total_stake,
@@ -199,62 +196,57 @@ public(package) fun new(
 public(package) fun create_update_only_trusted_validator_action(
     self: &ValidatorSet,
     only_trusted_validator: bool,
-):UpdateOnlyTrustedValidatorAction{
-    assert!(self.only_trusted_validator != only_trusted_validator,EValidatorOnlyStakingSame);
-    UpdateOnlyTrustedValidatorAction{
-        only_trusted_validator
+): UpdateOnlyTrustedValidatorAction {
+    assert!(self.only_trusted_validator != only_trusted_validator, EValidatorOnlyStakingSame);
+    UpdateOnlyTrustedValidatorAction {
+        only_trusted_validator,
     }
 }
 
 public(package) fun execute_update_only_trusted_validator_action(
-    self:&mut ValidatorSet,
+    self: &mut ValidatorSet,
     action: &UpdateOnlyTrustedValidatorAction,
-){
+) {
     self.only_trusted_validator = action.only_trusted_validator;
 }
 
 public(package) fun create_update_trusted_validator_action(
     self: &ValidatorSet,
     operate: bool,
-    validator: address
-):UpdateTrustedValidatorsAction{
-    if(operate){
-        assert!(!self.trusted_validators.contains(&validator),ETrustValidatorExist);
-    }else {
-        assert!(self.trusted_validators.contains(&validator),ETrustValidatorNotExist);
+    validator: address,
+): UpdateTrustedValidatorsAction {
+    if (operate) {
+        assert!(!self.trusted_validators.contains(&validator), ETrustValidatorExist);
+    } else {
+        assert!(self.trusted_validators.contains(&validator), ETrustValidatorNotExist);
     };
-    UpdateTrustedValidatorsAction{
+    UpdateTrustedValidatorsAction {
         operate,
-        validator
+        validator,
     }
 }
 
 public(package) fun execute_update_trusted_validators_action(
-    self:&mut ValidatorSet,
+    self: &mut ValidatorSet,
     action: &UpdateTrustedValidatorsAction,
-){
-    if(action.operate && !self.trusted_validators.contains(&action.validator)){
+) {
+    if (action.operate && !self.trusted_validators.contains(&action.validator)) {
         self.trusted_validators.insert(action.validator);
-    }else if(!action.operate && self.trusted_validators.contains(&action.validator)){
+    } else if (!action.operate && self.trusted_validators.contains(&action.validator)) {
         self.trusted_validators.remove(&action.validator);
-        if (find_validator(&self.active_validators, action.validator).is_some()){
+        if (find_validator(&self.active_validators, action.validator).is_some()) {
             // remove valdiator
             self.remove_validator(action.validator);
         }
     }
 }
+
 //add
-fun remove_validator(
-    self: &mut ValidatorSet,
-    validator_address:address,
-){
+fun remove_validator(self: &mut ValidatorSet, validator_address: address) {
     let mut validator_index_opt = find_validator(&self.active_validators, validator_address);
     assert!(validator_index_opt.is_some(), ENotAValidator);
     let validator_index = validator_index_opt.extract();
-    assert!(
-        !self.pending_removals.contains(&validator_index),
-        EValidatorAlreadyRemoved
-    );
+    assert!(!self.pending_removals.contains(&validator_index), EValidatorAlreadyRemoved);
     self.pending_removals.push_back(validator_index);
 }
 
@@ -264,22 +256,28 @@ public(package) fun create_update_only_validator_staking_action(
     only_validator_staking: bool,
 ): UpdateOnlyValidatorStakingAction {
     let active_idx_opt = find_validator(&self.active_validators, validator_address);
-    let pending_idx_opt = find_validator_from_table_vec(&self.pending_active_validators, validator_address);
+    let pending_idx_opt = find_validator_from_table_vec(
+        &self.pending_active_validators,
+        validator_address,
+    );
     let candidates = self.validator_candidates.contains(validator_address);
 
-    assert!(active_idx_opt.is_some() || pending_idx_opt.is_some() || candidates,ENotAValidator);
+    assert!(active_idx_opt.is_some() || pending_idx_opt.is_some() || candidates, ENotAValidator);
 
     UpdateOnlyValidatorStakingAction {
         validator_address,
-        only_validator_staking
+        only_validator_staking,
     }
 }
 
 public(package) fun execute_update_only_validator_staking_action(
-    self:& mut ValidatorSet,
+    self: &mut ValidatorSet,
     action: &UpdateOnlyValidatorStakingAction,
-){
-    let validator =  self.get_active_or_pending_or_candidate_validator_mut(action.validator_address, true);
+) {
+    let validator = self.get_active_or_pending_or_candidate_validator_mut(
+        action.validator_address,
+        true,
+    );
     validator.set_only_validator_staking(action.only_validator_staking);
 }
 
@@ -336,8 +334,8 @@ public(package) fun request_remove_validator_candidate(
 public(package) fun request_add_validator(self: &mut ValidatorSet, ctx: &TxContext) {
     let validator_address = ctx.sender();
     assert!(self.validator_candidates.contains(validator_address), ENotValidatorCandidate);
-    
-    assert!(self.is_trusted_validator(validator_address),EOnlyTrustValidatorJoin);//add
+
+    assert!(self.is_trusted_validator(validator_address), EOnlyTrustValidatorJoin); //add
 
     let validator = self.validator_candidates.remove(validator_address).destroy();
     assert!(
@@ -423,7 +421,7 @@ public(package) fun request_add_stake(
     assert!(sui_amount >= MIN_STAKING_THRESHOLD, EStakingBelowThreshold);
     self
         .get_candidate_or_active_validator_mut(validator_address)
-        .request_add_stake(stake, ctx.sender(), is_validator,ctx)
+        .request_add_stake(stake, ctx.sender(), is_validator, ctx)
 }
 
 /// Called by `sui_system`, to withdraw some share of a stake from the validator. The share to withdraw
@@ -436,7 +434,8 @@ public(package) fun request_withdraw_stake(
     self: &mut ValidatorSet,
     staked_oct: StakedOct,
     ctx: &mut TxContext,
-): (Balance<OCT>,Option<CoinVesting<OCT>>) {//update
+): (Balance<OCT>, Option<CoinVesting<OCT>>) {
+    //update
     let staking_pool_id = staked_oct.pool_id();
     let validator = if (self.staking_pool_mappings.contains(staking_pool_id)) {
         // This is an active validator.
@@ -872,10 +871,10 @@ fun count_duplicates_vec(validators: &vector<Validator>, validator: &Validator):
     validators.count!(|v| v.is_duplicate(validator))
 }
 
-fun is_trusted_validator(self: &ValidatorSet,validator: address):bool{
-    if(!self.only_trusted_validator){
+fun is_trusted_validator(self: &ValidatorSet, validator: address): bool {
+    if (!self.only_trusted_validator) {
         true
-    }else {
+    } else {
         self.trusted_validators.contains(&validator)
     }
 }
