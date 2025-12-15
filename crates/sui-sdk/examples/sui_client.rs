@@ -24,15 +24,15 @@ async fn main() -> Result<(), anyhow::Error> {
     let sui_local = SuiClientBuilder::default().build_localnet().await?;
     println!("Sui local network version: {}", sui_local.api_version());
 
-    // Sui devnet -- https://fullnode.devnet.sui.io:443
+    // Sui devnet -- https://rpc-devnet.onelabs.cc:443
     let sui_devnet = SuiClientBuilder::default().build_devnet().await?;
     println!("Sui devnet version: {}", sui_devnet.api_version());
 
-    // Sui testnet -- https://fullnode.testnet.sui.io:443
+    // Sui testnet -- https://rpc-testnet.onelabs.cc:443
     let sui_testnet = SuiClientBuilder::default().build_testnet().await?;
     println!("Sui testnet version: {}", sui_testnet.api_version());
 
-    // Sui mainnet -- https://fullnode.mainnet.sui.io:443
+    // Sui mainnet -- https://rpc-mainnet.onelabs.cc:443
     let sui_mainnet = SuiClientBuilder::default().build_mainnet().await?;
     println!("Sui mainnet version: {}", sui_mainnet.api_version());
 

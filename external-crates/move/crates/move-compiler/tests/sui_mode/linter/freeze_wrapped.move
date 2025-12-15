@@ -3,8 +3,8 @@
 
 #[allow(unused_field)]
 module a::test {
-    use sui::object::UID;
-    use sui::transfer;
+    use one::object::UID;
+    use one::transfer;
 
     struct Inner has key, store {
         id: UID
@@ -66,13 +66,13 @@ module a::test {
 
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module sui::transfer {
+module one::transfer {
     const ZERO: u64 = 0;
     public fun public_freeze_object<T: key>(_: T) {
         abort ZERO

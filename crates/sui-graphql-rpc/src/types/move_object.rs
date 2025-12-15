@@ -21,14 +21,14 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectLookup, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedSuiDowncastError,
+    stake::StakedOctDowncastError,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration, SuinsRegistrationDowncastError},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
     type_filter::ExactTypeFilter,
     uint53::UInt53,
 };
-use crate::{connection::ScanConnection, data::Db, error::Error, types::stake::StakedSui};
+use crate::{connection::ScanConnection, data::Db, error::Error, types::stake::StakedOct};
 
 #[derive(Clone)]
 pub(crate) struct MoveObject {
@@ -65,7 +65,7 @@ pub(crate) enum MoveObjectDowncastError {
         name = "has_public_transfer",
         ty = "bool",
         desc = "Determines whether a transaction can transfer this object, using the \
-                TransferObjects transaction command or `sui::transfer::public_transfer`, both of \
+                TransferObjects transaction command or `one::transfer::public_transfer`, both of \
                 which require the object to have the `key` and `store` abilities."
     ),
     field(
@@ -113,7 +113,7 @@ pub(crate) enum IMoveObject {
     MoveObject(MoveObject),
     Coin(Coin),
     CoinMetadata(CoinMetadata),
-    StakedSui(StakedSui),
+    StakedOct(StakedOct),
     SuinsRegistration(SuinsRegistration),
 }
 
@@ -139,7 +139,7 @@ impl MoveObject {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::sui::SUI`.
+    /// it defaults to `0x2::one::OCT`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_).balance(ctx, type_).await
     }
@@ -158,7 +158,7 @@ impl MoveObject {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::one::OCT`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -171,16 +171,16 @@ impl MoveObject {
         OwnerImpl::from(&self.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(&self.super_).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(&self.super_).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -287,7 +287,7 @@ impl MoveObject {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(self).has_public_transfer(ctx).await
@@ -349,13 +349,13 @@ impl MoveObject {
         }
     }
 
-    /// Attempts to convert the Move object into a `0x3::staking_pool::StakedSui`.
-    async fn as_staked_sui(&self) -> Result<Option<StakedSui>> {
-        match StakedSui::try_from(self) {
+    /// Attempts to convert the Move object into a `0x3::staking_pool::StakedOct`.
+    async fn as_staked_oct(&self) -> Result<Option<StakedOct>> {
+        match StakedOct::try_from(self) {
             Ok(coin) => Ok(Some(coin)),
-            Err(StakedSuiDowncastError::NotAStakedSui) => Ok(None),
-            Err(StakedSuiDowncastError::Bcs(e)) => {
-                Err(Error::Internal(format!("Failed to deserialize StakedSui: {e}"))).extend()
+            Err(StakedOctDowncastError::NotAStakedOct) => Ok(None),
+            Err(StakedOctDowncastError::Bcs(e)) => {
+                Err(Error::Internal(format!("Failed to deserialize StakedOct: {e}"))).extend()
             }
         }
     }

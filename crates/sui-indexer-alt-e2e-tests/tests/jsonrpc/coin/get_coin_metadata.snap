@@ -16,9 +16,9 @@ task 2, line 70:
 //# view-object 1,1
 Owner: Immutable
 Version: 2
-Contents: sui::coin::CoinMetadata<Test::fake::FAKE> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::CoinMetadata<Test::fake::FAKE> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(1,1),
         },
     },
@@ -67,9 +67,9 @@ Contents: sui::coin::CoinMetadata<Test::fake::FAKE> {
             101u8,
         ],
     },
-    icon_url: std::option::Option<sui::url::Url> {
+    icon_url: std::option::Option<one::url::Url> {
         vec: vector[
-            sui::url::Url {
+            one::url::Url {
                 url: std::ascii::String {
                     bytes: vector[
                         104u8,
@@ -99,9 +99,9 @@ task 3, line 72:
 //# view-object 1,2
 Owner: Account Address ( A )
 Version: 2
-Contents: sui::coin::CoinMetadata<Test::real::REAL> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::CoinMetadata<Test::real::REAL> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(1,2),
         },
     },
@@ -150,9 +150,9 @@ Contents: sui::coin::CoinMetadata<Test::real::REAL> {
             108u8,
         ],
     },
-    icon_url: std::option::Option<sui::url::Url> {
+    icon_url: std::option::Option<one::url::Url> {
         vec: vector[
-            sui::url::Url {
+            one::url::Url {
                 url: std::ascii::String {
                     bytes: vector[
                         104u8,
@@ -182,13 +182,13 @@ task 4, line 74:
 //# view-object 1,4
 Owner: Account Address ( A )
 Version: 2
-Contents: sui::coin::TreasuryCap<Test::real::REAL> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::TreasuryCap<Test::real::REAL> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(1,4),
         },
     },
-    total_supply: sui::balance::Supply<Test::real::REAL> {
+    total_supply: one::balance::Supply<Test::real::REAL> {
         value: 0u64,
     },
 }

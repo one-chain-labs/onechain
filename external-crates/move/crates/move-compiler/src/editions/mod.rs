@@ -283,7 +283,7 @@ impl Edition {
 
 impl Flavor {
     pub const CORE: &'static str = "core";
-    pub const SUI: &'static str = "sui";
+    pub const SUI: &'static str = "one";
     pub const ALL: &'static [Self] = &[Self::Core, Self::Sui];
 }
 

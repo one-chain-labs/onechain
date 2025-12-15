@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui::versioned {
-    use sui::object::{UID, ID};
-    use sui::tx_context::TxContext;
-    use sui::object;
-    use sui::dynamic_field;
+module one::versioned {
+    use one::object::{UID, ID};
+    use one::tx_context::TxContext;
+    use one::object;
+    use one::dynamic_field;
 
     /// Failed to upgrade the inner object due to invalid capability or new version.
     const EInvalidUpgrade: u64 = 0;

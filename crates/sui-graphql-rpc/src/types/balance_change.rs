@@ -34,7 +34,7 @@ impl BalanceChange {
         }
     }
 
-    /// The inner type of the coin whose balance has changed (e.g. `0x2::sui::SUI`).
+    /// The inner type of the coin whose balance has changed (e.g. `0x2::one::OCT`).
     async fn coin_type(&self) -> Option<MoveType> {
         Some(self.stored.coin_type.clone().into())
     }

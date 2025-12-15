@@ -3,11 +3,11 @@
 
 module object_owner::object_owner {
     use std::option::{Self, Option};
-    use sui::dynamic_object_field;
-    use sui::dynamic_field;
-    use sui::object::{Self, ID, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::dynamic_object_field;
+    use one::dynamic_field;
+    use one::object::{Self, ID, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     public struct Parent has key {
         id: UID,

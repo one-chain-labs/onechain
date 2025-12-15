@@ -19,13 +19,13 @@ The security features of the Sui system ensure a number of properties:
 - Once a transaction is finalized, its effects - namely changes to the assets it operates on or new assets created - will be persisted, and the resulting assets will be available for further processing.
 - The Sui system operates through a protocol between a set of independent validators. Yet all its security properties are preserved when a small subset of the validators do not follow the protocol.
 - All operations in Sui can be audited to ensure any assets have been correctly processed. This implies all operations on Sui are visible to all, and users may wish to use multiple different addresses to protect their privacy.
-- Validators are determined periodically through users of Sui locking and delegating SUI tokens to one or more validators.
+- Validators are determined periodically through users of Sui locking and delegating OCT tokens to one or more validators.
 
 ## Security architecture {#security-architecture}
 
 The Sui system is operated by a set of validators that process transactions. They implement the Sui protocol that allows them to reach agreement on valid transactions submitted and processed in the system.
 
-The agreement protocols Sui uses tolerate a fraction of validators not following the Sui protocol correctly, through the use of Byzantine fault tolerant broadcast and consensus. Specifically, each validator has some voting power, assigned to it through the process of users staking / voting for them using their SUI tokens. Sui maintains all its security properties if over 2/3 of the stake is assigned to validators that follow the protocol. However, a number of auditing properties are maintained even if more validators are faulty.
+The agreement protocols Sui uses tolerate a fraction of validators not following the Sui protocol correctly, through the use of Byzantine fault tolerant broadcast and consensus. Specifically, each validator has some voting power, assigned to it through the process of users staking / voting for them using their OCT tokens. Sui maintains all its security properties if over 2/3 of the stake is assigned to validators that follow the protocol. However, a number of auditing properties are maintained even if more validators are faulty.
 
 ### Addresses and ownership {#addresses-and-ownership}
 
@@ -59,7 +59,7 @@ The public auditability of Sui also implies that all transactions and assets wit
 
 ### Censorship-resistance and openness {#censorship-resistance-openness}
 
-Sui uses the established Delegated Proof-of Stake model to periodically determine its set of validators. Users can lock and delegate their SUI tokens in each epoch to determine the committee of validators that operate the Sui network in the next epoch. Anyone with over a minimum amount of delegated stake can operate a Sui validator.
+Sui uses the established Delegated Proof-of Stake model to periodically determine its set of validators. Users can lock and delegate their OCT tokens in each epoch to determine the committee of validators that operate the Sui network in the next epoch. Anyone with over a minimum amount of delegated stake can operate a Sui validator.
 
 Validators operate the network and provide rewards to users that stake their Sui to support them as validators, through gas fee income. Validators with poor reliability, and in turn the users that delegated their stake to them, may receive a lower reward. But user stake cannot be confiscated away either by malicious validators or anyone in the network.
 

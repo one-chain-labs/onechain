@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui::vec_set {
+module one::vec_set {
     use std::option::{Self, Option};
     use std::vector;
 

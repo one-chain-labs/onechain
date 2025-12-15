@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module base_addr::base {
-    use sui::object::UID;
+    use one::object::UID;
 
     public struct A<T> {
         f1: bool,

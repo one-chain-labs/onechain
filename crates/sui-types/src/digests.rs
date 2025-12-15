@@ -136,8 +136,8 @@ impl fmt::UpperHex for Digest {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ChainIdentifier(CheckpointDigest);
 
-pub const MAINNET_CHAIN_IDENTIFIER_BASE58: &str = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S";
-pub const TESTNET_CHAIN_IDENTIFIER_BASE58: &str = "69WiPg3DAQiwdxfncX6wYQ2siKwAe6L9BZthQea3JNMD";
+pub const MAINNET_CHAIN_IDENTIFIER_BASE58: &str = "82BXqhKfNQ11TPtEnG7UfToCDRH5mGMYZoUkREW46Tz6";
+pub const TESTNET_CHAIN_IDENTIFIER_BASE58: &str = "7kb4vByy1gDLyRg22otcCwLXBdA4wqBt3XQPxYoLFrPy";
 
 pub static MAINNET_CHAIN_IDENTIFIER: OnceCell<ChainIdentifier> = OnceCell::new();
 pub static TESTNET_CHAIN_IDENTIFIER: OnceCell<ChainIdentifier> = OnceCell::new();
@@ -513,7 +513,7 @@ impl TransactionDigest {
     /// ie. for an object there is no parent digest.
     /// Note that this is not the same as the digest of the genesis transaction,
     /// which cannot be known ahead of time.
-    // TODO(https://github.com/MystenLabs/sui/issues/65): we can pick anything here
+    // TODO(https://github.com/one-chain-labs/onechain/issues/65): we can pick anything here
     pub const fn genesis_marker() -> Self {
         Self::ZERO
     }

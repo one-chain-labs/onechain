@@ -227,7 +227,6 @@ impl GenesisConfig {
         &self,
         mut rng: R,
     ) -> Result<(Vec<AccountKeyPair>, Vec<TokenAllocation>)> {
-        let mut addresses = Vec::new();
         let mut allocations = Vec::new();
 
         info!("Creating accounts and token allocations...");
@@ -242,7 +241,6 @@ impl GenesisConfig {
                 address
             };
 
-            addresses.push(address);
 
             // Populate gas itemized objects
             account.gas_amounts.iter().for_each(|a| {

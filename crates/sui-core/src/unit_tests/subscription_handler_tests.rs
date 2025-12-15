@@ -58,7 +58,7 @@ impl TestEvent {
     fn type_() -> StructTag {
         StructTag {
             address: SUI_FRAMEWORK_ADDRESS,
-            module: ident_str!("SUI").to_owned(),
+            module: ident_str!("OCT").to_owned(),
             name: ident_str!("new_foobar").to_owned(),
             type_params: vec![],
         }

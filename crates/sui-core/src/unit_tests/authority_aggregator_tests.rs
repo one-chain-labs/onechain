@@ -46,7 +46,7 @@ use crate::{
         LocalAuthorityClientFaultConfig,
         MockAuthorityApi,
     },
-    test_utils::{make_transfer_object_transaction, make_transfer_sui_transaction},
+    test_utils::{make_transfer_object_transaction, make_transfer_oct_transaction},
     unit_test_utils::init_local_authorities,
 };
 
@@ -660,7 +660,7 @@ async fn test_handle_transaction_fork() {
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let gas_object = random_object_ref();
-    let tx = make_transfer_sui_transaction(
+    let tx = make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         None,
@@ -713,7 +713,7 @@ async fn test_handle_certificate_response() {
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let gas_object = random_object_ref();
-    let tx = VerifiedTransaction::new_unchecked(make_transfer_sui_transaction(
+    let tx = VerifiedTransaction::new_unchecked(make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         None,
@@ -771,7 +771,7 @@ async fn test_handle_transaction_response() {
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let gas_object = random_object_ref();
-    let tx = VerifiedTransaction::new_unchecked(make_transfer_sui_transaction(
+    let tx = VerifiedTransaction::new_unchecked(make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         None,
@@ -779,7 +779,7 @@ async fn test_handle_transaction_response() {
         &sender_kp,
         666, // this is a dummy value which does not matter
     ));
-    let tx2 = VerifiedTransaction::new_unchecked(make_transfer_sui_transaction(
+    let tx2 = VerifiedTransaction::new_unchecked(make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         Some(1),
@@ -1181,7 +1181,7 @@ async fn test_handle_conflicting_transaction_response() {
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let conflicting_object = random_object_ref();
-    let tx1 = VerifiedTransaction::new_unchecked(make_transfer_sui_transaction(
+    let tx1 = VerifiedTransaction::new_unchecked(make_transfer_oct_transaction(
         conflicting_object,
         SuiAddress::default(),
         Some(1),
@@ -1189,7 +1189,7 @@ async fn test_handle_conflicting_transaction_response() {
         &sender_kp,
         666, // this is a dummy value which does not matter
     ));
-    let conflicting_tx2 = VerifiedTransaction::new_unchecked(make_transfer_sui_transaction(
+    let conflicting_tx2 = VerifiedTransaction::new_unchecked(make_transfer_oct_transaction(
         conflicting_object,
         SuiAddress::default(),
         Some(2),
@@ -1291,7 +1291,7 @@ async fn test_handle_conflicting_transaction_response() {
     // Validator 2 returns a conflicting tx2
     clients.get_mut(&authority_keys[1].0).unwrap().set_tx_info_response_error(conflicting_error.clone());
     // Validator 3 returns a conflicting tx3
-    let conflicting_tx3 = make_transfer_sui_transaction(
+    let conflicting_tx3 = make_transfer_oct_transaction(
         conflicting_object,
         SuiAddress::default(),
         Some(3),
@@ -1328,7 +1328,7 @@ async fn test_handle_conflicting_transaction_response() {
     // Validator 2 returns a conflicting tx2
     clients.get_mut(&authority_keys[1].0).unwrap().set_tx_info_response_error(conflicting_error.clone());
     // Validator 3 returns a conflicting tx3
-    let conflicting_tx3 = make_transfer_sui_transaction(
+    let conflicting_tx3 = make_transfer_oct_transaction(
         conflicting_object,
         SuiAddress::default(),
         Some(3),
@@ -1480,7 +1480,7 @@ async fn test_handle_overload_response() {
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let gas_object = random_object_ref();
-    let txn = make_transfer_sui_transaction(
+    let txn = make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         None,
@@ -1536,7 +1536,7 @@ async fn test_handle_overload_retry_response() {
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let gas_object = random_object_ref();
-    let txn = make_transfer_sui_transaction(
+    let txn = make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         None,
@@ -1613,7 +1613,7 @@ async fn test_early_exit_with_too_many_conflicts() {
     let (authorities, mut clients, authority_keys) = make_fake_authorities();
 
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
-    let txn = make_transfer_sui_transaction(
+    let txn = make_transfer_oct_transaction(
         random_object_ref(),
         SuiAddress::default(),
         None,
@@ -1711,7 +1711,7 @@ async fn test_process_transaction_again() {
     let (authorities, clients, authority_keys) = make_fake_authorities();
     let (sender, sender_kp): (_, AccountKeyPair) = get_key_pair();
     let gas_object = random_object_ref();
-    let tx = make_transfer_sui_transaction(
+    let tx = make_transfer_oct_transaction(
         gas_object,
         SuiAddress::default(),
         None,

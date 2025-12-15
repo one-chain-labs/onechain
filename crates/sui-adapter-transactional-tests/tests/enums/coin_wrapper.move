@@ -5,13 +5,13 @@
 
 //# publish --upgradeable --sender A
 module Test::f {
-    use sui::coin::Coin;
-    use sui::sui::SUI;
+    use one::coin::Coin;
+    use one::oct::OCT;
 
     public struct Other { }
 
     public enum CoinWrapper has store {
-        Sui(Coin<SUI>),
+        Sui(Coin<OCT>),
         Other(Coin<Other>),
     }
 
@@ -39,7 +39,7 @@ module Test::f {
         }
     }
 
-    public fun create_sui(coin: &mut Coin<SUI>, amount: u64, ctx: &mut TxContext): CoinObject {
+    public fun create_sui(coin: &mut Coin<OCT>, amount: u64, ctx: &mut TxContext): CoinObject {
         CoinObject {
             id: object::new(ctx),
             coin: CoinWrapper::Sui(coin.split(amount, ctx)),

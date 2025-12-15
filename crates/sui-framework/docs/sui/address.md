@@ -1,5 +1,5 @@
 ---
-title: Module `sui::address`
+title: Module `one::address`
 ---
 
 
@@ -22,7 +22,7 @@ title: Module `sui::address`
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
 </code></pre>
 
 

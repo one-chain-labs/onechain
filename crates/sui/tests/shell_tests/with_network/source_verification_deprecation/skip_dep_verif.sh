@@ -4,7 +4,7 @@
 # check that --skip-dependency-verification has the right behavior on publish and upgrade
 
 echo "=== munge Move.toml files ===" | tee /dev/stderr
-FRAMEWORK_DIR=$(echo $CARGO_MANIFEST_DIR | sed 's#/crates/sui#/crates/sui-framework/packages/sui-framework#g')
+FRAMEWORK_DIR=$(echo $CARGO_MANIFEST_DIR | sed 's#/crates/sui#/crates/sui-framework/packages/one-framework#g')
 for i in dependency/Move.toml example/Move.toml
 do
   cat $i | sed "s#FRAMEWORK_DIR#$FRAMEWORK_DIR#g" > Move.toml \

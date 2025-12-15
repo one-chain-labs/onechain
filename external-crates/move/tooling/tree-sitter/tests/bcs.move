@@ -18,7 +18,7 @@
 /// /// This function reads u8 and u64 value from the input
 /// /// and returns the rest of the bytes.
 /// fun deserialize(bytes: vector<u8>): (u8, u64, vector<u8>) {
-///     use sui::bcs::{Self, BCS};
+///     use one::bcs::{Self, BCS};
 ///
 ///     let prepared: BCS = bcs::new(bytes);
 ///     let (u8_value, u64_value) = (
@@ -32,10 +32,10 @@
 ///     (u8_value, u64_value, leftovers)
 /// }
 /// ```
-module sui::bcs {
+module one::bcs {
     use std::option::{Self, Option};
     use std::vector as v;
-    use sui::address;
+    use one::address;
     use std::bcs;
 
     /// For when bytes length is less than required for deserialization.

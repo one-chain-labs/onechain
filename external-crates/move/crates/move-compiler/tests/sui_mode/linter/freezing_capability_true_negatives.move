@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module a::test_true_negatives {
-    use sui::object::UID;
-    use sui::transfer;
+    use one::object::UID;
+    use one::transfer;
 
     struct NormalStruct has key {
        id: UID
@@ -62,13 +62,13 @@ module a::test_true_negatives {
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module sui::transfer {
+module one::transfer {
     const ZERO: u64 = 0;
     public fun public_freeze_object<T: key>(_: T) {
         abort ZERO

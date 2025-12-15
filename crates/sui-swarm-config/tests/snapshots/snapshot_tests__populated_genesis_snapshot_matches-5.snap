@@ -217,7 +217,7 @@ validators:
       delegation_staking_pool:
         validator_address: "0x21b60aa9a8cb189ccbe20461dbfad2202fdef55b"
         starting_epoch: 1
-        sui_balance: 0
+        oct_balance: 0
         rewards_pool:
           value: 0
         delegation_token_supply:

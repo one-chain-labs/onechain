@@ -58,13 +58,13 @@ The `plinko::plinko` module combines various Sui blockchain features, such as co
 ```move title="plinko.move"
 module plinko::plinko {
 // === Imports ===
-use sui::coin::{Self, Coin};
-use sui::balance::Balance;
-use sui::sui::SUI;
-use sui::bls12381::bls12381_min_pk_verify;
-use sui::event::emit;
-use sui::hash::{blake2b256};
-use sui::dynamic_object_field::{Self as dof};
+use one::coin::{Self, Coin};
+use one::balance::Balance;
+use one::oct::OCT;
+use one::bls12381::bls12381_min_pk_verify;
+use one::event::emit;
+use one::hash::{blake2b256};
+use one::dynamic_object_field::{Self as dof};
 
 // Import Counter NFT module
 use plinko::counter_nft::Counter;
@@ -85,7 +85,7 @@ const EGameDoesNotExist: u64 = 6;
 public struct Game has key, store {
     id: UID,
     game_start_epoch: u64,
-    stake: Balance<SUI>,
+    stake: Balance<OCT>,
     player: address,
     // The VRF input used to generate the extended beacon
     vrf_input: vector<u8>,
@@ -115,7 +115,7 @@ public struct Outcome has copy, drop {
 // === Public Functions ===
 
 /// Function used to create a new game. The player must provide a Counter NFT and the number of balls.
-public fun start_game(counter: &mut Counter, num_balls: u64, coin: Coin<SUI>, house_data: &mut HouseData, ctx: &mut TxContext): ID {
+public fun start_game(counter: &mut Counter, num_balls: u64, coin: Coin<OCT>, house_data: &mut HouseData, ctx: &mut TxContext): ID {
     let fee_bp = house_data.base_fee_in_bp();
     let (id, new_game) = internal_start_game(counter, num_balls, coin, house_data, fee_bp, ctx);
     dof::add(house_data.borrow_mut(), id, new_game);
@@ -166,7 +166,7 @@ public fun finish_game(game_id: ID, bls_sig: vector<u8>, house_data: &mut HouseD
     // Initializes variables for calculating game outcome.
     let mut trace = vector[];
     // Calculate the stake amount per ball
-    let stake_per_ball = stake.value<SUI>() / num_balls;
+    let stake_per_ball = stake.value<OCT>() / num_balls;
     let mut total_funds_amount: u64 = 0;
 
     // Calculates outcome for each ball based on the extended beacon.
@@ -204,7 +204,7 @@ public fun finish_game(game_id: ID, bls_sig: vector<u8>, house_data: &mut HouseD
 
 // Processes the payout to the player and returns the game outcome.
 let payout_balance_mut = house_data.borrow_balance_mut();
-let payout_coin: Coin<SUI> = coin::take(payout_balance_mut, total_funds_amount, ctx);
+let payout_coin: Coin<OCT> = coin::take(payout_balance_mut, total_funds_amount, ctx);
 
 payout_balance_mut.join(stake);
 
@@ -268,7 +268,7 @@ public fun borrow_game(game_id: ID, house_data: &HouseData): &Game {
 /// Internal helper function used to create a new game.
 /// The player must provide a guess and a Counter NFT.
 /// Stake is taken from the player's coin and added to the game's stake.
-fun internal_start_game(counter: &mut Counter, num_balls: u64, coin: Coin<SUI>, house_data: &HouseData, fee_bp: u16, ctx: &mut TxContext): (ID, Game) {
+fun internal_start_game(counter: &mut Counter, num_balls: u64, coin: Coin<OCT>, house_data: &HouseData, fee_bp: u16, ctx: &mut TxContext): (ID, Game) {
     let user_stake = coin.value();
     // Ensure that the stake is not higher than the max stake.
     assert!(user_stake <= house_data.max_stake(), EStakeTooHigh);
@@ -287,7 +287,7 @@ fun internal_start_game(counter: &mut Counter, num_balls: u64, coin: Coin<SUI>, 
     let new_game = Game {
         id,
         game_start_epoch: ctx.epoch(),
-        stake: coin.into_balance<SUI>(),
+        stake: coin.into_balance<OCT>(),
         player: ctx.sender(),
         vrf_input,
         fee_bp
@@ -359,10 +359,10 @@ The `plinko::house_data` module in the Plinko game is designed to manage the gam
 ```move title="house_data.move"
 module plinko::house_data {
 // === Imports ===
-use sui::balance::{Self, Balance};
-use sui::sui::SUI;
-use sui::coin::{Self, Coin};
-use sui::package::{Self};
+use one::balance::{Self, Balance};
+use one::oct::OCT;
+use one::coin::{Self, Coin};
+use one::package::{Self};
 
 // === Errors ===
 const ECallerNotHouse: u64 = 0;
@@ -375,7 +375,7 @@ const EInsufficientBalance: u64 = 1;
 public struct HouseData has key {
     id: UID,
     // House's balance which also contains the accrued winnings of the house.
-    balance: Balance<SUI>,
+    balance: Balance<OCT>,
     // Address of the house or the game operator.
     house: address,
     // Public key used to verify the beacon produced by the back-end.
@@ -385,7 +385,7 @@ public struct HouseData has key {
     // Minimum stake amount required to play the game.
     min_stake: u64,
     // The accrued fees from games played.
-    fees: Balance<SUI>,
+    fees: Balance<OCT>,
     // The default fee in basis points. 1 basis point = 0.01%.
     base_fee_in_bp: u16,
     // Multipliers used to calculate winnings based on the game outcome.
@@ -418,7 +418,7 @@ fun init(otw: HOUSE_DATA, ctx: &mut TxContext) {
 /// It also sets the max and min stake values, that can later on be updated.
 /// Stores the house address and the base fee in basis points.
 /// This object is involved in all games created by the same instance of this package.
-public fun initialize_house_data(house_cap: HouseCap, coin: Coin<SUI>, public_key: vector<u8>, multiplier: vector<u64>, ctx: &mut TxContext) {
+public fun initialize_house_data(house_cap: HouseCap, coin: Coin<OCT>, public_key: vector<u8>, multiplier: vector<u64>, ctx: &mut TxContext) {
     assert!(coin.value() > 0, EInsufficientBalance);
 
     let mut house_data = HouseData {
@@ -451,7 +451,7 @@ public fun update_multiplier_vector(house_data: &mut HouseData, v: vector<u64>, 
 
 /// Function used to top up the house balance. Can be called by anyone.
 /// House can have multiple accounts so giving the treasury balance is not limited.
-public fun top_up(house_data: &mut HouseData, coin: Coin<SUI>, _: &mut TxContext) {
+public fun top_up(house_data: &mut HouseData, coin: Coin<OCT>, _: &mut TxContext) {
     coin::put(&mut house_data.balance, coin)
 }
 
@@ -542,12 +542,12 @@ public(package) fun borrow(house_data: &HouseData): &UID {
 }
 
     /// Returns a mutable reference to the balance of the house.
-public(package) fun borrow_balance_mut(house_data: &mut HouseData): &mut Balance<SUI> {
+public(package) fun borrow_balance_mut(house_data: &mut HouseData): &mut Balance<OCT> {
     &mut house_data.balance
 }
 
 /// Returns a mutable reference to the fees of the house.
-public(package) fun borrow_fees_mut(house_data: &mut HouseData): &mut Balance<SUI> {
+public(package) fun borrow_fees_mut(house_data: &mut HouseData): &mut Balance<OCT> {
     &mut house_data.fees
 }
 
@@ -627,7 +627,7 @@ Unlike traditional NFTs, the Counter NFT is non-transferable, ensuring it remain
 ```move title="counter_nft.move"
 module plinko::counter_nft {
 // === Imports ===
-use sui::bcs::{Self};
+use one::bcs::{Self};
 
 // === Structs ===
 

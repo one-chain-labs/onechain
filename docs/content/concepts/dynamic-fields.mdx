@@ -24,8 +24,8 @@ There are two flavors of dynamic field -- "fields" and "object fields" -- which 
 
 | Type | Description | Module |
 | --- | --- | --- |
-| Fields | Can store any value that has `store`, however an object stored in this kind of field is considered wrapped and is not accessible via its ID by external tools (explorers, wallets, and so on) accessing storage.| [`dynamic_field`](https://github.com/MystenLabs/sui/tree/main/crates/sui-framework/packages/sui-framework/sources/dynamic_field.move) |
-| Object field | Values must be objects (have the `key` ability, and `id: UID` as the first field), but are still accessible at their ID to external tools.| [`dynamic_object_field`](https://github.com/MystenLabs/sui/tree/main/crates/sui-framework/packages/sui-framework/sources/dynamic_object_field.move) |
+| Fields | Can store any value that has `store`, however an object stored in this kind of field is considered wrapped and is not accessible via its ID by external tools (explorers, wallets, and so on) accessing storage.| [`dynamic_field`](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-framework/packages/one-framework/sources/dynamic_field.move) |
+| Object field | Values must be objects (have the `key` ability, and `id: UID` as the first field), but are still accessible at their ID to external tools.| [`dynamic_object_field`](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-framework/packages/one-framework/sources/dynamic_object_field.move) |
 
 ### Field names
 
@@ -37,11 +37,11 @@ Use the `add` function from the relevant Sui framework module to add dynamic fie
 
 **Dynamic field**
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/dynamic_field.move#fun=add noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/dynamic_field.move#fun=add noComments}
 
 **Dynamic object field**
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/dynamic_object_field.move#fun=add noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/dynamic_object_field.move#fun=add noComments}
 
 These functions add a field with name `name` and value `value` to `object`. To see it in action, consider these code snippets:
 
@@ -64,13 +64,13 @@ It is an error to overwrite a field (attempt to add a field with the same `<Name
 
 You can reference dynamic fields by reference using the following APIs:
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/dynamic_field.move#fun=borrow,borrow_mut noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/dynamic_field.move#fun=borrow,borrow_mut noComments}
 
 Where `object` is the UID of the object the field is defined on and `name` is the field's name.
 
 :::info
 
-`sui::dynamic_object_field` has equivalent functions for object fields, but with the added constraint `Value: key + store`.
+`one::dynamic_object_field` has equivalent functions for object fields, but with the added constraint `Value: key + store`.
 
 :::
 
@@ -96,13 +96,13 @@ You must access dynamic object field values through these APIs. A transaction th
 
 Similar to unwrapping an object held in a regular field, you can remove a dynamic field, exposing its value:
 
-{@inject: crates/sui-framework/packages/sui-framework/sources/dynamic_field.move#fun=remove noComments}
+{@inject: crates/sui-framework/packages/one-framework/sources/dynamic_field.move#fun=remove noComments}
 
 This function takes a mutable reference to the ID of the `object` the field is defined on, and the field's `name`.  If a field with a `value: Value` is defined on `object` at `name`, it is removed and `value` returned, otherwise it aborts. Future attempts to access this field on `object` will fail.
 
 :::tip
 
-`sui::dynamic_object_field` has an equivalent function for object fields.
+`one::dynamic_object_field` has an equivalent function for object fields.
 
 :::
 

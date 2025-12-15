@@ -11,8 +11,8 @@
 /// - Defines a milestone-based vesting schedule.
 /// ===========================================================================================
 module vesting::milestone;
-use sui::coin::{Self, Coin};
-use sui::balance::Balance;
+use one::coin::{Self, Coin};
+use one::balance::Balance;
 
 // === Errors ===
 #[error]

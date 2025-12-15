@@ -7,11 +7,11 @@ Before you start developing with Sui and Move, you should familiarize yourself w
 
 ## Fork the Sui repository {#fork}
 
-The recommended way to contribute to the Sui repository is to fork the project, make changes on your fork, then submit a pull request (PR). The Sui repository is available on GitHub: https://github.com/MystenLabs/sui.
+The recommended way to contribute to the Sui repository is to fork the project, make changes on your fork, then submit a pull request (PR). The Sui repository is available on GitHub: https://github.com/one-chain-labs/onechain.
 
 To create a local Sui repository:
 
-1. Go to the [Sui repository](https://github.com/MystenLabs/sui) on GitHub.
+1. Go to the [Sui repository](https://github.com/one-chain-labs/onechain) on GitHub.
 1. Click the **Fork** button to create a copy of the repository in your account.
 
    ![Fork Sui repo](./images/fork.png)
@@ -37,36 +37,36 @@ The Sui repo is a monorepo, containing all the source code that is used to build
 
 The root folder of the Sui monorepo has the following top-level folders:
 
-- [apps](https://github.com/MystenLabs/sui/tree/main/apps): Contains the source code for the main web applications that Mysten Labs runs, `Sui Wallet`.
-- [consensus](https://github.com/MystenLabs/sui/tree/main/consensus): Contains the source code of consensus.
-- [crates](https://github.com/MystenLabs/sui/tree/main/crates): Contains all the Rust crates that are part of the Sui system.
-- [dapps](https://github.com/MystenLabs/sui/tree/main/dapps): Contains some examples of decentralized applications built on top of Sui, such as Kiosk or Sponsored Transactions.
-- [dashboards](https://github.com/MystenLabs/sui/tree/main/dashboards): Currently empty.
-- [doc](https://github.com/MystenLabs/sui/tree/main/doc): Contains deprecated documentation related to Move and Sui.
-- [docker](https://github.com/MystenLabs/sui/tree/main/docker): Contains the docker files needed to spin up a node, an indexer, a Full node or other services.
-- [docs](https://github.com/MystenLabs/sui/tree/main/docs): Contains this documentation and the source for this site.
-- [examples](https://github.com/MystenLabs/sui/tree/main/examples): Contains examples of apps written for Sui and smart contracts written in Move.
-- [external-crates](https://github.com/MystenLabs/sui/tree/main/external-crates): Contains the source code for the Move programming language.
-- [kiosk](https://github.com/MystenLabs/sui/tree/main/kiosk): Contains the source code of the Mysten Labs Kiosk extensions and rules, as well as examples.
-- [nre](https://github.com/MystenLabs/sui/tree/main/nre): Contains information about node and network reliability engineering.
-- [scripts](https://github.com/MystenLabs/sui/tree/main/scripts): Contains a number of scripts that are used internally.
-- [sui-execution](https://github.com/MystenLabs/sui/tree/main/sui-execution): Contains the source code responsible for abstracting access to the execution layer.
+- [apps](https://github.com/one-chain-labs/onechain/tree/main/apps): Contains the source code for the main web applications that Mysten Labs runs, `Sui Wallet`.
+- [consensus](https://github.com/one-chain-labs/onechain/tree/main/consensus): Contains the source code of consensus.
+- [crates](https://github.com/one-chain-labs/onechain/tree/main/crates): Contains all the Rust crates that are part of the Sui system.
+- [dapps](https://github.com/one-chain-labs/onechain/tree/main/dapps): Contains some examples of decentralized applications built on top of Sui, such as Kiosk or Sponsored Transactions.
+- [dashboards](https://github.com/one-chain-labs/onechain/tree/main/dashboards): Currently empty.
+- [doc](https://github.com/one-chain-labs/onechain/tree/main/doc): Contains deprecated documentation related to Move and Sui.
+- [docker](https://github.com/one-chain-labs/onechain/tree/main/docker): Contains the docker files needed to spin up a node, an indexer, a Full node or other services.
+- [docs](https://github.com/one-chain-labs/onechain/tree/main/docs): Contains this documentation and the source for this site.
+- [examples](https://github.com/one-chain-labs/onechain/tree/main/examples): Contains examples of apps written for Sui and smart contracts written in Move.
+- [external-crates](https://github.com/one-chain-labs/onechain/tree/main/external-crates): Contains the source code for the Move programming language.
+- [kiosk](https://github.com/one-chain-labs/onechain/tree/main/kiosk): Contains the source code of the Mysten Labs Kiosk extensions and rules, as well as examples.
+- [nre](https://github.com/one-chain-labs/onechain/tree/main/nre): Contains information about node and network reliability engineering.
+- [scripts](https://github.com/one-chain-labs/onechain/tree/main/scripts): Contains a number of scripts that are used internally.
+- [sui-execution](https://github.com/one-chain-labs/onechain/tree/main/sui-execution): Contains the source code responsible for abstracting access to the execution layer.
 
 The following primary directories offer a good starting point for exploring the Sui codebase:
 
-- [move](https://github.com/MystenLabs/sui/tree/main/external-crates/move) - Move VM, compiler, and tools.
-- [consensus](https://github.com/MystenLabs/sui/tree/main/consensus) - Consensus engine.
+- [move](https://github.com/one-chain-labs/onechain/tree/main/external-crates/move) - Move VM, compiler, and tools.
+- [consensus](https://github.com/one-chain-labs/onechain/tree/main/consensus) - Consensus engine.
 - [typescript-sdk](https://github.com/MystenLabs/ts-sdks/tree/main/packages/typescript/) - the Sui TypeScript SDK.
-- [wallet](https://github.com/MystenLabs/sui/tree/main/apps/wallet) - Chrome extension wallet for Sui.
-- [sui](https://github.com/MystenLabs/sui/tree/main/crates/sui) - the Sui command line tool.
-- [sui-core](https://github.com/MystenLabs/sui/tree/main/crates/sui-core) - Core Sui components.
-- [sui-execution](https://github.com/MystenLabs/sui/tree/main/sui-execution) - Execution Layer (programmable transactions, execution integration).
-- [sui-framework](https://github.com/MystenLabs/sui/tree/main/crates/sui-framework) - Move system packages (0x1, 0x2, 0x3, 0xdee9).
-- [sui-network](https://github.com/MystenLabs/sui/tree/main/crates/sui-network) - Networking interfaces.
-- [sui-node](https://github.com/MystenLabs/sui/tree/main/crates/sui-node) - Validator and Full node software.
-- [sui-protocol-config](https://github.com/MystenLabs/sui/tree/main/crates/sui-protocol-config) - On-chain system configuration and limits.
-- [sui-sdk](https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk) - The Sui Rust SDK.
-- [sui-types](https://github.com/MystenLabs/sui/tree/main/crates/sui-types) - Sui object types, such as coins and gas.
+- [wallet](https://github.com/one-chain-labs/onechain/tree/main/apps/wallet) - Chrome extension wallet for Sui.
+- [sui](https://github.com/one-chain-labs/onechain/tree/main/crates/sui) - the Sui command line tool.
+- [sui-core](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-core) - Core Sui components.
+- [sui-execution](https://github.com/one-chain-labs/onechain/tree/main/sui-execution) - Execution Layer (programmable transactions, execution integration).
+- [sui-framework](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-framework) - Move system packages (0x1, 0x2, 0x3, 0xdee9).
+- [sui-network](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-network) - Networking interfaces.
+- [sui-node](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-node) - Validator and Full node software.
+- [sui-protocol-config](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-protocol-config) - On-chain system configuration and limits.
+- [sui-sdk](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk) - The Sui Rust SDK.
+- [sui-types](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-types) - Sui object types, such as coins and gas.
 
 ## Development branches
 

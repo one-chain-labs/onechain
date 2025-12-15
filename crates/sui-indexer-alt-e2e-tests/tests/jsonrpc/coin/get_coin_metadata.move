@@ -5,8 +5,8 @@
 
 //# publish --sender A
 module Test::fake {
-    use sui::coin;
-    use sui::url;
+    use one::coin;
+    use one::url;
 
     public struct FAKE has drop {}
 
@@ -27,8 +27,8 @@ module Test::fake {
 }
 
 module Test::real {
-    use sui::coin;
-    use sui::url;
+    use one::coin;
+    use one::url;
 
     public struct REAL has drop {}
 

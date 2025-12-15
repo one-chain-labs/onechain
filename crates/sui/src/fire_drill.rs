@@ -6,8 +6,8 @@
 //! 2. restart the node in a new epoch when config file will be reloaded and take effects
 //!
 //! Example usage:
-//! sui fire-drill metadata-rotation \
-//! --sui-node-config-path validator.yaml \
+//! one fire-drill metadata-rotation \
+//! --one-node-config-path validator.yaml \
 //! --account-key-path account.key \
 //! --fullnode-rpc-url http://fullnode-my-local-net:9000
 
@@ -48,7 +48,7 @@ pub enum FireDrill {
 #[derive(Parser)]
 pub struct MetadataRotation {
     /// Path to sui node config.
-    #[clap(long = "sui-node-config-path")]
+    #[clap(long = "one-node-config-path")]
     sui_node_config_path: PathBuf,
     /// Path to account key file.
     #[clap(long = "account-key-path")]
@@ -102,7 +102,7 @@ pub async fn get_gas_obj_ref(
     sui_client: &SuiClient,
     minimal_gas_balance: u64,
 ) -> anyhow::Result<ObjectRef> {
-    let coins = sui_client.coin_read_api().get_coins(sui_address, Some("0x2::sui::SUI".into()), None, None).await?.data;
+    let coins = sui_client.coin_read_api().get_coins(sui_address, Some("0x2::one::OCT".into()), None, None).await?.data;
     let gas_obj = coins.iter().find(|c| c.balance >= minimal_gas_balance);
     if gas_obj.is_none() {
         bail!("Validator doesn't have enough Sui coins to cover transaction fees.");
@@ -284,7 +284,7 @@ async fn update_metadata_on_chain(
     let tx_data = TransactionData::new_move_call(
         sui_address,
         SUI_SYSTEM_PACKAGE_ID,
-        ident_str!("sui_system").to_owned(),
+        SUI_SYSTEM_MODULE_NAME.to_owned(),
         ident_str!(function).to_owned(),
         vec![],
         gas_obj_ref,

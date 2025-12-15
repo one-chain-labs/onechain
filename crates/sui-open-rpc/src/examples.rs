@@ -198,7 +198,7 @@ impl RpcExampleProvider {
                 package_object_id: SUI_FRAMEWORK_PACKAGE_ID,
                 module: "pay".to_string(),
                 function: "split".to_string(),
-                type_arguments: vec![SuiTypeTag::new("0x2::sui::SUI".to_string())],
+                type_arguments: vec![SuiTypeTag::new("0x2::one::OCT".to_string())],
                 arguments: vec![
                     SuiJsonValue::new(json!(coin_ref.0)).unwrap(),
                     SuiJsonValue::new(json!(random_amount)).unwrap(),
@@ -473,7 +473,7 @@ impl RpcExampleProvider {
                     "query",
                     json!(SuiObjectResponseQuery {
                         filter: Some(SuiObjectDataFilter::StructType(
-                            StructTag::from_str("0x2::coin::Coin<0x2::sui::SUI>").unwrap()
+                            StructTag::from_str("0x2::coin::Coin<0x2::one::OCT>").unwrap()
                         )),
                         options: Some(SuiObjectDataOptions::new().with_type().with_owner().with_previous_transaction())
                     }),
@@ -711,7 +711,7 @@ impl RpcExampleProvider {
         let address = SuiAddress::from(ObjectID::new(self.rng.gen()));
 
         let result = Balance {
-            coin_type: "0x2::sui::SUI".to_string(),
+            coin_type: "0x2::one::OCT".to_string(),
             coin_object_count: 15,
             total_balance: 3000000000,
             locked_balance: HashMap::new(),
@@ -729,7 +729,7 @@ impl RpcExampleProvider {
         let cursor = ObjectID::new(self.rng.gen());
         let coins = (0 .. 3)
             .map(|_| Coin {
-                coin_type: "0x2::sui::SUI".to_string(),
+                coin_type: "0x2::one::OCT".to_string(),
                 coin_object_id: ObjectID::new(self.rng.gen()),
                 version: SequenceNumber::from_u64(103626),
                 digest: ObjectDigest::new(self.rng.gen()),
@@ -798,7 +798,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_get_coins(&mut self) -> Examples {
-        let coin_type = "0x2::sui::SUI".to_string();
+        let coin_type = "0x2::one::OCT".to_string();
         let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
         let coins = (0 .. 3)
             .map(|_| Coin {
@@ -1034,7 +1034,7 @@ impl RpcExampleProvider {
         let version: u64 = 13488;
         let options = Some(SuiObjectDataOptions::new().with_type().with_owner().with_previous_transaction());
         let filter = Some(SuiObjectDataFilter::MatchAll(vec![
-            SuiObjectDataFilter::StructType(StructTag::from_str("0x2::coin::Coin<0x2::sui::SUI>").unwrap()),
+            SuiObjectDataFilter::StructType(StructTag::from_str("0x2::coin::Coin<0x2::one::OCT>").unwrap()),
             SuiObjectDataFilter::AddressOwner(owner),
             SuiObjectDataFilter::Version(version),
         ]));
@@ -1145,14 +1145,14 @@ impl RpcExampleProvider {
                 staking_pool: ObjectID::new(self.rng.gen()),
                 stakes: vec![
                     Stake {
-                        staked_sui_id: ObjectID::new(self.rng.gen()),
+                        staked_oct_id: ObjectID::new(self.rng.gen()),
                         stake_request_epoch: 62,
                         stake_active_epoch: 63,
                         principal,
                         status: StakeStatus::Active { estimated_reward: (principal as f64 * 0.0026) as u64 },
                     },
                     Stake {
-                        staked_sui_id: ObjectID::new(self.rng.gen()),
+                        staked_oct_id: ObjectID::new(self.rng.gen()),
                         stake_request_epoch: 142,
                         stake_active_epoch: 143,
                         principal,
@@ -1164,7 +1164,7 @@ impl RpcExampleProvider {
                 validator_address: SuiAddress::from(ObjectID::new(self.rng.gen())),
                 staking_pool: ObjectID::new(self.rng.gen()),
                 stakes: vec![Stake {
-                    staked_sui_id: ObjectID::new(self.rng.gen()),
+                    staked_oct_id: ObjectID::new(self.rng.gen()),
                     stake_request_epoch: 244,
                     stake_active_epoch: 245,
                     principal,
@@ -1189,14 +1189,14 @@ impl RpcExampleProvider {
             staking_pool: ObjectID::new(self.rng.gen()),
             stakes: vec![
                 Stake {
-                    staked_sui_id: stake1,
+                    staked_oct_id: stake1,
                     stake_request_epoch: 62,
                     stake_active_epoch: 63,
                     principal,
                     status: StakeStatus::Active { estimated_reward: (principal as f64 * 0.0026) as u64 },
                 },
                 Stake {
-                    staked_sui_id: stake2,
+                    staked_oct_id: stake2,
                     stake_request_epoch: 244,
                     stake_active_epoch: 245,
                     principal,
@@ -1206,7 +1206,7 @@ impl RpcExampleProvider {
         };
         Examples::new("suix_getStakesByIds", vec![ExamplePairing::new(
             "Returns the staking information for the address the request provides.",
-            vec![("staked_sui_ids", json!(vec![stake1, stake2]))],
+            vec![("staked_oct_ids", json!(vec![stake1, stake2]))],
             json!(result),
         )])
     }

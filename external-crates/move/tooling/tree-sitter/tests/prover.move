@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui::prover {
-    use sui::object;
+module one::prover {
+    use one::object;
 
     #[allow(unused_const)]
     const OWNED: u64 = 1;
@@ -57,12 +57,12 @@ module sui::prover {
     // "helper" function - may also be used in specs but mostly opaque ones defining behavior of key
     // framework functions
 
-    spec fun uid_has_field<K: copy + drop + store>(uid: sui::object::UID, name: K): bool {
+    spec fun uid_has_field<K: copy + drop + store>(uid: one::object::UID, name: K): bool {
         let addr = object::uid_to_address(uid);
         exists<object::DynamicFields<K>>(addr) && contains(global<object::DynamicFields<K>>(addr).names, name)
     }
 
-    spec fun uid_num_fields<K: copy + drop + store>(uid: sui::object::UID): u64 {
+    spec fun uid_num_fields<K: copy + drop + store>(uid: one::object::UID): u64 {
         let addr = object::uid_to_address(uid);
         if (!exists<object::DynamicFields<K>>(addr)) {
             0

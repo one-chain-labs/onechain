@@ -137,12 +137,12 @@ Move's type system guarantees that a given `Key` cannot be re-used (because `unl
 - A locked object can be unlocked with its key.
 - Trying to unlock an object with the wrong key fails.
 
-The test starts with a helper function for creating an object, it doesn't matter what kind of object it is, as long as it has the `store` ability. The test uses `Coin<SUI>`, because it comes with a `#[test_only]` function for minting:
+The test starts with a helper function for creating an object, it doesn't matter what kind of object it is, as long as it has the `store` ability. The test uses `Coin<OCT>`, because it comes with a `#[test_only]` function for minting:
 
 {@inject: examples/trading/contracts/escrow/sources/lock.move#fun=test_coin noComments}
 
 - All test-related functions and imports are annotated with `#[test_only]` to make sure they don't show up in the published package. This can also be done by separating tests into their own module – e.g. `lock_tests.move` – and marking that module as `#[test_only]`.
-- The `test_scenario` module is used to provide access to a `&mut TxContext` in the test (necessary for creating new objects). Tests that don't need to simulate multiple transactions but still need access to a `TxContext` can use `sui::tx_context::dummy` to create a test context instead.
+- The `test_scenario` module is used to provide access to a `&mut TxContext` in the test (necessary for creating new objects). Tests that don't need to simulate multiple transactions but still need access to a `TxContext` can use `one::tx_context::dummy` to create a test context instead.
 
 The first test works by creating an object to test, locking it and unlocking it – this should finish executing without aborting.
 The last two lines exist to keep the Move compiler happy by cleaning up the test coin and test scenario objects, because values in Move are not implicitly cleaned up unless they have the `drop` ability.
@@ -245,7 +245,7 @@ Finally, you need to add a function to allow the first party to complete the tra
 
 :::tip Additional resources
 
-- [Full source code](https://github.com/MystenLabs/sui/blob/705ee1ed3ce8cfadc4597c6facb6769d7dfb5896/examples/trading/contracts/escrow/sources/shared.move)
+- [Full source code](https://github.com/one-chain-labs/onechain/blob/705ee1ed3ce8cfadc4597c6facb6769d7dfb5896/examples/trading/contracts/escrow/sources/shared.move)
 - Concepts: [Shared Objects](../../../concepts/object-ownership/shared)
 - Concepts: [Shared Object Deletion](https://blog.sui.io/ephemeral-shared-objects/)
 - Concepts: [PTBs](../../../concepts/transactions/prog-txn-blocks)
@@ -306,7 +306,7 @@ Functions responsible for various aspects of the escrow's lifecycle emit these e
 <summary>
 `emit` events included in functions from `shared.move`
 </summary>
-{@inject: examples/trading/contracts/escrow/sources/shared.move#use=sui::event}
+{@inject: examples/trading/contracts/escrow/sources/shared.move#use=one::event}
 {@inject: examples/trading/contracts/escrow/sources/shared.move#fun=create,swap,return_to_sender noTitle noComments}
 </details>
 
@@ -386,7 +386,7 @@ The callback is responsible for reading the event and updating the database acco
 
 :::tip Additional resources
 
-- [Full source code](https://github.com/MystenLabs/sui/tree/705ee1ed3ce8cfadc4597c6facb6769d7dfb5896/examples/trading/api)
+- [Full source code](https://github.com/one-chain-labs/onechain/tree/705ee1ed3ce8cfadc4597c6facb6769d7dfb5896/examples/trading/api)
 - Reference: [JSON-RPC](https://docs.sui.io/sui-api-ref)
 
 :::
@@ -476,7 +476,7 @@ Now that you have an indexer and an API service, you can deploy your move packag
   $ sui client switch --env testnet
   ```
 
-  Before being able to publish your package to Testnet, you need Testnet SUI tokens. To get some, run the following command: 
+  Before being able to publish your package to Testnet, you need Testnet OCT tokens. To get some, run the following command: 
 
   ```sh
   $ sui client faucet
@@ -1029,7 +1029,7 @@ Use the `useSuiClient()` hook from `dApp Kit` to retrieve the Sui client instanc
 
 :::info
 
-The full source code of the demo bear smart contract is available at [Trading Contracts Demo directory](https://github.com/MystenLabs/sui/tree/main/examples/trading/contracts/demo)
+The full source code of the demo bear smart contract is available at [Trading Contracts Demo directory](https://github.com/one-chain-labs/onechain/tree/main/examples/trading/contracts/demo)
 
 :::
 

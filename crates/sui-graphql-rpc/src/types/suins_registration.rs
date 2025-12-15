@@ -25,7 +25,7 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedSui,
+    stake::StakedOct,
     string_input::impl_string_input,
     sui_address::SuiAddress,
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -113,7 +113,7 @@ impl SuinsRegistration {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::sui::SUI`.
+    /// it defaults to `0x2::one::OCT`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
@@ -132,7 +132,7 @@ impl SuinsRegistration {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::one::OCT`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -145,16 +145,16 @@ impl SuinsRegistration {
         OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(&self.super_.super_).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -263,7 +263,7 @@ impl SuinsRegistration {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(&self.super_).has_public_transfer(ctx).await

@@ -1,5 +1,5 @@
 ---
-title: Module `sui::clock`
+title: Module `one::clock`
 ---
 
 APIs for accessing time from move calls, via the <code><a href="../sui/clock.md#sui_clock_Clock">Clock</a></code>: a unique
@@ -18,11 +18,11 @@ shared object that is created at 0x6 during genesis.
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -52,7 +52,7 @@ input parameter, unless it is passed by immutable reference.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
@@ -62,7 +62,7 @@ input parameter, unless it is passed by immutable reference.
 <dd>
  The clock's timestamp, which is set automatically by a
  system transaction every time consensus commits a
- schedule, or by <code>sui::clock::increment_for_testing</code> during
+ schedule, or by <code>one::clock::increment_for_testing</code> during
  testing.
 </dd>
 </dl>
@@ -93,7 +93,7 @@ The <code><a href="../sui/clock.md#sui_clock">clock</a></code>'s current timesta
 milliseconds since an arbitrary point in the past.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/clock.md#sui_clock_timestamp_ms">timestamp_ms</a>(<a href="../sui/clock.md#sui_clock">clock</a>: &<a href="../sui/clock.md#sui_clock_Clock">sui::clock::Clock</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/clock.md#sui_clock_timestamp_ms">timestamp_ms</a>(<a href="../sui/clock.md#sui_clock">clock</a>: &<a href="../sui/clock.md#sui_clock_Clock">one::clock::Clock</a>): u64
 </code></pre>
 
 
@@ -119,7 +119,7 @@ Create and share the singleton Clock -- this function is
 called exactly once, during genesis.
 
 
-<pre><code><b>fun</b> <a href="../sui/clock.md#sui_clock_create">create</a>(ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui/clock.md#sui_clock_create">create</a>(ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -150,7 +150,7 @@ called exactly once, during genesis.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/clock.md#sui_clock_consensus_commit_prologue">consensus_commit_prologue</a>(<a href="../sui/clock.md#sui_clock">clock</a>: &<b>mut</b> <a href="../sui/clock.md#sui_clock_Clock">sui::clock::Clock</a>, <a href="../sui/clock.md#sui_clock_timestamp_ms">timestamp_ms</a>: u64, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui/clock.md#sui_clock_consensus_commit_prologue">consensus_commit_prologue</a>(<a href="../sui/clock.md#sui_clock">clock</a>: &<b>mut</b> <a href="../sui/clock.md#sui_clock_Clock">one::clock::Clock</a>, <a href="../sui/clock.md#sui_clock_timestamp_ms">timestamp_ms</a>: u64, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 

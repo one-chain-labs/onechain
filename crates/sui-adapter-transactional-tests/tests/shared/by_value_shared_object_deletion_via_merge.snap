@@ -28,13 +28,13 @@ task 4, line 66:
 //# view-object 2,0
 Owner: Shared( 3 )
 Version: 3
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 0u64,
     },
 }
@@ -43,13 +43,13 @@ task 5, lines 68-71:
 //# view-object 3,0
 Owner: Account Address ( A )
 Version: 4
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(3,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 0u64,
     },
 }
@@ -85,13 +85,13 @@ task 10, line 84:
 //# view-object 7,0
 Owner: Account Address ( A )
 Version: 5
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(7,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 0u64,
     },
 }
@@ -100,13 +100,13 @@ task 11, line 86:
 //# view-object 8,0
 Owner: Shared( 6 )
 Version: 6
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(8,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 0u64,
     },
 }
@@ -116,8 +116,8 @@ task 12, lines 88-90:
 Owner: Shared( 7 )
 Version: 7
 Contents: t2::o2::Obj2 {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(9,0),
         },
     },
@@ -154,13 +154,13 @@ task 17, line 103:
 //# view-object 14,0
 Owner: Shared( 8 )
 Version: 8
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(14,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 0u64,
     },
 }
@@ -169,13 +169,13 @@ task 18, line 105:
 //# view-object 15,0
 Owner: Shared( 9 )
 Version: 9
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(15,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 0u64,
     },
 }
@@ -185,8 +185,8 @@ task 19, lines 107-109:
 Owner: Shared( 10 )
 Version: 10
 Contents: t2::o2::Obj2 {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(16,0),
         },
     },

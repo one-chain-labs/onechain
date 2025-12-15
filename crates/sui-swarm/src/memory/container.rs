@@ -8,7 +8,7 @@ use std::{
 
 use futures::FutureExt;
 use sui_config::NodeConfig;
-use sui_node::{SuiNode, SuiNodeHandle};
+use one_node::{SuiNode, SuiNodeHandle};
 use sui_types::{
     base_types::ConciseableName,
     crypto::{AuthorityPublicKeyBytes, KeypairTraits},

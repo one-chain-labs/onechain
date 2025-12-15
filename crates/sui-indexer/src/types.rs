@@ -5,26 +5,23 @@ use move_core_types::language_storage::StructTag;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sui_json_rpc_types::{ObjectChange, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions};
-use sui_types::{
-    base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress},
-    crypto::AggregateAuthoritySignature,
-    digests::TransactionDigest,
-    dynamic_field::DynamicFieldType,
-    effects::TransactionEffects,
-    messages_checkpoint::{
-        CertifiedCheckpointSummary,
-        CheckpointCommitment,
-        CheckpointContents,
-        CheckpointDigest,
-        CheckpointSequenceNumber,
-        EndOfEpochData,
-    },
-    move_package::MovePackage,
-    object::{Object, Owner},
-    sui_serde::SuiStructTag,
-    transaction::SenderSignedData,
+use sui_json_rpc_types::{
+    ObjectChange, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
 };
+use sui_types::base_types::{ObjectDigest, SequenceNumber};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::crypto::AggregateAuthoritySignature;
+use sui_types::digests::TransactionDigest;
+use sui_types::dynamic_field::DynamicFieldType;
+use sui_types::effects::TransactionEffects;
+use sui_types::messages_checkpoint::{
+    CertifiedCheckpointSummary, CheckpointCommitment, CheckpointContents, CheckpointDigest,
+    CheckpointSequenceNumber, EndOfEpochData,
+};
+use sui_types::move_package::MovePackage;
+use sui_types::object::{Object, Owner};
+use sui_types::sui_serde::SuiStructTag;
+use sui_types::transaction::SenderSignedData;
 
 use crate::errors::IndexerError;
 
@@ -83,7 +80,9 @@ impl IndexedCheckpoint {
             computation_cost: checkpoint.epoch_rolling_gas_cost_summary.computation_cost,
             storage_cost: checkpoint.epoch_rolling_gas_cost_summary.storage_cost,
             storage_rebate: checkpoint.epoch_rolling_gas_cost_summary.storage_rebate,
-            non_refundable_storage_fee: checkpoint.epoch_rolling_gas_cost_summary.non_refundable_storage_fee,
+            non_refundable_storage_fee: checkpoint
+                .epoch_rolling_gas_cost_summary
+                .non_refundable_storage_fee,
             successful_tx_num,
             network_total_transactions: checkpoint.network_total_transactions,
             timestamp_ms: checkpoint.timestamp_ms,
@@ -162,23 +161,31 @@ impl EventIndex {
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
         EventIndex {
-            tx_sequence_number: rng.gen(),
-            event_sequence_number: rng.gen(),
+            tx_sequence_number: rng.r#gen(),
+            event_sequence_number: rng.r#gen(),
             sender: SuiAddress::random_for_testing_only(),
             emit_package: ObjectID::random(),
-            emit_module: rng.gen::<u64>().to_string(),
+            emit_module: rng.r#gen::<u64>().to_string(),
             type_package: ObjectID::random(),
-            type_module: rng.gen::<u64>().to_string(),
-            type_name: rng.gen::<u64>().to_string(),
-            type_instantiation: rng.gen::<u64>().to_string(),
+            type_module: rng.r#gen::<u64>().to_string(),
+            type_name: rng.r#gen::<u64>().to_string(),
+            type_instantiation: rng.r#gen::<u64>().to_string(),
         }
     }
 }
 
 impl EventIndex {
-    pub fn from_event(tx_sequence_number: u64, event_sequence_number: u64, event: &sui_types::event::Event) -> Self {
-        let type_instantiation =
-            event.type_.to_canonical_string(/* with_prefix */ true).splitn(3, "::").collect::<Vec<_>>()[2].to_string();
+    pub fn from_event(
+        tx_sequence_number: u64,
+        event_sequence_number: u64,
+        event: &sui_types::event::Event,
+    ) -> Self {
+        let type_instantiation = event
+            .type_
+            .to_canonical_string(/* with_prefix */ true)
+            .splitn(3, "::")
+            .collect::<Vec<_>>()[2]
+            .to_string();
         Self {
             tx_sequence_number,
             event_sequence_number,
@@ -213,7 +220,11 @@ impl TryFrom<i16> for ObjectStatus {
         Ok(match value {
             0 => ObjectStatus::Active,
             1 => ObjectStatus::WrappedOrDeleted,
-            value => return Err(IndexerError::PersistentStorageDataCorruptionError(format!("{value} as ObjectStatus"))),
+            value => {
+                return Err(IndexerError::PersistentStorageDataCorruptionError(format!(
+                    "{value} as ObjectStatus"
+                )))
+            }
         })
     }
 }
@@ -227,7 +238,11 @@ impl TryFrom<i16> for OwnerType {
             1 => OwnerType::Address,
             2 => OwnerType::Object,
             3 => OwnerType::Shared,
-            value => return Err(IndexerError::PersistentStorageDataCorruptionError(format!("{value} as OwnerType"))),
+            value => {
+                return Err(IndexerError::PersistentStorageDataCorruptionError(format!(
+                    "{value} as OwnerType"
+                )))
+            }
         })
     }
 }
@@ -241,7 +256,9 @@ pub fn owner_to_owner_info(owner: &Owner) -> (OwnerType, Option<SuiAddress>) {
         Owner::Immutable => (OwnerType::Immutable, None),
         // ConsensusV2 objects are treated as singly-owned for now in indexers.
         // This will need to be updated if additional Authenticators are added.
-        Owner::ConsensusV2 { authenticator, .. } => (OwnerType::Address, Some(*authenticator.as_single_owner())),
+        Owner::ConsensusV2 { authenticator, .. } => {
+            (OwnerType::Address, Some(*authenticator.as_single_owner()))
+        }
     }
 }
 
@@ -263,10 +280,10 @@ impl IndexedObject {
         let mut rng = rand::thread_rng();
         let random_address = SuiAddress::random_for_testing_only();
         IndexedObject {
-            checkpoint_sequence_number: rng.gen(),
+            checkpoint_sequence_number: rng.r#gen(),
             object: Object::with_owner_for_testing(random_address),
             df_kind: {
-                let random_value = rng.gen_range(0 .. 3);
+                let random_value = rng.gen_range(0..3);
                 match random_value {
                     0 => Some(DynamicFieldType::DynamicField),
                     1 => Some(DynamicFieldType::DynamicObject),
@@ -283,7 +300,11 @@ impl IndexedObject {
         object: Object,
         df_kind: Option<DynamicFieldType>,
     ) -> Self {
-        Self { checkpoint_sequence_number, object, df_kind }
+        Self {
+            checkpoint_sequence_number,
+            object,
+            df_kind,
+        }
     }
 }
 
@@ -299,8 +320,8 @@ impl IndexedDeletedObject {
         let mut rng = rand::thread_rng();
         IndexedDeletedObject {
             object_id: ObjectID::random(),
-            object_version: rng.gen(),
-            checkpoint_sequence_number: rng.gen(),
+            object_version: rng.r#gen(),
+            checkpoint_sequence_number: rng.r#gen(),
         }
     }
 }
@@ -352,22 +373,32 @@ impl TxIndex {
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
         TxIndex {
-            tx_sequence_number: rng.gen(),
+            tx_sequence_number: rng.r#gen(),
             tx_kind: if rng.gen_bool(0.5) {
                 TransactionKind::SystemTransaction
             } else {
                 TransactionKind::ProgrammableTransaction
             },
             transaction_digest: TransactionDigest::random(),
-            checkpoint_sequence_number: rng.gen(),
-            input_objects: (0 .. 1000).map(|_| ObjectID::random()).collect(),
-            changed_objects: (0 .. 1000).map(|_| ObjectID::random()).collect(),
-            affected_objects: (0 .. 1000).map(|_| ObjectID::random()).collect(),
-            payers: (0 .. rng.gen_range(0 .. 100)).map(|_| SuiAddress::random_for_testing_only()).collect(),
+            checkpoint_sequence_number: rng.r#gen(),
+            input_objects: (0..1000).map(|_| ObjectID::random()).collect(),
+            changed_objects: (0..1000).map(|_| ObjectID::random()).collect(),
+            affected_objects: (0..1000).map(|_| ObjectID::random()).collect(),
+            payers: (0..rng.gen_range(0..100))
+                .map(|_| SuiAddress::random_for_testing_only())
+                .collect(),
             sender: SuiAddress::random_for_testing_only(),
-            recipients: (0 .. rng.gen_range(0 .. 1000)).map(|_| SuiAddress::random_for_testing_only()).collect(),
-            move_calls: (0 .. rng.gen_range(0 .. 1000))
-                .map(|_| (ObjectID::random(), rng.gen::<u64>().to_string(), rng.gen::<u64>().to_string()))
+            recipients: (0..rng.gen_range(0..1000))
+                .map(|_| SuiAddress::random_for_testing_only())
+                .collect(),
+            move_calls: (0..rng.gen_range(0..1000))
+                .map(|_| {
+                    (
+                        ObjectID::random(),
+                        rng.r#gen::<u64>().to_string(),
+                        rng.r#gen::<u64>().to_string(),
+                    )
+                })
                 .collect(),
         }
     }
@@ -434,24 +465,86 @@ pub enum IndexedObjectChange {
 impl From<ObjectChange> for IndexedObjectChange {
     fn from(oc: ObjectChange) -> Self {
         match oc {
-            ObjectChange::Published { package_id, version, digest, modules } => {
-                Self::Published { package_id, version, digest, modules }
-            }
-            ObjectChange::Transferred { sender, recipient, object_type, object_id, version, digest } => {
-                Self::Transferred { sender, recipient, object_type, object_id, version, digest }
-            }
-            ObjectChange::Mutated { sender, owner, object_type, object_id, version, previous_version, digest } => {
-                Self::Mutated { sender, owner, object_type, object_id, version, previous_version, digest }
-            }
-            ObjectChange::Deleted { sender, object_type, object_id, version } => {
-                Self::Deleted { sender, object_type, object_id, version }
-            }
-            ObjectChange::Wrapped { sender, object_type, object_id, version } => {
-                Self::Wrapped { sender, object_type, object_id, version }
-            }
-            ObjectChange::Created { sender, owner, object_type, object_id, version, digest } => {
-                Self::Created { sender, owner, object_type, object_id, version, digest }
-            }
+            ObjectChange::Published {
+                package_id,
+                version,
+                digest,
+                modules,
+            } => Self::Published {
+                package_id,
+                version,
+                digest,
+                modules,
+            },
+            ObjectChange::Transferred {
+                sender,
+                recipient,
+                object_type,
+                object_id,
+                version,
+                digest,
+            } => Self::Transferred {
+                sender,
+                recipient,
+                object_type,
+                object_id,
+                version,
+                digest,
+            },
+            ObjectChange::Mutated {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                previous_version,
+                digest,
+            } => Self::Mutated {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                previous_version,
+                digest,
+            },
+            ObjectChange::Deleted {
+                sender,
+                object_type,
+                object_id,
+                version,
+            } => Self::Deleted {
+                sender,
+                object_type,
+                object_id,
+                version,
+            },
+            ObjectChange::Wrapped {
+                sender,
+                object_type,
+                object_id,
+                version,
+            } => Self::Wrapped {
+                sender,
+                object_type,
+                object_id,
+                version,
+            },
+            ObjectChange::Created {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                digest,
+            } => Self::Created {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                digest,
+            },
         }
     }
 }
@@ -459,12 +552,32 @@ impl From<ObjectChange> for IndexedObjectChange {
 impl From<IndexedObjectChange> for ObjectChange {
     fn from(val: IndexedObjectChange) -> Self {
         match val {
-            IndexedObjectChange::Published { package_id, version, digest, modules } => {
-                ObjectChange::Published { package_id, version, digest, modules }
-            }
-            IndexedObjectChange::Transferred { sender, recipient, object_type, object_id, version, digest } => {
-                ObjectChange::Transferred { sender, recipient, object_type, object_id, version, digest }
-            }
+            IndexedObjectChange::Published {
+                package_id,
+                version,
+                digest,
+                modules,
+            } => ObjectChange::Published {
+                package_id,
+                version,
+                digest,
+                modules,
+            },
+            IndexedObjectChange::Transferred {
+                sender,
+                recipient,
+                object_type,
+                object_id,
+                version,
+                digest,
+            } => ObjectChange::Transferred {
+                sender,
+                recipient,
+                object_type,
+                object_id,
+                version,
+                digest,
+            },
             IndexedObjectChange::Mutated {
                 sender,
                 owner,
@@ -473,16 +586,52 @@ impl From<IndexedObjectChange> for ObjectChange {
                 version,
                 previous_version,
                 digest,
-            } => ObjectChange::Mutated { sender, owner, object_type, object_id, version, previous_version, digest },
-            IndexedObjectChange::Deleted { sender, object_type, object_id, version } => {
-                ObjectChange::Deleted { sender, object_type, object_id, version }
-            }
-            IndexedObjectChange::Wrapped { sender, object_type, object_id, version } => {
-                ObjectChange::Wrapped { sender, object_type, object_id, version }
-            }
-            IndexedObjectChange::Created { sender, owner, object_type, object_id, version, digest } => {
-                ObjectChange::Created { sender, owner, object_type, object_id, version, digest }
-            }
+            } => ObjectChange::Mutated {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                previous_version,
+                digest,
+            },
+            IndexedObjectChange::Deleted {
+                sender,
+                object_type,
+                object_id,
+                version,
+            } => ObjectChange::Deleted {
+                sender,
+                object_type,
+                object_id,
+                version,
+            },
+            IndexedObjectChange::Wrapped {
+                sender,
+                object_type,
+                object_id,
+                version,
+            } => ObjectChange::Wrapped {
+                sender,
+                object_type,
+                object_id,
+                version,
+            },
+            IndexedObjectChange::Created {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                digest,
+            } => ObjectChange::Created {
+                sender,
+                owner,
+                object_type,
+                object_id,
+                version,
+                digest,
+            },
         }
     }
 }
@@ -500,16 +649,28 @@ impl From<SuiTransactionBlockResponseWithOptions> for SuiTransactionBlockRespons
         SuiTransactionBlockResponse {
             digest: response.digest,
             transaction: options.show_input.then_some(response.transaction).flatten(),
-            raw_transaction: options.show_raw_input.then_some(response.raw_transaction).unwrap_or_default(),
+            raw_transaction: options
+                .show_raw_input
+                .then_some(response.raw_transaction)
+                .unwrap_or_default(),
             effects: options.show_effects.then_some(response.effects).flatten(),
             events: options.show_events.then_some(response.events).flatten(),
-            object_changes: options.show_object_changes.then_some(response.object_changes).flatten(),
-            balance_changes: options.show_balance_changes.then_some(response.balance_changes).flatten(),
+            object_changes: options
+                .show_object_changes
+                .then_some(response.object_changes)
+                .flatten(),
+            balance_changes: options
+                .show_balance_changes
+                .then_some(response.balance_changes)
+                .flatten(),
             timestamp_ms: response.timestamp_ms,
             confirmed_local_execution: response.confirmed_local_execution,
             checkpoint: response.checkpoint,
             errors: vec![],
-            raw_effects: options.show_raw_effects.then_some(response.raw_effects).unwrap_or_default(),
+            raw_effects: options
+                .show_raw_effects
+                .then_some(response.raw_effects)
+                .unwrap_or_default(),
         }
     }
 }

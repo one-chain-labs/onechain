@@ -4,7 +4,7 @@
 //! The Sui Rust SDK
 //!
 //! It aims at providing a similar SDK functionality like the one existing for
-//! [TypeScript](https://github.com/MystenLabs/sui/tree/main/sdk/typescript/).
+//! [TypeScript](https://github.com/one-chain-labs/onechain/tree/main/sdk/typescript/).
 //! Sui Rust SDK builds on top of the [JSON RPC API](https://docs.sui.io/sui-jsonrpc)
 //! and therefore many of the return types are the ones specified in [sui_types].
 //!
@@ -68,7 +68,7 @@
 //! ## Examples
 //!
 //! For detailed examples, please check the APIs docs and the examples folder
-//! in the [main repository](https://github.com/MystenLabs/sui/tree/main/crates/sui-sdk/examples).
+//! in the [main repository](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples).
 
 use std::{
     fmt::{Debug, Formatter},
@@ -112,13 +112,13 @@ pub mod sui_client_config;
 pub mod verify_personal_message_signature;
 pub mod wallet_context;
 
-pub const SUI_COIN_TYPE: &str = "0x2::sui::SUI";
+pub const SUI_COIN_TYPE: &str = "0x2::one::OCT";
 pub const SUI_LOCAL_NETWORK_URL: &str = "http://127.0.0.1:9000";
 pub const SUI_LOCAL_NETWORK_URL_0: &str = "http://0.0.0.0:9000";
 pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/gas";
-pub const SUI_DEVNET_URL: &str = "https://fullnode.devnet.sui.io:443";
-pub const SUI_TESTNET_URL: &str = "https://fullnode.testnet.sui.io:443";
-pub const SUI_MAINNET_URL: &str = "https://fullnode.mainnet.sui.io:443";
+pub const SUI_DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
+pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
+pub const SUI_MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
 
 /// A Sui client builder for connecting to the Sui network
 ///

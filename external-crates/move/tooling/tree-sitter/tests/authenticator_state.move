@@ -7,19 +7,19 @@
 //
 // This module is not currently accessible from user contracts, and is used only to record the JWK
 // state to the chain for auditability + restore from snapshot purposes.
-module sui::authenticator_state {
+module one::authenticator_state {
     // friend bar;
-    // friend sui::coin;
+    // friend one::coin;
 
     use std::string;
     use std::option::{Self, Option};
     use std::vector;
-    use sui::dynamic_field;
+    use one::dynamic_field;
     use std::string::{String, utf8};
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
-    use sui::math;
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::math;
 
     /// Sender is not @0x0 the system address.
     const ENotSystemAddress: u64 = 0;
@@ -301,7 +301,7 @@ module sui::authenticator_state {
         // any jwk below this epoch is not retained
         min_epoch: u64,
         ctx: &TxContext) {
-        // This will only be called by sui_system::advance_epoch
+        // This will only be called by one_system::advance_epoch
         assert!(tx_context::sender(ctx) == @0x0, ENotSystemAddress);
 
         let inner = load_inner_mut(self);

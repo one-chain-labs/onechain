@@ -250,7 +250,7 @@ validators:
         id: "0x8474f7863c3cf2c1671e87c3de6cf4d08760d1cc431c84526decfea3c588a016"
         activation_epoch: 0
         deactivation_epoch: ~
-        sui_balance: 20000000000000000
+        oct_balance: 20000000000000000
         rewards_pool:
           value: 0
         pool_token_balance: 20000000000000000
@@ -258,7 +258,7 @@ validators:
           id: "0x84eda7b6897dc636d5c2d32fe3c700ce5ad46ebc44aa928e9a74d3b552ef96b6"
           size: 1
         pending_stake: 0
-        pending_total_sui_withdraw: 0
+        pending_total_oct_withdraw: 0
         pending_pool_token_withdraw: 0
         extra_fields:
           id:

@@ -16,11 +16,11 @@ use sui_indexer_builder::metrics::IndexerMetricProvider;
 
 #[derive(Clone, Debug)]
 pub struct BridgeIndexerMetrics {
-    pub(crate) total_sui_bridge_transactions: IntCounter,
-    pub(crate) total_sui_token_deposited: IntCounter,
-    pub(crate) total_sui_token_transfer_approved: IntCounter,
-    pub(crate) total_sui_token_transfer_claimed: IntCounter,
-    pub(crate) total_sui_bridge_txn_other: IntCounter,
+    pub(crate) total_oct_bridge_transactions: IntCounter,
+    pub(crate) total_oct_token_deposited: IntCounter,
+    pub(crate) total_oct_token_transfer_approved: IntCounter,
+    pub(crate) total_oct_token_transfer_claimed: IntCounter,
+    pub(crate) total_oct_bridge_txn_other: IntCounter,
     pub(crate) total_eth_bridge_transactions: IntCounter,
     pub(crate) total_eth_token_deposited: IntCounter,
     pub(crate) total_eth_token_transfer_claimed: IntCounter,
@@ -34,32 +34,32 @@ pub struct BridgeIndexerMetrics {
 impl BridgeIndexerMetrics {
     pub fn new(registry: &Registry) -> Self {
         Self {
-            total_sui_bridge_transactions: register_int_counter_with_registry!(
-                "bridge_indexer_total_sui_bridge_transactions",
+            total_oct_bridge_transactions: register_int_counter_with_registry!(
+                "bridge_indexer_total_oct_bridge_transactions",
                 "Total number of sui bridge transactions",
                 registry,
             )
             .unwrap(),
-            total_sui_token_deposited: register_int_counter_with_registry!(
-                "bridge_indexer_total_sui_token_deposited",
+            total_oct_token_deposited: register_int_counter_with_registry!(
+                "bridge_indexer_total_oct_token_deposited",
                 "Total number of sui token deposited transactions",
                 registry,
             )
             .unwrap(),
-            total_sui_token_transfer_approved: register_int_counter_with_registry!(
-                "bridge_indexer_total_sui_token_transfer_approved",
+            total_oct_token_transfer_approved: register_int_counter_with_registry!(
+                "bridge_indexer_total_oct_token_transfer_approved",
                 "Total number of sui token approved transactions",
                 registry,
             )
             .unwrap(),
-            total_sui_token_transfer_claimed: register_int_counter_with_registry!(
-                "bridge_indexer_total_sui_token_transfer_claimed",
+            total_oct_token_transfer_claimed: register_int_counter_with_registry!(
+                "bridge_indexer_total_oct_token_transfer_claimed",
                 "Total number of sui token claimed transactions",
                 registry,
             )
             .unwrap(),
-            total_sui_bridge_txn_other: register_int_counter_with_registry!(
-                "bridge_indexer_total_sui_bridge_txn_other",
+            total_oct_bridge_txn_other: register_int_counter_with_registry!(
+                "bridge_indexer_total_oct_bridge_txn_other",
                 "Total number of other sui bridge transactions",
                 registry,
             )

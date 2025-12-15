@@ -1,14 +1,14 @@
-// Protobuf definitions of public Sui core types.
+// Protobuf definitions of public Oct core types.
 //
 // This file contains a complete set of protobuf definitions for all of the
-// public sui core types. All sui types are intended to have a 1:1 mapping to a
+// public oct core types. All oct types are intended to have a 1:1 mapping to a
 // protobuf message defined in this file and be able to roundtrip to/from their
 // rust and protobuf definitions assuming a sufficiently up-to-date version of
 // both these definitions.
 //
 // For more information on the types these proto messages correspond with, see
 // the documentation for their rust versions defined in the
-// [`sui-sdk-types`](https://mystenlabs.github.io/sui-rust-sdk/sui_sdk_types/)
+// [`oct-sdk-types`](https://mystenlabs.github.io/oct-rust-sdk/oct_sdk_types/)
 // library.
 //
 // ## Use of `optional`
@@ -21,38 +21,38 @@
 // `optional`, and wrapping `repeated` fields in a message as needed.
 syntax = "proto3";
 
-package sui.types;
+package oct.types;
 
 import "google/protobuf/empty.proto";
 
-// Unique identifier for an account on the Sui blockchain.
+// Unique identifier for an account on the Oct blockchain.
 //
 // An `Address` is a 32-byte pseudonymous identifier used to uniquely identify an account and
-// asset-ownership on the Sui blockchain. Often, human-readable addresses are encoded in
-// hexadecimal with a `0x` prefix. For example, this is a valid Sui address:
+// asset-ownership on the Oct blockchain. Often, human-readable addresses are encoded in
+// hexadecimal with a `0x` prefix. For example, this is a valid Oct address:
 // `0x02a212de6a9dfa3a69e22387acfbafbb1a9e591bd9d636e7895dcfc8de05f331`.
 message Address {
   // 32-byte address.
   optional bytes address = 1;
 }
 
-// Unique identifier for an object on the Sui blockchain.
+// Unique identifier for an object on the Oct blockchain.
 //
-// An `ObjectId` is a 32-byte identifier used to uniquely identify an object on the Sui
+// An `ObjectId` is a 32-byte identifier used to uniquely identify an object on the Oct
 // blockchain.
 message ObjectId {
   // 32-byte object-id.
   optional bytes object_id = 1;
 }
 
-// 32-byte output of hashing a Sui structure using the Blake2b256 hash function.
+// 32-byte output of hashing a Oct structure using the Blake2b256 hash function.
 message Digest {
   // 32-byte hash.
   optional bytes digest = 1;
 }
 
 // Message that represents a type that is serialized and encoded using the
-// [BCS](https://mystenlabs.github.io/sui-rust-sdk/sui_sdk_types/index.html#bcs)
+// [BCS](https://mystenlabs.github.io/oct-rust-sdk/oct_sdk_types/index.html#bcs)
 // format.
 message Bcs {
   // Bytes of a BCS encoded value.
@@ -83,10 +83,10 @@ message U256 {
 
 // Checkpoint {{{
 
-// A header for a checkpoint on the Sui blockchain.
+// A header for a checkpoint on the Oct blockchain.
 //
-// On the Sui network, checkpoints define the history of the blockchain. They are quite similar to
-// the concept of blocks used by other blockchains like Bitcoin or Ethereum. The Sui blockchain,
+// On the Oct network, checkpoints define the history of the blockchain. They are quite similar to
+// the concept of blocks used by other blockchains like Bitcoin or Ethereum. The Oct blockchain,
 // however, forms checkpoints after transaction execution has already happened to provide a
 // certified history of the chain, instead of being formed before execution.
 //
@@ -147,7 +147,7 @@ message CheckpointSummary {
 message CheckpointCommitment {
   oneof commitment {
     // An elliptic curve multiset hash attesting to the set of objects that comprise the live
-    // state of the Sui blockchain.
+    // state of the Oct blockchain.
     Digest ecmh_live_object_set = 1;
   }
 }
@@ -293,7 +293,7 @@ message MoveStruct {
   optional bytes contents = 5;
 }
 
-// An object on the Sui blockchain.
+// An object on the Oct blockchain.
 message Object {
   // `ObjectId` for this object.
   optional ObjectId object_id = 1;
@@ -306,7 +306,7 @@ message Object {
 
   // The digest of the transaction that created or last mutated this object
   optional Digest previous_transaction = 5;
-  // The amount of SUI to rebate if this object gets deleted.
+  // The amount of OCT to rebate if this object gets deleted.
   // This number is re-calculated each time the object is mutated based on
   // the present storage gas price.
   optional uint64 storage_rebate = 6;
@@ -1200,8 +1200,8 @@ message FailureStatus {
     // The modules in the package must have their self-addresses set to zero.
     google.protobuf.Empty publish_error_non_zero_address = 11;
 
-    // Sui Move bytecode verification error.
-    google.protobuf.Empty sui_move_verification_error = 12;
+    // Oct Move bytecode verification error.
+    google.protobuf.Empty oct_move_verification_error = 12;
 
     //
     // MoveVm errors.
@@ -1267,8 +1267,8 @@ message FailureStatus {
     // Certificate is on the deny list.
     google.protobuf.Empty certificate_denied = 31;
 
-    // Sui Move bytecode verification timed out.
-    google.protobuf.Empty sui_move_verification_timedout = 32;
+    // Oct Move bytecode verification timed out.
+    google.protobuf.Empty oct_move_verification_timedout = 32;
 
     // The requested shared object operation is not allowed.
     google.protobuf.Empty shared_object_operation_not_allowed = 33;
@@ -1417,7 +1417,7 @@ message UserSignature {
 // corresponding public key.
 message SimpleSignature {
   // The signature scheme of the signautre and public key, which should be an
-  // enum value of [sui.types.SignatureScheme][sui.types.SignatureScheme]
+  // enum value of [oct.types.SignatureScheme][oct.types.SignatureScheme]
   optional int32 scheme = 1;
   // Signature bytes.
   optional bytes signature = 2;
@@ -1552,7 +1552,7 @@ message Bn254FieldElement {
 // A passkey authenticator.
 //
 // See
-// [struct.PasskeyAuthenticator](https://mystenlabs.github.io/sui-rust-sdk/sui_sdk_types/struct.PasskeyAuthenticator.html#bcs)
+// [struct.PasskeyAuthenticator](https://mystenlabs.github.io/oct-rust-sdk/oct_sdk_types/struct.PasskeyAuthenticator.html#bcs)
 // for more information on the requirements on the shape of the
 // `client_data_json` field.
 message PasskeyAuthenticator {

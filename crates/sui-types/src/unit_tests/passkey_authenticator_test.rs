@@ -112,7 +112,7 @@ async fn create_credential_and_sign_test_tx(
     let object_id = ObjectID::ZERO;
     let object = Object::immutable_with_id_for_testing(object_id);
     let gas_price = 1000;
-    let tx_data = TransactionData::new_transfer_sui(
+    let tx_data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         None,

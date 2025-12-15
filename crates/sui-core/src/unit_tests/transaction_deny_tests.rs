@@ -43,7 +43,7 @@ use crate::{
         test_authority_builder::TestAuthorityBuilder,
         AuthorityState,
     },
-    test_utils::make_transfer_sui_transaction,
+    test_utils::make_transfer_oct_transaction,
 };
 
 const ACCOUNT_NUM: usize = 5;
@@ -111,7 +111,7 @@ async fn transfer_with_account(
     state: &Arc<AuthorityState>,
 ) -> SuiResult<HandleTransactionResponse> {
     let rgp = state.reference_gas_price_for_testing().unwrap();
-    let data = TransactionData::new_transfer_sui_allow_sponsor(
+    let data = TransactionData::new_transfer_oct_allow_sponsor(
         sender_account.0,
         sender_account.0,
         None,
@@ -401,7 +401,7 @@ async fn test_package_denied() {
 async fn test_certificate_deny() {
     let (network_config, state) = setup_test(TransactionDenyConfig::default()).await;
     let (sender, key, gas_objects) = get_accounts_and_coins(&network_config, &state).pop().unwrap();
-    let tx = make_transfer_sui_transaction(
+    let tx = make_transfer_oct_transaction(
         gas_objects[0],
         sender,
         None,

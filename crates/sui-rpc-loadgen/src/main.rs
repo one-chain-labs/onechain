@@ -92,8 +92,8 @@ pub enum ClapCommand {
         #[clap(flatten)]
         common: CommonOptions,
     },
-    #[clap(name = "pay-sui")]
-    PaySui {
+    #[clap(name = "pay-oct")]
+    PayOct {
         // TODO(chris) customize recipients and amounts
         #[clap(flatten)]
         common: CommonOptions,
@@ -194,7 +194,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (command, common, need_keystore) = match opts.command {
         ClapCommand::DryRun { common } => (Command::new_dry_run(), common, false),
-        ClapCommand::PaySui { common } => (Command::new_pay_sui(), common, true),
+        ClapCommand::PayOct { common } => (Command::new_pay_oct(), common, true),
         ClapCommand::GetCheckpoints {
             common,
             start,

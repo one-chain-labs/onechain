@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Basic math for nicer programmability
-module sui::math {
+module one::math {
 
     /// Return the larger of `x` and `y`
     public fun max(x: u64, y: u64): u64 {

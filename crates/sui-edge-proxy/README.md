@@ -168,7 +168,7 @@ Now that this has been deployed, ingress traffic can be pointed at the edge-prox
 
 ## Troubleshooting / Debugging
 
-If you find any issues with the Sui Edge Proxy or would like to request a feature, please open an issue in the [sui repository](https://github.com/MystenLabs/sui/issues/new).
+If you find any issues with the Sui Edge Proxy or would like to request a feature, please open an issue in the [sui repository](https://github.com/one-chain-labs/onechain/issues/new).
 
 ## Local Development
 

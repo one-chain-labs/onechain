@@ -3,7 +3,7 @@
 
 use clap::*;
 use colored::Colorize;
-use sui::{
+use one::{
     client_commands::SuiClientCommands::{ProfileTransaction, ReplayBatch, ReplayTransaction},
     sui_commands::SuiCommand,
 };
@@ -15,7 +15,7 @@ bin_version::bin_version!();
 
 #[derive(Parser)]
 #[clap(
-    name = env!("CARGO_BIN_NAME"),
+    name = "one",
     about = "A Byzantine fault tolerant chain with low-latency finality and high throughput",
     rename_all = "kebab-case",
     author,
@@ -60,6 +60,6 @@ async fn main() {
 
         _ => telemetry_subscribers::TelemetryConfig::new().with_log_level("error").with_env().init(),
     };
-    debug!("Sui CLI version: {VERSION}");
+    debug!("OneChain version: {VERSION}");
     exit_main!(args.command.execute().await);
 }

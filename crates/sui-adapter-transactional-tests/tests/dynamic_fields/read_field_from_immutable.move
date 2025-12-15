@@ -9,7 +9,7 @@
 //# publish
 module a::m {
 
-use sui::dynamic_field::{add, borrow};
+use one::dynamic_field::{add, borrow};
 
 public struct Obj has key {
     id: object::UID,
@@ -18,7 +18,7 @@ public struct Obj has key {
 entry fun add_then_freeze(ctx: &mut TxContext) {
     let mut id = object::new(ctx);
     add<u64, u64>(&mut id, 0, 0);
-    sui::transfer::freeze_object(Obj { id })
+    one::transfer::freeze_object(Obj { id })
 }
 
 entry fun read_from_frozen(obj: &Obj) {

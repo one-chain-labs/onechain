@@ -4,7 +4,7 @@
 /// Example of using tlock or IBE decryption in Move.
 module ibe::example;
 
-use sui::{bls12381::{Self, G1, G2}, group_ops::{bytes, equal, Element}, hash::blake2b256};
+use one::{bls12381::{Self, G1, G2}, group_ops::{bytes, equal, Element}, hash::blake2b256};
 
 const EInvalidLength: u64 = 1;
 

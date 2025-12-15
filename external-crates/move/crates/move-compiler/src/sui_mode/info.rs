@@ -30,7 +30,7 @@ use move_proc_macros::growing_stack;
 
 #[derive(Debug, Clone, Copy)]
 pub enum UIDHolder {
-    /// is `sui::object::UID``
+    /// is `one::object::UID``
     IsUID,
     /// holds UID directly as one of the fields
     Direct { field: Field, ty: Loc },
@@ -42,7 +42,7 @@ pub enum UIDHolder {
 pub enum TransferKind {
     /// The object has store
     PublicTransfer(Loc),
-    /// transferred within the module to an address vis `sui::transfer::transfer`
+    /// transferred within the module to an address vis `one::transfer::transfer`
     PrivateTransfer(Loc),
 }
 

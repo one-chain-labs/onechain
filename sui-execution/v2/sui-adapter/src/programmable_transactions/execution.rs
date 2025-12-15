@@ -690,7 +690,7 @@ mod checked {
         package_id: ObjectID,
         modules: &[CompiledModule],
     ) -> Result<(), ExecutionError> {
-        // TODO(https://github.com/MystenLabs/sui/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
+        // TODO(https://github.com/one-chain-labs/onechain/issues/69): avoid this redundant serialization by exposing VM API that allows us to run the linker directly on `Vec<CompiledModule>`
         let new_module_bytes: Vec<_> = modules
             .iter()
             .map(|m| {
@@ -952,14 +952,14 @@ mod checked {
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::NonEntryFunctionInvoked,
-                format!("Cannot directly call functions in sui::{}", EVENT_MODULE),
+                format!("Cannot directly call functions in one::{}", EVENT_MODULE),
             ));
         }
 
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) && PRIVATE_TRANSFER_FUNCTIONS.contains(&function) {
             let msg = format!(
-                "Cannot directly call sui::{m}::{f}. \
-                Use the public variant instead, sui::{m}::public_{f}",
+                "Cannot directly call one::{m}::{f}. \
+                Use the public variant instead, one::{m}::public_{f}",
                 m = TRANSFER_MODULE,
                 f = function
             );
@@ -1126,7 +1126,7 @@ mod checked {
                 };
                 let (sidx, targs) = &**struct_inst;
                 let Some(s) = context.vm.get_runtime().get_struct_type(*sidx) else {
-                    invariant_violation!("sui::transfer::Receiving struct not found in session")
+                    invariant_violation!("one::transfer::Receiving struct not found in session")
                 };
                 let resolved_struct = get_datatype_ident(&s);
 

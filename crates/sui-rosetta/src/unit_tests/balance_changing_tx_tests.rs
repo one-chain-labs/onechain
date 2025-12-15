@@ -64,7 +64,7 @@ use crate::{
 };
 
 #[tokio::test]
-async fn test_transfer_sui() {
+async fn test_transfer_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -76,7 +76,7 @@ async fn test_transfer_sui() {
     let recipient = get_random_address(&addresses, vec![sender]);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, Some(50000));
+        builder.transfer_oct(recipient, Some(50000));
         builder.finish()
     };
     test_transaction(
@@ -94,7 +94,7 @@ async fn test_transfer_sui() {
 }
 
 #[tokio::test]
-async fn test_transfer_sui_whole_coin() {
+async fn test_transfer_oct_whole_coin() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -106,7 +106,7 @@ async fn test_transfer_sui_whole_coin() {
     let recipient = get_random_address(&addresses, vec![sender]);
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, None);
+        builder.transfer_oct(recipient, None);
         builder.finish()
     };
     test_transaction(
@@ -335,7 +335,7 @@ async fn test_pay_multiple_coin_multiple_recipient() {
 }
 
 #[tokio::test]
-async fn test_pay_sui_multiple_coin_same_recipient() {
+async fn test_pay_oct_multiple_coin_same_recipient() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -349,7 +349,7 @@ async fn test_pay_sui_multiple_coin_same_recipient() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient1, recipient1, recipient1], vec![100000, 100000, 100000]).unwrap();
+        builder.pay_oct(vec![recipient1, recipient1, recipient1], vec![100000, 100000, 100000]).unwrap();
         builder.finish()
     };
     test_transaction(
@@ -367,7 +367,7 @@ async fn test_pay_sui_multiple_coin_same_recipient() {
 }
 
 #[tokio::test]
-async fn test_pay_sui() {
+async fn test_pay_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -382,7 +382,7 @@ async fn test_pay_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
+        builder.pay_oct(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
         builder.finish()
     };
     test_transaction(
@@ -400,7 +400,7 @@ async fn test_pay_sui() {
 }
 
 #[tokio::test]
-async fn test_failed_pay_sui() {
+async fn test_failed_pay_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -415,7 +415,7 @@ async fn test_failed_pay_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
+        builder.pay_oct(vec![recipient1, recipient2], vec![1000000, 2000000]).unwrap();
         builder.finish()
     };
     test_transaction(&client, keystore, vec![], sender, pt, vec![coin1, coin2], 2000000, rgp, true).await;
@@ -474,7 +474,7 @@ async fn test_stake_sui_with_none_amount() {
 }
 
 #[tokio::test]
-async fn test_pay_all_sui() {
+async fn test_pay_all_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -488,7 +488,7 @@ async fn test_pay_all_sui() {
     let coin2 = get_random_sui(&client, sender, vec![coin1.0]).await;
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_all_sui(recipient);
+        builder.pay_all_oct(recipient);
         builder.finish()
     };
     test_transaction(
@@ -642,7 +642,7 @@ fn extract_balance_changes_from_ops(ops: Operations) -> HashMap<SuiAddress, i128
             match op.type_ {
                 OperationType::SuiBalanceChange
                 | OperationType::Gas
-                | OperationType::PaySui
+                | OperationType::PayOct
                 | OperationType::PayCoin
                 | OperationType::StakeReward
                 | OperationType::StakePrinciple

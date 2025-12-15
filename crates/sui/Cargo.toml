@@ -1,10 +1,10 @@
 [package]
-name = "sui"
+name = "one"
 version.workspace = true
-authors = ["Mysten Labs <build@mystenlabs.com>"]
-license = "Apache-2.0"
-publish = false
-edition = "2021"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+edition.workspace = true
 
 [lints]
 workspace = true

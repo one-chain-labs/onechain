@@ -14,8 +14,8 @@
 //# publish --sender A
 module test::mod {
   use std::string::utf8;
-  use sui::display;
-  use sui::package;
+  use one::display;
+  use one::package;
 
   public struct MOD() has drop;
 

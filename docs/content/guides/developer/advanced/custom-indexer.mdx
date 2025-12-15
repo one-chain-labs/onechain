@@ -24,7 +24,7 @@ trait Worker: Send + Sync {
 }
 ```
 
-In this example, the `CheckpointData` struct represents full checkpoint content. The struct contains checkpoint summary and contents, as well as detailed information about each individual transaction. The individual transaction data includes events and input/output objects. The full definition for this content is in the [full_checkpoint_content.rs](https://github.com/MystenLabs/sui/blob/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-types/src/full_checkpoint_content.rs) file of the `sui-types` crate.
+In this example, the `CheckpointData` struct represents full checkpoint content. The struct contains checkpoint summary and contents, as well as detailed information about each individual transaction. The individual transaction data includes events and input/output objects. The full definition for this content is in the [full_checkpoint_content.rs](https://github.com/one-chain-labs/onechain/blob/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-types/src/full_checkpoint_content.rs) file of the `sui-types` crate.
 
 :::tip
 
@@ -145,7 +145,7 @@ Find the following source code in the [Sui repo](https://github.com/mystenlabs/s
 
 ## Related links
 
-- [Sui internal example](https://github.com/MystenLabs/sui/tree/main/crates/sui-data-ingestion/src/): Sui data ingestion daemon that runs internal pipelines.
-- [Production example](https://github.com/MystenLabs/sui/tree/main/crates/suins-indexer/src): Sui Name Service custom indexer.
+- [Sui internal example](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-data-ingestion/src/): Sui data ingestion daemon that runs internal pipelines.
+- [Production example](https://github.com/one-chain-labs/onechain/tree/main/crates/suins-indexer/src): Sui Name Service custom indexer.
 - [Using Events](../sui-101/using-events.mdx): Events in Sui enable you to monitor on-chain activity in near-real time when coupled with a custom indexer.
 

@@ -52,7 +52,7 @@ Create a file called `settings.json` that contains all the configuration paramet
 	],
 	"specs": "m5d.8xlarge",
 	"repository": {
-		"url": "https://github.com/MystenLabs/sui.git",
+		"url": "https://github.com/one-chain-labs/onechain.git",
 		"commit": "main"
 	},
 	"results_directory": "./results",
@@ -92,11 +92,11 @@ needing more instances down the line.
 
 ## Step 4. Choose protocol
 
-There is support to benchmark either Sui or Narwhal only. To choose which protocol to benchmark, you can set the `Protocol` & `BenchmarkType` field [here](https://github.com/MystenLabs/sui/blob/main/crates/sui-aws-orchestrator/src/main.rs#L33-L34)
+There is support to benchmark either Sui or Narwhal only. To choose which protocol to benchmark, you can set the `Protocol` & `BenchmarkType` field [here](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-aws-orchestrator/src/main.rs#L33-L34)
 
 ```
 // Sui
-use protocol::sui::{SuiBenchmarkType, SuiProtocol};
+use protocol::one::{SuiBenchmarkType, SuiProtocol};
 type Protocol = SuiProtocol;
 type BenchmarkType = SuiBenchmarkType;
 // Narwhal

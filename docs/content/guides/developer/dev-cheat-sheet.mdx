@@ -18,7 +18,7 @@ Quick reference on best practices for Sui Network developers.
 - Use `vector`-backed collections (`vector`, `VecSet`, `VecMap`, `PriorityQueue`) with a **known** maximum size of ≤ 1000 items.
   - Use dynamic field-backed collections (`Table`, `Bag`, `ObjectBag`, `ObjectTable`, `LinkedTable`) for any collection that allows third-party addition, larger collections, and collections of unknown size.
   - Move objects have a maximum size of 250KB—any attempt to create a larger object leads to an aborted transaction. Ensure that your objects do not have an ever-growing `vector`-backed collection.
-- If your function `f` needs a payment in (e.g.) SUI from the caller, use `fun f(payment: Coin<SUI>)` not `fun f(payment: &mut Coin<SUI>, amount: u64)`. This is safer for callers—they know exactly how much they are paying, and do not need to trust `f` to extract the right amount.
+- If your function `f` needs a payment in (e.g.) SUI from the caller, use `fun f(payment: Coin<OCT>)` not `fun f(payment: &mut Coin<OCT>, amount: u64)`. This is safer for callers—they know exactly how much they are paying, and do not need to trust `f` to extract the right amount.
 - Don't micro-optimize gas usage. Sui computation costs are rounded up to the closest _bucket_, so only very drastic changes will make a difference. In particular, if your transaction is already in the lowest cost bucket, it can't get any cheaper.
 - Follow the [Move coding conventions](https://move-language.github.io/move/coding-conventions.html) for consistent style.
 
@@ -29,8 +29,8 @@ Quick reference on best practices for Sui Network developers.
 
 ### Testing
 
-- Use [`sui::test_scenario`](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/test/test_scenario.move) to mimic multi-transaction, multi-sender test scenarios.
-- Use the [`sui::test_utils`](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/test/test_utils.move#L5) module for better test error messages via `assert_eq`, debug printing via `print`, and test-only destruction via `destroy`.
+- Use [`one::test_scenario`](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-framework/sources/test/test_scenario.move) to mimic multi-transaction, multi-sender test scenarios.
+- Use the [`one::test_utils`](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-framework/sources/test/test_utils.move#L5) module for better test error messages via `assert_eq`, debug printing via `print`, and test-only destruction via `destroy`.
 - Use `sui move test --coverage` to compute code coverage information for your tests, and `sui move coverage source --module <name>` to see uncovered lines highlighted in red. Push coverage all the way to 100% if feasible.
 
 ## Apps

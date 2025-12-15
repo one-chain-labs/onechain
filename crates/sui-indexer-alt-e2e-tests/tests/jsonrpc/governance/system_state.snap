@@ -97,7 +97,7 @@ Response: {
 task 2, lines 12-14:
 //# programmable --sender A --inputs 1000000000 object(0x5) @validator_0
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: sui_system::sui_system::request_add_stake(Input(1), Result(0), Input(2))
+//> 1: one_system::one_system::request_add_stake(Input(1), Result(0), Input(2))
 events: Event { package_id: sui_system, transaction_module: Identifier("sui_system"), sender: A, type_: StructTag { address: sui_system, module: Identifier("validator"), name: Identifier("StakingRequestEvent"), type_params: [] }, contents: [47, 76, 11, 20, 224, 106, 157, 212, 114, 78, 130, 59, 34, 137, 227, 53, 107, 46, 152, 127, 208, 243, 67, 94, 62, 0, 182, 22, 187, 236, 17, 31, 218, 131, 22, 109, 1, 175, 215, 221, 207, 138, 245, 248, 68, 244, 90, 170, 83, 244, 133, 72, 229, 17, 124, 35, 245, 162, 151, 140, 253, 66, 34, 68, 252, 204, 154, 66, 27, 187, 19, 193, 166, 106, 26, 169, 143, 10, 215, 80, 41, 237, 233, 72, 87, 119, 156, 105, 21, 180, 79, 148, 6, 139, 146, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 202, 154, 59, 0, 0, 0, 0] }
 created: object(2,0), object(2,1)
 mutated: 0x0000000000000000000000000000000000000000000000000000000000000005, object(0,0)
@@ -290,7 +290,7 @@ Response: {
 
 task 8, lines 34-35:
 //# programmable --sender A --inputs object(0x5) object(2,1)
-//> 0: sui_system::sui_system::request_withdraw_stake(Input(0), Input(1))
+//> 0: one_system::one_system::request_withdraw_stake(Input(0), Input(1))
 events: Event { package_id: sui_system, transaction_module: Identifier("sui_system"), sender: A, type_: StructTag { address: sui_system, module: Identifier("validator"), name: Identifier("UnstakingRequestEvent"), type_params: [] }, contents: [47, 76, 11, 20, 224, 106, 157, 212, 114, 78, 130, 59, 34, 137, 227, 53, 107, 46, 152, 127, 208, 243, 67, 94, 62, 0, 182, 22, 187, 236, 17, 31, 218, 131, 22, 109, 1, 175, 215, 221, 207, 138, 245, 248, 68, 244, 90, 170, 83, 244, 133, 72, 229, 17, 124, 35, 245, 162, 151, 140, 253, 66, 34, 68, 252, 204, 154, 66, 27, 187, 19, 193, 166, 106, 26, 169, 143, 10, 215, 80, 41, 237, 233, 72, 87, 119, 156, 105, 21, 180, 79, 148, 6, 139, 146, 30, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 202, 154, 59, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
 created: object(8,0)
 mutated: 0x0000000000000000000000000000000000000000000000000000000000000005, object(0,0), object(2,0)

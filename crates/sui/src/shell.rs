@@ -306,7 +306,7 @@ impl PartialOrd<Self> for CacheKey {
 /// ```
 /// use std::cmp::Ordering;
 /// use std::collections::BTreeMap;
-/// use sui::shell::CacheKey;
+/// use one::shell::CacheKey;
 ///
 /// assert_eq!(Ordering::Equal, CacheKey::flag("--flag").cmp(&CacheKey::new("any command", "--flag")));
 ///

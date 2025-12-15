@@ -168,7 +168,7 @@ This example finds the balance changes of all the transactions where a given add
 ```graphql
 query ($address: SuiAddress!) {
   transactionBlocks(filter: {
-    function: "0x3::sui_system::request_add_stake"
+    function: "0x3::one_system::request_add_stake"
     sentAddress: $address
   }) {
     nodes {
@@ -369,10 +369,10 @@ mutation ($tx: String!, $sigs: [String!]!) {
 
 ## Other examples
 
-You can find other examples in the [repository](https://github.com/MystenLabs/sui/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples), grouped into sub-directories. For example, there are directories for [transaction block effects](https://github.com/MystenLabs/sui/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples/transaction_block_effects), [protocol configs](https://github.com/MystenLabs/sui/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples/protocol_configs), [stake connection](https://github.com/MystenLabs/sui/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples/stake_connection), and more.
+You can find other examples in the [repository](https://github.com/one-chain-labs/onechain/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples), grouped into sub-directories. For example, there are directories for [transaction block effects](https://github.com/one-chain-labs/onechain/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples/transaction_block_effects), [protocol configs](https://github.com/one-chain-labs/onechain/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples/protocol_configs), [stake connection](https://github.com/one-chain-labs/onechain/tree/releases/sui-graphql-rpc-v2024.1.0-release/crates/sui-graphql-rpc/examples/stake_connection), and more.
 
 :::info
-Examples in the repository are designed to work with the version of GraphQL built at the same revision. The links above point to examples intended for [GraphQL v2024.1](https://github.com/MystenLabs/sui/tree/releases/sui-graphql-rpc-v2024.1.0-release), the latest production version at the time of writing.
+Examples in the repository are designed to work with the version of GraphQL built at the same revision. The links above point to examples intended for [GraphQL v2024.1](https://github.com/one-chain-labs/onechain/tree/releases/sui-graphql-rpc-v2024.1.0-release), the latest production version at the time of writing.
 :::
 
 ## Related links

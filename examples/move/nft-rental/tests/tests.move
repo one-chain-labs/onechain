@@ -5,7 +5,7 @@ module nft_rental::tests;
 
 use kiosk::kiosk_lock_rule as lock_rule;
 use nft_rental::rentables_ext::{Self, Promise, ProtectedTP, RentalPolicy, Listed};
-use sui::{
+use one::{
     clock::{Self, Clock},
     kiosk::{Kiosk, KioskOwnerCap},
     kiosk_test_utils,

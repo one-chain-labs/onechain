@@ -1,16 +1,16 @@
 {
   "openrpc": "1.2.6",
   "info": {
-    "title": "Sui JSON-RPC",
-    "description": "Sui JSON-RPC API for interaction with Sui Full node. Make RPC calls using https://fullnode.NETWORK.sui.io:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
+    "title": "OneChain JSON-RPC",
+    "description": "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
     "contact": {
-      "name": "Mysten Labs",
-      "url": "https://mystenlabs.com",
-      "email": "build@mystenlabs.com"
+      "name": "OneChain Labs",
+      "url": "https://onelabs.cc",
+      "email": "build@onelabs.cc"
     },
     "license": {
       "name": "Apache-2.0",
-      "url": "https://raw.githubusercontent.com/MystenLabs/sui/main/LICENSE"
+      "url": "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE"
     },
     "version": "1.44.3"
   },
@@ -1234,7 +1234,7 @@
                 "objectId": "0x53e4567ccafa5f36ce84c80aa8bc9be64e0d5ae796884274aef3005ae6733809",
                 "version": "1",
                 "digest": "33K5ZXJ3RyubvYaHuEnQ1QXmmbhgtrFwp199dnEbL4n7",
-                "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                "type": "0x2::coin::Coin<0x2::one::OCT>",
                 "owner": {
                   "AddressOwner": "0xc8ec1d5b84dd6289e193b9f88de4a994358c9f856135236c3e75a925e1c77ac3"
                 },
@@ -1242,7 +1242,7 @@
                 "storageRebate": "100",
                 "content": {
                   "dataType": "moveObject",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "hasPublicTransfer": true,
                   "fields": {
                     "balance": "100000000",
@@ -2257,7 +2257,7 @@
                   "objectId": "0x77b3482580ee8d5bdc5b824808df54bfec4fc817622e5add0e48f749f01def98",
                   "version": "1",
                   "digest": "2QwXW3qzMEZPAyyP9VHtXbC2tp7iomypQc5XnkyPsu5d",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0x504d411325e3c7f89d412044fe99007efb0f94f1e64d2e8090c619a39299d87e"
                   },
@@ -2265,7 +2265,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2281,7 +2281,7 @@
                   "objectId": "0x9060d87664c26a3f9a509228c21b16dc6797cf787c839a07edc03e6338421091",
                   "version": "1",
                   "digest": "5itvhMFvtJcV6fY2VY4x7F9Ex18q2N4Rr5WU4FXTJsFU",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0x23618df6438d21a48040e6bb568cafc13246bd847c60448160e0358cac4a1134"
                   },
@@ -2289,7 +2289,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2305,7 +2305,7 @@
                   "objectId": "0xb37379c527753c5c8ab783f697e7b61439368cd75ebe63d633af32ffb4a022d1",
                   "version": "1",
                   "digest": "8rsTRNPs13DZvD2xneZEtf2nAAipep6uHXPXWVXfzDBr",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0x8b95b4eaa9fd3b22b43f6b2c8e92090bd6d16522a6fd4fa83ec70a5f197ad656"
                   },
@@ -2313,7 +2313,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2329,7 +2329,7 @@
                   "objectId": "0xee309e94ff5c9f6b02c5637f018f6ea7bed8f6c3d80f2a595c2305e12dd6d07c",
                   "version": "1",
                   "digest": "3w6ars2tmgBST4ozGxPWzSpEGyn4AdxMBv3K9sdkCWfR",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0x3fbbd3ebef7dbcc7b02346cdf05674452cc61f316af5d5d7c02b94b023242685"
                   },
@@ -2337,7 +2337,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2353,7 +2353,7 @@
                   "objectId": "0x29bc7c8d230db3b417edb1184cf075da5e934f672d3da3e003d989075efaecc7",
                   "version": "1",
                   "digest": "BE9GoMd7Mr8fGte3EdsXxUMwYjcErW71n6Gsm4iPvDmv",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0x9b5cd5df0df2a168259b7115a41ccc0a372b6fd0026e0c63043492ce4d0c19a6"
                   },
@@ -2361,7 +2361,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2869,7 +2869,7 @@
                 "objectId": "0x11af4b844ff94b3fbef6e36b518da3ad4c5856fa686464524a876b463d129760",
                 "version": "4",
                 "digest": "5VPAwDXy3BL72ehFc7gSJoz27ahMd6spUg5YwYc4ibcv",
-                "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                "type": "0x2::coin::Coin<0x2::one::OCT>",
                 "owner": {
                   "AddressOwner": "0x3568c40e814d9d5396d23087a0fd641e91e0e00df6c012cded9ef9ba5e5bf042"
                 },
@@ -2877,7 +2877,7 @@
                 "storageRebate": "100",
                 "content": {
                   "dataType": "moveObject",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "hasPublicTransfer": true,
                   "fields": {
                     "balance": "10000",
@@ -2969,7 +2969,7 @@
                   "objectId": "0x38b3186a7bb26a1ab2c982a0a9b482aa70f5a010fffc60f20194ef0f597474e8",
                   "version": "4",
                   "digest": "hvBGBXvKVhC7XYgVPujuiLjxASR6UGAkSFrCRtVxX1F",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0x47866ff92885a3c21a7703f564721c198308aa0c71b771ada6b96c16fc9c0fa7"
                   },
@@ -2977,7 +2977,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "10000",
@@ -2994,7 +2994,7 @@
                   "objectId": "0xceaf9ee4582d3a233101e322a22cb2a5bea2e681ea5af4e59bd1abb0bb4fcb27",
                   "version": "12",
                   "digest": "B5z4YkAgTi78fdxMbxG3fv2V4YBkhpc8PRCPz8MzLtbf",
-                  "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                  "type": "0x2::coin::Coin<0x2::one::OCT>",
                   "owner": {
                     "AddressOwner": "0xa6ced287081357950315a8842c3870f2d83f980fe0996a92d351d6749a0a0b47"
                   },
@@ -3002,7 +3002,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "20000",
@@ -3079,7 +3079,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3109,7 +3109,7 @@
             "name": "Result",
             "value": [
               {
-                "coinType": "0x2::sui::SUI",
+                "coinType": "0x2::one::OCT",
                 "coinObjectCount": 15,
                 "totalBalance": "3000000000",
                 "lockedBalance": {}
@@ -3130,7 +3130,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3182,7 +3182,7 @@
             "value": {
               "data": [
                 {
-                  "coinType": "0x2::sui::SUI",
+                  "coinType": "0x2::one::OCT",
                   "coinObjectId": "0x861c5e055605b2bb1199faf653a8771e448930bc95a0369fad43a9870a2e5878",
                   "version": "103626",
                   "digest": "Ao1QyN9UTmYzb2ead3D5xhSBk7TvACRvmnJW8gRbwP99",
@@ -3190,7 +3190,7 @@
                   "previousTransaction": "7dp5WtTmtGp83EXYYFMzjBJRFeSgR67AzqMETLrfgeFx"
                 },
                 {
-                  "coinType": "0x2::sui::SUI",
+                  "coinType": "0x2::one::OCT",
                   "coinObjectId": "0x7e769678d059761bff8a8f3944642e4c33a6e4fb0b55f8face36fadaa22f2a0d",
                   "version": "103626",
                   "digest": "5taVxHU9QLQD5cNdqxt8kNGAab93GMG4vX7zYDxEaohx",
@@ -3198,7 +3198,7 @@
                   "previousTransaction": "9xLdMXezY8d1yRA2TtN6pYjapyy2EVKHWNriGPFGCFvd"
                 },
                 {
-                  "coinType": "0x2::sui::SUI",
+                  "coinType": "0x2::one::OCT",
                   "coinObjectId": "0xa323d541ba5cf9e34919d2644cda38a263f69f47ae954dec65295231e0d2c7c8",
                   "version": "103626",
                   "digest": "82ZNKSSueWUQkpFNbBZGHSr3sUL5Rxfr7ucVRsvgQzz2",
@@ -3224,7 +3224,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3232,7 +3232,7 @@
         },
         {
           "name": "coin_type",
-          "description": "optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::sui::SUI if not specified.",
+          "description": "optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::one::OCT if not specified.",
           "schema": {
             "type": "string"
           }
@@ -3328,7 +3328,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3336,7 +3336,7 @@
         },
         {
           "name": "coin_type",
-          "description": "optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::sui::SUI if not specified.",
+          "description": "optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::one::OCT if not specified.",
           "schema": {
             "type": "string"
           }
@@ -3375,7 +3375,7 @@
             },
             {
               "name": "coin_type",
-              "value": "0x2::sui::SUI"
+              "value": "0x2::one::OCT"
             },
             {
               "name": "cursor",
@@ -3391,7 +3391,7 @@
             "value": {
               "data": [
                 {
-                  "coinType": "0x2::sui::SUI",
+                  "coinType": "0x2::one::OCT",
                   "coinObjectId": "0xd62ca040aba24f862a763851c54908cd2a0ee7d709c11b93d4a2083747b76856",
                   "version": "103626",
                   "digest": "C9fdokK19BpDCgUgWsJv3cfd4LDyk7WGYBeGhFHbEL2Z",
@@ -3399,7 +3399,7 @@
                   "previousTransaction": "tw5DzJTfdxTn4f3rekFrhN7dQTUezBgsEhycDobTBLb"
                 },
                 {
-                  "coinType": "0x2::sui::SUI",
+                  "coinType": "0x2::one::OCT",
                   "coinObjectId": "0xf44d295a385dc3544d211411b865e8bc4f01f49186970c7cf61e1cc829cc0be7",
                   "version": "103626",
                   "digest": "5qZkmtN5J5uGHURtiy9BtBhnXATPR2Wa6BJBDLrMzCaf",
@@ -3407,7 +3407,7 @@
                   "previousTransaction": "AfgFe7ZfjJ5dWV6VAy2LbtvBFhcABkvdvwEjLrRcFqtr"
                 },
                 {
-                  "coinType": "0x2::sui::SUI",
+                  "coinType": "0x2::one::OCT",
                   "coinObjectId": "0x42ef9314ccc792dd4401a88e69c66b4c5e43f21e9e57f4abe3c702649d3a7dd0",
                   "version": "103626",
                   "digest": "FLE2nB2Wio3oUyTx6HyzkrMsWiZxDg9Kk8s7ivvuoBbD",
@@ -3703,7 +3703,7 @@
       "params": [
         {
           "name": "address",
-          "description": "the owner's Sui address",
+          "description": "the owner's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3754,7 +3754,7 @@
                 "filter": {
                   "MatchAll": [
                     {
-                      "StructType": "0x2::coin::Coin<0x2::sui::SUI>"
+                      "StructType": "0x2::coin::Coin<0x2::one::OCT>"
                     },
                     {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
@@ -3793,7 +3793,7 @@
                     "objectId": "0x0b37a91692359a98496738a58c17a9334aeacc435c70ab9635e47a277d8f8dd9",
                     "version": "13488",
                     "digest": "FZzfCnKCSRW2jN9AwkiarjYQapViUQAh799aiRMZ4YC2",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "owner": {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
                     },
@@ -3806,7 +3806,7 @@
                     "objectId": "0xd4feace07fc863a2eef286c3e95ed48e2c181bb65db5beaf7ea664b4ca6b744c",
                     "version": "13488",
                     "digest": "3cxBDcfnkVgtXWhnMnKKkMGtZdiEorUhb1vdp2DkVyfi",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "owner": {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
                     },
@@ -3819,7 +3819,7 @@
                     "objectId": "0xe26860fac6839ce2d7ed7e6f29d276a1b4c23f2d9a9b6f0d8b2c17beace292b7",
                     "version": "13488",
                     "digest": "3tX9sgYC4A6nVKGjKEE5xxW6t4zkvDL9BwjuaxMg8arP",
-                    "type": "0x2::coin::Coin<0x2::sui::SUI>",
+                    "type": "0x2::coin::Coin<0x2::one::OCT>",
                     "owner": {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
                     },
@@ -3906,18 +3906,20 @@
                 "stakingPool": "0x9a95cf69368e31b4dbe8ee9bdb3c0587bbc79d8fc6edf4007e185a962fd906df",
                 "stakes": [
                   {
-                    "stakedSuiId": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
+                    "stakedOctId": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
                     "stakeRequestEpoch": "62",
                     "stakeActiveEpoch": "63",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Active",
                     "estimatedReward": "520000000"
                   },
                   {
-                    "stakedSuiId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
+                    "stakedOctId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
                     "stakeRequestEpoch": "142",
                     "stakeActiveEpoch": "143",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Pending"
                   }
                 ]
@@ -3927,10 +3929,11 @@
                 "stakingPool": "0x14cc7fee4100fdcabda6d15c63c4b49c45ae23f2b936495cd38b1a4b04010295",
                 "stakes": [
                   {
-                    "stakedSuiId": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
+                    "stakedOctId": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
                     "stakeRequestEpoch": "244",
                     "stakeActiveEpoch": "245",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Unstaked"
                   }
                 ]
@@ -3950,7 +3953,7 @@
       "description": "Return one or more [DelegatedStake]. If a Stake was withdrawn its status will be Unstaked.",
       "params": [
         {
-          "name": "staked_sui_ids",
+          "name": "staked_oct_ids",
           "required": true,
           "schema": {
             "type": "array",
@@ -3975,7 +3978,7 @@
           "name": "Returns the staking information for the address the request provides.",
           "params": [
             {
-              "name": "staked_sui_ids",
+              "name": "staked_oct_ids",
               "value": [
                 "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
                 "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d"
@@ -3989,18 +3992,20 @@
               "stakingPool": "0x63ee67e81398729f87d81d62f399c041b0f8d0938923ea7e3917608ee62df437",
               "stakes": [
                 {
-                  "stakedSuiId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
+                  "stakedOctId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
                   "stakeRequestEpoch": "62",
                   "stakeActiveEpoch": "63",
                   "principal": "200000000000",
+                    "lock": false,
                   "status": "Active",
                   "estimatedReward": "520000000"
                 },
                 {
-                  "stakedSuiId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
+                  "stakedOctId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
                   "stakeRequestEpoch": "244",
                   "stakeActiveEpoch": "245",
                   "principal": "200000000000",
+                    "lock": false,
                   "status": "Unstaked"
                 }
               ]
@@ -4520,7 +4525,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4579,7 +4584,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4636,7 +4641,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4730,7 +4735,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4794,17 +4799,17 @@
       }
     },
     {
-      "name": "unsafe_payAllSui",
+      "name": "unsafe_payAllOct",
       "tags": [
         {
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Send all SUI coins to one recipient. This is for SUI coin only and does not require a separate gas coin object. Specifically, what pay_all_sui does are: 1. accumulate all SUI from input coins and deposit all SUI to the first input coin 2. transfer the updated first coin to the recipient and also use this first coin as gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - actual_gas_cost. 4. all other input coins other than the first are deleted.",
+      "description": "Send all OCT coins to one recipient. This is for OneChain coin only and does not require a separate gas coin object. Specifically, what pay_all_oct does are: 1. accumulate all OCT from input coins and deposit all OCT to the first input coin 2. transfer the updated first coin to the recipient and also use this first coin as gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - actual_gas_cost. 4. all other input coins other than the first are deleted.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4847,17 +4852,17 @@
       }
     },
     {
-      "name": "unsafe_paySui",
+      "name": "unsafe_payOct",
       "tags": [
         {
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Send SUI coins to a list of addresses, following a list of amounts. This is for SUI coin only and does not require a separate gas coin object. Specifically, what pay_sui does are: 1. debit each input_coin to create new coin following the order of amounts and assign it to the corresponding recipient. 2. accumulate all residual SUI from input coins left and deposit all SUI to the first input coin, then use the first input coin as the gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost 4. all other input coints other than the first one are deleted.",
+      "description": "Send OCT coins to a list of addresses, following a list of amounts. This is for OneChain coin only and does not require a separate gas coin object. Specifically, what pay_oct does are: 1. debit each input_coin to create new coin following the order of amounts and assign it to the corresponding recipient. 2. accumulate all residual OCT from input coins left and deposit all OCT to the first input coin, then use the first input coin as the gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost 4. all other input coints other than the first one are deleted.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4924,7 +4929,7 @@
       "params": [
         {
           "name": "sender",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4987,7 +4992,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4995,7 +5000,7 @@
         },
         {
           "name": "coins",
-          "description": "Coin<SUI> object to stake",
+          "description": "Coin<OCT> object to stake",
           "required": true,
           "schema": {
             "type": "array",
@@ -5013,7 +5018,7 @@
         },
         {
           "name": "validator",
-          "description": "the validator's Sui address",
+          "description": "the validator's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5054,15 +5059,15 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
           }
         },
         {
-          "name": "staked_sui",
-          "description": "StakedSui object ID",
+          "name": "staked_oct",
+          "description": "StakedOct object ID",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/ObjectID"
@@ -5103,7 +5108,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5163,7 +5168,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5220,7 +5225,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5251,7 +5256,7 @@
         },
         {
           "name": "recipient",
-          "description": "the recipient's Sui address",
+          "description": "the recipient's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5267,17 +5272,17 @@
       }
     },
     {
-      "name": "unsafe_transferSui",
+      "name": "unsafe_transferOct",
       "tags": [
         {
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Create an unsigned transaction to send SUI coin object to a Sui address. The SUI object is also used as the gas object.",
+      "description": "Create an unsigned transaction to send OneChain coin object to a OneChain address. The OneChain object is also used as the gas object.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's Sui address",
+          "description": "the transaction signer's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5285,7 +5290,7 @@
         },
         {
           "name": "sui_object_id",
-          "description": "the Sui coin object to be used in this transaction",
+          "description": "the OneChain coin object to be used in this transaction",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/ObjectID"
@@ -5301,7 +5306,7 @@
         },
         {
           "name": "recipient",
-          "description": "the recipient's Sui address",
+          "description": "the recipient's OneChain address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5338,6 +5343,9 @@
               "SingleOwner"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "SingleOwner": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -5363,6 +5371,9 @@
           "totalBalance"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "coinObjectCount": {
             "type": "integer",
             "format": "uint",
@@ -5390,6 +5401,9 @@
           "owner"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "amount": {
             "description": "The amount indicate the balance value changes, negative amount means spending coin value and positive means receiving coin value.",
             "type": "string"
@@ -5448,6 +5462,9 @@
           "validatorSignature"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "checkpointCommitments": {
             "description": "Commitments to checkpoint state",
             "type": "array",
@@ -5550,6 +5567,9 @@
               "ECMHLiveObjectSetDigest"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ECMHLiveObjectSetDigest": {
                 "$ref": "#/components/schemas/ECMHLiveObjectSetDigest"
               }
@@ -5584,6 +5604,9 @@
           "value"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "indexMod4": {
             "type": "integer",
             "format": "uint8",
@@ -5605,6 +5628,9 @@
           "version"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "balance": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -5633,6 +5659,9 @@
           "validators"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "epoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -5663,6 +5692,9 @@
               "Ed25519"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Ed25519": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -5675,6 +5707,9 @@
               "Secp256k1"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Secp256k1": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -5687,6 +5722,9 @@
               "Secp256r1"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Secp256r1": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -5699,6 +5737,9 @@
               "ZkLogin"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ZkLogin": {
                 "$ref": "#/components/schemas/ZkLoginAuthenticatorAsBytes"
               }
@@ -5711,6 +5752,9 @@
               "Passkey"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Passkey": {
                 "$ref": "#/components/schemas/PasskeyAuthenticatorAsBytes"
               }
@@ -5731,6 +5775,9 @@
               "CancelledTransactions"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "CancelledTransactions": {
                 "type": "array",
                 "items": {
@@ -5769,6 +5816,9 @@
               "CancelledTransactionsV2"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "CancelledTransactionsV2": {
                 "type": "array",
                 "items": {
@@ -5824,6 +5874,9 @@
               "type"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "dataType": {
                 "type": "string",
                 "enum": [
@@ -5848,6 +5901,9 @@
               "disassembled"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "dataType": {
                 "type": "string",
                 "enum": [
@@ -5870,6 +5926,9 @@
           "validatorAddress"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "stakes": {
             "type": "array",
             "items": {
@@ -5898,6 +5957,9 @@
         "description": "Additional rguments supplied to dev inspect beyond what is allowed in today's API.",
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "gasBudget": {
             "description": "The gas budget for the transaction.",
             "anyOf": [
@@ -5967,6 +6029,9 @@
           "events"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "effects": {
             "description": "Summary of effects that likely would be generated if the transaction is actually run. Note however, that not all dev-inspect transactions are actually usable as transactions so it might not be possible actually generate these effects from a normal transaction.",
             "allOf": [
@@ -6030,6 +6095,9 @@
       "DisplayFieldsResponse": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": [
               "object",
@@ -6061,6 +6129,9 @@
           "objectChanges"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "balanceChanges": {
             "type": "array",
             "items": {
@@ -6097,6 +6168,9 @@
               "bcsName"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "bcsEncoding": {
                 "type": "string",
                 "enum": [
@@ -6115,6 +6189,9 @@
               "bcsName"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "bcsEncoding": {
                 "type": "string",
                 "enum": [
@@ -6136,6 +6213,9 @@
           "version"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "digest": {
             "$ref": "#/components/schemas/ObjectDigest"
           },
@@ -6163,6 +6243,9 @@
           "value"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "type": {
             "type": "string"
           },
@@ -6183,6 +6266,9 @@
           "digest"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "digest": {
             "type": "array",
             "items": {
@@ -6206,6 +6292,9 @@
           "nextEpochProtocolVersion"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "epochCommitments": {
             "description": "Commitments to epoch specific state (e.g. live object set)",
             "type": "array",
@@ -6250,6 +6339,9 @@
               "bcsEncoding"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "bcs": {
                 "$ref": "#/components/schemas/Base64"
               },
@@ -6268,6 +6360,9 @@
               "bcsEncoding"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "bcs": {
                 "$ref": "#/components/schemas/Base58"
               },
@@ -6289,6 +6384,9 @@
           "type"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "id": {
             "description": "Sequential event ID, ie (transaction seq number, event seq number). 1) Serves as a unique event ID for each fullnode 2) Also serves to sequence events for the purposes of pagination and querying. A higher id is an event seen later by that fullnode. This ID is the \"cursor\" for event querying.",
             "allOf": [
@@ -6309,7 +6407,7 @@
             "description": "Parsed json value of the event"
           },
           "sender": {
-            "description": "Sender's Sui address.",
+            "description": "Sender's OneChain address.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/SuiAddress"
@@ -6346,6 +6444,9 @@
               "All"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "All": {
                 "type": "array",
                 "maxItems": 0
@@ -6360,6 +6461,9 @@
               "Any"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Any": {
                 "type": "array",
                 "items": {
@@ -6376,6 +6480,9 @@
               "Sender"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Sender": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -6389,6 +6496,9 @@
               "Transaction"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Transaction": {
                 "$ref": "#/components/schemas/TransactionDigest"
               }
@@ -6402,6 +6512,9 @@
               "MoveModule"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MoveModule": {
                 "type": "object",
                 "required": [
@@ -6409,6 +6522,9 @@
                   "package"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "module": {
                     "description": "the module name",
                     "type": "string"
@@ -6433,6 +6549,9 @@
               "MoveEventType"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MoveEventType": {
                 "type": "string"
               }
@@ -6446,6 +6565,9 @@
               "MoveEventModule"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MoveEventModule": {
                 "type": "object",
                 "required": [
@@ -6453,6 +6575,9 @@
                   "package"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "module": {
                     "description": "the module name",
                     "type": "string"
@@ -6477,6 +6602,9 @@
               "TimeRange"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "TimeRange": {
                 "type": "object",
                 "required": [
@@ -6484,6 +6612,9 @@
                   "startTime"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "endTime": {
                     "description": "right endpoint of time interval, milliseconds since epoch, exclusive",
                     "allOf": [
@@ -6515,6 +6646,9 @@
           "txDigest"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "eventSeq": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -6538,6 +6672,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "status": {
                 "type": "string",
                 "enum": [
@@ -6553,6 +6690,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "error": {
                 "type": "string"
               },
@@ -6576,6 +6716,9 @@
           "storageRebate"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "computationCost": {
             "description": "Cost of computation/execution",
             "allOf": [
@@ -6619,6 +6762,9 @@
           "price"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "budget": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -6645,6 +6791,9 @@
               "MultiSig"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MultiSig": {
                 "$ref": "#/components/schemas/MultiSig"
               }
@@ -6657,6 +6806,9 @@
               "MultiSigLegacy"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MultiSigLegacy": {
                 "$ref": "#/components/schemas/MultiSigLegacy"
               }
@@ -6669,6 +6821,9 @@
               "Signature"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Signature": {
                 "$ref": "#/components/schemas/Signature"
               }
@@ -6681,6 +6836,9 @@
               "ZkLoginAuthenticator"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ZkLoginAuthenticator": {
                 "$ref": "#/components/schemas/ZkLoginAuthenticator"
               }
@@ -6693,6 +6851,9 @@
               "PasskeyAuthenticator"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "PasskeyAuthenticator": {
                 "$ref": "#/components/schemas/PasskeyAuthenticator"
               }
@@ -6708,6 +6869,9 @@
           "version"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "objectId": {
             "description": "the ID of the queried object",
             "allOf": [
@@ -6738,6 +6902,9 @@
               "MovePackage"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MovePackage": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -6750,6 +6917,9 @@
               "ImmOrOwnedMoveObject"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ImmOrOwnedMoveObject": {
                 "$ref": "#/components/schemas/ObjectRef"
               }
@@ -6762,6 +6932,9 @@
               "SharedMoveObject"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "SharedMoveObject": {
                 "type": "object",
                 "required": [
@@ -6769,6 +6942,9 @@
                   "initial_shared_version"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "id": {
                     "$ref": "#/components/schemas/ObjectID"
                   },
@@ -6795,6 +6971,9 @@
           "packageObjectId"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "arguments": {
             "type": "array",
             "items": {
@@ -6833,6 +7012,9 @@
               "Object"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Object": {
                 "$ref": "#/components/schemas/ObjectValueKind"
               }
@@ -6856,6 +7038,9 @@
               "type"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "fields": {
                 "type": "object",
                 "additionalProperties": {
@@ -6903,6 +7088,9 @@
               "id"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "id": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -6934,6 +7122,9 @@
           "variant"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "fields": {
             "type": "object",
             "additionalProperties": {
@@ -6957,6 +7148,9 @@
           "sigs"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "bitmap": {
             "description": "A bitmap that indicates the position of which public key the signature should be authenticated with.",
             "type": "integer",
@@ -6989,6 +7183,9 @@
           "sigs"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "bitmap": {
             "description": "A bitmap that indicates the position of which public key the signature should be authenticated with.",
             "allOf": [
@@ -7022,6 +7219,9 @@
           "threshold"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "pk_map": {
             "description": "A list of public key and its corresponding weight.",
             "type": "array",
@@ -7057,6 +7257,9 @@
           "threshold"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "pk_map": {
             "description": "A list of public key and its corresponding weight.",
             "type": "array",
@@ -7098,6 +7301,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "digest": {
                 "$ref": "#/components/schemas/ObjectDigest"
               },
@@ -7134,6 +7340,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "digest": {
                 "$ref": "#/components/schemas/ObjectDigest"
               },
@@ -7174,6 +7383,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "digest": {
                 "$ref": "#/components/schemas/ObjectDigest"
               },
@@ -7214,6 +7426,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "objectId": {
                 "$ref": "#/components/schemas/ObjectID"
               },
@@ -7245,6 +7460,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "objectId": {
                 "$ref": "#/components/schemas/ObjectID"
               },
@@ -7278,6 +7496,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "digest": {
                 "$ref": "#/components/schemas/ObjectDigest"
               },
@@ -7314,6 +7535,9 @@
           "version"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "bcs": {
             "description": "Move object content or package content in BCS, default to be None unless SuiObjectDataOptions.showBcs is set to true",
             "anyOf": [
@@ -7411,6 +7635,9 @@
       "ObjectDataOptions": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "showBcs": {
             "description": "Whether to show the content in BCS format. Default to be False",
             "default": false,
@@ -7464,6 +7691,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "details": {
                 "$ref": "#/components/schemas/ObjectData"
               },
@@ -7483,6 +7713,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "details": {
                 "$ref": "#/components/schemas/ObjectID"
               },
@@ -7502,6 +7735,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "details": {
                 "$ref": "#/components/schemas/ObjectRef"
               },
@@ -7521,6 +7757,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "details": {
                 "type": "array",
                 "items": [
@@ -7550,6 +7789,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "details": {
                 "type": "object",
                 "required": [
@@ -7558,6 +7800,9 @@
                   "object_id"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "asked_version": {
                     "$ref": "#/components/schemas/SequenceNumber2"
                   },
@@ -7587,6 +7832,9 @@
           "version"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "digest": {
             "description": "Base64 string representing the object digest",
             "allOf": [
@@ -7622,6 +7870,9 @@
               "object_id"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "code": {
                 "type": "string",
                 "enum": [
@@ -7640,6 +7891,9 @@
               "parent_object_id"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "code": {
                 "type": "string",
                 "enum": [
@@ -7660,6 +7914,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "code": {
                 "type": "string",
                 "enum": [
@@ -7693,6 +7950,9 @@
               "code"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "code": {
                 "type": "string",
                 "enum": [
@@ -7708,6 +7968,9 @@
               "error"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "code": {
                 "type": "string",
                 "enum": [
@@ -7724,6 +7987,9 @@
       "ObjectResponseQuery": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "filter": {
             "description": "If None, no filter will be applied",
             "default": null,
@@ -7765,6 +8031,9 @@
           "reference"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "owner": {
             "$ref": "#/components/schemas/Owner"
           },
@@ -7782,6 +8051,9 @@
               "AddressOwner"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "AddressOwner": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -7795,6 +8067,9 @@
               "ObjectOwner"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ObjectOwner": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -7808,12 +8083,18 @@
               "Shared"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Shared": {
                 "type": "object",
                 "required": [
                   "initial_shared_version"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "initial_shared_version": {
                     "description": "The version at which the object became shared",
                     "allOf": [
@@ -7841,6 +8122,9 @@
               "ConsensusV2"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ConsensusV2": {
                 "type": "object",
                 "required": [
@@ -7848,6 +8132,9 @@
                   "start_version"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "authenticator": {
                     "description": "The authentication mode of the object",
                     "allOf": [
@@ -7879,6 +8166,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -7908,6 +8198,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -7933,6 +8226,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -7962,6 +8258,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -7991,6 +8290,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -8020,6 +8322,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -8049,6 +8354,9 @@
           "hasNextPage"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "type": "array",
             "items": {
@@ -8078,6 +8386,9 @@
           "client_data_json"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "authenticator_data": {
             "description": "`authenticatorData` is a bytearray that encodes [Authenticator Data](https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data) structure returned by the authenticator attestation response as is.",
             "type": "array",
@@ -8106,6 +8417,9 @@
           "protocolVersion"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "attributes": {
             "type": "object",
             "additionalProperties": {
@@ -8144,6 +8458,9 @@
               "u16"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "u16": {
                 "$ref": "#/components/schemas/BigInt_for_uint16"
               }
@@ -8156,6 +8473,9 @@
               "u32"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "u32": {
                 "$ref": "#/components/schemas/BigInt_for_uint32"
               }
@@ -8168,6 +8488,9 @@
               "u64"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "u64": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
@@ -8180,6 +8503,9 @@
               "f64"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "f64": {
                 "type": "string"
               }
@@ -8192,6 +8518,9 @@
               "bool"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "bool": {
                 "type": "string"
               }
@@ -8211,6 +8540,9 @@
               "Ed25519"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Ed25519": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -8223,6 +8555,9 @@
               "Secp256k1"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Secp256k1": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -8235,6 +8570,9 @@
               "Secp256r1"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Secp256r1": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -8247,6 +8585,9 @@
               "ZkLogin"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ZkLogin": {
                 "$ref": "#/components/schemas/ZkLoginPublicIdentifier"
               }
@@ -8259,6 +8600,9 @@
               "Passkey"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Passkey": {
                 "$ref": "#/components/schemas/Base64"
               }
@@ -8275,6 +8619,9 @@
               "transferObjectRequestParams"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "transferObjectRequestParams": {
                 "$ref": "#/components/schemas/TransferObjectParams"
               }
@@ -8287,6 +8634,9 @@
               "moveCallRequestParams"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "moveCallRequestParams": {
                 "$ref": "#/components/schemas/MoveCallParams"
               }
@@ -8307,6 +8657,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "bcsBytes": {
                 "$ref": "#/components/schemas/Base64"
               },
@@ -8338,6 +8691,9 @@
               "version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "dataType": {
                 "type": "string",
                 "enum": [
@@ -8394,6 +8750,9 @@
               "Ed25519SuiSignature"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Ed25519SuiSignature": {
                 "$ref": "#/components/schemas/Ed25519SuiSignature"
               }
@@ -8406,6 +8765,9 @@
               "Secp256k1SuiSignature"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Secp256k1SuiSignature": {
                 "$ref": "#/components/schemas/Secp256k1SuiSignature"
               }
@@ -8418,6 +8780,9 @@
               "Secp256r1SuiSignature"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Secp256r1SuiSignature": {
                 "$ref": "#/components/schemas/Secp256r1SuiSignature"
               }
@@ -8435,6 +8800,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "status": {
                 "type": "string",
                 "enum": [
@@ -8450,6 +8818,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "estimatedReward": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -8467,6 +8838,9 @@
               "status"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "status": {
                 "type": "string",
                 "enum": [
@@ -8480,9 +8854,12 @@
           "principal",
           "stakeActiveEpoch",
           "stakeRequestEpoch",
-          "stakedSuiId"
+          "stakedOctId"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "principal": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -8492,8 +8869,8 @@
           "stakeRequestEpoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
-          "stakedSuiId": {
-            "description": "ID of the StakedSui receipt object.",
+          "stakedOctId": {
+            "description": "ID of the StakedOct receipt object.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ObjectID"
@@ -8510,6 +8887,9 @@
           "jwk_id"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "epoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -8541,6 +8921,9 @@
               "Input"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Input": {
                 "type": "integer",
                 "format": "uint16",
@@ -8556,6 +8939,9 @@
               "Result"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Result": {
                 "type": "integer",
                 "format": "uint16",
@@ -8571,6 +8957,9 @@
               "NestedResult"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "NestedResult": {
                 "type": "array",
                 "items": [
@@ -8599,6 +8988,9 @@
           "min_epoch"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "min_epoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           }
@@ -8618,6 +9010,9 @@
                   "version"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "digest": {
                     "$ref": "#/components/schemas/ObjectDigest"
                   },
@@ -8644,6 +9039,9 @@
                   "objectType"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "initialSharedVersion": {
                     "$ref": "#/components/schemas/SequenceNumber"
                   },
@@ -8670,6 +9068,9 @@
                   "version"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "digest": {
                     "$ref": "#/components/schemas/ObjectDigest"
                   },
@@ -8692,6 +9093,9 @@
               "type"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "type": {
                 "type": "string",
                 "enum": [
@@ -8707,6 +9111,9 @@
               "value"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "type": {
                 "type": "string",
                 "enum": [
@@ -8737,6 +9144,9 @@
           "storage_rebate"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "computation_charge": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -8763,6 +9173,9 @@
           "symbol"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "decimals": {
             "description": "Number of decimal places the coin uses.",
             "type": "integer",
@@ -8818,6 +9231,9 @@
               "ChangeEpoch"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ChangeEpoch": {
                 "$ref": "#/components/schemas/SuiChangeEpoch"
               }
@@ -8830,6 +9246,9 @@
               "AuthenticatorStateExpire"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "AuthenticatorStateExpire": {
                 "$ref": "#/components/schemas/SuiAuthenticatorStateExpire"
               }
@@ -8842,6 +9261,9 @@
               "BridgeStateCreate"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "BridgeStateCreate": {
                 "$ref": "#/components/schemas/CheckpointDigest"
               }
@@ -8854,6 +9276,9 @@
               "BridgeCommitteeUpdate"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "BridgeCommitteeUpdate": {
                 "$ref": "#/components/schemas/SequenceNumber2"
               }
@@ -8865,6 +9290,9 @@
       "SuiExecutionResult": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "mutableReferenceOutputs": {
             "description": "The value of any arguments that were mutably borrowed. Non-mut borrowed values are not included",
             "type": "array",
@@ -8923,6 +9351,9 @@
           "n"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "alg": {
             "type": "string"
           },
@@ -8945,6 +9376,9 @@
           "kid"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "iss": {
             "type": "string"
           },
@@ -8968,6 +9402,9 @@
           "abilities"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "abilities": {
             "type": "array",
             "items": {
@@ -8983,6 +9420,9 @@
           "name"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "address": {
             "type": "string"
           },
@@ -8999,6 +9439,9 @@
           "variants"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "abilities": {
             "$ref": "#/components/schemas/SuiMoveAbilitySet"
           },
@@ -9026,6 +9469,9 @@
           "type"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "name": {
             "type": "string"
           },
@@ -9044,6 +9490,9 @@
           "visibility"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "isEntry": {
             "type": "boolean"
           },
@@ -9081,6 +9530,9 @@
           "structs"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "address": {
             "type": "string"
           },
@@ -9126,6 +9578,9 @@
           "typeParameters"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "abilities": {
             "$ref": "#/components/schemas/SuiMoveAbilitySet"
           },
@@ -9165,6 +9620,9 @@
               "Struct"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Struct": {
                 "type": "object",
                 "required": [
@@ -9174,6 +9632,9 @@
                   "typeArguments"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "address": {
                     "type": "string"
                   },
@@ -9200,6 +9661,9 @@
               "Vector"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Vector": {
                 "$ref": "#/components/schemas/SuiMoveNormalizedType"
               }
@@ -9212,6 +9676,9 @@
               "TypeParameter"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "TypeParameter": {
                 "type": "integer",
                 "format": "uint16",
@@ -9226,6 +9693,9 @@
               "Reference"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Reference": {
                 "$ref": "#/components/schemas/SuiMoveNormalizedType"
               }
@@ -9238,6 +9708,9 @@
               "MutableReference"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MutableReference": {
                 "$ref": "#/components/schemas/SuiMoveNormalizedType"
               }
@@ -9253,6 +9726,9 @@
           "isPhantom"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "constraints": {
             "$ref": "#/components/schemas/SuiMoveAbilitySet"
           },
@@ -9277,6 +9753,9 @@
               "MatchAll"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MatchAll": {
                 "type": "array",
                 "items": {
@@ -9292,6 +9771,9 @@
               "MatchAny"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MatchAny": {
                 "type": "array",
                 "items": {
@@ -9307,6 +9789,9 @@
               "MatchNone"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MatchNone": {
                 "type": "array",
                 "items": {
@@ -9323,6 +9808,9 @@
               "Package"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Package": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -9336,6 +9824,9 @@
               "MoveModule"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MoveModule": {
                 "type": "object",
                 "required": [
@@ -9343,6 +9834,9 @@
                   "package"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "module": {
                     "description": "the module name",
                     "type": "string"
@@ -9367,6 +9861,9 @@
               "StructType"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "StructType": {
                 "type": "string"
               }
@@ -9379,6 +9876,9 @@
               "AddressOwner"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "AddressOwner": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -9391,6 +9891,9 @@
               "ObjectOwner"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ObjectOwner": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -9403,6 +9906,9 @@
               "ObjectId"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ObjectId": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -9415,6 +9921,9 @@
               "ObjectIds"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ObjectIds": {
                 "type": "array",
                 "items": {
@@ -9430,6 +9939,9 @@
               "Version"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Version": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
@@ -9441,6 +9953,9 @@
       "SuiObjectResponse": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "anyOf": [
               {
@@ -9472,6 +9987,9 @@
           "package"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "arguments": {
             "description": "The arguments to the function.",
             "type": "array",
@@ -9504,6 +10022,21 @@
           }
         }
       },
+      "SuiSupperCommitteeSummary": {
+        "description": "This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the SUI system state type.",
+        "type": "object",
+        "required": [
+          "proposalList"
+        ],
+        "properties": {
+          "proposalList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectID"
+            }
+          }
+        }
+      },
       "SuiSystemStateSummary": {
         "description": "This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the SUI system state type.",
         "type": "object",
@@ -9517,6 +10050,7 @@
           "inactivePoolsSize",
           "maxValidatorCount",
           "minValidatorJoiningStake",
+          "onlyTrustedValidator",
           "pendingActiveValidatorsId",
           "pendingActiveValidatorsSize",
           "pendingRemovals",
@@ -9537,8 +10071,10 @@
           "stakingPoolMappingsSize",
           "storageFundNonRefundableBalance",
           "storageFundTotalObjectStorageRebates",
+          "supperCommittee",
           "systemStateVersion",
           "totalStake",
+          "trustedValidators",
           "validatorCandidatesId",
           "validatorCandidatesSize",
           "validatorLowStakeGracePeriod",
@@ -9547,6 +10083,9 @@
           "validatorVeryLowStakeThreshold"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "activeValidators": {
             "description": "The list of active validators in the current epoch.",
             "type": "array",
@@ -9626,6 +10165,9 @@
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
             ]
+          },
+          "onlyTrustedValidator": {
+            "type": "boolean"
           },
           "pendingActiveValidatorsId": {
             "description": "ID of the object that contains the list of new validators that will join at the end of the epoch.",
@@ -9749,7 +10291,7 @@
             ]
           },
           "stakingPoolMappingsId": {
-            "description": "ID of the object that maps from staking pool's ID to the sui address of a validator.",
+            "description": "ID of the object that maps from staking pool's ID to the OneChain address of a validator.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ObjectID"
@@ -9780,6 +10322,9 @@
               }
             ]
           },
+          "supperCommittee": {
+            "$ref": "#/components/schemas/SuiSupperCommitteeSummary"
+          },
           "systemStateVersion": {
             "description": "The current version of the system state data structure type.",
             "allOf": [
@@ -9795,6 +10340,12 @@
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
             ]
+          },
+          "trustedValidators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuiAddress"
+            }
           },
           "validatorCandidatesId": {
             "description": "ID of the object that stores preactive validators, mapping their addresses to their `Validator` structs.",
@@ -9868,6 +10419,9 @@
               "MoveCall"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MoveCall": {
                 "$ref": "#/components/schemas/SuiProgrammableMoveCall"
               }
@@ -9881,6 +10435,9 @@
               "TransferObjects"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "TransferObjects": {
                 "type": "array",
                 "items": [
@@ -9907,6 +10464,9 @@
               "SplitCoins"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "SplitCoins": {
                 "type": "array",
                 "items": [
@@ -9933,6 +10493,9 @@
               "MergeCoins"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MergeCoins": {
                 "type": "array",
                 "items": [
@@ -9959,6 +10522,9 @@
               "Publish"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Publish": {
                 "type": "array",
                 "items": {
@@ -9975,6 +10541,9 @@
               "Upgrade"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Upgrade": {
                 "type": "array",
                 "items": [
@@ -10004,6 +10573,9 @@
               "MakeMoveVec"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MakeMoveVec": {
                 "type": "array",
                 "items": [
@@ -10062,6 +10634,7 @@
           "nextEpochCommissionRate",
           "nextEpochGasPrice",
           "nextEpochStake",
+          "onlyValidatorStaking",
           "operationCapId",
           "p2pAddress",
           "pendingPoolTokenWithdraw",
@@ -10072,6 +10645,7 @@
           "projectUrl",
           "proofOfPossessionBytes",
           "protocolPubkeyBytes",
+          "revenueReceivingAddress",
           "rewardsPool",
           "stakingPoolId",
           "stakingPoolSuiBalance",
@@ -10081,6 +10655,9 @@
           "workerPubkeyBytes"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "commissionRate": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -10195,6 +10772,9 @@
               }
             ]
           },
+          "onlyValidatorStaking": {
+            "type": "boolean"
+          },
           "operationCapId": {
             "$ref": "#/components/schemas/ObjectID"
           },
@@ -10244,6 +10824,9 @@
           },
           "protocolPubkeyBytes": {
             "$ref": "#/components/schemas/Base64"
+          },
+          "revenueReceivingAddress": {
+            "$ref": "#/components/schemas/SuiAddress"
           },
           "rewardsPool": {
             "description": "The epoch stake rewards will be added here at the end of each epoch.",
@@ -10313,6 +10896,9 @@
           "value"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "value": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           }
@@ -10325,6 +10911,9 @@
           "txSignatures"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "data": {
             "$ref": "#/components/schemas/TransactionBlockData"
           },
@@ -10344,6 +10933,9 @@
           "txBytes"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "gas": {
             "description": "the gas objects to be used",
             "type": "array",
@@ -10379,6 +10971,9 @@
               "transaction"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "gasData": {
                 "$ref": "#/components/schemas/GasData"
               },
@@ -10412,6 +11007,9 @@
               "transactionDigest"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "created": {
                 "description": "ObjectRef and owner of new objects created.",
                 "type": "array",
@@ -10538,6 +11136,9 @@
           "sequenceNumber"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "objectId": {
             "$ref": "#/components/schemas/ObjectID"
           },
@@ -10560,6 +11161,9 @@
               "storage_rebate"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "computation_charge": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -10591,6 +11195,9 @@
               "objects"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "kind": {
                 "type": "string",
                 "enum": [
@@ -10615,6 +11222,9 @@
               "round"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "commit_timestamp_ms": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -10641,6 +11251,9 @@
               "transactions"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "inputs": {
                 "description": "Input objects or primitive values",
                 "type": "array",
@@ -10673,6 +11286,9 @@
               "round"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "epoch": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -10703,6 +11319,9 @@
               "randomness_round"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "epoch": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -10733,6 +11352,9 @@
               "transactions"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "kind": {
                 "type": "string",
                 "enum": [
@@ -10757,6 +11379,9 @@
               "round"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "commit_timestamp_ms": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -10788,6 +11413,9 @@
               "round"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "commit_timestamp_ms": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               },
@@ -10834,6 +11462,9 @@
               "round"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "additional_state_digest": {
                 "$ref": "#/components/schemas/AdditionalConsensusStateDigest"
               },
@@ -10879,6 +11510,9 @@
           "digest"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "balanceChanges": {
             "type": [
               "array",
@@ -10984,6 +11618,9 @@
       "TransactionBlockResponseOptions": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "showBalanceChanges": {
             "description": "Whether to show balance_changes. Default to be False",
             "default": false,
@@ -11024,6 +11661,9 @@
       "TransactionBlockResponseQuery": {
         "type": "object",
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "filter": {
             "description": "If None, no filter will be applied",
             "default": null,
@@ -11070,6 +11710,9 @@
               "Checkpoint"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "Checkpoint": {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
@@ -11083,12 +11726,18 @@
               "MoveFunction"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "MoveFunction": {
                 "type": "object",
                 "required": [
                   "package"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "function": {
                     "type": [
                       "string",
@@ -11116,6 +11765,9 @@
               "InputObject"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "InputObject": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -11129,6 +11781,9 @@
               "ChangedObject"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ChangedObject": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -11142,6 +11797,9 @@
               "AffectedObject"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "AffectedObject": {
                 "$ref": "#/components/schemas/ObjectID"
               }
@@ -11155,6 +11813,9 @@
               "FromAddress"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "FromAddress": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -11168,6 +11829,9 @@
               "ToAddress"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "ToAddress": {
                 "$ref": "#/components/schemas/SuiAddress"
               }
@@ -11181,6 +11845,9 @@
               "FromAndToAddress"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "FromAndToAddress": {
                 "type": "object",
                 "required": [
@@ -11188,6 +11855,9 @@
                   "to"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "from": {
                     "$ref": "#/components/schemas/SuiAddress"
                   },
@@ -11206,12 +11876,18 @@
               "FromOrToAddress"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "FromOrToAddress": {
                 "type": "object",
                 "required": [
                   "addr"
                 ],
                 "properties": {
+            "lock": {
+              "type": "boolean"
+            },
                   "addr": {
                     "$ref": "#/components/schemas/SuiAddress"
                   }
@@ -11227,6 +11903,9 @@
               "TransactionKind"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "TransactionKind": {
                 "type": "string"
               }
@@ -11240,6 +11919,9 @@
               "TransactionKindIn"
             ],
             "properties": {
+            "lock": {
+              "type": "boolean"
+            },
               "TransactionKindIn": {
                 "type": "array",
                 "items": {
@@ -11258,6 +11940,9 @@
           "recipient"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "objectId": {
             "$ref": "#/components/schemas/ObjectID"
           },
@@ -11275,6 +11960,9 @@
           "package"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "datatype_name": {
             "type": "string"
           },
@@ -11297,6 +11985,9 @@
           "upgraded_version"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "upgraded_id": {
             "description": "ID of the upgraded packages",
             "allOf": [
@@ -11322,6 +12013,9 @@
           "apy"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "address": {
             "$ref": "#/components/schemas/SuiAddress"
           },
@@ -11338,6 +12032,9 @@
           "epoch"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "apys": {
             "type": "array",
             "items": {
@@ -11358,6 +12055,9 @@
           "userSignature"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "inputs": {
             "$ref": "#/components/schemas/ZkLoginInputs"
           },
@@ -11384,6 +12084,9 @@
           "proofPoints"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "addressSeed": {
             "$ref": "#/components/schemas/Bn254FrElement"
           },
@@ -11414,6 +12117,9 @@
           "c"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "a": {
             "type": "array",
             "items": {
@@ -11452,6 +12158,9 @@
           "success"
         ],
         "properties": {
+            "lock": {
+              "type": "boolean"
+            },
           "errors": {
             "description": "The errors field captures any verification error",
             "type": "array",

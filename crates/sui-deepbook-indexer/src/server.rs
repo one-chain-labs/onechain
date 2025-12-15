@@ -44,7 +44,7 @@ use crate::{
     sui_deepbook_indexer::PgDeepbookPersistent,
 };
 
-pub const SUI_MAINNET_URL: &str = "https://fullnode.mainnet.sui.io:443";
+pub const SUI_MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
 pub const GET_POOLS_PATH: &str = "/get_pools";
 pub const GET_HISTORICAL_VOLUME_BY_BALANCE_MANAGER_ID_WITH_INTERVAL: &str =
     "/historical_volume_by_balance_manager_id_with_interval/:pool_names/:balance_manager_id";

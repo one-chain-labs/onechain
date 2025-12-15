@@ -8,11 +8,11 @@
 //# publish
 
 module test::m1 {
-    use sui::sui::SUI;
-    use sui::coin;
+    use one::oct::OCT;
+    use one::coin;
 
     public fun mint_shared(ctx: &mut TxContext) {
-        transfer::public_share_object(coin::zero<SUI>(ctx))
+        transfer::public_share_object(coin::zero<OCT>(ctx))
     }
 }
 

@@ -3,8 +3,8 @@
 
 #[allow(unused_field)]
 module a::test1 {
-    use sui::coin::Coin;
-    use sui::object::UID;
+    use one::coin::Coin;
+    use one::object::UID;
 
     struct S1 {}
 
@@ -16,8 +16,8 @@ module a::test1 {
 
 #[allow(unused_field)]
 module a::test2 {
-    use sui::coin::Coin as Balance;
-    use sui::object::UID;
+    use one::coin::Coin as Balance;
+    use one::object::UID;
 
     struct S1 {}
 
@@ -30,8 +30,8 @@ module a::test2 {
 
 #[allow(unused_field)]
 module a::test3 {
-    use sui::coin::TreasuryCap;
-    use sui::object::UID;
+    use one::coin::TreasuryCap;
+    use one::object::UID;
 
     struct S1 {}
 
@@ -43,14 +43,14 @@ module a::test3 {
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module sui::coin {
-    use sui::object::UID;
+module one::coin {
+    use one::object::UID;
     struct Coin<phantom T> has key, store {
         id: UID
     }

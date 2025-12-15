@@ -28,6 +28,7 @@ use move_binary_format::{binary_config::BinaryConfig, CompiledModule};
 use move_core_types::{annotated_value::MoveStructLayout, language_storage::ModuleId};
 use mysten_common::{debug_fatal, fatal};
 use mysten_metrics::{monitored_scope, spawn_monitored_task, TX_TYPE_SHARED_OBJ_TX, TX_TYPE_SINGLE_WRITER_TX};
+use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use prometheus::{
     register_histogram_vec_with_registry,
@@ -164,12 +165,12 @@ use tokio::{
     sync::{mpsc, mpsc::unbounded_channel, oneshot, RwLock},
     task::JoinHandle,
 };
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, warn};
 use typed_store::TypedStoreError;
 
 use self::{authority_store::ExecutionLockWriteGuard, authority_store_pruner::AuthorityStorePruningMetrics};
 #[cfg(msim)]
-pub use crate::checkpoints::checkpoint_executor::utils::{init_checkpoint_timeout_config, CheckpointTimeoutConfig};
+pub use crate::checkpoints::checkpoint_executor::{init_checkpoint_timeout_config, CheckpointTimeoutConfig};
 use crate::{
     authority::{
         authority_per_epoch_store::{AuthorityPerEpochStore, CertTxGuard},
@@ -238,10 +239,6 @@ mod batch_verification_tests;
 #[path = "unit_tests/coin_deny_list_tests.rs"]
 mod coin_deny_list_tests;
 
-#[cfg(test)]
-#[path = "unit_tests/auth_unit_test_utils.rs"]
-pub mod auth_unit_test_utils;
-
 pub mod authority_test_utils;
 
 pub mod authority_per_epoch_store;
@@ -259,6 +256,7 @@ pub mod transaction_deferral;
 
 pub(crate) mod authority_store;
 pub mod backpressure;
+pub static CHAIN_IDENTIFIER: OnceCell<ChainIdentifier> = OnceCell::new();
 
 /// Prometheus metrics which can be displayed in Grafana, queried and alerted on
 pub struct AuthorityMetrics {
@@ -386,7 +384,7 @@ const GAS_LATENCY_RATIO_BUCKETS: &[f64] = &[
     6000.0, 7000.0, 8000.0, 9000.0, 10000.0, 50000.0, 100000.0, 1000000.0,
 ];
 
-pub const DEV_INSPECT_GAS_COIN_VALUE: u64 = 1_000_000_000_000_000;
+pub const DEV_INSPECT_GAS_COIN_VALUE: u64 = 1_000_000_000_000;
 
 impl AuthorityMetrics {
     pub fn new(registry: &prometheus::Registry) -> AuthorityMetrics {
@@ -1141,7 +1139,7 @@ impl AuthorityState {
         } else {
             self.metrics.execute_certificate_latency_single_writer.start_timer()
         };
-        trace!("execute_certificate");
+        debug!("execute_certificate");
 
         self.metrics.total_cert_attempts.inc();
 
@@ -1204,6 +1202,7 @@ impl AuthorityState {
     ) -> SuiResult<(TransactionEffects, Option<ExecutionError>)> {
         let _scope = monitored_scope("Execution::try_execute_immediately");
         let _metrics_guard = self.metrics.internal_execution_latency.start_timer();
+        debug!("execute_certificate_internal");
 
         let tx_digest = certificate.digest();
 
@@ -2163,21 +2162,21 @@ impl AuthorityState {
             .tap_err(|e| warn!(tx_digest=?digest, "Failed to process object index, index_tx is skipped: {e}"))?;
 
         indexes.index_tx(
-            cert.data().intent_message().value.sender(),
-            cert.data().intent_message().value.input_objects()?.iter().map(|o| o.object_id()),
-            effects.all_changed_objects().into_iter().map(|(obj_ref, owner, _kind)| (obj_ref, owner)),
-            cert.data()
-                .intent_message()
-                .value
-                .move_calls()
-                .into_iter()
-                .map(|(package, module, function)| (*package, module.to_owned(), function.to_owned())),
-            events,
-            changes,
-            digest,
-            timestamp_ms,
-            tx_coins,
-        )
+                cert.data().intent_message().value.sender(),
+                cert.data().intent_message().value.input_objects()?.iter().map(|o| o.object_id()),
+                effects.all_changed_objects().into_iter().map(|(obj_ref, owner, _kind)| (obj_ref, owner)),
+                cert.data()
+                    .intent_message()
+                    .value
+                    .move_calls()
+                    .into_iter()
+                    .map(|(package, module, function)| (*package, module.to_owned(), function.to_owned())),
+                events,
+                changes,
+                digest,
+                timestamp_ms,
+                tx_coins,
+            )
     }
 
     #[cfg(msim)]

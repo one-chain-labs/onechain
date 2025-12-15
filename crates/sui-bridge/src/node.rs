@@ -563,7 +563,7 @@ mod tests {
         bridge_test_cluster
             .test_cluster
             .inner
-            .transfer_sui_must_exceed(sender_address, client_sui_address, 1000000000)
+            .transfer_oct_must_exceed(sender_address, client_sui_address, 1000000000)
             .await;
 
         let config = BridgeNodeConfig {
@@ -633,7 +633,7 @@ mod tests {
         let gas_obj = bridge_test_cluster
             .test_cluster
             .inner
-            .transfer_sui_must_exceed(sender_address, client_sui_address, 1000000000)
+            .transfer_oct_must_exceed(sender_address, client_sui_address, 1000000000)
             .await;
 
         let config = BridgeNodeConfig {

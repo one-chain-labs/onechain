@@ -76,7 +76,7 @@ async fn test_custom_coin_balance() {
     println!("response: {}", serde_json::to_string_pretty(&response).unwrap());
     assert_eq!(response.balances.len(), 2);
     assert_eq!(response.balances[0].value, SUI_BALANCE as i128);
-    assert_eq!(response.balances[0].currency.clone().metadata.coin_type, "0x2::sui::SUI");
+    assert_eq!(response.balances[0].currency.clone().metadata.coin_type, "0x2::one::OCT");
     assert_eq!(response.balances[1].value, COIN1_BALANCE as i128);
     assert_eq!(response.balances[1].currency.clone().metadata.coin_type, coin_type);
 }

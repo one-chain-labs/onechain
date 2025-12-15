@@ -1,5 +1,5 @@
 ---
-title: Module `sui::package`
+title: Module `one::package`
 ---
 
 Functions for operating on Move packages from within Move:
@@ -45,12 +45,12 @@ Functions for operating on Move packages from within Move:
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/types.md#sui_types">sui::types</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/types.md#sui_types">one::types</a>;
 </code></pre>
 
 
@@ -76,7 +76,7 @@ a type originated from.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
@@ -113,12 +113,12 @@ Capability controlling the ability to upgrade a package.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code><a href="../sui/package.md#sui_package">package</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/package.md#sui_package">package</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  (Mutable) ID of the package that can be upgraded.
@@ -166,13 +166,13 @@ progress.
 
 <dl>
 <dt>
-<code>cap: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>cap: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  (Immutable) ID of the <code><a href="../sui/package.md#sui_package_UpgradeCap">UpgradeCap</a></code> this originated from.
 </dd>
 <dt>
-<code><a href="../sui/package.md#sui_package">package</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/package.md#sui_package">package</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  (Immutable) ID of the package that can be upgraded.
@@ -217,13 +217,13 @@ the end of the transaction that performed the upgrade.
 
 <dl>
 <dt>
-<code>cap: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>cap: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  (Immutable) ID of the <code><a href="../sui/package.md#sui_package_UpgradeCap">UpgradeCap</a></code> this originated from.
 </dd>
 <dt>
-<code><a href="../sui/package.md#sui_package">package</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/package.md#sui_package">package</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  (Immutable) ID of the package after it was upgraded.
@@ -331,7 +331,7 @@ constraint there can be only one Publisher object per module
 but multiple per package (!).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_claim">claim</a>&lt;OTW: drop&gt;(otw: OTW, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/package.md#sui_package_Publisher">sui::package::Publisher</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_claim">claim</a>&lt;OTW: drop&gt;(otw: OTW, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/package.md#sui_package_Publisher">one::package::Publisher</a>
 </code></pre>
 
 
@@ -364,7 +364,7 @@ Since this function can only be called in the module initializer,
 the sender is the publisher.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_claim_and_keep">claim_and_keep</a>&lt;OTW: drop&gt;(otw: OTW, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_claim_and_keep">claim_and_keep</a>&lt;OTW: drop&gt;(otw: OTW, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -374,7 +374,7 @@ the sender is the publisher.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_claim_and_keep">claim_and_keep</a>&lt;OTW: drop&gt;(otw: OTW, ctx: &<b>mut</b> TxContext) {
-    <a href="../sui/transfer.md#sui_transfer_public_transfer">sui::transfer::public_transfer</a>(<a href="../sui/package.md#sui_package_claim">claim</a>(otw, ctx), ctx.sender())
+    <a href="../sui/transfer.md#sui_transfer_public_transfer">one::transfer::public_transfer</a>(<a href="../sui/package.md#sui_package_claim">claim</a>(otw, ctx), ctx.sender())
 }
 </code></pre>
 
@@ -390,7 +390,7 @@ Destroy a Publisher object effectively removing all privileges
 associated with it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_burn_publisher">burn_publisher</a>(self: <a href="../sui/package.md#sui_package_Publisher">sui::package::Publisher</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_burn_publisher">burn_publisher</a>(self: <a href="../sui/package.md#sui_package_Publisher">one::package::Publisher</a>)
 </code></pre>
 
 
@@ -416,7 +416,7 @@ associated with it.
 Check whether type belongs to the same package as the publisher object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_from_package">from_package</a>&lt;T&gt;(self: &<a href="../sui/package.md#sui_package_Publisher">sui::package::Publisher</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_from_package">from_package</a>&lt;T&gt;(self: &<a href="../sui/package.md#sui_package_Publisher">one::package::Publisher</a>): bool
 </code></pre>
 
 
@@ -441,7 +441,7 @@ Check whether type belongs to the same package as the publisher object.
 Check whether a type belongs to the same module as the publisher object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_from_module">from_module</a>&lt;T&gt;(self: &<a href="../sui/package.md#sui_package_Publisher">sui::package::Publisher</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_from_module">from_module</a>&lt;T&gt;(self: &<a href="../sui/package.md#sui_package_Publisher">one::package::Publisher</a>): bool
 </code></pre>
 
 
@@ -467,7 +467,7 @@ Check whether a type belongs to the same module as the publisher object.
 Read the name of the module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_published_module">published_module</a>(self: &<a href="../sui/package.md#sui_package_Publisher">sui::package::Publisher</a>): &<a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_published_module">published_module</a>(self: &<a href="../sui/package.md#sui_package_Publisher">one::package::Publisher</a>): &<a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>
 </code></pre>
 
 
@@ -492,7 +492,7 @@ Read the name of the module.
 Read the package address string.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_published_package">published_package</a>(self: &<a href="../sui/package.md#sui_package_Publisher">sui::package::Publisher</a>): &<a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_published_package">published_package</a>(self: &<a href="../sui/package.md#sui_package_Publisher">one::package::Publisher</a>): &<a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>
 </code></pre>
 
 
@@ -521,7 +521,7 @@ Otherwise guaranteed to be the latest version of any given
 package.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_upgrade_package">upgrade_package</a>(cap: &<a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_upgrade_package">upgrade_package</a>(cap: &<a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -547,7 +547,7 @@ The most recent version of the package, increments by one for each
 successfully applied upgrade.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_version">version</a>(cap: &<a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_version">version</a>(cap: &<a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>): u64
 </code></pre>
 
 
@@ -573,7 +573,7 @@ The most permissive kind of upgrade currently supported by this
 <code>cap</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_upgrade_policy">upgrade_policy</a>(cap: &<a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>): u8
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_upgrade_policy">upgrade_policy</a>(cap: &<a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>): u8
 </code></pre>
 
 
@@ -598,7 +598,7 @@ The most permissive kind of upgrade currently supported by this
 The package that this ticket is authorized to upgrade
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_ticket_package">ticket_package</a>(ticket: &<a href="../sui/package.md#sui_package_UpgradeTicket">sui::package::UpgradeTicket</a>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_ticket_package">ticket_package</a>(ticket: &<a href="../sui/package.md#sui_package_UpgradeTicket">one::package::UpgradeTicket</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -623,7 +623,7 @@ The package that this ticket is authorized to upgrade
 The kind of upgrade that this ticket authorizes.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_ticket_policy">ticket_policy</a>(ticket: &<a href="../sui/package.md#sui_package_UpgradeTicket">sui::package::UpgradeTicket</a>): u8
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_ticket_policy">ticket_policy</a>(ticket: &<a href="../sui/package.md#sui_package_UpgradeTicket">one::package::UpgradeTicket</a>): u8
 </code></pre>
 
 
@@ -649,7 +649,7 @@ ID of the <code><a href="../sui/package.md#sui_package_UpgradeCap">UpgradeCap</a
 update.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_receipt_cap">receipt_cap</a>(receipt: &<a href="../sui/package.md#sui_package_UpgradeReceipt">sui::package::UpgradeReceipt</a>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_receipt_cap">receipt_cap</a>(receipt: &<a href="../sui/package.md#sui_package_UpgradeReceipt">one::package::UpgradeReceipt</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -675,7 +675,7 @@ ID of the package that was upgraded to: the latest version of
 the package, as of the upgrade represented by this <code>receipt</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_receipt_package">receipt_package</a>(receipt: &<a href="../sui/package.md#sui_package_UpgradeReceipt">sui::package::UpgradeReceipt</a>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_receipt_package">receipt_package</a>(receipt: &<a href="../sui/package.md#sui_package_UpgradeReceipt">one::package::UpgradeReceipt</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -711,7 +711,7 @@ A package's digest is calculated as:
 sha3_256(sort(modules ++ deps))
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_ticket_digest">ticket_digest</a>(ticket: &<a href="../sui/package.md#sui_package_UpgradeTicket">sui::package::UpgradeTicket</a>): &vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_ticket_digest">ticket_digest</a>(ticket: &<a href="../sui/package.md#sui_package_UpgradeTicket">one::package::UpgradeTicket</a>): &vector&lt;u8&gt;
 </code></pre>
 
 
@@ -804,7 +804,7 @@ Restrict upgrades through this upgrade <code>cap</code> to just add code, or
 change dependencies.
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui/package.md#sui_package_only_additive_upgrades">only_additive_upgrades</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui/package.md#sui_package_only_additive_upgrades">only_additive_upgrades</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>)
 </code></pre>
 
 
@@ -830,7 +830,7 @@ Restrict upgrades through this upgrade <code>cap</code> to just change
 dependencies.
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui/package.md#sui_package_only_dep_upgrades">only_dep_upgrades</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui/package.md#sui_package_only_dep_upgrades">only_dep_upgrades</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>)
 </code></pre>
 
 
@@ -855,7 +855,7 @@ dependencies.
 Discard the <code><a href="../sui/package.md#sui_package_UpgradeCap">UpgradeCap</a></code> to make a package immutable.
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui/package.md#sui_package_make_immutable">make_immutable</a>(cap: <a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui/package.md#sui_package_make_immutable">make_immutable</a>(cap: <a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>)
 </code></pre>
 
 
@@ -890,7 +890,7 @@ the parent package must be compatible with the policy in the ticket
 for the upgrade to succeed.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_authorize_upgrade">authorize_upgrade</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>, policy: u8, digest: vector&lt;u8&gt;): <a href="../sui/package.md#sui_package_UpgradeTicket">sui::package::UpgradeTicket</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_authorize_upgrade">authorize_upgrade</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>, policy: u8, digest: vector&lt;u8&gt;): <a href="../sui/package.md#sui_package_UpgradeTicket">one::package::UpgradeTicket</a>
 </code></pre>
 
 
@@ -926,7 +926,7 @@ Consume an <code><a href="../sui/package.md#sui_package_UpgradeReceipt">UpgradeR
 the upgrade.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_commit_upgrade">commit_upgrade</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>, receipt: <a href="../sui/package.md#sui_package_UpgradeReceipt">sui::package::UpgradeReceipt</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/package.md#sui_package_commit_upgrade">commit_upgrade</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>, receipt: <a href="../sui/package.md#sui_package_UpgradeReceipt">one::package::UpgradeReceipt</a>)
 </code></pre>
 
 
@@ -954,7 +954,7 @@ the upgrade.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/package.md#sui_package_restrict">restrict</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">sui::package::UpgradeCap</a>, policy: u8)
+<pre><code><b>fun</b> <a href="../sui/package.md#sui_package_restrict">restrict</a>(cap: &<b>mut</b> <a href="../sui/package.md#sui_package_UpgradeCap">one::package::UpgradeCap</a>, policy: u8)
 </code></pre>
 
 

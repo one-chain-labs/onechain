@@ -15,8 +15,8 @@ module vesting::hybrid;
 
 use vesting::cliff;
 use vesting::linear;
-use sui::coin::{Self, Coin};
-use sui::clock::Clock;
+use one::coin::{Self, Coin};
+use one::clock::Clock;
 
 
 // === Structs ===

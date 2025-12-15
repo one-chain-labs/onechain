@@ -207,8 +207,8 @@ impl MoveObject {
         self.type_.is_coin()
     }
 
-    pub fn is_staked_sui(&self) -> bool {
-        self.type_.is_staked_sui()
+    pub fn is_staked_oct(&self) -> bool {
+        self.type_.is_staked_oct()
     }
 
     pub fn is_clock(&self) -> bool {
@@ -332,7 +332,7 @@ impl MoveObject {
     }
 
     /// Get the total amount of SUI embedded in `self`. Intended for testing purposes
-    pub fn get_total_sui(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
+    pub fn get_total_oct(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
         let balances = self.get_coin_balances(layout_resolver)?;
         Ok(balances.get(&GAS::type_tag()).copied().unwrap_or(0))
     }
@@ -822,7 +822,7 @@ impl ObjectInner {
     }
 
     // TODO: use `MoveObj::get_balance_unsafe` instead.
-    // context: https://github.com/MystenLabs/sui/pull/10679#discussion_r1165877816
+    // context: https://github.com/one-chain-labs/onechain/pull/10679#discussion_r1165877816
     pub fn as_coin_maybe(&self) -> Option<Coin> {
         if let Some(move_object) = self.data.try_as_move() {
             let coin: Coin = bcs::from_bytes(move_object.contents()).ok()?;
@@ -915,10 +915,10 @@ impl ObjectInner {
 // Testing-related APIs.
 impl Object {
     /// Get the total amount of SUI embedded in `self`, including both Move objects and the storage rebate
-    pub fn get_total_sui(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
+    pub fn get_total_oct(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
         Ok(self.storage_rebate
             + match &self.data {
-                Data::Move(m) => m.get_total_sui(layout_resolver)?,
+                Data::Move(m) => m.get_total_oct(layout_resolver)?,
                 Data::Package(_) => 0,
             })
     }

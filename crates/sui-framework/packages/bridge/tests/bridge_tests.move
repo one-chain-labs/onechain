@@ -43,13 +43,13 @@ use bridge::message_types;
 use bridge::test_token::{TEST_TOKEN, create_bridge_token as create_test_token};
 use bridge::usdc::USDC;
 use std::type_name;
-use sui::address;
-use sui::balance;
-use sui::coin::{Self, Coin};
-use sui::hex;
-use sui::package::test_publish;
-use sui::test_scenario;
-use sui::test_utils::destroy;
+use one::address;
+use one::balance;
+use one::coin::{Self, Coin};
+use one::hex;
+use one::package::test_publish;
+use one::test_scenario;
+use one::test_utils::destroy;
 
 // common error start code for unexpected errors in tests (assertions).
 // If more than one assert in a test needs to use an unexpected error code,

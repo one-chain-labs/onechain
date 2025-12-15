@@ -75,3 +75,4 @@ docs/content/references/framework/**
 lcov.info
 
 .sparse
+replace_scripts/.replace_scripts.lock

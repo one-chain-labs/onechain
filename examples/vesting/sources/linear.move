@@ -11,9 +11,9 @@
 /// ===========================================================================================
 #[allow(unused_const)]
 module vesting::linear;
-use sui::coin::{Self, Coin};
-use sui::clock::Clock;
-use sui::balance::Balance;
+use one::coin::{Self, Coin};
+use one::clock::Clock;
+use one::balance::Balance;
 
 // === Errors ===
 #[error]

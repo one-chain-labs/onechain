@@ -5,10 +5,10 @@
 module vesting::backloaded_tests;
 
 use vesting::backloaded::{Self, new_wallet, Wallet};
-use sui::clock::{Self};
-use sui::coin::{Self};
-use sui::test_scenario as ts;
-use sui::sui::SUI;
+use one::clock::{Self};
+use one::coin::{Self};
+use one::test_scenario as ts;
+use one::oct::OCT;
 
 public struct Token has key, store { id: UID }
 
@@ -22,7 +22,7 @@ const BACK_PERCENTAGE: u8 = 80;
 
 fun test_setup(start_front: u64, start_back: u64, duration: u64, back_percentage: u8): ts::Scenario {
     let mut ts = ts::begin(CONTROLLER_ADDR);
-    let coins = coin::mint_for_testing<SUI>(FULLY_VESTED_AMOUNT, ts.ctx());
+    let coins = coin::mint_for_testing<OCT>(FULLY_VESTED_AMOUNT, ts.ctx());
     let now = clock::create_for_testing(ts.ctx());
     let wallet = new_wallet(coins, &now, start_front, start_back, duration, back_percentage, ts.ctx());
     transfer::public_transfer(wallet, OWNER_ADDR);
@@ -49,7 +49,7 @@ fun test_backloaded_vesting() {
     let mut ts = test_setup(START_FRONT, START_BACK, VESTING_DURATION, BACK_PERCENTAGE);
     ts.next_tx(OWNER_ADDR);
     let mut now = clock::create_for_testing(ts.ctx());
-    let mut wallet = ts.take_from_sender<Wallet<SUI>>();
+    let mut wallet = ts.take_from_sender<Wallet<OCT>>();
 
     // check zero vested
     now.set_for_testing(START_FRONT);
@@ -103,7 +103,7 @@ fun test_backloaded_claimable() {
     let mut ts = test_setup(START_FRONT, START_FRONT + 100, 200, BACK_PERCENTAGE);
     ts.next_tx(OWNER_ADDR);
     let mut now = clock::create_for_testing(ts.ctx());
-    let mut wallet = ts.take_from_sender<Wallet<SUI>>();
+    let mut wallet = ts.take_from_sender<Wallet<OCT>>();
     let first_duration_claimable = FULLY_VESTED_AMOUNT * (100 - BACK_PERCENTAGE as u64) / 100;
     let last_duration_claimable = FULLY_VESTED_AMOUNT * (BACK_PERCENTAGE as u64) / 100;
 
@@ -121,7 +121,7 @@ fun test_backloaded_claimable() {
     now.increment_for_testing(100);
     assert!(wallet.claimable(&now) == FULLY_VESTED_AMOUNT - coin.value());
 
-    sui::test_utils::destroy(coin);
+    one::test_utils::destroy(coin);
     ts.return_to_sender(wallet);
     now.destroy_for_testing();
     let _end = ts::end(ts);

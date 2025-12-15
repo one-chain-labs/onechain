@@ -304,11 +304,11 @@ mod tests {
         let million_coin = Object::with_id_owner_gas_for_testing(id, SuiAddress::ZERO, 1000000);
         assert_eq!(get_coin_balance_bucket(&million_coin).unwrap(), 6);
 
-        // The type of this object is a staked SUI, not a coin.
+        // The type of this object is a staked OCT, not a coin.
         let invalid_coin = unsafe {
             Object::new_move(
                 MoveObject::new_from_execution(
-                    MoveObjectType::staked_sui(),
+                    MoveObjectType::staked_oct(),
                     false,
                     SequenceNumber::new(),
                     bcs::to_bytes(&Object::new_gas_for_testing()).unwrap(),

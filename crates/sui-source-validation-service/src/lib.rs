@@ -47,9 +47,9 @@ pub const HOST_PORT_ENV: &str = "HOST_PORT";
 pub const SUI_SOURCE_VALIDATION_VERSION_HEADER: &str = "x-sui-source-validation-version";
 pub const SUI_SOURCE_VALIDATION_VERSION: &str = "0.1";
 
-pub const MAINNET_URL: &str = "https://fullnode.mainnet.sui.io:443";
-pub const TESTNET_URL: &str = "https://fullnode.testnet.sui.io:443";
-pub const DEVNET_URL: &str = "https://fullnode.devnet.sui.io:443";
+pub const MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
+pub const TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
+pub const DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
 pub const LOCALNET_URL: &str = "http://127.0.0.1:9000";
 
 pub const MAINNET_WS_URL: &str = "wss://rpc.mainnet.sui.io:443";

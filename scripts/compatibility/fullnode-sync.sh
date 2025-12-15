@@ -62,7 +62,7 @@ fi
 
 if [[ ! -f "${SUI_RUN_PATH}/genesis.blob" ]]; then
     echo "Copying genesis.blob for ${NETWORK}"
-    curl -fLJO https://github.com/MystenLabs/sui-genesis/raw/main/${NETWORK}/genesis.blob
+    curl -fLJO https://github.com/one-chain-labs/onechain-genesis/raw/main/${NETWORK}/genesis.blob
     mv ./genesis.blob ${SUI_RUN_PATH}/genesis.blob
     echo "Done"
 fi

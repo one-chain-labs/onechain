@@ -6,7 +6,7 @@ Objects in Sui can have different types of ownership, with two broad categories:
 
 ## Create immutable object
 
-To convert an object into an immutable object, call the `public_freeze_object` function from the [transfer module](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/transfer.move):
+To convert an object into an immutable object, call the `public_freeze_object` function from the [transfer module](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-framework/sources/transfer.move):
 
 ```move
 public native fun public_freeze_object<T: key>(obj: T);
@@ -14,7 +14,7 @@ public native fun public_freeze_object<T: key>(obj: T);
 
 This call makes the specified object immutable. This is a non-reversible operation. You should freeze an object only when you are certain that you don't need to mutate it.
 
-You can see this function's use in one of the [color_object example module](https://github.com/MystenLabs/sui/blob/main/examples/move/color_object/sources/example.move) tests. The test creates a new (owned) `ColorObject`, then calls `public_freeze_object` to turn it into an immutable object.
+You can see this function's use in one of the [color_object example module](https://github.com/one-chain-labs/onechain/blob/main/examples/move/color_object/sources/example.move) tests. The test creates a new (owned) `ColorObject`, then calls `public_freeze_object` to turn it into an immutable object.
 
 ```move
 {

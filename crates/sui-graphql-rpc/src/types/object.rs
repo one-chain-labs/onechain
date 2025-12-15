@@ -49,7 +49,7 @@ use super::{
     move_object::MoveObject,
     move_package::MovePackage,
     owner::{Authenticator, Owner, OwnerImpl},
-    stake::StakedSui,
+    stake::StakedOct,
     sui_address::{addr, SuiAddress},
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block,
@@ -136,7 +136,7 @@ pub(crate) struct ObjectFilter {
     /// name.
     ///
     /// Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by
-    /// the full type name, such as `0x2::coin::Coin<0x2::sui::SUI>`.
+    /// the full type name, such as `0x2::coin::Coin<0x2::one::OCT>`.
     pub type_: Option<TypeFilter>,
 
     /// Filter for live objects by their current owners.
@@ -296,7 +296,7 @@ pub(crate) enum IObject {
     MoveObject(MoveObject),
     Coin(Coin),
     CoinMetadata(CoinMetadata),
-    StakedSui(StakedSui),
+    StakedOct(StakedOct),
     SuinsRegistration(SuinsRegistration),
 }
 
@@ -359,7 +359,7 @@ impl Object {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::sui::SUI`.
+    /// it defaults to `0x2::one::OCT`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(self).balance(ctx, type_).await
     }
@@ -378,7 +378,7 @@ impl Object {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::one::OCT`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -391,16 +391,16 @@ impl Object {
         OwnerImpl::from(self).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<Cursor>,
         last: Option<u64>,
         before: Option<Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(self).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(self).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.

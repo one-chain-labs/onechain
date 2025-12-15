@@ -30,7 +30,7 @@ sudo mv sui-node /opt/sui/bin
 - Build from source:
 
 ```shell
-git clone https://github.com/MystenLabs/sui.git && cd sui
+git clone https://github.com/one-chain-labs/onechain.git && cd sui
 git checkout $SUI_SHA
 cargo build --release --bin sui-node
 mv ./target/release/sui-node /opt/sui/bin/sui-node

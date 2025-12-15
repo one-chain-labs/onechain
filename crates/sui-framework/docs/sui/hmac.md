@@ -1,5 +1,5 @@
 ---
-title: Module `sui::hmac`
+title: Module `one::hmac`
 ---
 
 

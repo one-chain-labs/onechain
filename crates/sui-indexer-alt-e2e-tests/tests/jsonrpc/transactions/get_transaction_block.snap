@@ -16,7 +16,7 @@ task 2, lines 50-56:
 //# programmable --sender A --inputs object(1,0) 42 @A
 //> 0: test::counter::inc(Input(0));
 //> 1: test::counter::inc_by(Input(0), Input(1));
-//> 2: sui::coin::value<sui::sui::SUI>(Gas);
+//> 2: one::coin::value<one::oct::OCT>(Gas);
 //> 3: test::counter::inc_by(Input(0), Result(2));
 //> 4: test::counter::take(Input(0), Input(1));
 //> 5: TransferObjects([Result(4)], Input(2))
@@ -731,7 +731,7 @@ Response: {
                 "module": "coin",
                 "function": "value",
                 "type_arguments": [
-                  "0x2::sui::SUI"
+                  "0x2::one::OCT"
                 ],
                 "arguments": [
                   "GasCoin"
@@ -925,7 +925,7 @@ Response: {
         "owner": {
           "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
         },
-        "coinType": "0x2::sui::SUI",
+        "coinType": "0x2::one::OCT",
         "amount": "-3331604"
       }
     ]
@@ -944,14 +944,14 @@ Response: {
         "owner": {
           "AddressOwner": "0xa7b032703878aa74c3126935789fd1d4d7e111d5911b09247d6963061c312b5a"
         },
-        "coinType": "0x2::sui::SUI",
+        "coinType": "0x2::one::OCT",
         "amount": "42"
       },
       {
         "owner": {
           "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
         },
-        "coinType": "0x2::sui::SUI",
+        "coinType": "0x2::one::OCT",
         "amount": "-1997922"
       }
     ]

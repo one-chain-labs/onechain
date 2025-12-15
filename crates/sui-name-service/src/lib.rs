@@ -88,7 +88,7 @@ pub struct NameServiceConfig {
     pub reverse_registry_id: ObjectID,
 }
 
-/// Rust version of the Move sui::table::Table type.
+/// Rust version of the Move one::table::Table type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Table<K, V> {
     pub id: ObjectID,
@@ -196,10 +196,10 @@ impl NameServiceConfig {
 
     // Create a config based on the package and object ids published on mainnet
     pub fn mainnet() -> Self {
-        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0xd22b24490e0bae52676651b4f56660a5ff8022a2576e0089f79b3c88d44e08f0";
-        const MAINNET_NS_REGISTRY_ID: &str = "0xe64cd9db9f829c6cc405d9790bd71567ae07259855f4fba6f02c84f52298c106";
+        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0xb518b15510de80320a046288ca391a2a06b8aa4ca979287549edc123dbe8313f";
+        const MAINNET_NS_REGISTRY_ID: &str = "0x7bd439c354340ced161f29bbd9ee8c4799402fb83ec43eec0277a356e68878cf";
         const MAINNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0x2fd099e17a292d2bc541df474f9fafa595653848cbabb2d7a4656ec786a1969f";
+            "0x83b34ff1aeb4a11a983133625479abdec2820e2cbeafe11b8b817944a223586d";
 
         let package_address = SuiAddress::from_str(MAINNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(MAINNET_NS_REGISTRY_ID).unwrap();
@@ -211,9 +211,9 @@ impl NameServiceConfig {
     // Create a config based on the package and object ids published on testnet
     pub fn testnet() -> Self {
         const TESTNET_NS_PACKAGE_ADDRESS: &str = "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93";
-        const TESTNET_NS_REGISTRY_ID: &str = "0xb120c0d55432630fce61f7854795a3463deb6e3b443cc4ae72e1282073ff56e4";
+        const TESTNET_NS_REGISTRY_ID: &str = "0xb01097dfebb8fe21fe91a4502051e94920cc78c5382708271732b430e1af281f";
         const TESTNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0xcee9dbb070db70936c3a374439a6adb16f3ba97eac5468d2e1e6fff6ed93e465";
+            "0x6f35cfef2e07be3323901211a4e5cdd9ab8fef5274489ca0481ab38a754e0eb4";
 
         let package_address = SuiAddress::from_str(TESTNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(TESTNET_NS_REGISTRY_ID).unwrap();

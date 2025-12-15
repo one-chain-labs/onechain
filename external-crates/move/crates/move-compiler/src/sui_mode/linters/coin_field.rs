@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! This analysis flags uses of the sui::coin::Coin struct in fields of other structs. In most cases
-//! it's preferable to use sui::balance::Balance instead to save space.
+//! This analysis flags uses of the one::coin::Coin struct in fields of other structs. In most cases
+//! it's preferable to use one::balance::Balance instead to save space.
 
 use crate::{
     diag,
@@ -24,7 +24,7 @@ const COIN_FIELD_DIAG: DiagnosticInfo = custom(
     Severity::Warning,
     LinterDiagnosticCategory::Sui as u8,
     LinterDiagnosticCode::CoinField as u8,
-    "sub-optimal 'sui::coin::Coin' field type",
+    "sub-optimal 'one::coin::Coin' field type",
 );
 
 simple_visitor!(
@@ -47,8 +47,8 @@ simple_visitor!(
         if let N::StructFields::Defined(_, sfields) = &sdef.fields {
             for (_floc, _fname, (_, (_, ftype))) in sfields {
                 if is_field_coin_type(ftype) {
-                    let msg = "Sub-optimal 'sui::coin::Coin' field type. Using \
-                        'sui::balance::Balance' instead will be more space efficient";
+                    let msg = "Sub-optimal 'one::coin::Coin' field type. Using \
+                        'one::balance::Balance' instead will be more space efficient";
                     self.add_diag(diag!(COIN_FIELD_DIAG, (ftype.loc, msg)));
                 }
             }

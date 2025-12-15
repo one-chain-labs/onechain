@@ -459,7 +459,7 @@ impl<'backing> TemporaryStore<'backing> {
             .expect("0x5 object must be muated in system tx with unmetered storage rebate")
             .clone();
         // In unmetered execution, storage_rebate field of mutated object must be 0.
-        // If not, we would be dropping SUI on the floor by overriding it.
+        // If not, we would be dropping OCT on the floor by overriding it.
         assert_eq!(system_state_wrapper.storage_rebate, 0);
         system_state_wrapper.storage_rebate = unmetered_storage_rebate;
         self.write_object(system_state_wrapper, WriteKind::Mutate);
@@ -727,7 +727,7 @@ impl TemporaryStore<'_> {
 type ModifiedObjectInfo<'a> = (ObjectID, Option<(SequenceNumber, u64)>, Option<&'a Object>);
 
 impl TemporaryStore<'_> {
-    fn get_input_sui(
+    fn get_input_oct(
         &self,
         id: &ObjectID,
         expected_version: SequenceNumber,
@@ -743,9 +743,9 @@ impl TemporaryStore<'_> {
                     obj.version(),
                 );
             }
-            obj.get_total_sui(layout_resolver).map_err(|e| {
+            obj.get_total_oct(layout_resolver).map_err(|e| {
                 make_invariant_violation!(
-                    "Failed looking up input SUI in SUI conservation checking for input with \
+                    "Failed looking up input OCT in OCT conservation checking for input with \
                          type {:?}: {e:#?}",
                     obj.struct_tag(),
                 )
@@ -753,11 +753,11 @@ impl TemporaryStore<'_> {
         } else {
             // not in input objects, must be a dynamic field
             let Some(obj) = self.store.get_object_by_key(id, expected_version) else {
-                invariant_violation!("Failed looking up dynamic field {id} in SUI conservation checking");
+                invariant_violation!("Failed looking up dynamic field {id} in OCT conservation checking");
             };
-            obj.get_total_sui(layout_resolver).map_err(|e| {
+            obj.get_total_oct(layout_resolver).map_err(|e| {
                 make_invariant_violation!(
-                    "Failed looking up input SUI in SUI conservation checking for type \
+                    "Failed looking up input OCT in OCT conservation checking for type \
                          {:?}: {e:#?}",
                     obj.struct_tag(),
                 )
@@ -793,19 +793,19 @@ impl TemporaryStore<'_> {
             .collect()
     }
 
-    /// Check that this transaction neither creates nor destroys SUI. This should hold for all txes
+    /// Check that this transaction neither creates nor destroys OCT. This should hold for all txes
     /// except the epoch change tx, which mints staking rewards equal to the gas fees burned in the
     /// previous epoch.  Specifically, this checks two key invariants about storage fees and storage
     /// rebate:
     ///
-    /// 1. all SUI in storage rebate fields of input objects should flow either to the transaction
+    /// 1. all OCT in storage rebate fields of input objects should flow either to the transaction
     ///    storage rebate, or the transaction non-refundable storage rebate
-    /// 2. all SUI charged for storage should flow into the storage rebate field of some output
+    /// 2. all OCT charged for storage should flow into the storage rebate field of some output
     ///    object
     ///
     /// If `do_expensive_checks` is true, this will also check a third invariant:
     ///
-    /// 3. all SUI in input objects (including coins etc in the Move part of an object) should flow
+    /// 3. all OCT in input objects (including coins etc in the Move part of an object) should flow
     ///    either to an output object, or be burned as part of computation fees or non-refundable
     ///    storage rebate
     ///
@@ -813,8 +813,8 @@ impl TemporaryStore<'_> {
     /// rebate to the gas object, but *before* we have updated object versions.  If
     /// `do_expensive_checks` is false, this function will only check conservation of object storage
     /// rea `epoch_fees` and `epoch_rebates` are only set for advance epoch transactions.  The
-    /// advance epoch transaction would mint `epoch_fees` amount of SUI, and burn `epoch_rebates`
-    /// amount of SUI. We need these information for conservation check.
+    /// advance epoch transaction would mint `epoch_fees` amount of OCT, and burn `epoch_rebates`
+    /// amount of OCT. We need these information for conservation check.
     pub fn check_sui_conserved(
         &self,
         gas_summary: &GasCostSummary,
@@ -822,27 +822,27 @@ impl TemporaryStore<'_> {
         layout_resolver: &mut impl LayoutResolver,
         do_expensive_checks: bool,
     ) -> Result<(), ExecutionError> {
-        // total amount of SUI in input objects, including both coins and storage rebates
-        let mut total_input_sui = 0;
-        // total amount of SUI in output objects, including both coins and storage rebates
-        let mut total_output_sui = 0;
-        // total amount of SUI in storage rebate of input objects
+        // total amount of OCT in input objects, including both coins and storage rebates
+        let mut total_input_oct = 0;
+        // total amount of OCT in output objects, including both coins and storage rebates
+        let mut total_output_oct = 0;
+        // total amount of OCT in storage rebate of input objects
         let mut total_input_rebate = 0;
-        // total amount of SUI in storage rebate of output objects
+        // total amount of OCT in storage rebate of output objects
         let mut total_output_rebate = 0;
         for (id, input, output) in self.get_modified_objects() {
             if let Some((version, storage_rebate)) = input {
                 total_input_rebate += storage_rebate;
                 if do_expensive_checks {
-                    total_input_sui += self.get_input_sui(&id, version, layout_resolver)?;
+                    total_input_oct += self.get_input_oct(&id, version, layout_resolver)?;
                 }
             }
             if let Some(object) = output {
                 total_output_rebate += object.storage_rebate;
                 if do_expensive_checks {
-                    total_output_sui += object.get_total_sui(layout_resolver).map_err(|e| {
+                    total_output_oct += object.get_total_oct(layout_resolver).map_err(|e| {
                         make_invariant_violation!(
-                            "Failed looking up output SUI in SUI conservation checking for \
+                            "Failed looking up output OCT in OCT conservation checking for \
                              mutated type {:?}: {e:#?}",
                             object.struct_tag(),
                         )
@@ -854,35 +854,35 @@ impl TemporaryStore<'_> {
             // note: storage_cost flows into the storage_rebate field of the output objects, which is why it is not accounted for here.
             // similarly, all of the storage_rebate *except* the storage_fund_rebate_inflow gets credited to the gas coin
             // both computation costs and storage rebate inflow are
-            total_output_sui += gas_summary.computation_cost + gas_summary.non_refundable_storage_fee;
+            total_output_oct += gas_summary.computation_cost + gas_summary.non_refundable_storage_fee;
             if let Some((epoch_fees, epoch_rebates)) = advance_epoch_gas_summary {
-                total_input_sui += epoch_fees;
-                total_output_sui += epoch_rebates;
+                total_input_oct += epoch_fees;
+                total_output_oct += epoch_rebates;
             }
-            if total_input_sui != total_output_sui {
+            if total_input_oct != total_output_oct {
                 return Err(ExecutionError::invariant_violation(format!(
-                    "SUI conservation failed: input={}, output={}, this transaction either mints or burns SUI",
-                    total_input_sui, total_output_sui
+                    "OCT conservation failed: input={}, output={}, this transaction either mints or burns OCT",
+                    total_input_oct, total_output_oct
                 )));
             }
         }
 
-        // all SUI in storage rebate fields of input objects should flow either to the transaction storage rebate, or the non-refundable
+        // all OCT in storage rebate fields of input objects should flow either to the transaction storage rebate, or the non-refundable
         // storage rebate pool
         if total_input_rebate != gas_summary.storage_rebate + gas_summary.non_refundable_storage_fee {
             // TODO: re-enable once we fix the edge case with OOG, gas smashing, and storage rebate
             /*return Err(ExecutionError::invariant_violation(
-                format!("SUI conservation failed--{} SUI in storage rebate field of input objects, {} SUI in tx storage rebate or tx non-refundable storage rebate",
+                format!("OCT conservation failed--{} OCT in storage rebate field of input objects, {} OCT in tx storage rebate or tx non-refundable storage rebate",
                 total_input_rebate,
                 gas_summary.non_refundable_storage_fee))
             );*/
         }
 
-        // all SUI charged for storage should flow into the storage rebate field of some output object
+        // all OCT charged for storage should flow into the storage rebate field of some output object
         if gas_summary.storage_cost != total_output_rebate {
             // TODO: re-enable once we fix the edge case with OOG, gas smashing, and storage rebate
             /*return Err(ExecutionError::invariant_violation(
-                format!("SUI conservation failed--{} SUI charged for storage, {} SUI in storage rebate field of output objects",
+                format!("OCT conservation failed--{} OCT charged for storage, {} OCT in storage rebate field of output objects",
                 gas_summary.storage_cost,
                 total_output_rebate))
             );*/

@@ -24,10 +24,10 @@ An event object in Sui consists of the following attributes:
 
 ## Emit events in Move
 
-To create an event in your Move modules, add the `sui::event` dependency.
+To create an event in your Move modules, add the `one::event` dependency.
 
 ```move
-use sui::event;
+use one::event;
 ```
 
 With the dependency added, you can use the `emit` function to trigger an event whenever the action you want to monitor fires. For example, the following code is part of an example application that enables the locking of objects. The `lock` function handles the locking of objects and emits an event whenever the function is called.
@@ -94,7 +94,7 @@ A successful `curl` return
 				"packageId": "0x158f2027f60c89bb91526d9bf08831d27f5a0fcb0f74e6698b9f0e1fb2be5d05",
 				"transactionModule": "deepbook_utils",
 				"sender": "0x8b35e67a519fffa11a9c74f169228ff1aa085f3a3d57710af08baab8c02211b9",
-				"type": "0xdee9::clob_v2::OrderFilled<0x2::sui::SUI, 0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN>",
+				"type": "0xdee9::clob_v2::OrderFilled<0x2::one::OCT, 0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN>",
 				"parsedJson": {
 					"base_asset_quantity_filled": "0",
 					"base_asset_quantity_remaining": "1532800000000",
@@ -121,7 +121,7 @@ A successful `curl` return
 				"packageId": "0x158f2027f60c89bb91526d9bf08831d27f5a0fcb0f74e6698b9f0e1fb2be5d05",
 				"transactionModule": "deepbook_utils",
 				"sender": "0x8b35e67a519fffa11a9c74f169228ff1aa085f3a3d57710af08baab8c02211b9",
-				"type": "0xdee9::clob_v2::OrderFilled<0x2::sui::SUI, 0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN>",
+				"type": "0xdee9::clob_v2::OrderFilled<0x2::one::OCT, 0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN>",
 				"parsedJson": {
 					"base_asset_quantity_filled": "700000000",
 					"base_asset_quantity_remaining": "0",
@@ -293,7 +293,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 <BetaTag beta="true" slim="true"/>
 
-You can use GraphQL to query events instead of JSON RPC. The following example queries are in the [`sui-graphql-rpc` crate](https://github.com/MystenLabs/sui/tree/main/crates/sui-graphql-rpc/examples/event_connection) in the Sui repo. 
+You can use GraphQL to query events instead of JSON RPC. The following example queries are in the [`sui-graphql-rpc` crate](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-graphql-rpc/examples/event_connection) in the Sui repo. 
 
 <details>
 <summary>

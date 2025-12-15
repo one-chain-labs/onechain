@@ -3,7 +3,7 @@ name = "suins"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { local = "../../../sui-framework/packages/sui-framework" }
+Sui = { local = "../../../sui-framework/packages/one-framework" }
 
 [addresses]
 suins = "0x0"

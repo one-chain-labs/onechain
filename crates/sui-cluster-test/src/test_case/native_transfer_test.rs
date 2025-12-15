@@ -48,7 +48,7 @@ impl TestCaseImpl for NativeTransferTest {
         // Test transfer sui
         let obj_to_transfer_2 = *sui_objs_2.swap_remove(0).id();
         let params = rpc_params![signer, obj_to_transfer_2, (2_000_000).to_string(), recipient_addr, None::<u64>];
-        let data = ctx.build_transaction_remotely("unsafe_transferSui", params).await?;
+        let data = ctx.build_transaction_remotely("unsafe_transferOct", params).await?;
         let mut response = ctx.sign_and_execute(data, "coin transfer").await;
 
         Self::examine_response(ctx, &mut response, signer, recipient_addr, obj_to_transfer).await;
@@ -74,11 +74,11 @@ impl NativeTransferTest {
         }
         BalanceChangeChecker::new()
             .owner(Owner::AddressOwner(recipient))
-            .coin_type("0x2::sui::SUI")
+            .coin_type("0x2::one::OCT")
             .check(&balance_changes.remove(0));
         BalanceChangeChecker::new()
             .owner(Owner::AddressOwner(signer))
-            .coin_type("0x2::sui::SUI")
+            .coin_type("0x2::one::OCT")
             .check(&balance_changes.remove(0));
         // Verify fullnode observes the txn
         ctx.let_fullnode_sync(vec![response.digest], 5).await;

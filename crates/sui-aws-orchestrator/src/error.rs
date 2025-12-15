@@ -53,7 +53,7 @@ pub type SshResult<T> = Result<T, SshError>;
 #[derive(thiserror::Error, Debug)]
 pub enum SshError {
     #[error("Failed to load private key for {address}: {error}")]
-    PrivateKeyError { address: SocketAddr, error: russh_keys::Error },
+    PrivateKeyError { address: SocketAddr, error: russh::keys::Error },
 
     #[error("Failed to create ssh session with {address}: {error}")]
     SessionError { address: SocketAddr, error: russh::Error },

@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use rand::seq::IteratorRandom;
-use sui_core::test_utils::make_transfer_sui_transaction;
+use sui_core::test_utils::make_transfer_oct_transaction;
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
     base_types::{ObjectRef, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
-    gas_coin::MIST_PER_SUI,
+    gas_coin::MIST_PER_OCT,
     transaction::Transaction,
 };
 use tracing::error;
@@ -80,10 +80,10 @@ impl Payload for DelegationTestPayload {
             )
             .call_staking(coin, self.validator)
             .build_and_sign(self.keypair.as_ref()),
-            None => make_transfer_sui_transaction(
+            None => make_transfer_oct_transaction(
                 self.gas,
                 self.sender,
-                Some(MIST_PER_SUI),
+                Some(MIST_PER_OCT),
                 self.sender,
                 &self.keypair,
                 self.system_state_observer.state.borrow().reference_gas_price,

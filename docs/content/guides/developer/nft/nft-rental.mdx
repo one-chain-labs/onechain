@@ -65,7 +65,7 @@ This implementation is charging a rental fee based on days. You can re-purpose a
 
 ## Move modules
 
-The NFT Rental example uses a single module, `nft_rental.move`. You can find the source for this file hosted in the [sui repository](https://github.com/MystenLabs/sui/tree/main/examples/move/nft-rental/sources/nft_rental.move) in the `examples` directory. The source code includes extensive comments to help you follow the example's logic and structure. 
+The NFT Rental example uses a single module, `nft_rental.move`. You can find the source for this file hosted in the [sui repository](https://github.com/one-chain-labs/onechain/tree/main/examples/move/nft-rental/sources/nft_rental.move) in the `examples` directory. The source code includes extensive comments to help you follow the example's logic and structure. 
 
 ### nft_rental
 
@@ -134,7 +134,7 @@ The `RentalPolicy` struct is a shared object that every creator mints. The struc
 ```move
 public struct RentalPolicy<phantom T> has key, store {
   id: UID,
-  balance: Balance<SUI>,
+  balance: Balance<OCT>,
   /// Note: Move does not support float numbers.
   ///
   /// If you need to represent a float, you need to determine the desired
@@ -203,7 +203,7 @@ public fun setup_renting<T>(publisher: &Publisher, amount_bp: u64, ctx: &mut TxC
 
   let rental_policy = RentalPolicy<T> {
     id: object::new(ctx),
-    balance: balance::zero<SUI>(),
+    balance: balance::zero<OCT>(),
     amount_bp,
   };
 
@@ -238,7 +238,7 @@ public fun list<T: key + store>(
   kiosk.list<T>(cap, item_id, 0);
 
   // Constructs a zero coin.
-  let coin = coin::zero<SUI>(ctx);
+  let coin = coin::zero<OCT>(ctx);
   // Purchases the item with 0 SUI.
   let (object, request) = kiosk.purchase<T>(item_id, coin);
 
@@ -302,7 +302,7 @@ public fun rent<T: key + store>(
   borrower_kiosk: &mut Kiosk,
   rental_policy: &mut RentalPolicy<T>,
   item_id: ID,
-  mut coin: Coin<SUI>,
+  mut coin: Coin<OCT>,
   clock: &Clock,
   ctx: &mut TxContext,
 ) {
@@ -649,7 +649,7 @@ rect rgba(191, 223, 255, 0.2)
 
 ## Related links
 
-- [NFT Rental example](https://github.com/MystenLabs/sui/tree/main/examples/move/nft-rental): The source code that this document references.
+- [NFT Rental example](https://github.com/one-chain-labs/onechain/tree/main/examples/move/nft-rental): The source code that this document references.
 - [Sui Kiosk](../../../standards/kiosk.mdx): Kiosk is a decentralized system for commerce applications on Sui.
 - [Kiosk Apps](../../../standards/kiosk-apps.mdx): The Kiosk Apps standard extends the functionality of Sui Kiosk.  
 - [Custom Transfer Rules](../../../concepts/transfers/custom-rules.mdx): Custom transfer rules are used in this example to define rental policies.

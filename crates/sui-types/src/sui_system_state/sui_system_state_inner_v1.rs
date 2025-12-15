@@ -1,18 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use fastcrypto::traits::ToFromBytes;
-use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize};
-
-use super::{
-    epoch_start_sui_system_state::EpochStartValidatorInfoV1,
-    get_validators_from_table_vec,
-    sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-    AdvanceEpochParams,
-    SuiSystemStateTrait,
-};
 use crate::{
     balance::Balance,
     base_types::{ObjectID, SuiAddress},
@@ -31,6 +19,15 @@ use crate::{
     storage::ObjectStore,
     sui_system_state::epoch_start_sui_system_state::EpochStartSystemState,
 };
+use super::epoch_start_sui_system_state::EpochStartValidatorInfoV1;
+use super::sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary};
+use super::{get_validators_from_table_vec, AdvanceEpochParams, SuiSystemStateTrait};
+use anyhow::Result;
+use fastcrypto::traits::ToFromBytes;
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
+
+use super::sui_system_state_summary::{SuiSupperCommitteeSummary};
 
 const E_METADATA_INVALID_POP: u64 = 0;
 const E_METADATA_INVALID_PUBKEY: u64 = 1;
@@ -269,9 +266,11 @@ impl ValidatorMetadataV1 {
 /// Rust version of the Move sui::validator::Validator type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ValidatorV1 {
-    metadata: ValidatorMetadataV1,
+    pub metadata: ValidatorMetadataV1,
     #[serde(skip)]
     verified_metadata: OnceCell<VerifiedValidatorMetadataV1>,
+    pub revenue_receiving_address: SuiAddress,
+    pub only_validator_staking: bool,
 
     pub voting_power: u64,
     pub operation_cap_id: ID,
@@ -321,17 +320,19 @@ impl ValidatorV1 {
             voting_power,
             operation_cap_id,
             gas_price,
+            revenue_receiving_address,
+            only_validator_staking,
             staking_pool:
                 StakingPoolV1 {
                     id: staking_pool_id,
                     activation_epoch: staking_pool_activation_epoch,
                     deactivation_epoch: staking_pool_deactivation_epoch,
-                    sui_balance: staking_pool_sui_balance,
+                    oct_balance: staking_pool_oct_balance,
                     rewards_pool,
                     pool_token_balance,
                     exchange_rates: Table { id: exchange_rates_id, size: exchange_rates_size },
                     pending_stake,
-                    pending_total_sui_withdraw,
+                    pending_total_oct_withdraw,
                     pending_pool_token_withdraw,
                     extra_fields: _,
                 },
@@ -364,18 +365,20 @@ impl ValidatorV1 {
             next_epoch_primary_address,
             next_epoch_worker_address,
             voting_power,
+            revenue_receiving_address,
+            only_validator_staking,
             operation_cap_id: operation_cap_id.bytes,
             gas_price,
             staking_pool_id,
             staking_pool_activation_epoch,
             staking_pool_deactivation_epoch,
-            staking_pool_sui_balance,
+            staking_pool_oct_balance,
             rewards_pool: rewards_pool.value(),
             pool_token_balance,
             exchange_rates_id,
             exchange_rates_size,
             pending_stake,
-            pending_total_sui_withdraw,
+            pending_total_oct_withdraw,
             pending_pool_token_withdraw,
             commission_rate,
             next_epoch_stake,
@@ -391,14 +394,26 @@ pub struct StakingPoolV1 {
     pub id: ObjectID,
     pub activation_epoch: Option<u64>,
     pub deactivation_epoch: Option<u64>,
-    pub sui_balance: u64,
+    pub oct_balance: u64,
     pub rewards_pool: Balance,
     pub pool_token_balance: u64,
     pub exchange_rates: Table,
     pub pending_stake: u64,
-    pub pending_total_sui_withdraw: u64,
+    pub pending_total_oct_withdraw: u64,
     pub pending_pool_token_withdraw: u64,
     pub extra_fields: Bag,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct SuiSupperCommittee {
+    pub proposal_list: Vec<ObjectID>,
+    pub extra_fields: Bag,
+}
+
+impl SuiSupperCommittee {
+    pub fn into_supper_committee_summary(self) -> SuiSupperCommitteeSummary {
+        SuiSupperCommitteeSummary { proposal_list: self.proposal_list }
+    }
 }
 
 /// Rust version of the Move sui_system::validator_set::ValidatorSet type
@@ -412,6 +427,8 @@ pub struct ValidatorSetV1 {
     pub inactive_validators: Table,
     pub validator_candidates: Table,
     pub at_risk_validators: VecMap<SuiAddress, u64>,
+    pub only_trusted_validator: bool,
+    pub trusted_validators: VecSet<SuiAddress>,
     pub extra_fields: Bag,
 }
 
@@ -428,6 +445,7 @@ pub struct SuiSystemStateInnerV1 {
     pub epoch: u64,
     pub protocol_version: u64,
     pub system_state_version: u64,
+    pub supper_committee: SuiSupperCommittee,
     pub validators: ValidatorSetV1,
     pub storage_fund: StorageFundV1,
     pub parameters: SystemParametersV1,
@@ -446,7 +464,7 @@ pub struct SuiSystemStateInnerV1 {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct StakeSubsidyV1 {
-    /// Balance of SUI set aside for stake subsidies that will be drawn down over time.
+    /// Balance of OCT set aside for stake subsidies that will be drawn down over time.
     pub balance: Balance,
 
     /// Count of the number of times stake subsidies have been distributed.
@@ -575,6 +593,7 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
             epoch,
             protocol_version,
             system_state_version,
+            supper_committee,
             validators:
                 ValidatorSetV1 {
                     total_stake,
@@ -588,6 +607,8 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
                     inactive_validators: Table { id: inactive_pools_id, size: inactive_pools_size },
                     validator_candidates: Table { id: validator_candidates_id, size: validator_candidates_size },
                     at_risk_validators: VecMap { contents: at_risk_validators },
+                    trusted_validators: VecSet { contents: trusted_validators },
+                    only_trusted_validator,
                     extra_fields: _,
                 },
             storage_fund,
@@ -659,6 +680,9 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
             validator_low_stake_grace_period,
             stake_subsidy_period_length,
             stake_subsidy_decrease_rate,
+            supper_committee: supper_committee.into_supper_committee_summary(),
+            trusted_validators,
+            only_trusted_validator,
         }
     }
 }

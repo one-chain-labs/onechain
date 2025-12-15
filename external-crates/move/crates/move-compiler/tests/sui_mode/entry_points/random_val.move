@@ -1,18 +1,18 @@
 // invalid Random by value
 
 module a::m {
-    public entry fun no_random_val(_: sui::random::Random) {
+    public entry fun no_random_val(_: one::random::Random) {
         abort 0
     }
 }
 
-module sui::random {
+module one::random {
     struct Random has key {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }

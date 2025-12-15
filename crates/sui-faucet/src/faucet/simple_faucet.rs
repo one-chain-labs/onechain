@@ -386,9 +386,9 @@ impl SimpleFaucet {
             .map_err(FaucetError::internal)?;
         let tx = Transaction::from_data(tx_data, vec![signature]);
         let tx_digest = *tx.digest();
-        info!(?tx_digest, ?recipient, ?coin_id, ?uuid, "PaySui transaction in faucet.");
+        info!(?tx_digest, ?recipient, ?coin_id, ?uuid, "PayOct transaction in faucet.");
 
-        match timeout(Duration::from_secs(300), self.execute_pay_sui_txn_with_retries(&tx, coin_id, recipient, uuid))
+        match timeout(Duration::from_secs(300), self.execute_pay_oct_txn_with_retries(&tx, coin_id, recipient, uuid))
             .await
         {
             Err(elapsed) => {
@@ -396,7 +396,7 @@ impl SimpleFaucet {
                     ?recipient,
                     ?coin_id,
                     ?uuid,
-                    "Failed to execute PaySui transactions in faucet after {elapsed}. Coin will \
+                    "Failed to execute PayOct transactions in faucet after {elapsed}. Coin will \
                      not be reused."
                 );
 
@@ -461,7 +461,7 @@ impl SimpleFaucet {
         match gas_coin_response {
             GasCoinResponse::ValidGasCoin(coin_id) => {
                 let tx_data = self
-                    .build_pay_sui_txn(coin_id, self.active_address, recipient, amounts, gas_cost)
+                    .build_pay_oct_txn(coin_id, self.active_address, recipient, amounts, gas_cost)
                     .await
                     .map_err(FaucetError::internal)?;
 
@@ -521,7 +521,7 @@ impl SimpleFaucet {
         info!(?uuid, ?coin_id, "Recycled coin");
     }
 
-    async fn execute_pay_sui_txn_with_retries(
+    async fn execute_pay_oct_txn_with_retries(
         &self,
         tx: &Transaction,
         coin_id: ObjectID,
@@ -531,7 +531,7 @@ impl SimpleFaucet {
         let mut retry_delay = Duration::from_millis(500);
 
         loop {
-            let res = self.execute_pay_sui_txn(tx, coin_id, recipient, uuid).await;
+            let res = self.execute_pay_oct_txn(tx, coin_id, recipient, uuid).await;
 
             if let Ok(res) = res {
                 return res;
@@ -542,7 +542,7 @@ impl SimpleFaucet {
                 ?coin_id,
                 ?uuid,
                 ?retry_delay,
-                "PaySui transaction in faucet failed, previous error: {:?}",
+                "PayOct transaction in faucet failed, previous error: {:?}",
                 &res,
             );
 
@@ -551,7 +551,7 @@ impl SimpleFaucet {
         }
     }
 
-    async fn execute_pay_sui_txn(
+    async fn execute_pay_oct_txn(
         &self,
         tx: &Transaction,
         coin_id: ObjectID,
@@ -592,7 +592,7 @@ impl SimpleFaucet {
             .map_err(|e| FaucetError::FullnodeReadingError(format!("Error fetch gas price {e:?}")))
     }
 
-    async fn build_pay_sui_txn(
+    async fn build_pay_oct_txn(
         &self,
         coin_id: ObjectID,
         signer: SuiAddress,
@@ -604,9 +604,9 @@ impl SimpleFaucet {
         let client = self.wallet.get_client().await?;
         client
             .transaction_builder()
-            .pay_sui(signer, vec![coin_id], recipients, amounts.to_vec(), budget)
+            .pay_oct(signer, vec![coin_id], recipients, amounts.to_vec(), budget)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to build PaySui transaction for coin {:?}, with err {:?}", coin_id, e))
+            .map_err(|e| anyhow::anyhow!("Failed to build PayOct transaction for coin {:?}, with err {:?}", coin_id, e))
     }
 
     async fn check_and_map_transfer_gas_result(
@@ -624,7 +624,7 @@ impl SimpleFaucet {
             .to_vec();
         if created.len() != number_of_coins {
             return Err(FaucetError::CoinAmountTransferredIncorrect(format!(
-                "PaySui Transaction should create exact {:?} new coins, but got {:?}",
+                "PayOct Transaction should create exact {:?} new coins, but got {:?}",
                 number_of_coins, created
             )));
         }
@@ -636,7 +636,7 @@ impl SimpleFaucet {
         Ok((res.digest, coin_ids))
     }
 
-    async fn build_batch_pay_sui_txn(
+    async fn build_batch_pay_oct_txn(
         &self,
         coin_id: ObjectID,
         batch_requests: Vec<(Uuid, SuiAddress, Vec<u64>)>,
@@ -650,7 +650,7 @@ impl SimpleFaucet {
             let mut builder = ProgrammableTransactionBuilder::new();
             for (_uuid, recipient, amounts) in batch_requests {
                 let recipients = vec![recipient; amounts.len()];
-                builder.pay_sui(recipients, amounts)?;
+                builder.pay_oct(recipients, amounts)?;
             }
             builder.finish()
         };
@@ -696,7 +696,7 @@ impl SimpleFaucet {
 
             if number_of_coins as u64 + index > coins_created_for_address.len() as u64 {
                 return Err(FaucetError::CoinAmountTransferredIncorrect(format!(
-                    "PaySui Transaction should create exact {:?} new coins, but got {:?}",
+                    "PayOct Transaction should create exact {:?} new coins, but got {:?}",
                     number_of_coins as u64 + index,
                     coins_created_for_address.len()
                 )));
@@ -765,7 +765,7 @@ impl Faucet for SimpleFaucet {
 
         let (digest, coin_ids) = self.transfer_gases(amounts, recipient, id).await?;
 
-        info!(uuid = ?id, ?recipient, ?digest, "PaySui txn succeeded");
+        info!(uuid = ?id, ?recipient, ?digest, "PayOct txn succeeded");
         let mut sent = Vec::with_capacity(coin_ids.len());
         let coin_results = futures::future::join_all(coin_ids.iter().map(|coin_id| self.get_coin(*coin_id))).await;
         for (coin_id, res) in coin_ids.into_iter().zip(coin_results) {
@@ -883,15 +883,15 @@ pub async fn batch_transfer_gases(
     // The UUID here is for the batched request
     let uuid = Uuid::new_v4();
     info!(?uuid, "Batch transfer attempted of size: {:?}", total_requests);
-    let total_sui_needed: u64 = requests.iter().flat_map(|(_, _, amounts)| amounts).sum();
+    let total_oct_needed: u64 = requests.iter().flat_map(|(_, _, amounts)| amounts).sum();
     // This loop is utilized to grab a coin that is large enough for the request
     loop {
-        let gas_coin_response = faucet.prepare_gas_coin(total_sui_needed + gas_cost, uuid, true).await;
+        let gas_coin_response = faucet.prepare_gas_coin(total_oct_needed + gas_cost, uuid, true).await;
 
         match gas_coin_response {
             GasCoinResponse::ValidGasCoin(coin_id) => {
                 let tx_data = faucet
-                    .build_batch_pay_sui_txn(coin_id, requests.clone(), faucet.active_address, gas_cost)
+                    .build_batch_pay_oct_txn(coin_id, requests.clone(), faucet.active_address, gas_cost)
                     .await
                     .map_err(FaucetError::internal)?;
 
@@ -1224,7 +1224,7 @@ mod tests {
         let gas_budget = 50_000_000;
         let tx_data = client
             .transaction_builder()
-            .pay_all_sui(address, vec![bad_gas.0], SuiAddress::random_for_testing_only(), gas_budget)
+            .pay_all_oct(address, vec![bad_gas.0], SuiAddress::random_for_testing_only(), gas_budget)
             .await
             .unwrap();
         execute_tx(faucet.wallet_mut(), tx_data).await.unwrap();
@@ -1269,7 +1269,7 @@ mod tests {
         };
 
         let tx_data = faucet
-            .build_pay_sui_txn(coin_id, faucet_address, recipient, &[100], 200_000_000)
+            .build_pay_oct_txn(coin_id, faucet_address, recipient, &[100], 200_000_000)
             .await
             .map_err(FaucetError::internal)
             .unwrap();
@@ -1390,7 +1390,7 @@ mod tests {
         for gas in gas_coins.iter().take(gas_coins.len() - 1) {
             let tx_data = client
                 .transaction_builder()
-                .transfer_sui(address, gas.0, gas_budget, destination_address, None)
+                .transfer_oct(address, gas.0, gas_budget, destination_address, None)
                 .await
                 .unwrap();
             execute_tx(&mut context, tx_data).await.unwrap();
@@ -1450,7 +1450,7 @@ mod tests {
         for gas in gas_coins {
             let tx_data = client
                 .transaction_builder()
-                .transfer_sui(address, gas.0, gas_budget, destination_address, None)
+                .transfer_oct(address, gas.0, gas_budget, destination_address, None)
                 .await
                 .unwrap();
             execute_tx(&mut context, tx_data).await.unwrap();
@@ -1491,7 +1491,7 @@ mod tests {
         };
 
         let tx_data = faucet
-            .build_pay_sui_txn(coin_id, faucet_address, recipient, &[100], 200_000_000)
+            .build_pay_oct_txn(coin_id, faucet_address, recipient, &[100], 200_000_000)
             .await
             .map_err(FaucetError::internal)
             .unwrap();

@@ -418,7 +418,7 @@ pub enum OperationType {
     StakeReward,
     StakePrinciple,
     // sui-rosetta supported operation type
-    PaySui,
+    PayOct,
     PayCoin,
     Stake,
     WithdrawStake,
@@ -863,7 +863,7 @@ pub struct PrefundedAccount {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum InternalOperation {
-    PaySui {
+    PayOct {
         sender: SuiAddress,
         recipients: Vec<SuiAddress>,
         amounts: Vec<u64>,
@@ -889,7 +889,7 @@ pub enum InternalOperation {
 impl InternalOperation {
     pub fn sender(&self) -> SuiAddress {
         match self {
-            InternalOperation::PaySui { sender, .. }
+            InternalOperation::PayOct { sender, .. }
             | InternalOperation::PayCoin { sender, .. }
             | InternalOperation::Stake { sender, .. }
             | InternalOperation::WithdrawStake { sender, .. } => *sender,
@@ -899,9 +899,9 @@ impl InternalOperation {
     /// Combine with ConstructionMetadata to form the TransactionData
     pub fn try_into_data(self, metadata: ConstructionMetadata) -> Result<TransactionData, Error> {
         let pt = match self {
-            Self::PaySui { recipients, amounts, .. } => {
+            Self::PayOct { recipients, amounts, .. } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
-                builder.pay_sui(recipients, amounts)?;
+                builder.pay_oct(recipients, amounts)?;
                 builder.finish()
             }
             Self::PayCoin { recipients, amounts, .. } => {

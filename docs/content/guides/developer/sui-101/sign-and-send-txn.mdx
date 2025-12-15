@@ -101,7 +101,7 @@ console.log(res);
 
 <TabItem value="rust" label="Rust">
 
-The full code example below can be found under [crates/sui-sdk](https://github.com/MystenLabs/sui/blob/main/crates/sui-sdk/examples/sign_tx_guide.rs).
+The full code example below can be found under [crates/sui-sdk](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-sdk/examples/sign_tx_guide.rs).
 
 There are various ways to instantiate a `SuiKeyPair` and to derive its public key and Sui address using the Sui Rust SDK.
 
@@ -155,7 +155,7 @@ Next, sign transaction data constructed using an example programmable transactio
     // construct an example programmable transaction.
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(vec![sender], vec![1])?;
+        builder.pay_oct(vec![sender], vec![1])?;
         builder.finish()
     };
 
@@ -246,7 +246,7 @@ Create a transfer transaction in the CLI. Set the `$SUI_ADDRESS` to the one corr
 $ sui client gas
 ```
 ```sh
-$ sui client transfer-sui --to $SUI_ADDRESS --sui-coin-object-id $GAS_COIN_ID --gas-budget $GAS_BUDGET --serialize-unsigned-transaction
+$ sui client transfer-oct --to $SUI_ADDRESS --sui-coin-object-id $GAS_COIN_ID --gas-budget $GAS_BUDGET --serialize-unsigned-transaction
 ```
 ```sh
 $ sui keytool sign --address $SUI_ADDRESS --data $TX_BYTES

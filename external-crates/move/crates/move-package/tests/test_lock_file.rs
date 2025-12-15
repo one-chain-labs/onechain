@@ -86,7 +86,7 @@ deps_digest = "0"
 [move.toolchain-version]
 compiler-version = "0.0.0"
 edition = "legacy"
-flavor = "sui"
+flavor = "one"
 "#;
     fs::write(lock_path.clone(), lock_contents).unwrap();
 
@@ -149,7 +149,7 @@ flavor = "sui"
         [move.toolchain-version]
         compiler-version = "0.0.0"
         edition = "legacy"
-        flavor = "sui"
+        flavor = "one"
     "#]];
     expected.assert_eq(&contents);
 }
@@ -195,7 +195,7 @@ fn update_lock_file_toolchain_version() {
     let expected = expect![[r#"
         compiler-version = "0.0.1"
         edition = "2024.beta"
-        flavor = "sui"
+        flavor = "one"
     "#]];
     expected.assert_eq(&toml);
 }

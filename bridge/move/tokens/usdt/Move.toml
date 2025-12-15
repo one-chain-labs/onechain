@@ -5,7 +5,7 @@ edition = "legacy"
 
 [dependencies]
 MoveStdlib = { local = "../../../../crates/sui-framework/packages/move-stdlib" }
-Sui = { local = "../../../../crates/sui-framework/packages/sui-framework" }
+One = { local = "../../../../crates/sui-framework/packages/one-framework" }
 
 [addresses]
 bridged_usdt = "0x0"

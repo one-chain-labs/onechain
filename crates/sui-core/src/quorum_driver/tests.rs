@@ -31,7 +31,7 @@ use crate::{
         QuorumDriverMetrics,
     },
     test_authority_clients::{LocalAuthorityClient, LocalAuthorityClientFaultConfig},
-    test_utils::make_transfer_sui_transaction,
+    test_utils::make_transfer_oct_transaction,
     unit_test_utils::init_local_authorities,
 };
 
@@ -47,7 +47,7 @@ async fn setup() -> (AuthorityAggregator<LocalAuthorityClient>, Transaction) {
 }
 
 fn make_tx(gas: &Object, sender: SuiAddress, keypair: &AccountKeyPair, gas_price: u64) -> Transaction {
-    make_transfer_sui_transaction(
+    make_transfer_oct_transaction(
         gas.compute_object_reference(),
         SuiAddress::random_for_testing_only(),
         None,

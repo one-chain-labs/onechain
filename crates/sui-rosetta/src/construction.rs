@@ -243,7 +243,7 @@ pub async fn metadata(
 
     // Get amount, objects, for the operation
     let (total_required_amount, objects) = match &option.internal_operation {
-        InternalOperation::PaySui { amounts, .. } => {
+        InternalOperation::PayOct { amounts, .. } => {
             let amount = amounts.iter().sum::<u64>();
             (Some(amount), vec![])
         }
@@ -274,7 +274,7 @@ pub async fn metadata(
                     .flat_map(|s| {
                         s.stakes.into_iter().filter_map(|s| {
                             if let StakeStatus::Active { .. } = s.status {
-                                Some(s.staked_sui_id)
+                                Some(s.staked_oct_id)
                             } else {
                                 None
                             }

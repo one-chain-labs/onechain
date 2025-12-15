@@ -7,7 +7,7 @@ modules. Specific deployments of Move might also use the `address` value for
 [storage](../abilities.md#key) operations.
 
 > For Sui, `address` is used to represent "accounts", and also objects via strong type wrappers
-> (with `sui::object::UID` and `sui::object::ID`).
+> (with `one::object::UID` and `one::object::ID`).
 
 Although an `address` is a 256 bit integer under the hood, Move addresses are intentionally
 opaque---they cannot be created from integers, they do not support arithmetic operations, and they

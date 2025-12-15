@@ -271,7 +271,7 @@ pub enum SuiObjectResponseError {
     // TODO: also integrate SuiPastObjectResponse (VersionNotFound,  VersionTooHigh)
 }
 
-/// Custom error type for Sui.
+/// Custom error type for OneChain.
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Error, Hash, AsRefStr, IntoStaticStr)]
 pub enum SuiError {
     #[error("Error checking transaction input objects: {:?}", error)]
@@ -469,7 +469,7 @@ pub enum SuiError {
     FailedToSubmitToConsensus(String),
     #[error("Failed to connect with consensus node: {0}")]
     ConsensusConnectionBroken(String),
-    #[error("Failed to execute handle_consensus_transaction on Sui: {0}")]
+    #[error("Failed to execute handle_consensus_transaction on OneChain: {0}")]
     HandleConsensusTransactionFailure(String),
 
     // Cryptography errors.

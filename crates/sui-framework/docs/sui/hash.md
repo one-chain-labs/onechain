@@ -1,5 +1,5 @@
 ---
-title: Module `sui::hash`
+title: Module `one::hash`
 ---
 
 Module which defines hash functions. Note that Sha-256 and Sha3-256 is available in the std::hash module in the

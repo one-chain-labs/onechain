@@ -1,5 +1,5 @@
 ---
-title: Module `sui::math`
+title: Module `one::math`
 ---
 
 DEPRECATED, use the each integer type's individual module instead, e.g. <code><a href="../std/u64.md#std_u64">std::u64</a></code>

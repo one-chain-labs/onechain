@@ -923,7 +923,7 @@ impl KeyToolCommand {
                 let jwt_randomness = if fixed {
                     "100681567828351849884072155819400689117".to_string()
                 } else {
-                    let random_bytes = rand::thread_rng().gen::<[u8; 16]>();
+                    let random_bytes = rand::thread_rng().r#gen::<[u8; 16]>();
                     let jwt_random_bytes = BigUint::from_bytes_be(&random_bytes);
                     jwt_random_bytes.to_string()
                 };

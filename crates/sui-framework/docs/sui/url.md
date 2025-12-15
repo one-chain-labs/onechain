@@ -1,5 +1,5 @@
 ---
-title: Module `sui::url`
+title: Module `one::url`
 ---
 
 URL: standard Uniform Resource Locator string
@@ -53,7 +53,7 @@ Standard Uniform Resource Locator (URL) string.
 Create a <code><a href="../sui/url.md#sui_url_Url">Url</a></code>, with no validation
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_new_unsafe">new_unsafe</a>(<a href="../sui/url.md#sui_url">url</a>: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>): <a href="../sui/url.md#sui_url_Url">sui::url::Url</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_new_unsafe">new_unsafe</a>(<a href="../sui/url.md#sui_url">url</a>: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>): <a href="../sui/url.md#sui_url_Url">one::url::Url</a>
 </code></pre>
 
 
@@ -79,7 +79,7 @@ Create a <code><a href="../sui/url.md#sui_url_Url">Url</a></code> with no valida
 Note: this will abort if <code>bytes</code> is not valid ASCII
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_new_unsafe_from_bytes">new_unsafe_from_bytes</a>(bytes: vector&lt;u8&gt;): <a href="../sui/url.md#sui_url_Url">sui::url::Url</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_new_unsafe_from_bytes">new_unsafe_from_bytes</a>(bytes: vector&lt;u8&gt;): <a href="../sui/url.md#sui_url_Url">one::url::Url</a>
 </code></pre>
 
 
@@ -105,7 +105,7 @@ Note: this will abort if <code>bytes</code> is not valid ASCII
 Get inner URL
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_inner_url">inner_url</a>(self: &<a href="../sui/url.md#sui_url_Url">sui::url::Url</a>): <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_inner_url">inner_url</a>(self: &<a href="../sui/url.md#sui_url_Url">one::url::Url</a>): <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>
 </code></pre>
 
 
@@ -130,7 +130,7 @@ Get inner URL
 Update the inner URL
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_update">update</a>(self: &<b>mut</b> <a href="../sui/url.md#sui_url_Url">sui::url::Url</a>, <a href="../sui/url.md#sui_url">url</a>: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/url.md#sui_url_update">update</a>(self: &<b>mut</b> <a href="../sui/url.md#sui_url_Url">one::url::Url</a>, <a href="../sui/url.md#sui_url">url</a>: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>)
 </code></pre>
 
 

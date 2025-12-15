@@ -227,7 +227,7 @@ fn transfer_dust(
     let gas = find_address_owned(&fx).expect("Failed to find gas object");
 
     let mut builder = ProgrammableTransactionBuilder::new();
-    builder.transfer_sui(recipient, Some(1));
+    builder.transfer_oct(recipient, Some(1));
 
     let data = TransactionData::new_programmable(
         sender,

@@ -8,7 +8,7 @@ use std::{
 
 use prometheus::Registry;
 use sui_config::NodeConfig;
-use sui_node::{SuiNode, SuiNodeHandle};
+use one_node::{SuiNode, SuiNodeHandle};
 use sui_types::base_types::ConciseableName;
 use tokio::sync::watch;
 use tracing::{info, trace};

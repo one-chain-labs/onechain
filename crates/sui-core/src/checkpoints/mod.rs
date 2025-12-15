@@ -1047,7 +1047,7 @@ impl CheckpointBuilder {
 
                 // Get the unincluded depdnencies of the consensus commit prologue. We should expect no
                 // other dependencies that haven't been included in any previous checkpoints.
-                if let Some((ccp_digest, ccp_effects)) = &consensus_commit_prologue {
+                if let Some((_ccp_digest, ccp_effects)) = &consensus_commit_prologue {
                     let unsorted_ccp =
                         self.complete_checkpoint_effects(vec![ccp_effects.clone()], effects_in_current_checkpoint)?;
 
@@ -1060,7 +1060,7 @@ impl CheckpointBuilder {
                         );
                     }
                     assert_eq!(unsorted_ccp.len(), 1);
-                    assert_eq!(unsorted_ccp[0].transaction_digest(), ccp_digest);
+                    assert_eq!(unsorted_ccp[0].transaction_digest(), _ccp_digest);
                 }
                 consensus_commit_prologue
             } else {
@@ -1071,11 +1071,11 @@ impl CheckpointBuilder {
 
         let _scope = monitored_scope("CheckpointBuilder::causal_sort");
         let mut sorted: Vec<TransactionEffects> = Vec::with_capacity(unsorted.len() + 1);
-        if let Some((ccp_digest, ccp_effects)) = consensus_commit_prologue {
+        if let Some((_ccp_digest, ccp_effects)) = consensus_commit_prologue {
             if cfg!(debug_assertions) {
                 // When consensus_commit_prologue is extracted, it should not be included in the `unsorted`.
                 for tx in unsorted.iter() {
-                    assert!(tx.transaction_digest() != &ccp_digest);
+                    assert!(tx.transaction_digest() != &_ccp_digest);
                 }
             }
             sorted.push(ccp_effects);

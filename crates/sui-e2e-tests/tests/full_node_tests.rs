@@ -7,7 +7,7 @@ use futures::future;
 use jsonrpsee::{core::client::ClientT, rpc_params};
 use move_core_types::{annotated_value::MoveStructLayout, ident_str};
 use rand::rngs::OsRng;
-use sui::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
+use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use sui_config::node::RunWithRange;
 use sui_json_rpc_types::{
     EventFilter,
@@ -21,7 +21,7 @@ use sui_json_rpc_types::{
 };
 use sui_keys::keystore::AccountKeystore;
 use sui_macros::*;
-use sui_node::SuiNodeHandle;
+use one_node::SuiNodeHandle;
 use sui_sdk::wallet_context::WalletContext;
 use sui_storage::{key_value_store::TransactionKeyValueStore, key_value_store_metrics::KeyValueStoreMetrics};
 use sui_test_transaction_builder::{
@@ -70,7 +70,7 @@ async fn test_full_node_follows_txes() -> Result<(), anyhow::Error> {
 
     let context = &mut test_cluster.wallet;
 
-    // TODO: test fails on CI due to flakiness without this. Once https://github.com/MystenLabs/sui/pull/7056 is
+    // TODO: test fails on CI due to flakiness without this. Once https://github.com/one-chain-labs/onechain/pull/7056 is
     // merged we should be able to root out the flakiness.
     sleep(Duration::from_millis(10)).await;
 
@@ -273,19 +273,19 @@ async fn test_full_node_indexes() -> Result<(), anyhow::Error> {
     let sender_balance_change = BalanceChange {
         change_type: BalanceChangeType::Pay,
         owner: sender,
-        coin_type: parse_struct_tag("0x2::sui::SUI").unwrap(),
+        coin_type: parse_struct_tag("0x2::one::OCT").unwrap(),
         amount: -100000000000000,
     };
     let recipient_balance_change = BalanceChange {
         change_type: BalanceChangeType::Receive,
         owner: receiver,
-        coin_type: parse_struct_tag("0x2::sui::SUI").unwrap(),
+        coin_type: parse_struct_tag("0x2::one::OCT").unwrap(),
         amount: 100000000000000,
     };
     let gas_balance_change = BalanceChange {
         change_type: BalanceChangeType::Gas,
         owner: sender,
-        coin_type: parse_struct_tag("0x2::sui::SUI").unwrap(),
+        coin_type: parse_struct_tag("0x2::one::OCT").unwrap(),
         amount: (gas_used as i128).neg(),
     };
 
@@ -961,7 +961,7 @@ async fn test_access_old_object_pruned() {
     let sender = tx_builder.sender();
     let gas_object = tx_builder.gas_object();
     let effects =
-        test_cluster.sign_and_execute_transaction(&tx_builder.transfer_sui(None, sender).build()).await.effects.unwrap();
+        test_cluster.sign_and_execute_transaction(&tx_builder.transfer_oct(None, sender).build()).await.effects.unwrap();
     let new_gas_version = effects.gas_object().reference.version;
     test_cluster.trigger_reconfiguration().await;
     // Construct a new transaction that uses the old gas object reference.
@@ -971,7 +971,7 @@ async fn test_access_old_object_pruned() {
             .await
             // Make sure we are doing something different from the first transaction.
             // Otherwise we would just end up with the same digest.
-            .transfer_sui(Some(1), sender)
+            .transfer_oct(Some(1), sender)
             .build(),
     );
     for validator in test_cluster.swarm.active_validators() {

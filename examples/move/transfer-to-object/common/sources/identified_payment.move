@@ -4,7 +4,7 @@
 #[lint_allow(coin_field)]
 module common::identified_payment;
 
-use sui::{coin::{Self, Coin}, dynamic_field, event, sui::SUI, transfer::Receiving};
+use one::{coin::{Self, Coin}, dynamic_field, event, one::OCT, transfer::Receiving};
 
 const ENotEarmarkedForSender: u64 = 0;
 
@@ -17,7 +17,7 @@ const ENotEarmarkedForSender: u64 = 0;
 public struct IdentifiedPayment has key, store {
     id: UID,
     payment_id: u64,
-    coin: Coin<SUI>,
+    coin: Coin<OCT>,
 }
 
 /// An `EarmarkedPayment` payment is an `IdentifiedPayment` that is
@@ -52,7 +52,7 @@ public struct ProcessedPaymentEvent has copy, drop {
 /// Make a payment with the given payment ID to the provided `to` address.
 /// Will create an `IdentifiedPayment` object that can be unpacked by the
 /// recipient, and also emits an event.
-public fun make_payment(payment_id: u64, coin: Coin<SUI>, to: address, ctx: &mut TxContext) {
+public fun make_payment(payment_id: u64, coin: Coin<OCT>, to: address, ctx: &mut TxContext) {
     let payment_amount = coin::value(&coin);
     let identified_payment = IdentifiedPayment {
         id: object::new(ctx),
@@ -72,7 +72,7 @@ public fun make_payment(payment_id: u64, coin: Coin<SUI>, to: address, ctx: &mut
 public fun make_shared_payment(
     register_uid: &mut UID,
     payment_id: u64,
-    coin: Coin<SUI>,
+    coin: Coin<OCT>,
     ctx: &mut TxContext,
 ) {
     let payment_amount = coin::value(&coin);
@@ -92,7 +92,7 @@ public fun make_shared_payment(
 
 /// Process an `IdentifiedPayment` payment returning back the payments ID,
 /// along with the coin that was sent in the payment.
-public fun unpack(identified_payment: IdentifiedPayment): (u64, Coin<SUI>) {
+public fun unpack(identified_payment: IdentifiedPayment): (u64, Coin<OCT>) {
     let IdentifiedPayment { id, payment_id, coin } = identified_payment;
     object::delete(id);
     event::emit(ProcessedPaymentEvent {
@@ -113,7 +113,7 @@ public fun transfer(earmarked: EarmarkedPayment, to: address) {
 
 /// An example of a custom receiving rule -- this behaves in a similar manner
 /// to custom transfer rules: if the object is `key` only , the
-/// `sui::transfer::receive` function can only be called on the object from
+/// `one::transfer::receive` function can only be called on the object from
 /// within the same module that defined that object.
 ///
 /// In this case `EarmarkedPayment` is defined with `key` only, so this is

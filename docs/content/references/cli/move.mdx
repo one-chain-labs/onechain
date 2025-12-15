@@ -72,7 +72,7 @@ name = "smart_contract_test"
 version = "0.0.1"
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+Sui = { git = "https://github.com/one-chain-labs/onechain.git", subdir = "crates/sui-framework/packages/one-framework", rev = "framework/testnet" }
 
 [addresses]
 smart_contract_test = "0x0"
@@ -86,7 +86,7 @@ Use `sui move build` at the root of your Move project to build the package.
 $ sui move build
 ```
 ```sh
-UPDATING GIT DEPENDENCY https://github.com/MystenLabs/sui.git
+UPDATING GIT DEPENDENCY https://github.com/one-chain-labs/onechain.git
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING smart_contract_test
@@ -100,7 +100,7 @@ Use `sui move test` to run the tests in a Move package.
 $ sui move test
 ```
 ```sh
-UPDATING GIT DEPENDENCY https://github.com/MystenLabs/sui.git
+UPDATING GIT DEPENDENCY https://github.com/one-chain-labs/onechain.git
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING smart_contract_test
@@ -118,7 +118,7 @@ This command currently only works on debug builds of the CLI.  Please build the 
 :::
 
 
-This example uses [`first_package`](https://github.com/MystenLabs/sui/tree/main/examples/move/first_package) Move package.
+This example uses [`first_package`](https://github.com/one-chain-labs/onechain/tree/main/examples/move/first_package) Move package.
 
 To get a summary of the test coverage, you must first run the `sui move test --coverage` command, and then the `sui move coverage summary --test` to get a summary of the test coverage in the example project.
 

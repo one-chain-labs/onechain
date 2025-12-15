@@ -4,7 +4,7 @@ title: Sui Gas Pricing
 
 The Sui gas-pricing mechanism achieves three outcomes: delivering low, predictable transaction fees, incentivizing validators to optimize their transaction processing operations, and preventing denial of service attacks.
 
-This enables you to focus on using the Sui network to provide the best user experience without needing to forecast the current market price of gas fees. Since validators agree on a network-wide reference price at the start of each epoch, you can use the reference price as a credible anchor when submitting transactions. Moreover, the price setting mechanism rewards good validator behavior, thus aligning incentives between SUI token holders, the network's operators (validators), and its users.
+This enables you to focus on using the Sui network to provide the best user experience without needing to forecast the current market price of gas fees. Since validators agree on a network-wide reference price at the start of each epoch, you can use the reference price as a credible anchor when submitting transactions. Moreover, the price setting mechanism rewards good validator behavior, thus aligning incentives between OCT token holders, the network's operators (validators), and its users.
 
 A unique feature of the Sui gas price mechanism is that users pay separate fees for transaction execution and for storing the data associated with each transaction. The gas fees associated with an arbitrary transaction $\tau$ equal:
 
@@ -36,7 +36,7 @@ In sum, the gas price mechanism has two main forces: the tallying rule incentivi
 
 The storage gas price $StoragePrice$ captures the costs of covering one unit of storage in perpetuity, in SUI units. This price is set through governance proposals and is updated infrequently. The goal is to ensure Sui users pay for their use of on-chain data storage by depositing these fees into the storage fund and then redistributing these fees to future validators. In contrast to the computation gas price, storage prices are fixed and common for all transactions both within an epoch and across epochs until the storage price is updated.
 
-The $StoragePrice$ is set exogenously through the governance proposal with the goal of targeting the off-chain dollar cost of data storage. In the long run, as the costs of storage fall due to technological improvements and the dollar price of the SUI token evolves, governance proposals will update the price in order to reflect the new dollar target price.
+The $StoragePrice$ is set exogenously through the governance proposal with the goal of targeting the off-chain dollar cost of data storage. In the long run, as the costs of storage fall due to technological improvements and the dollar price of the OCT token evolves, governance proposals will update the price in order to reflect the new dollar target price.
 
 ## Gas prices as a coordination mechanism {#coordination-mechanism}
 

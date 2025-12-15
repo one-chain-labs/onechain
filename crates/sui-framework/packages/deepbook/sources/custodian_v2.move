@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module deepbook::custodian_v2 {
-    use sui::balance::{Self, Balance, split};
-    use sui::coin::{Self, Coin};
-    use sui::table::{Self, Table};
+    use one::balance::{Self, Balance, split};
+    use one::coin::{Self, Coin};
+    use one::table::{Self, Table};
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
     const EAdminAccountCapRequired: u64 = 2;

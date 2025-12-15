@@ -33,7 +33,7 @@ use sui_json_rpc_types::{
     TransactionFilter,
 };
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
-use sui_node::SuiNodeHandle;
+use one_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolVersion;
 use sui_sdk::{
     apis::QuorumDriverApi,
@@ -260,7 +260,7 @@ impl TestCluster {
                         Ok(Some(run_with_range)) => Some(run_with_range),
                         Ok(None) => None,
                         Err(e) => {
-                            error!("failed recv from sui-node shutdown channel: {}", e);
+                            error!("failed recv from one-node shutdown channel: {}", e);
                             None
                         },
                     }
@@ -268,7 +268,7 @@ impl TestCluster {
             }
         })
         .await
-        .expect("Timed out waiting for cluster to hit target epoch and recv shutdown signal from sui-node")
+        .expect("Timed out waiting for cluster to hit target epoch and recv shutdown signal from one-node")
     }
 
     pub async fn wait_for_protocol_version(&self, target_protocol_version: ProtocolVersion) -> SuiSystemState {
@@ -608,15 +608,15 @@ impl TestCluster {
         let context = &self.wallet;
         let (sender, gas) = context.get_one_gas_object().await.unwrap().unwrap();
         let tx = context.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(amount, funding_address).build(),
+            &TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(amount, funding_address).build(),
         );
         context.execute_transaction_must_succeed(tx).await;
 
         context.get_one_gas_object_owned_by_address(funding_address).await.unwrap().unwrap()
     }
 
-    pub async fn transfer_sui_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
-        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_sui(Some(amount), receiver).build();
+    pub async fn transfer_oct_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
+        let tx = self.test_transaction_builder_with_sender(sender).await.transfer_oct(Some(amount), receiver).build();
         let effects = self.sign_and_execute_transaction(&tx).await.effects.unwrap();
         assert_eq!(&SuiExecutionStatus::Success, effects.status());
         effects.created().first().unwrap().object_id()
@@ -945,7 +945,7 @@ impl TestClusterBuilder {
         // valid JWKs as well.
         #[cfg(msim)]
         if !self.default_jwks {
-            sui_node::set_jwk_injector(Arc::new(|_authority, provider| {
+            one_node::set_jwk_injector(Arc::new(|_authority, provider| {
                 use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
                 use rand::Rng;
 

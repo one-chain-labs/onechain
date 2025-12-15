@@ -3,7 +3,7 @@
 
 use clap::*;
 use colored::Colorize;
-use sui_tool::commands::ToolCommand;
+use one_tool::commands::ToolCommand;
 use sui_types::exit_main;
 
 // Define the `GIT_REVISION` and `VERSION` consts
@@ -11,8 +11,8 @@ bin_version::bin_version!();
 
 #[derive(Parser)]
 #[command(
-    name = "sui-tool",
-    about = "Debugging utilities for sui",
+    name = "one-tool",
+    about = "Debugging utilities for one",
     rename_all = "kebab-case",
     author,
     version = VERSION,
@@ -28,7 +28,9 @@ async fn main() {
     colored::control::set_virtual_terminal(true).unwrap();
 
     let app = App::parse();
-    let (_guards, handle) = telemetry_subscribers::TelemetryConfig::new().with_env().init();
+    let (_guards, handle) = telemetry_subscribers::TelemetryConfig::new()
+        .with_env()
+        .init();
 
     exit_main!(app.command.execute(handle).await);
 }

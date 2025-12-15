@@ -3,7 +3,7 @@
 
 module bridge::message {
     use std::ascii::{Self, String};
-    use sui::bcs::{Self, BCS};
+    use one::bcs::{Self, BCS};
 
     use bridge::chain_ids;
     use bridge::message_types;

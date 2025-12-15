@@ -134,6 +134,9 @@ pub struct NodeConfig {
     pub db_checkpoint_config: DBCheckpointConfig,
 
     #[serde(default)]
+    pub indirect_objects_threshold: usize,
+
+    #[serde(default)]
     pub expensive_safety_check_config: ExpensiveSafetyCheckConfig,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -442,9 +445,12 @@ pub fn default_zklogin_oauth_providers() -> BTreeMap<Chain, BTreeSet<String>> {
         "Threedos".to_string(),
         "Onefc".to_string(),
         "FanTV".to_string(),
+        "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A".to_string(), // test tenant in mysten aws
         "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8".to_string(), // Ambrus, external partner
         "Arden".to_string(),                                                    // Arden partner
         "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es".to_string(), // Trace, external partner
+        "Huionepay".to_string(),
+        "TestHuionepay".to_string(),
     ]);
 
     // providers that are available for mainnet and testnet.
@@ -461,6 +467,8 @@ pub fn default_zklogin_oauth_providers() -> BTreeMap<Chain, BTreeSet<String>> {
         "Threedos".to_string(),
         "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es".to_string(), // Trace, external partner
         "Arden".to_string(),
+        "Huionepay".to_string(),
+        "TestHuionepay".to_string(),
         "FanTV".to_string(),
     ]);
     map.insert(Chain::Mainnet, providers.clone());
@@ -785,7 +793,7 @@ impl ExpensiveSafetyCheckConfig {
 }
 
 fn default_checkpoint_execution_max_concurrency() -> usize {
-    40
+    200
 }
 
 fn default_local_execution_timeout_sec() -> u64 {

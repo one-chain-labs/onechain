@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_system::validator_wrapper {
-    use sui::versioned::Versioned;
-    use sui::versioned;
-    use sui::tx_context::TxContext;
-    use sui_system::validator::{Validator, ValidatorV2};
-    use sui_system::validator;
+module one_system::validator_wrapper {
+    use one::versioned::Versioned;
+    use one::versioned;
+    use one::tx_context::TxContext;
+    use one_system::validator::{Validator, ValidatorV2};
+    use one_system::validator;
 
     const VALIDATOR_VERSION_V1: u64 = 18446744073709551605;  // u64::MAX - 10
     const VALIDATOR_VERSION_V3: u64 = 18446744073709551607;  // u64::MAX - 8

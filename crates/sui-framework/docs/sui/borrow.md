@@ -1,5 +1,5 @@
 ---
-title: Module `sui::borrow`
+title: Module `one::borrow`
 ---
 
 A simple library that enables hot-potato-locked borrow mechanics.
@@ -23,10 +23,10 @@ sure the object is returned and was not swapped for another one.
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -86,7 +86,7 @@ A hot potato making sure the object is put back once borrowed.
 <dd>
 </dd>
 <dt>
-<code>obj: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>obj: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -127,7 +127,7 @@ An attempt to swap the <code><a href="../sui/borrow.md#sui_borrow_Referent">Refe
 Create a new <code><a href="../sui/borrow.md#sui_borrow_Referent">Referent</a></code> struct
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow_new">new</a>&lt;T: key, store&gt;(value: T, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/borrow.md#sui_borrow_Referent">sui::borrow::Referent</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow_new">new</a>&lt;T: key, store&gt;(value: T, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/borrow.md#sui_borrow_Referent">one::borrow::Referent</a>&lt;T&gt;
 </code></pre>
 
 
@@ -156,7 +156,7 @@ Borrow the <code>T</code> from the <code><a href="../sui/borrow.md#sui_borrow_Re
 hot potato.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/borrow.md#sui_borrow_Referent">sui::borrow::Referent</a>&lt;T&gt;): (T, <a href="../sui/borrow.md#sui_borrow_Borrow">sui::borrow::Borrow</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/borrow.md#sui_borrow_Referent">one::borrow::Referent</a>&lt;T&gt;): (T, <a href="../sui/borrow.md#sui_borrow_Borrow">one::borrow::Borrow</a>)
 </code></pre>
 
 
@@ -189,7 +189,7 @@ hot potato.
 Put an object and the <code><a href="../sui/borrow.md#sui_borrow_Borrow">Borrow</a></code> hot potato back.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow_put_back">put_back</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/borrow.md#sui_borrow_Referent">sui::borrow::Referent</a>&lt;T&gt;, value: T, <a href="../sui/borrow.md#sui_borrow">borrow</a>: <a href="../sui/borrow.md#sui_borrow_Borrow">sui::borrow::Borrow</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow_put_back">put_back</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/borrow.md#sui_borrow_Referent">one::borrow::Referent</a>&lt;T&gt;, value: T, <a href="../sui/borrow.md#sui_borrow">borrow</a>: <a href="../sui/borrow.md#sui_borrow_Borrow">one::borrow::Borrow</a>)
 </code></pre>
 
 
@@ -217,7 +217,7 @@ Put an object and the <code><a href="../sui/borrow.md#sui_borrow_Borrow">Borrow<
 Unpack the <code><a href="../sui/borrow.md#sui_borrow_Referent">Referent</a></code> struct and return the value.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow_destroy">destroy</a>&lt;T: key, store&gt;(self: <a href="../sui/borrow.md#sui_borrow_Referent">sui::borrow::Referent</a>&lt;T&gt;): T
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow_destroy">destroy</a>&lt;T: key, store&gt;(self: <a href="../sui/borrow.md#sui_borrow_Referent">one::borrow::Referent</a>&lt;T&gt;): T
 </code></pre>
 
 

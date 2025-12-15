@@ -256,7 +256,7 @@ pub fn to_source_string(strings: Vec<String>) -> String {
 }
 
 pub fn ptb_description() -> clap::Command {
-    clap::Command::new("sui client ptb")
+    clap::Command::new("one client ptb")
         .about(
             "Build, preview, and execute programmable transaction blocks. Depending on your \
             shell, you might have to use quotes around arrays or other passed values. \
@@ -314,7 +314,7 @@ pub fn ptb_description() -> clap::Command {
             \n --make-move-vec <u64> []\
             \n --make-move-vec <u64> [1, 2, 3, 4]\
             \n --make-move-vec <std::option::Option<u64>> [none,none]\
-            \n --make-move-vec <sui::coin::Coin<sui::sui::SUI>> [gas]",
+            \n --make-move-vec <one::coin::Coin<one::oct::OCT>> [gas]",
             )
             .value_names(["TYPE", "[VALUES]"]),
         )
@@ -381,7 +381,7 @@ pub fn ptb_description() -> clap::Command {
             .long_help(
                 "Publish the Move package. It takes as input the folder where the package exists.\
             \n\nExamples:\
-            \n --move-call sui::tx_context::sender\
+            \n --move-call one::tx_context::sender\
             \n --assign sender\
             \n --publish \".\"\
             \n --assign upgrade_cap\

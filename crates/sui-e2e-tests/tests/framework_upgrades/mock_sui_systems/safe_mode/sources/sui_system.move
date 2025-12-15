@@ -1,19 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_system::sui_system {
+module one_system::one_system {
     use std::vector;
 
-    use sui::balance::Balance;
-    use sui::object::UID;
-    use sui::sui::SUI;
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
-    use sui::dynamic_field;
+    use one::balance::Balance;
+    use one::object::UID;
+    use one::oct::OCT;
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::dynamic_field;
 
-    use sui_system::validator::Validator;
-    use sui_system::sui_system_state_inner::SuiSystemStateInner;
-    use sui_system::sui_system_state_inner;
+    use one_system::validator::Validator;
+    use one_system::sui_system_state_inner::SuiSystemStateInner;
+    use one_system::sui_system_state_inner;
 
     public struct SuiSystemState has key {
         id: UID,
@@ -23,7 +23,7 @@ module sui_system::sui_system {
     public(package) fun create(
         id: UID,
         validators: vector<Validator>,
-        storage_fund: Balance<SUI>,
+        storage_fund: Balance<OCT>,
         protocol_version: u64,
         epoch_start_timestamp_ms: u64,
         epoch_duration_ms: u64,
@@ -47,8 +47,8 @@ module sui_system::sui_system {
     }
 
     fun advance_epoch(
-        storage_reward: Balance<SUI>,
-        computation_reward: Balance<SUI>,
+        storage_reward: Balance<OCT>,
+        computation_reward: Balance<OCT>,
         wrapper: &mut SuiSystemState,
         _new_epoch: u64,
         _next_protocol_version: u64,
@@ -58,7 +58,7 @@ module sui_system::sui_system {
         _reward_slashing_rate: u64,
         _epoch_start_timestamp_ms: u64,
         ctx: &mut TxContext,
-    ) : Balance<SUI> {
+    ) : Balance<OCT> {
         let self = load_system_state_mut(wrapper);
         assert!(tx_context::sender(ctx) == @0x1, 0); // aborts here
         sui_system_state_inner::advance_epoch(

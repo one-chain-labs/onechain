@@ -60,15 +60,15 @@ trap "clean_tmp_dir $TMP_DIR" EXIT
 
 for DIST_OS VSCODE_OS in "${(@kv)SUPPORTED_OS}"; do
     # Sui distribution identifier
-    SUI_DISTRO=$NETWORK"-v"$VERSION
+    ONE_DISTRO=$NETWORK"-v"$VERSION
     # name of the Sui distribution archive file, for example sui-testnet-v1.13.0-macos-arm64.tgz
-    SUI_ARCHIVE="sui-"$SUI_DISTRO"-"$DIST_OS".tgz"
+    ONE_ARCHIVE="sui-"$ONE_DISTRO"-"$DIST_OS".tgz"
     # a path to downloaded Sui archive
-    SUI_ARCHIVE_PATH=$TMP_DIR"/"$SUI_ARCHIVE
+    ONE_ARCHIVE_PATH=$TMP_DIR"/"$ONE_ARCHIVE
 
     # download Sui archive file to a given location and uncompress it
-    curl https://github.com/MystenLabs/sui/releases/download/"$SUI_DISTRO"/"$SUI_ARCHIVE" -L -o $SUI_ARCHIVE_PATH
-    tar -xf $SUI_ARCHIVE_PATH --directory $TMP_DIR
+    curl https://github.com/one-chain-labs/onechain/releases/download/"$ONE_DISTRO"/"$ONE_ARCHIVE" -L -o $ONE_ARCHIVE_PATH
+    tar -xf $ONE_ARCHIVE_PATH --directory $TMP_DIR
 
     # names of the move-analyzer binary, both the one becoming part of the extension ($SERVER_BIN)
     # and the one in the Sui archive ($ARCHIVE_SERVER_BIN)

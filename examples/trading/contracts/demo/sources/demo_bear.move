@@ -4,7 +4,7 @@
 module demo::demo_bear;
 
 use std::string::{String, utf8};
-use sui::{display, package};
+use one::{display, package};
 
 /// our demo struct.
 public struct DemoBear has key, store {
@@ -44,8 +44,8 @@ fun init(otw: DEMO_BEAR, ctx: &mut TxContext) {
     // Commit first version of `Display` to apply changes.
     display::update_version(&mut display);
 
-    sui::transfer::public_transfer(display, ctx.sender());
-    sui::transfer::public_transfer(publisher, ctx.sender())
+    one::transfer::public_transfer(display, ctx.sender());
+    one::transfer::public_transfer(publisher, ctx.sender())
 }
 
 public fun new(name: String, ctx: &mut TxContext): DemoBear {

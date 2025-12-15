@@ -26,13 +26,13 @@ task 3, line 21:
 //# view-object 1,0
 Owner: Account Address ( A )
 Version: 2
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(1,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 12000u64,
     },
 }
@@ -41,13 +41,13 @@ task 4, line 23:
 //# view-object 2,0
 Owner: Account Address ( A )
 Version: 3
-Contents: sui::coin::Coin<sui::sui::SUI> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
-    balance: sui::balance::Balance<sui::sui::SUI> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 3400u64,
     },
 }
@@ -64,7 +64,7 @@ Response: {
   "result": {
     "data": [
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
         "coinObjectId": "0x2834d85dbfefdcd66f04811231ba818893793e83a895d53402fd99e132e36562",
         "version": "3",
         "digest": "D63GjQSUZQ6iuYP2hJfbAp9fTcjBramkoH4tDDmGFMCT",
@@ -72,7 +72,7 @@ Response: {
         "previousTransaction": "EK4m6HC3b7C2T7fZT9KjqugnkgPD7YsgBXGoG9WAFmQN"
       },
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
         "coinObjectId": "0xe4a7de8e2336a34d8a4a544546eecffad748156a8fb62dd4e6c030424d49e259",
         "version": "2",
         "digest": "gMNG9ZADuKXKq5PoHpFbspGzEv9kZ4ifgvXXswLjthf",
@@ -105,7 +105,7 @@ Response: {
   "result": {
     "data": [
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
         "coinObjectId": "0x8f30d8a369b4b9649bd1f018cb5c6fc84c19098aefb8d3d0cffb50aa1574251d",
         "version": "4",
         "digest": "AWvFXoUkm92HAZcAargDYsx68QS8arnJiqxjVUzXC7nk",
@@ -113,7 +113,7 @@ Response: {
         "previousTransaction": "AXzgRv8bvNPQvMiETHqWkQ9oQhWb8QF2PUurfXeEFUyT"
       },
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
         "coinObjectId": "0xa9a2c06be125dfa73fab40fdcca74eb80251de59c95a4baf07e13e1435fe19cd",
         "version": "4",
         "digest": "9DPCe86YYAHDNXptQhoXyJ5jxjew9BSJwT51W9MuBAFf",

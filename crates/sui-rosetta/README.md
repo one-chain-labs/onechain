@@ -13,7 +13,7 @@ read and write transactions to the Sui network.
 
 ### Build from source
 #### 0. Checkout and build Sui
-Checkout the [Sui source code](https://github.com/MystenLabs/sui) and compile using `cargo build --release`, the binaries will be located in `target/release` directory.
+Checkout the [Sui source code](https://github.com/one-chain-labs/onechain) and compile using `cargo build --release`, the binaries will be located in `target/release` directory.
 
 #### 1. Genesis
 
@@ -146,7 +146,7 @@ docker run mysten/sui-rosetta-devnet sui-rosetta start-offline-server
 There are 2 places we convert Sui's transaction to Rosetta's operations, 
 one is in the `/construction/parse` endpoint and another one in `/block/transaction endpoint`.
 `/operation/parse` uses `Operation::from_data` to create the "intent" operations and `/block/transaction` uses `Operation::from_data_and_effect` to create the "confirmed" operations.
-the `/construction/parse` endpoint is used for checking transaction correctness during transaction construction, in our case we only support `TransferSui` for now, the operations created looks like this (negative amount indicate sender):
+the `/construction/parse` endpoint is used for checking transaction correctness during transaction construction, in our case we only support `TransferOct` for now, the operations created looks like this (negative amount indicate sender):
 ```json
 {
     "operation_identifier": {
@@ -209,5 +209,5 @@ The sender, recipients and transfer amounts are specified in the intent operatio
 these data are being used to create TransactionData for signature.
 After the tx is executed, the rosetta-cli compare the intent operations with the confirmed operations , 
 the confirmed operations must contain the intent operations (the confirmed operations can have more operations than the intent).
-Since the intent operations of TransferSui contains all the balance change information(amount field) already, 
+Since the intent operations of TransferOct contains all the balance change information(amount field) already, 
 we don't need to use the event to create the operations, also operation created by `get_coin_operation_from_event` will contain recipient's coin id, which will cause a mismatch.

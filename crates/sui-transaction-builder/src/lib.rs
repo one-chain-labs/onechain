@@ -95,7 +95,7 @@ impl TransactionBuilder {
                     return Ok(obj.object_ref());
                 }
             }
-            Err(anyhow!("Cannot find gas coin for signer address {signer} with amount sufficient for the required gas budget {gas_budget}. If you are using the pay or transfer commands, you can use pay-sui or transfer-sui commands instead, which will use the only object as gas payment."))
+            Err(anyhow!("Cannot find gas coin for signer address {signer} with amount sufficient for the required gas budget {gas_budget}. If you are using the pay or transfer commands, you can use pay-oct or transfer-oct commands instead, which will use the only object as gas payment."))
         }
     }
 
@@ -186,14 +186,14 @@ impl TransactionBuilder {
         Ok(())
     }
 
-    pub fn transfer_sui_tx_kind(&self, recipient: SuiAddress, amount: Option<u64>) -> TransactionKind {
+    pub fn transfer_oct_tx_kind(&self, recipient: SuiAddress, amount: Option<u64>) -> TransactionKind {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, amount);
+        builder.transfer_oct(recipient, amount);
         let pt = builder.finish();
         TransactionKind::programmable(pt)
     }
 
-    pub async fn transfer_sui(
+    pub async fn transfer_oct(
         &self,
         signer: SuiAddress,
         sui_object_id: ObjectID,
@@ -203,7 +203,7 @@ impl TransactionBuilder {
     ) -> anyhow::Result<TransactionData> {
         let object = self.get_object_ref(sui_object_id).await?;
         let gas_price = self.0.get_reference_gas_price().await?;
-        Ok(TransactionData::new_transfer_sui(recipient, signer, amount, object, gas_budget, gas_price))
+        Ok(TransactionData::new_transfer_oct(recipient, signer, amount, object, gas_budget, gas_price))
     }
 
     pub async fn pay_tx_kind(
@@ -230,7 +230,7 @@ impl TransactionBuilder {
     ) -> anyhow::Result<TransactionData> {
         if let Some(gas) = gas {
             if input_coins.contains(&gas) {
-                return Err(anyhow!("Gas coin is in input coins of Pay transaction, use PaySui transaction instead!"));
+                return Err(anyhow!("Gas coin is in input coins of Pay transaction, use PayOct transaction instead!"));
             }
         }
 
@@ -248,23 +248,23 @@ impl TransactionBuilder {
         Ok(obj_refs)
     }
 
-    /// Construct a transaction kind for the PaySui transaction type
+    /// Construct a transaction kind for the PayOct transaction type
     ///
     /// Use this function together with tx_data_for_dry_run or tx_data
     /// for maximum reusability
-    pub fn pay_sui_tx_kind(
+    pub fn pay_oct_tx_kind(
         &self,
         recipients: Vec<SuiAddress>,
         amounts: Vec<u64>,
     ) -> Result<TransactionKind, anyhow::Error> {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_sui(recipients.clone(), amounts.clone())?;
+        builder.pay_oct(recipients.clone(), amounts.clone())?;
         let pt = builder.finish();
         let tx_kind = TransactionKind::programmable(pt);
         Ok(tx_kind)
     }
 
-    pub async fn pay_sui(
+    pub async fn pay_oct(
         &self,
         signer: SuiAddress,
         input_coins: Vec<ObjectID>,
@@ -278,17 +278,17 @@ impl TransactionBuilder {
         // [0] is safe because input_coins is non-empty and coins are of same length as input_coins.
         let gas_object_ref = coin_refs.remove(0);
         let gas_price = self.0.get_reference_gas_price().await?;
-        TransactionData::new_pay_sui(signer, coin_refs, recipients, amounts, gas_object_ref, gas_budget, gas_price)
+        TransactionData::new_pay_oct(signer, coin_refs, recipients, amounts, gas_object_ref, gas_budget, gas_price)
     }
 
-    pub fn pay_all_sui_tx_kind(&self, recipient: SuiAddress) -> TransactionKind {
+    pub fn pay_all_oct_tx_kind(&self, recipient: SuiAddress) -> TransactionKind {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.pay_all_sui(recipient);
+        builder.pay_all_oct(recipient);
         let pt = builder.finish();
         TransactionKind::programmable(pt)
     }
 
-    pub async fn pay_all_sui(
+    pub async fn pay_all_oct(
         &self,
         signer: SuiAddress,
         input_coins: Vec<ObjectID>,
@@ -301,7 +301,7 @@ impl TransactionBuilder {
         // [0] is safe because input_coins is non-empty and coins are of same length as input_coins.
         let gas_object_ref = coin_refs.remove(0);
         let gas_price = self.0.get_reference_gas_price().await?;
-        Ok(TransactionData::new_pay_all_sui(signer, coin_refs, recipient, gas_object_ref, gas_budget, gas_price))
+        Ok(TransactionData::new_pay_all_oct(signer, coin_refs, recipient, gas_object_ref, gas_budget, gas_price))
     }
 
     pub async fn move_call_tx_kind(
@@ -855,11 +855,11 @@ impl TransactionBuilder {
     pub async fn request_withdraw_stake(
         &self,
         signer: SuiAddress,
-        staked_sui: ObjectID,
+        staked_oct: ObjectID,
         gas: Option<ObjectID>,
         gas_budget: u64,
     ) -> anyhow::Result<TransactionData> {
-        let staked_sui = self.get_object_ref(staked_sui).await?;
+        let staked_oct = self.get_object_ref(staked_oct).await?;
         let gas_price = self.0.get_reference_gas_price().await?;
         let gas = self.select_gas(signer, gas, gas_budget, vec![], gas_price).await?;
         TransactionData::new_move_call(
@@ -869,7 +869,7 @@ impl TransactionBuilder {
             WITHDRAW_STAKE_FUN_NAME.to_owned(),
             vec![],
             gas,
-            vec![CallArg::SUI_SYSTEM_MUT, CallArg::Object(ObjectArg::ImmOrOwnedObject(staked_sui))],
+            vec![CallArg::SUI_SYSTEM_MUT, CallArg::Object(ObjectArg::ImmOrOwnedObject(staked_oct))],
             gas_budget,
             gas_price,
         )

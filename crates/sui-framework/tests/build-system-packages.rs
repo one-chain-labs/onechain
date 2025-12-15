@@ -40,8 +40,8 @@ fn build_system_packages() {
 
     let bridge_path = packages_path.join("bridge");
     let deepbook_path = packages_path.join("deepbook");
-    let sui_system_path = packages_path.join("sui-system");
-    let sui_framework_path = packages_path.join("sui-framework");
+    let sui_system_path = packages_path.join("one-system");
+    let sui_framework_path = packages_path.join("one-framework");
     let move_stdlib_path = packages_path.join("move-stdlib");
 
     build_packages(&bridge_path, &deepbook_path, &sui_system_path, &sui_framework_path, &move_stdlib_path, out_dir);
@@ -58,9 +58,9 @@ fn check_diff(checked_in: &Path, built: &Path) {
             .output()
             .unwrap();
         if !output.status.success() {
-            let header = "Generated and checked-in sui-framework packages and/or docs do not match.\n\
+            let header = "Generated and checked-in one-framework packages and/or docs do not match.\n\
                  Re-run with `UPDATE=1` to update checked-in packages and docs. e.g.\n\n\
-                 UPDATE=1 cargo test -p sui-framework --test build-system-packages";
+                 UPDATE=1 cargo test -p one-framework --test build-system-packages";
 
             panic!(
                 "{header}\n\n{}\n\n{}",
@@ -97,8 +97,8 @@ fn build_packages(
         out_dir,
         "bridge",
         "deepbook",
-        "sui-system",
-        "sui-framework",
+        "one-system",
+        "one-framework",
         "move-stdlib",
         config,
     );

@@ -45,7 +45,7 @@ pub fn verify_module(module: &CompiledModule, fn_info_map: &FnInfoMap) -> Result
     // the module has no initializer). The reason for it is that the SUI coin is only instantiated
     // during genesis. It is easiest to simply special-case this module particularly that this is
     // framework code and thus deemed correct.
-    if ModuleId::new(SUI_FRAMEWORK_ADDRESS, ident_str!("sui").to_owned()) == module.self_id() {
+    if ModuleId::new(SUI_FRAMEWORK_ADDRESS, ident_str!("oct").to_owned()) == module.self_id() {
         return Ok(());
     }
 

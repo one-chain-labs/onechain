@@ -4,12 +4,12 @@
 /// Functions for operating on Move packages from within Move:
 /// - Creating proof-of-publish objects from one-time witnesses
 /// - Administering package upgrades through upgrade policies.
-module sui::package {
-    use sui::object::{Self, ID, UID};
-    use sui::tx_context::{TxContext, sender};
+module one::package {
+    use one::object::{Self, ID, UID};
+    use one::tx_context::{TxContext, sender};
     use std::ascii::String;
     use std::type_name;
-    use sui::types;
+    use one::types;
 
     /// Tried to create a `Publisher` using a type that isn't a
     /// one-time witness.
@@ -107,7 +107,7 @@ module sui::package {
     /// Since this function can only be called in the module initializer,
     /// the sender is the publisher.
     public fun claim_and_keep<OTW: drop>(otw: OTW, ctx: &mut TxContext) {
-        sui::transfer::public_transfer(claim(otw, ctx), sender(ctx))
+        one::transfer::public_transfer(claim(otw, ctx), sender(ctx))
     }
 
     /// Destroy a Publisher object effectively removing all privileges
@@ -304,7 +304,7 @@ module sui::package {
         // hashing the existing package and cap ID.
         let data = object::id_to_bytes(&cap);
         std::vector::append(&mut data, object::id_to_bytes(&package));
-        let package = object::id_from_bytes(sui::hash::blake2b256(&data));
+        let package = object::id_from_bytes(one::hash::blake2b256(&data));
 
         UpgradeReceipt {
             cap, package

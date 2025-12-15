@@ -53,10 +53,10 @@ Create a new file in the `sources` directory with the name `house_data.move` and
 ```move title='house_data.move'
 module satoshi_flip::house_data {
 
-  use sui::balance::{Self, Balance};
-  use sui::sui::SUI;
-  use sui::coin::{Self, Coin};
-  use sui::package::{Self};
+  use one::balance::{Self, Balance};
+  use one::oct::OCT;
+  use one::coin::{Self, Coin};
+  use one::package::{Self};
 
   // Error codes
   const ECallerNotHouse: u64 = 0;
@@ -76,12 +76,12 @@ Next, add some more code to this module:
   /// Configuration and Treasury object, managed by the house.
   public struct HouseData has key {
     id: UID,
-    balance: Balance<SUI>,
+    balance: Balance<OCT>,
     house: address,
     public_key: vector<u8>,
     max_stake: u64,
     min_stake: u64,
-    fees: Balance<SUI>,
+    fees: Balance<OCT>,
     base_fee_in_bp: u16
   }
 
@@ -115,7 +115,7 @@ Next, add some more code to this module:
 So far, you've set up the data structures within the module. Now, create a function that initializes the house data and shares the `HouseData` object:
 
 ```move title='house_data.move'
-  public fun initialize_house_data(house_cap: HouseCap, coin: Coin<SUI>, public_key: vector<u8>, ctx: &mut TxContext) {
+  public fun initialize_house_data(house_cap: HouseCap, coin: Coin<OCT>, public_key: vector<u8>, ctx: &mut TxContext) {
     assert!(coin.value() > 0, EInsufficientBalance);
 
     let house_data = HouseData {
@@ -139,7 +139,7 @@ So far, you've set up the data structures within the module. Now, create a funct
 With the house data initialized, you also need to add some functions that enable some important administrative tasks for the house to perform:
 
 ```move title='house_data.move'
-  public fun top_up(house_data: &mut HouseData, coin: Coin<SUI>, _: &mut TxContext) {
+  public fun top_up(house_data: &mut HouseData, coin: Coin<OCT>, _: &mut TxContext) {
     coin::put(&mut house_data.balance, coin)
   }
 
@@ -188,11 +188,11 @@ You have established the data structure of this module, but without the appropri
 ```move title='house_data.move'
   // --------------- Mutable References ---------------
 
-  public(package) fun borrow_balance_mut(house_data: &mut HouseData): &mut Balance<SUI> {
+  public(package) fun borrow_balance_mut(house_data: &mut HouseData): &mut Balance<OCT> {
     &mut house_data.balance
   }
 
-  public(package) fun borrow_fees_mut(house_data: &mut HouseData): &mut Balance<SUI> {
+  public(package) fun borrow_fees_mut(house_data: &mut HouseData): &mut Balance<OCT> {
     &mut house_data.fees
   }
 
@@ -260,7 +260,7 @@ In the same `sources` directory, now create a file named `counter_nft.move`. A `
 ```move title='counter_nft.move'
 module satoshi_flip::counter_nft {
 
-  use sui::bcs::{Self};
+  use one::bcs::{Self};
 
   public struct Counter has key {
     id: UID,
@@ -328,13 +328,13 @@ Create the game module. In the `sources` directory, create a new file called `si
 module satoshi_flip::single_player_satoshi {
   use std::string::String;
 
-  use sui::coin::{Self, Coin};
-  use sui::balance::Balance;
-  use sui::sui::SUI;
-  use sui::bls12381::bls12381_min_pk_verify;
-  use sui::event::emit;
-  use sui::hash::{blake2b256};
-  use sui::dynamic_object_field::{Self as dof};
+  use one::coin::{Self, Coin};
+  use one::balance::Balance;
+  use one::oct::OCT;
+  use one::bls12381::bls12381_min_pk_verify;
+  use one::event::emit;
+  use one::hash::{blake2b256};
+  use one::dynamic_object_field::{Self as dof};
 
   use satoshi_flip::counter_nft::Counter;
   use satoshi_flip::house_data::HouseData;
@@ -380,7 +380,7 @@ Add a struct to the module:
   public struct Game has key, store {
     id: UID,
     guess_placed_epoch: u64,
-    total_stake: Balance<SUI>,
+    total_stake: Balance<OCT>,
     guess: String,
     player: address,
     vrf_input: vector<u8>,
@@ -534,7 +534,7 @@ The rest of the functions are accessors and helper functions used to retrieve va
   }
 
   /// Internal helper function used to create a new game.
-  fun internal_start_game(guess: String, counter: &mut Counter, coin: Coin<SUI>, house_data: &mut HouseData, fee_bp: u16, ctx: &mut TxContext): (ID, Game) {
+  fun internal_start_game(guess: String, counter: &mut Counter, coin: Coin<OCT>, house_data: &mut HouseData, fee_bp: u16, ctx: &mut TxContext): (ID, Game) {
     // Ensure guess is valid.
     map_guess(guess);
     let user_stake = coin.value();
@@ -657,7 +657,7 @@ Partial snippet of CLI deployment output.
 │  │ ObjectID: 0x0e4eb516f8899e116a26f927c8aaddae8466c8cdc3822f05c15159e3a8ff8006                          │
 │  │ Sender: 0x8e8cae7791a93778800b88b6a274de5c32a86484593568d38619c7ea71999654                            │
 │  │ Owner: Account Address ( 0x8e8cae7791a93778800b88b6a274de5c32a86484593568d38619c7ea71999654 )         │
-│  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                            │
+│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                            │
 │  │ Version: 75261540                                                                                     │
 │  │ Digest: Ezmi94kWCfjRzgGTwnXehv9ipPvYQ7T6Z4wefPLRQPPY                                                  │
 │  └──                                                                                                     │
@@ -839,7 +839,7 @@ Okay, that's a good start to have an overview of the project. Time to move to in
     // Split gas coin into house stake coin
     // SDK will take care for us abstracting away of up-front coin selections
     const [houseStakeCoin] = txb.splitCoins(txb.gas, [
-      MIST_PER_SUI * BigInt(houseStake),
+      MIST_PER_OCT * BigInt(houseStake),
     ]);
     // Calling smart contract function
     txb.moveCall({
@@ -1050,7 +1050,7 @@ Great, now you can create the game with the created `Counter` object. Isolate th
 const txb = new Transaction();
 
 // Player stake
-const [stakeCoin] = txb.splitCoins(txb.gas, [MIST_PER_SUI * BigInt(stake)]);
+const [stakeCoin] = txb.splitCoins(txb.gas, [MIST_PER_OCT * BigInt(stake)]);
 
 // Create the game with CounterNFT
 txb.moveCall({

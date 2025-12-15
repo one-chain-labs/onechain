@@ -146,7 +146,7 @@ pub fn create_fake_cert_and_effect_digest<'a>(
     (ExecutionDigests::new(*transaction.digest(), effects.digest()), cert)
 }
 
-pub fn make_transfer_sui_transaction(
+pub fn make_transfer_oct_transaction(
     gas_object: ObjectRef,
     recipient: SuiAddress,
     amount: Option<u64>,
@@ -154,7 +154,7 @@ pub fn make_transfer_sui_transaction(
     keypair: &AccountKeyPair,
     gas_price: u64,
 ) -> Transaction {
-    let data = TransactionData::new_transfer_sui(
+    let data = TransactionData::new_transfer_oct(
         recipient,
         sender,
         amount,
@@ -165,7 +165,7 @@ pub fn make_transfer_sui_transaction(
     to_sender_signed_transaction(data, keypair)
 }
 
-pub fn make_pay_sui_transaction(
+pub fn make_pay_oct_transaction(
     gas_object: ObjectRef,
     coins: Vec<ObjectRef>,
     recipients: Vec<SuiAddress>,
@@ -176,7 +176,7 @@ pub fn make_pay_sui_transaction(
     gas_budget: u64,
 ) -> Transaction {
     let data =
-        TransactionData::new_pay_sui(sender, coins, recipients, amounts, gas_object, gas_budget, gas_price).unwrap();
+        TransactionData::new_pay_oct(sender, coins, recipients, amounts, gas_object, gas_budget, gas_price).unwrap();
     to_sender_signed_transaction(data, keypair)
 }
 

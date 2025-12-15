@@ -13,17 +13,17 @@
 //# publish
 
 module t2::o2 {
-    use sui::dynamic_field as df;
-    use sui::dynamic_object_field as dof;
-    use sui::sui::SUI;
-    use sui::coin::{Self, Coin};
+    use one::dynamic_field as df;
+    use one::dynamic_object_field as dof;
+    use one::oct::OCT;
+    use one::coin::{Self, Coin};
 
     public struct Obj2 has key, store {
         id: UID,
     }
 
     public fun mint_shared_coin(ctx: &mut TxContext) {
-        transfer::public_share_object(coin::zero<SUI>(ctx))
+        transfer::public_share_object(coin::zero<OCT>(ctx))
     }
 
     public fun mint_shared_obj(ctx: &mut TxContext) {
@@ -31,30 +31,30 @@ module t2::o2 {
     }
 
     public fun mint_owned_coin(ctx: &mut TxContext) {
-        transfer::public_transfer(coin::zero<SUI>(ctx), @A)
+        transfer::public_transfer(coin::zero<OCT>(ctx), @A)
     }
 
-    public fun deleter(o2: Coin<SUI>) {
+    public fun deleter(o2: Coin<OCT>) {
         coin::destroy_zero(o2);
     }
 
-    public fun freezer(o2: Coin<SUI>) {
+    public fun freezer(o2: Coin<OCT>) {
         transfer::public_freeze_object(o2);
     }
 
-    public fun dofer(parent: &mut Obj2, o2: Coin<SUI>) {
+    public fun dofer(parent: &mut Obj2, o2: Coin<OCT>) {
         dof::add(&mut parent.id, 0, o2);
     }
 
-    public fun dfer(parent: &mut Obj2, o2: Coin<SUI>) {
+    public fun dfer(parent: &mut Obj2, o2: Coin<OCT>) {
         df::add(&mut parent.id, 0, o2);
     }
 
-    public fun transferer(o2: Coin<SUI>) {
+    public fun transferer(o2: Coin<OCT>) {
         transfer::public_transfer(o2, @0x0);
     }
 
-    public fun sharer(o2: Coin<SUI>) {
+    public fun sharer(o2: Coin<OCT>) {
         transfer::public_share_object(o2);
     }
 }

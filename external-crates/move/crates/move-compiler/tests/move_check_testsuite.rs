@@ -85,7 +85,7 @@ impl TestKind {
 fn default_testing_addresses(flavor: Flavor) -> BTreeMap<String, NumericalAddress> {
     let mut mapping = vec![
         ("std", "0x1"),
-        ("sui", "0x2"),
+        ("one", "0x2"),
         ("M", "0x40"),
         ("A", "0x41"),
         ("B", "0x42"),
@@ -95,7 +95,7 @@ fn default_testing_addresses(flavor: Flavor) -> BTreeMap<String, NumericalAddres
         ("k", "0x19"),
     ];
     if flavor == Flavor::Sui {
-        mapping.extend([("sui", "0x2"), ("sui_system", "0x3")]);
+        mapping.extend([("one", "0x2"), ("one_system", "0x3")]);
     }
     mapping
         .into_iter()

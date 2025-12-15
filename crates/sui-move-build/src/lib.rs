@@ -281,7 +281,7 @@ pub fn build_from_resolution_graph(
                 .map_err(|err| SuiError::ModuleVerificationFailure { error: err.to_string() })?;
             sui_bytecode_verifier::sui_verify_module_unmetered(m, &fn_info, &verifier_config)?;
         }
-        // TODO(https://github.com/MystenLabs/sui/issues/69): Run Move linker
+        // TODO(https://github.com/one-chain-labs/onechain/issues/69): Run Move linker
     }
 
     Ok(CompiledPackage {

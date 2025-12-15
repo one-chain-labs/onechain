@@ -9,7 +9,7 @@ use sui_storage::{key_value_store::TransactionKeyValueStore, key_value_store_met
 use sui_test_transaction_builder::{
     batch_make_transfer_transactions,
     make_staking_transaction,
-    make_transfer_sui_transaction,
+    make_transfer_oct_transaction,
 };
 use sui_types::{
     effects::TransactionEffectsAPI,
@@ -184,7 +184,7 @@ async fn test_tx_across_epoch_boundaries() {
     let (result_tx, mut result_rx) = tokio::sync::mpsc::channel::<FinalizedEffects>(total_tx_cnt);
 
     let test_cluster = TestClusterBuilder::new().build().await;
-    let tx = make_transfer_sui_transaction(&test_cluster.wallet, None, None).await;
+    let tx = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
     let authorities = test_cluster.swarm.validator_node_handles();
 
     // We first let 2 validators stop accepting user cert

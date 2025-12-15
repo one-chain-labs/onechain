@@ -40,7 +40,7 @@ use crate::{
             ExecutionIndicesWithStats,
             PkG,
         },
-        epoch_start_configuration::{EpochStartConfigTrait, EpochStartConfiguration},
+        epoch_start_configuration::EpochStartConfiguration,
         shared_object_congestion_tracker::CongestionPerObjectDebt,
         transaction_deferral::DeferralKey,
     },

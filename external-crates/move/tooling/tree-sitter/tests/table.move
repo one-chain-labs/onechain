@@ -16,10 +16,10 @@
 /// // table1 does not equal table2, despite having the same entries
 /// assert!(&table1 != &table2, 0);
 /// ```
-module sui::table {
-    use sui::object::{Self, UID};
-    use sui::dynamic_field as field;
-    use sui::tx_context::TxContext;
+module one::table {
+    use one::object::{Self, UID};
+    use one::dynamic_field as field;
+    use one::tx_context::TxContext;
 
     // Attempted to destroy a non-empty table
     const ETableNotEmpty: u64 = 0;
@@ -40,7 +40,7 @@ module sui::table {
     }
 
     /// Adds a key-value pair to the table `table: &mut Table<K, V>`
-    /// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
+    /// Aborts with `one::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
     /// that key `k: K`.
     public fun add<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K, v: V) {
         field::add(&mut table.id, k, v);
@@ -48,21 +48,21 @@ module sui::table {
     }
 
     /// Immutable borrows the value associated with the key in the table `table: &Table<K, V>`.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+    /// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
     /// that key `k: K`.
     public fun borrow<K: copy + drop + store, V: store>(table: &Table<K, V>, k: K): &V {
         field::borrow(&table.id, k)
     }
 
     /// Mutably borrows the value associated with the key in the table `table: &mut Table<K, V>`.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+    /// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
     /// that key `k: K`.
     public fun borrow_mut<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K): &mut V {
         field::borrow_mut(&mut table.id, k)
     }
 
     /// Removes the key-value pair in the table `table: &mut Table<K, V>` and returns the value.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+    /// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
     /// that key `k: K`.
     public fun remove<K: copy + drop + store, V: store>(table: &mut Table<K, V>, k: K): V {
         let v = field::remove(&mut table.id, k);

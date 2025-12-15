@@ -6,10 +6,10 @@
 /// With Programmable transactions, it is possible to borrow a value within
 /// a transaction, use it and put back in the end. Hot-potato `Borrow` makes
 /// sure the object is returned and was not swapped for another one.
-module sui::borrow {
-    use sui::object::{Self, ID};
+module one::borrow {
+    use one::object::{Self, ID};
     use std::option::{Self, Option};
-    use sui::tx_context::{Self, TxContext};
+    use one::tx_context::{Self, TxContext};
 
     /// The `Borrow` does not match the `Referent`.
     const EWrongBorrow: u64 = 0;
@@ -67,7 +67,7 @@ module sui::borrow {
 
     #[test]
     fun test_borrow() {
-        let ctx = &mut sui::tx_context::dummy();
+        let ctx = &mut one::tx_context::dummy();
         let ref = new(Test { id: object::new(ctx) }, ctx);
 
         let (value, borrow) = borrow(&mut ref);
@@ -81,7 +81,7 @@ module sui::borrow {
     #[expected_failure(abort_code = EWrongValue)]
     /// The `value` is swapped with another instance of the type `T`.
     fun test_object_swap() {
-        let ctx = &mut sui::tx_context::dummy();
+        let ctx = &mut one::tx_context::dummy();
         let ref_1 = new(Test { id: object::new(ctx) }, ctx);
         let ref_2 = new(Test { id: object::new(ctx) }, ctx);
 
@@ -102,7 +102,7 @@ module sui::borrow {
     #[expected_failure(abort_code = EWrongBorrow)]
     /// The both `borrow` and `value` are swapped with another `Referent`.
     fun test_borrow_fail() {
-        let ctx = &mut sui::tx_context::dummy();
+        let ctx = &mut one::tx_context::dummy();
         let ref_1 = new(Test { id: object::new(ctx) }, ctx);
         let ref_2 = new(Test { id: object::new(ctx) }, ctx);
 

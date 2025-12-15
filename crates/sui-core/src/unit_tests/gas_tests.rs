@@ -470,7 +470,7 @@ async fn test_native_transfer_gas_price_is_used() {
 }
 
 #[tokio::test]
-async fn test_transfer_sui_insufficient_gas() {
+async fn test_transfer_oct_insufficient_gas() {
     let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
     let recipient = dbg_addr(2);
     let authority_state = TestAuthorityBuilder::new().build().await;
@@ -482,7 +482,7 @@ async fn test_transfer_sui_insufficient_gas() {
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_sui(recipient, None);
+        builder.transfer_oct(recipient, None);
         builder.finish()
     };
     let kind = TransactionKind::ProgrammableTransaction(pt);
@@ -529,7 +529,7 @@ async fn test_invalid_gas_owners() {
         let pt = {
             let mut builder = ProgrammableTransactionBuilder::new();
             let recipient = dbg_addr(2);
-            builder.transfer_sui(recipient, None);
+            builder.transfer_oct(recipient, None);
             builder.finish()
         };
         let kind = TransactionKind::ProgrammableTransaction(pt);

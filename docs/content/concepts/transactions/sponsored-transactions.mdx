@@ -4,7 +4,7 @@ title: Sponsored Transactions
 
 A Sui sponsored transaction is one where a Sui address (the sponsor's) pays the gas fees for a transaction that another address (the user's) initializes. You can use sponsored transactions to cover the fees for users on your site or app so that they don't get charged for them. This removes a significant obstacle that web 2.0 users encounter when entering web3, as they often have to purchase tokens to perform a transaction on chain. For example, you could sponsor gamers' early transactions to increase conversion rates.
 
-Sponsored transactions also facilitate asset management as you don't need to maintain multiple accounts with SUI tokens to transfer funds.
+Sponsored transactions also facilitate asset management as you don't need to maintain multiple accounts with OCT tokens to transfer funds.
 
 You can use Sui sponsored transactions to:
 - Sponsor (pay gas fees for) a transaction a user initiates.
@@ -118,7 +118,7 @@ For user and sponsor-initiated transactions, users can submit the dual-signed tr
 
 ## Sponsored transaction data structure
 
-The following code block describes the `TransactionData` structure for sponsored transactions and `GasObject`. You can view the [source code](https://github.com/MystenLabs/sui/blob/224a28ed9dece21a952547896bd5d794bdf8b562/crates/sui-types/src/transaction.rs) in the Sui GitHub repository.
+The following code block describes the `TransactionData` structure for sponsored transactions and `GasObject`. You can view the [source code](https://github.com/one-chain-labs/onechain/blob/224a28ed9dece21a952547896bd5d794bdf8b562/crates/sui-types/src/transaction.rs) in the Sui GitHub repository.
 
 **`TransactionData` Structure**
 ```rust

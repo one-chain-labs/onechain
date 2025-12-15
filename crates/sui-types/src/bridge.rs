@@ -96,7 +96,7 @@ pub enum Bridge {
     V1(BridgeInnerV1),
 }
 
-/// Rust version of the Move sui::bridge::Bridge type
+/// Rust version of the Move one::bridge::Bridge type
 /// This repreents the object with 0x9 ID.
 /// In Rust, this type should be rarely used since it's just a thin
 /// wrapper used to access the inner object.

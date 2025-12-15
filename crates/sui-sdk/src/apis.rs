@@ -685,7 +685,7 @@ impl CoinReadApi {
     /// Return a paginated response with the coins for the given address, or an error upon failure.
     ///
     /// The coins can be filtered by `coin_type` (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC)
-    /// or use `None` for the default `Coin<SUI>`.
+    /// or use `None` for the default `Coin<OCT>`.
     ///
     /// # Examples
     ///
@@ -749,7 +749,7 @@ impl CoinReadApi {
     /// Return the coins for the given address as a stream.
     ///
     /// The coins can be filtered by `coin_type` (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC)
-    /// or use `None` for the default `Coin<SUI>`.
+    /// or use `None` for the default `Coin<OCT>`.
     ///
     /// # Examples
     ///
@@ -792,7 +792,7 @@ impl CoinReadApi {
     /// If that it is not possible, it will fail with an insufficient fund error.
     ///
     /// The coins can be filtered by `coin_type` (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC)
-    /// or use `None` to use the default `Coin<SUI>`.
+    /// or use `None` to use the default `Coin<OCT>`.
     ///
     /// # Examples
     ///
@@ -841,7 +841,7 @@ impl CoinReadApi {
     ///
     /// Note that this function sums up all the balances of all the coins matching
     /// the given coin type. By default, if `coin_type` is set to `None`,
-    /// it will use the default `Coin<SUI>`.
+    /// it will use the default `Coin<OCT>`.
     ///
     /// # Examples
     ///
@@ -904,7 +904,7 @@ impl CoinReadApi {
     ///     let sui = SuiClientBuilder::default().build_localnet().await?;
     ///     let coin_metadata = sui
     ///         .coin_read_api()
-    ///         .get_coin_metadata("0x2::sui::SUI".to_string())
+    ///         .get_coin_metadata("0x2::one::OCT".to_string())
     ///         .await?;
     ///     Ok(())
     /// }
@@ -925,7 +925,7 @@ impl CoinReadApi {
     ///     let sui = SuiClientBuilder::default().build_localnet().await?;
     ///     let total_supply = sui
     ///         .coin_read_api()
-    ///         .get_total_supply("0x2::sui::SUI".to_string())
+    ///         .get_total_supply("0x2::one::OCT".to_string())
     ///         .await?;
     ///     Ok(())
     /// }
@@ -963,7 +963,7 @@ impl EventApi {
     /// async fn main() -> Result<(), anyhow::Error> {
     ///     let sui = SuiClientBuilder::default()
     ///         .ws_url("wss://rpc.mainnet.sui.io:443")
-    ///         .build("https://fullnode.mainnet.sui.io:443")
+    ///         .build("https://rpc-mainnet.onelabs.cc:443")
     ///         .await?;
     ///     let mut subscribe_all = sui
     ///         .event_api()

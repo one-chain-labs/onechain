@@ -8,7 +8,7 @@ RUN apt-get update && apt-get -y --no-install-recommends install wget=1.21-1+deb
         iputils-ping netcat procps bind9-host bind9-dnsutils curl iproute2 git ca-certificates awscli
 
 # stress needs access to examples/move/basics
-RUN git clone https://github.com/MystenLabs/sui.git ; \
+RUN git clone https://github.com/one-chain-labs/onechain.git ; \
         cd sui ; \
         git checkout $SUI_TOOLS_IMAGE_TAG ; \
         cd .. ; \

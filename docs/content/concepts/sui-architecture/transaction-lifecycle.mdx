@@ -42,7 +42,7 @@ Certification happens after a transaction gets submitted to a Full node. Upon su
    - The transaction has a valid user signature.
    - The initiator of the transaction must have access to all the owned input objects the transaction uses. In the previous NFT example, the validity check makes sure you own the NFT you're trying to send to a friend.
    - All the shared input objects used by the transaction exist.
-   - The gas coin is a `Coin<SUI>` object, and it contains at least as much gas as specified in the transaction's gas budget.
+   - The gas coin is a `Coin<OCT>` object, and it contains at least as much gas as specified in the transaction's gas budget.
 
 If all the validity checks pass, the validator then attempts to lock all the owned input objects to the given transaction digest. This ensures each owned input object can only be used by one transaction at a time and is the way that Sui prevents double-spending. In other words, this makes sure that you send your NFT to only one friend instead of trying to send the same NFT to all your friends.
 

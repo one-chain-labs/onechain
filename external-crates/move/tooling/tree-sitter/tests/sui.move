@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Coin<SUI> is the token used to pay for gas in Sui.
+/// Coin<OCT> is the token used to pay for gas in Sui.
 /// It has 9 decimals, and the smallest unit (10^-9) is called "mist".
-module sui::sui {
+module one::sui {
     use std::option;
-    use sui::tx_context::{Self, TxContext};
-    use sui::balance::{Self, Balance};
-    use sui::transfer;
-    use sui::coin;
+    use one::tx_context::{Self, TxContext};
+    use one::balance::{Self, Balance};
+    use one::transfer;
+    use one::coin;
 
     const EAlreadyMinted: u64 = 0;
     /// Sender is not @0x0 the system address.
@@ -17,11 +17,11 @@ module sui::sui {
     #[allow(unused_const)]
     /// The amount of Mist per Sui token based on the the fact that mist is
     /// 10^-9 of a Sui token
-    const MIST_PER_SUI: u64 = 1_000_000_000;
+    const MIST_PER_OCT: u64 = 1_000_000_000;
 
     #[allow(unused_const)]
     /// The total supply of Sui denominated in whole Sui tokens (10 Billion)
-    const TOTAL_SUPPLY_SUI: u64 = 10_000_000_000;
+    const TOTAL_SUPPLY_OCT: u64 = 10_000_000_000;
 
     /// The total supply of Sui denominated in Mist (10 Billion * 10^9)
     const TOTAL_SUPPLY_MIST: u64 = 10_000_000_000_000_000_000;
@@ -32,7 +32,7 @@ module sui::sui {
     #[allow(unused_function)]
     /// Register the `SUI` Coin to acquire its `Supply`.
     /// This should be called only once during genesis creation.
-    fun new(ctx: &mut TxContext): Balance<SUI> {
+    fun new(ctx: &mut TxContext): Balance<OCT> {
         assert!(tx_context::sender(ctx) == @0x0, ENotSystemAddress);
         assert!(tx_context::epoch(ctx) == 0, EAlreadyMinted);
 
@@ -48,12 +48,12 @@ module sui::sui {
         );
         transfer::public_freeze_object(metadata);
         let supply = coin::treasury_into_supply(treasury);
-        let total_sui = balance::increase_supply(&mut supply, TOTAL_SUPPLY_MIST);
+        let total_oct = balance::increase_supply(&mut supply, TOTAL_SUPPLY_MIST);
         balance::destroy_supply(supply);
-        total_sui
+        total_oct
     }
 
-    public entry fun transfer(c: coin::Coin<SUI>, recipient: address) {
+    public entry fun transfer(c: coin::Coin<OCT>, recipient: address) {
         transfer::public_transfer(c, recipient)
     }
 }

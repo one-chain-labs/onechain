@@ -25,7 +25,7 @@ use super::{
     move_object::MoveObject,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedSui,
+    stake::StakedOct,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -196,7 +196,7 @@ impl MovePackage {
     }
 
     /// Total balance of all coins with marker type owned by this package. If type is not supplied,
-    /// it defaults to `0x2::sui::SUI`.
+    /// it defaults to `0x2::one::OCT`.
     ///
     /// Note that coins owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
@@ -221,7 +221,7 @@ impl MovePackage {
 
     /// The coin objects owned by this package.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::one::OCT`.
     ///
     /// Note that coins owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
@@ -237,19 +237,19 @@ impl MovePackage {
         OwnerImpl::from(&self.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this package.
+    /// The `0x3::staking_pool::StakedOct` objects owned by this package.
     ///
     /// Note that objects owned by a package are inaccessible, because packages are immutable and
     /// cannot be owned by an address.
-    pub(crate) async fn staked_suis(
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(&self.super_).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(&self.super_).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.

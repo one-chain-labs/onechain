@@ -1,5 +1,5 @@
 ---
-title: Module `sui::kiosk`
+title: Module `one::kiosk`
 ---
 
 Kiosk is a primitive for building safe, decentralized and trustless trading
@@ -164,26 +164,26 @@ See <code><a href="../sui/transfer_policy.md#sui_transfer_policy">transfer_polic
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/bag.md#sui_bag">sui::bag</a>;
-<b>use</b> <a href="../sui/balance.md#sui_balance">sui::balance</a>;
-<b>use</b> <a href="../sui/coin.md#sui_coin">sui::coin</a>;
-<b>use</b> <a href="../sui/config.md#sui_config">sui::config</a>;
-<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">sui::deny_list</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">sui::dynamic_object_field</a>;
-<b>use</b> <a href="../sui/event.md#sui_event">sui::event</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/package.md#sui_package">sui::package</a>;
-<b>use</b> <a href="../sui/sui.md#sui_sui">sui::sui</a>;
-<b>use</b> <a href="../sui/table.md#sui_table">sui::table</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/transfer_policy.md#sui_transfer_policy">sui::transfer_policy</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/types.md#sui_types">sui::types</a>;
-<b>use</b> <a href="../sui/url.md#sui_url">sui::url</a>;
-<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">sui::vec_set</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bag.md#sui_bag">one::bag</a>;
+<b>use</b> <a href="../sui/balance.md#sui_balance">one::balance</a>;
+<b>use</b> <a href="../sui/coin.md#sui_coin">one::coin</a>;
+<b>use</b> <a href="../sui/config.md#sui_config">one::config</a>;
+<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">one::deny_list</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/event.md#sui_event">one::event</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/package.md#sui_package">one::package</a>;
+<b>use</b> <a href="../sui/sui.md#sui_sui">one::sui</a>;
+<b>use</b> <a href="../sui/table.md#sui_table">one::table</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/transfer_policy.md#sui_transfer_policy">one::transfer_policy</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/types.md#sui_types">one::types</a>;
+<b>use</b> <a href="../sui/url.md#sui_url">one::url</a>;
+<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">one::vec_set</a>;
 </code></pre>
 
 
@@ -209,12 +209,12 @@ needs to be approved via the <code>TransferPolicy</code>.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>profits: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;</code>
+<code>profits: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
  Balance of the Kiosk - all profits from sales go here.
@@ -266,12 +266,12 @@ from the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> as wel
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code><b>for</b>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><b>for</b>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -306,18 +306,18 @@ on top of the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code>.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>kiosk_id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>kiosk_id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  ID of the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> the cap belongs to.
 </dd>
 <dt>
-<code>item_id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>item_id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  ID of the listed item.
@@ -352,12 +352,12 @@ the <code><a href="../sui/kiosk.md#sui_kiosk_borrow_val">borrow_val</a></code> c
 
 <dl>
 <dt>
-<code>kiosk_id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>kiosk_id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>item_id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>item_id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -384,7 +384,7 @@ Dynamic field key for an item placed into the kiosk.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -412,7 +412,7 @@ item is listed without a <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">P
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -446,7 +446,7 @@ Lock is released on <code><a href="../sui/kiosk.md#sui_kiosk_purchase">purchase<
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -475,12 +475,12 @@ type-indexed which allows for searching for offers of a specific <code>T</code>
 
 <dl>
 <dt>
-<code><a href="../sui/kiosk.md#sui_kiosk">kiosk</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/kiosk.md#sui_kiosk">kiosk</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -520,12 +520,12 @@ by the trading module / extension.
 
 <dl>
 <dt>
-<code><a href="../sui/kiosk.md#sui_kiosk">kiosk</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/kiosk.md#sui_kiosk">kiosk</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -558,12 +558,12 @@ to close tracked offers.
 
 <dl>
 <dt>
-<code><a href="../sui/kiosk.md#sui_kiosk">kiosk</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/kiosk.md#sui_kiosk">kiosk</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -715,7 +715,7 @@ Creates a new Kiosk in a default configuration: sender receives the
 <code><a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">KioskOwnerCap</a></code> and becomes the Owner, the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> is shared.
 
 
-<pre><code><b>entry</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_default">default</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>entry</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_default">default</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -726,8 +726,8 @@ Creates a new Kiosk in a default configuration: sender receives the
 
 <pre><code><b>entry</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_default">default</a>(ctx: &<b>mut</b> TxContext) {
     <b>let</b> (<a href="../sui/kiosk.md#sui_kiosk">kiosk</a>, cap) = <a href="../sui/kiosk.md#sui_kiosk_new">new</a>(ctx);
-    <a href="../sui/transfer.md#sui_transfer_transfer">sui::transfer::transfer</a>(cap, ctx.sender());
-    <a href="../sui/transfer.md#sui_transfer_share_object">sui::transfer::share_object</a>(<a href="../sui/kiosk.md#sui_kiosk">kiosk</a>);
+    <a href="../sui/transfer.md#sui_transfer_transfer">one::transfer::transfer</a>(cap, ctx.sender());
+    <a href="../sui/transfer.md#sui_transfer_share_object">one::transfer::share_object</a>(<a href="../sui/kiosk.md#sui_kiosk">kiosk</a>);
 }
 </code></pre>
 
@@ -742,7 +742,7 @@ Creates a new Kiosk in a default configuration: sender receives the
 Creates a new <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> with a matching <code><a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">KioskOwnerCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): (<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, <a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): (<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, <a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>)
 </code></pre>
 
 
@@ -780,7 +780,7 @@ Can only be performed by the bearer of the <code><a href="../sui/kiosk.md#sui_ki
 case where there's no items inside and a <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> is not shared.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_close_and_withdraw">close_and_withdraw</a>(self: <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: <a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/coin.md#sui_coin_Coin">sui::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_close_and_withdraw">close_and_withdraw</a>(self: <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: <a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -814,7 +814,7 @@ basic kiosk functions unless some logic for this is implemented
 in a third party module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_set_owner">set_owner</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_set_owner">set_owner</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -841,7 +841,7 @@ Update the <code><a href="../sui/kiosk.md#sui_kiosk_owner">owner</a></code> fiel
 implementing a custom logic that relies on the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> owner.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_set_owner_custom">set_owner_custom</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, <a href="../sui/kiosk.md#sui_kiosk_owner">owner</a>: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_set_owner_custom">set_owner_custom</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, <a href="../sui/kiosk.md#sui_kiosk_owner">owner</a>: <b>address</b>)
 </code></pre>
 
 
@@ -868,7 +868,7 @@ Place any object into a Kiosk.
 Performs an authorization check to make sure only owner can do that.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_place">place</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, item: T)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_place">place</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, item: T)
 </code></pre>
 
 
@@ -899,7 +899,7 @@ Requires policy for <code>T</code> to make sure that there's an issued <code>Tra
 and the item can be sold, otherwise the asset might be locked forever.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_lock">lock</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, _policy: &<a href="../sui/transfer_policy.md#sui_transfer_policy_TransferPolicy">sui::transfer_policy::TransferPolicy</a>&lt;T&gt;, item: T)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_lock">lock</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, _policy: &<a href="../sui/transfer_policy.md#sui_transfer_policy_TransferPolicy">one::transfer_policy::TransferPolicy</a>&lt;T&gt;, item: T)
 </code></pre>
 
 
@@ -931,7 +931,7 @@ Take any object from the Kiosk.
 Performs an authorization check to make sure only owner can do that.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_take">take</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): T
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_take">take</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): T
 </code></pre>
 
 
@@ -963,7 +963,7 @@ List the item by setting a price and making it available for purchase.
 Performs an authorization check to make sure only owner can sell.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_list">list</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>, price: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_list">list</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>, price: u64)
 </code></pre>
 
 
@@ -992,7 +992,7 @@ Performs an authorization check to make sure only owner can sell.
 Calls <code><a href="../sui/kiosk.md#sui_kiosk_place">place</a></code> and <code><a href="../sui/kiosk.md#sui_kiosk_list">list</a></code> together - simplifies the flow.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_place_and_list">place_and_list</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, item: T, price: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_place_and_list">place_and_list</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, item: T, price: u64)
 </code></pre>
 
 
@@ -1025,7 +1025,7 @@ Remove an existing listing from the <code><a href="../sui/kiosk.md#sui_kiosk_Kio
 user Kiosk. Can only be performed by the owner of the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_delist">delist</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_delist">delist</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>)
 </code></pre>
 
 
@@ -1061,7 +1061,7 @@ request their approval (by calling some function) so that the trade can be
 finalized.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase">purchase</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>, payment: <a href="../sui/coin.md#sui_coin_Coin">sui::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;): (T, <a href="../sui/transfer_policy.md#sui_transfer_policy_TransferRequest">sui::transfer_policy::TransferRequest</a>&lt;T&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase">purchase</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>, payment: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;): (T, <a href="../sui/transfer_policy.md#sui_transfer_policy_TransferRequest">one::transfer_policy::TransferRequest</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -1098,7 +1098,7 @@ Creates a <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a><
 for any price equal or higher than the <code>min_price</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_list_with_purchase_cap">list_with_purchase_cap</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>, min_price: u64, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">sui::kiosk::PurchaseCap</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_list_with_purchase_cap">list_with_purchase_cap</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>, min_price: u64, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">one::kiosk::PurchaseCap</a>&lt;T&gt;
 </code></pre>
 
 
@@ -1139,7 +1139,7 @@ Unpack the <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a>
 as the price for the listing making sure it's no less than <code>min_amount</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_with_cap">purchase_with_cap</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, purchase_cap: <a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">sui::kiosk::PurchaseCap</a>&lt;T&gt;, payment: <a href="../sui/coin.md#sui_coin_Coin">sui::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;): (T, <a href="../sui/transfer_policy.md#sui_transfer_policy_TransferRequest">sui::transfer_policy::TransferRequest</a>&lt;T&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_with_cap">purchase_with_cap</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, purchase_cap: <a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">one::kiosk::PurchaseCap</a>&lt;T&gt;, payment: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;): (T, <a href="../sui/transfer_policy.md#sui_transfer_policy_TransferRequest">one::transfer_policy::TransferRequest</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -1180,7 +1180,7 @@ Return the <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a>
 allow the item for taking. Can only be returned to its <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code>, aborts otherwise.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_return_purchase_cap">return_purchase_cap</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, purchase_cap: <a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">sui::kiosk::PurchaseCap</a>&lt;T&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_return_purchase_cap">return_purchase_cap</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, purchase_cap: <a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">one::kiosk::PurchaseCap</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -1208,7 +1208,7 @@ allow the item for taking. Can only be returned to its <code><a href="../sui/kio
 Withdraw profits from the Kiosk.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_withdraw">withdraw</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, amount: <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;u64&gt;, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/coin.md#sui_coin_Coin">sui::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_withdraw">withdraw</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, amount: <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;u64&gt;, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -1246,7 +1246,7 @@ Withdraw profits from the Kiosk.
 Internal: "lock" an item disabling the <code><a href="../sui/kiosk.md#sui_kiosk_take">take</a></code> action.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_lock_internal">lock_internal</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, item: T)
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_lock_internal">lock_internal</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, item: T)
 </code></pre>
 
 
@@ -1272,7 +1272,7 @@ Internal: "lock" an item disabling the <code><a href="../sui/kiosk.md#sui_kiosk_
 Internal: "place" an item to the Kiosk and increment the item count.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_place_internal">place_internal</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, item: T)
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_place_internal">place_internal</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, item: T)
 </code></pre>
 
 
@@ -1298,7 +1298,7 @@ Internal: "place" an item to the Kiosk and increment the item count.
 Internal: get a mutable access to the UID.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid_mut_internal">uid_mut_internal</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>): &<b>mut</b> <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid_mut_internal">uid_mut_internal</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>): &<b>mut</b> <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -1323,7 +1323,7 @@ Internal: get a mutable access to the UID.
 Check whether the <code>item</code> is present in the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_has_item">has_item</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_has_item">has_item</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): bool
 </code></pre>
 
 
@@ -1348,7 +1348,7 @@ Check whether the <code>item</code> is present in the <code><a href="../sui/kios
 Check whether the <code>item</code> is present in the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code> and has type T.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_has_item_with_type">has_item_with_type</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_has_item_with_type">has_item_with_type</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): bool
 </code></pre>
 
 
@@ -1375,7 +1375,7 @@ that the only two actions that can be performed on it are <code><a href="../sui/
 <code><a href="../sui/kiosk.md#sui_kiosk_list_with_purchase_cap">list_with_purchase_cap</a></code>, it cannot be <code><a href="../sui/kiosk.md#sui_kiosk_take">take</a></code>n out of the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_is_locked">is_locked</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_is_locked">is_locked</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): bool
 </code></pre>
 
 
@@ -1400,7 +1400,7 @@ that the only two actions that can be performed on it are <code><a href="../sui/
 Check whether an <code>item</code> is listed (exclusively or non exclusively).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_is_listed">is_listed</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_is_listed">is_listed</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): bool
 </code></pre>
 
 
@@ -1426,7 +1426,7 @@ Check whether an <code>item</code> is listed (exclusively or non exclusively).
 Check whether there's a <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a></code> issued for an item.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_is_listed_exclusively">is_listed_exclusively</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_is_listed_exclusively">is_listed_exclusively</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): bool
 </code></pre>
 
 
@@ -1451,7 +1451,7 @@ Check whether there's a <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">Pu
 Check whether the <code><a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">KioskOwnerCap</a></code> matches the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_has_access">has_access</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_has_access">has_access</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>): bool
 </code></pre>
 
 
@@ -1476,7 +1476,7 @@ Check whether the <code><a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">KioskO
 Access the <code>UID</code> using the <code><a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">KioskOwnerCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid_mut_as_owner">uid_mut_as_owner</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>): &<b>mut</b> <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid_mut_as_owner">uid_mut_as_owner</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>): &<b>mut</b> <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -1504,7 +1504,7 @@ Allow or disallow <code><a href="../sui/kiosk.md#sui_kiosk_uid">uid</a></code> a
 setting.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_set_allow_extensions">set_allow_extensions</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, allow_extensions: bool)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_set_allow_extensions">set_allow_extensions</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, allow_extensions: bool)
 </code></pre>
 
 
@@ -1534,7 +1534,7 @@ Given the &UID can be used for reading keys and authorization,
 its access
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid">uid</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>): &<a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid">uid</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>): &<a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -1560,7 +1560,7 @@ Get the mutable <code>UID</code> for dynamic field access and extensions.
 Aborts if <code>allow_extensions</code> set to <code><b>false</b></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid_mut">uid_mut</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>): &<b>mut</b> <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_uid_mut">uid_mut</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>): &<b>mut</b> <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -1586,7 +1586,7 @@ Aborts if <code>allow_extensions</code> set to <code><b>false</b></code>.
 Get the owner of the Kiosk.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_owner">owner</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_owner">owner</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>): <b>address</b>
 </code></pre>
 
 
@@ -1611,7 +1611,7 @@ Get the owner of the Kiosk.
 Get the number of items stored in a Kiosk.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_item_count">item_count</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>): u32
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_item_count">item_count</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>): u32
 </code></pre>
 
 
@@ -1636,7 +1636,7 @@ Get the number of items stored in a Kiosk.
 Get the amount of profits collected by selling items.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_profits_amount">profits_amount</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_profits_amount">profits_amount</a>(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>): u64
 </code></pre>
 
 
@@ -1661,7 +1661,7 @@ Get the amount of profits collected by selling items.
 Get mutable access to <code>profits</code> - owner only action.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_profits_mut">profits_mut</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>): &<b>mut</b> <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_profits_mut">profits_mut</a>(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>): &<b>mut</b> <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -1688,7 +1688,7 @@ Immutably borrow an item from the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk
 at any time.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): &T
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): &T
 </code></pre>
 
 
@@ -1716,7 +1716,7 @@ Mutably borrow an item from the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">
 Item can be <code><a href="../sui/kiosk.md#sui_kiosk_borrow_mut">borrow_mut</a></code>ed only if it's not <code><a href="../sui/kiosk.md#sui_kiosk_is_listed">is_listed</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_borrow_mut">borrow_mut</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): &<b>mut</b> T
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_borrow_mut">borrow_mut</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): &<b>mut</b> T
 </code></pre>
 
 
@@ -1745,7 +1745,7 @@ Take the item from the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">Kiosk</a>
 Item can be <code><a href="../sui/kiosk.md#sui_kiosk_borrow_val">borrow_val</a></code>-ed only if it's not <code><a href="../sui/kiosk.md#sui_kiosk_is_listed">is_listed</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_borrow_val">borrow_val</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): (T, <a href="../sui/kiosk.md#sui_kiosk_Borrow">sui::kiosk::Borrow</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_borrow_val">borrow_val</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>, id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>): (T, <a href="../sui/kiosk.md#sui_kiosk_Borrow">one::kiosk::Borrow</a>)
 </code></pre>
 
 
@@ -1774,7 +1774,7 @@ Return the borrowed item to the <code><a href="../sui/kiosk.md#sui_kiosk_Kiosk">
 if <code><a href="../sui/kiosk.md#sui_kiosk_borrow_val">borrow_val</a></code> is used.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_return_val">return_val</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">sui::kiosk::Kiosk</a>, item: T, <a href="../sui/borrow.md#sui_borrow">borrow</a>: <a href="../sui/kiosk.md#sui_kiosk_Borrow">sui::kiosk::Borrow</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_return_val">return_val</a>&lt;T: key, store&gt;(self: &<b>mut</b> <a href="../sui/kiosk.md#sui_kiosk_Kiosk">one::kiosk::Kiosk</a>, item: T, <a href="../sui/borrow.md#sui_borrow">borrow</a>: <a href="../sui/kiosk.md#sui_kiosk_Borrow">one::kiosk::Borrow</a>)
 </code></pre>
 
 
@@ -1802,7 +1802,7 @@ if <code><a href="../sui/kiosk.md#sui_kiosk_borrow_val">borrow_val</a></code> is
 Get the <code><b>for</b></code> field of the <code><a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">KioskOwnerCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_kiosk_owner_cap_for">kiosk_owner_cap_for</a>(cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">sui::kiosk::KioskOwnerCap</a>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_kiosk_owner_cap_for">kiosk_owner_cap_for</a>(cap: &<a href="../sui/kiosk.md#sui_kiosk_KioskOwnerCap">one::kiosk::KioskOwnerCap</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -1827,7 +1827,7 @@ Get the <code><b>for</b></code> field of the <code><a href="../sui/kiosk.md#sui_
 Get the <code>kiosk_id</code> from the <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_cap_kiosk">purchase_cap_kiosk</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">sui::kiosk::PurchaseCap</a>&lt;T&gt;): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_cap_kiosk">purchase_cap_kiosk</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">one::kiosk::PurchaseCap</a>&lt;T&gt;): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -1852,7 +1852,7 @@ Get the <code>kiosk_id</code> from the <code><a href="../sui/kiosk.md#sui_kiosk_
 Get the <code>Item_id</code> from the <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_cap_item">purchase_cap_item</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">sui::kiosk::PurchaseCap</a>&lt;T&gt;): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_cap_item">purchase_cap_item</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">one::kiosk::PurchaseCap</a>&lt;T&gt;): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -1877,7 +1877,7 @@ Get the <code>Item_id</code> from the <code><a href="../sui/kiosk.md#sui_kiosk_P
 Get the <code>min_price</code> from the <code><a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">PurchaseCap</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_cap_min_price">purchase_cap_min_price</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">sui::kiosk::PurchaseCap</a>&lt;T&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/kiosk.md#sui_kiosk_purchase_cap_min_price">purchase_cap_min_price</a>&lt;T: key, store&gt;(self: &<a href="../sui/kiosk.md#sui_kiosk_PurchaseCap">one::kiosk::PurchaseCap</a>&lt;T&gt;): u64
 </code></pre>
 
 

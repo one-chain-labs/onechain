@@ -23,8 +23,8 @@ task 3, line 49:
 Owner: Account Address ( A )
 Version: 2
 Contents: Test::M1::Parent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -42,8 +42,8 @@ task 5, line 53:
 Owner: Account Address ( A )
 Version: 3
 Contents: Test::M1::Parent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -60,8 +60,8 @@ task 7, line 57:
 Owner: Account Address ( A )
 Version: 4
 Contents: Test::M1::Parent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -147,8 +147,8 @@ task 10, line 111:
 Owner: Account Address ( A )
 Version: 4
 Contents: Test::M1::Parent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -165,8 +165,8 @@ task 12, line 115:
 Owner: Account Address ( A )
 Version: 5
 Contents: Test::M1::Parent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -183,8 +183,8 @@ task 14, line 119:
 Owner: Account Address ( A )
 Version: 6
 Contents: Test::M1::Parent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },

@@ -157,7 +157,7 @@ const MAX_REVIEWERS_TO_REWARD: u64 = 10;
 /// Represents a service
 public struct Service has key, store {
     id: UID,
-    reward_pool: Balance<SUI>,
+    reward_pool: Balance<OCT>,
     reward: u64,
     top_reviews: vector<ID>,
     reviews: ObjectTable<ID, Review>,
@@ -169,7 +169,7 @@ public struct Service has key, store {
 #### Reward distribution
 
 The same amount is rewarded to top reviewers, and the reward is distributed to 10 participants at most.
-The pool of `SUI` tokens to be distributed to reviewers is stored in the `reward_pool` field, and the amount of `SUI` tokens awarded to each participant is configured in `reward` field.
+The pool of `OCT` tokens to be distributed to reviewers is stored in the `reward_pool` field, and the amount of `OCT` tokens awarded to each participant is configured in `reward` field.
 
 #### Storage for reviews
 
@@ -459,4 +459,4 @@ Use the `useWalletKit()` hook from the Wallet Kit to retrieve the Sui client ins
 
 ## Related links
 
-[Reviews Rating repository](https://github.com/MystenLabs/sui/tree/main/examples/move/reviews_rating).
+[Reviews Rating repository](https://github.com/one-chain-labs/onechain/tree/main/examples/move/reviews_rating).

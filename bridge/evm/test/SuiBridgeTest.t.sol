@@ -635,7 +635,7 @@ contract SuiBridgeTest is BridgeBaseTest, ISuiBridge {
     }
 
     // An e2e token transfer regression test covering message ser/de and signature verification
-    function testTransferSuiToEthRegressionTest() public {
+    function testTransferOctToEthRegressionTest() public {
         address[] memory _committeeList = new address[](4);
         uint16[] memory _stake = new uint16[](4);
         _committeeList[0] = 0x68B43fD906C0B8F024a18C56e06744F7c6157c65;

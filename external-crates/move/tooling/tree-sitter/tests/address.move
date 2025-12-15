@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui::address {
-    use sui::hex;
+module one::address {
+    use one::hex;
     use std::ascii;
     use std::bcs;
     use std::string;

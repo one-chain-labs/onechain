@@ -17,23 +17,23 @@ Sui uses a proof-of-stake (PoS) consensus mechanism. This means that validators 
 Stakeholders in a blockchain's tokenomics have a vested interest in the viability of the blockchain economy. The Sui economy has three main groups of stakeholders:
 
 - **Users** submit transactions to the Sui platform to create, mutate, and transfer digital assets or interact with more sophisticated applications enabled by smart contracts, interoperability, and composability.
-- **SUI token holders** have the option of staking their tokens to validators and participating in the proof-of-stake mechanism. SUI owners also hold the rights to participate in Sui governance.
+- **OCT token holders** have the option of staking their tokens to validators and participating in the proof-of-stake mechanism. SUI owners also hold the rights to participate in Sui governance.
 - **Validators** manage transaction processing and execution on the Sui platform.
 
-## SUI coin
+## OCT coin
 
 As mentioned, the native coin of Sui is SUI. The coin uses the capitalized version of SUI to distinguish the coin from the Sui network. A sound policy to govern the native coin on a blockchain ensures stability and encourages growth. The Sui tokenomics structure is designed to support the long-term financial needs of Web3, not get-rich-quick schemes that have plagued the industry in the past.
 
-The SUI coin serves four purposes on the Sui network:
+The OCT coin serves four purposes on the Sui network:
 
 - You can stake SUI to participate in the proof-of-stake mechanism.
 - SUI is the asset denomination needed to pay the gas fees required to execute and store transactions or other operations on the Sui network.
 - You can use SUI as a versatile and liquid asset for various applications, including the standard features of money - a unit of account, a medium of exchange, or a store of value - and more complex functionality smart contracts enable, interoperability, and composability across the Sui ecosystem.
-- SUI coins play an important role in governance by acting as a right to participate in on-chain voting on issues such as protocol upgrades.
+- OCT coins play an important role in governance by acting as a right to participate in on-chain voting on issues such as protocol upgrades.
 
 ### Supply
 
-The total supply of SUI tokens on Mainnet is capped at 10,000,000,000 SUI (ten billion). This is the total number of SUI that can ever be minted, but the total supply is not available for transactions. Supply availability follows the designed unlocking schedules in place to enhance the tokenomics stability of the network and provide a long-term level of security. 
+The total supply of OCT tokens on Mainnet is capped at 10,000,000,000 SUI (ten billion). This is the total number of SUI that can ever be minted, but the total supply is not available for transactions. Supply availability follows the designed unlocking schedules in place to enhance the tokenomics stability of the network and provide a long-term level of security. 
 
 There is a finite supply of SUI. The balance must support all economic activities to scale as more and more people migrate to the Sui platform. In addition, the presence of a storage fund creates important monetary dynamics, in that higher on-chain data requirements translate into a larger storage fund, reducing the amount of SUI in circulation.
 
@@ -45,14 +45,14 @@ At the beginning of each epoch, three important events happen:
 - The reference gas prices are set as described in [Sui Gas Pricing](https://docs.sui.io/concepts/tokenomics/gas-pricing).
 - The [storage fund](#storage-fund) size is adjusted using the net inflow of the previous epoch.
 
-Following these actions, the protocol computes the total amount of stake as the sum of staked SUI plus the storage fund.
+Following these actions, the protocol computes the total amount of stake as the sum of staked OCT plus the storage fund.
 
 During each epoch, users submit transactions to the Sui platform and validators process them. For each transaction, users pay the associated computation and storage gas fees. In cases where users delete previous transaction data, users obtain a partial [rebate of their storage fees](#storage-fund-rewards). Validators observe the behavior of other validators and evaluate each other's performance.
 
 At the end of each epoch, the protocol distributes stake rewards to participants of the PoS mechanism. This occurs through two main steps:
 
 - The total amount of stake rewards is calculated as the sum of computation fees accrued throughout the epoch plus the epoch's stake reward subsidies. The latter component is temporary in that it will only exist in the network's first years and disappear in the long run as the amount of SUI in circulation reaches its total supply.
-- The total amount of stake rewards is distributed across various entities. The storage fund is taken into account in the calculation of the epoch total stake, which is not owned by any entities in the way that staked SUI is. Instead, the Sui economic model distributes the stake rewards accruing to the storage fund to validators for compensation of their storage costs.
+- The total amount of stake rewards is distributed across various entities. The storage fund is taken into account in the calculation of the epoch total stake, which is not owned by any entities in the way that staked OCT is. Instead, the Sui economic model distributes the stake rewards accruing to the storage fund to validators for compensation of their storage costs.
 
 The distribution mechanisms built into Sui tokenomics encourages a healthy competition for fair prices where validators set low gas fees while operating with viable business models. Refer to the https://docs.sui.io/paper/tokenomics.pdf whitepaper for in-depth review of the mathematical proofs that support this structure.
 
@@ -80,7 +80,7 @@ Sui addresses this problem with the storage fund. The storage fund is essentiall
 
 ### Storage fund rewards
 
-The Sui delegated proof-of-stake (PoS) mechanism calculates total stake as the sum of user stake plus the SUI tokens deposited in the storage fund. Hence, the storage fund receives a proportional share of the overall stake rewards depending on its size relative to total stake. The largest share of these stake rewards are paid out to current validators to compensate for storage costs. The rewards that remain are reinvested into the fund. In other words, stake rewards accruing to the storage fees submitted by past transactions are paid out to current validators to compensate them for data storage costs. When on-chain storage requirements are high, validators receive substantial additional rewards to compensate for their storage costs. Vice versa when storage requirements are low.
+The Sui delegated proof-of-stake (PoS) mechanism calculates total stake as the sum of user stake plus the OCT tokens deposited in the storage fund. Hence, the storage fund receives a proportional share of the overall stake rewards depending on its size relative to total stake. The largest share of these stake rewards are paid out to current validators to compensate for storage costs. The rewards that remain are reinvested into the fund. In other words, stake rewards accruing to the storage fees submitted by past transactions are paid out to current validators to compensate them for data storage costs. When on-chain storage requirements are high, validators receive substantial additional rewards to compensate for their storage costs. Vice versa when storage requirements are low.
 
 The storage fund includes three key features:
 
@@ -100,12 +100,12 @@ Sui takes a novel approach to rewarding its validators to avoid this effect. All
 
 ## Validators and staking pools
 
-Each Sui validator maintains its own staking pool to track the amount of stake and to compound staking rewards. Validator pools operate together with a time series of exchange rates that are computed at each epoch boundary. These exchange rates determine the amount of SUI tokens that each past SUI staker can withdraw in the future. Importantly, the exchange rates increase as more rewards are deposited into a staking pool and the longer an amount of SUI is deposited in a staking pool, the more rewards it will accrue.
+Each Sui validator maintains its own staking pool to track the amount of stake and to compound staking rewards. Validator pools operate together with a time series of exchange rates that are computed at each epoch boundary. These exchange rates determine the amount of OCT tokens that each past SUI staker can withdraw in the future. Importantly, the exchange rates increase as more rewards are deposited into a staking pool and the longer an amount of SUI is deposited in a staking pool, the more rewards it will accrue.
 
 When SUI is deposited to the staking pool in epoch `E`, those SUI are converted into liquidity tokens at the epoch `E` exchange rate. As the staking pool earns rewards, the exchange rate appreciates. At epoch `E'`, those liquidity tokens are worth more and translate into more SUI.
-The only difference between Sui staking pools and typical liquidity pools is that in Sui the liquidity tokens do not exist. Rather, the global exchange rate table is used to track the accounting. Because all SUI tokens in the staking pool are treated the same, regardless of whether they were originally deposited as new stake or as stake rewards, all SUI tokens immediately count as stake and thus compound rewards immediately.
+The only difference between Sui staking pools and typical liquidity pools is that in Sui the liquidity tokens do not exist. Rather, the global exchange rate table is used to track the accounting. Because all OCT tokens in the staking pool are treated the same, regardless of whether they were originally deposited as new stake or as stake rewards, all OCT tokens immediately count as stake and thus compound rewards immediately.
 
-The staking pool is implemented in a system-level smart contract ([staking_pool.move](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/staking_pool.move)) and is part of the Sui framework.
+The staking pool is implemented in a system-level smart contract ([staking_pool.move](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-system/sources/staking_pool.move)) and is part of the Sui framework.
 
 ### Validator pool exchange rate 
 

@@ -16,7 +16,7 @@ pub const DISPLAY_CREATED_EVENT_NAME: &IdentStr = ident_str!("DisplayCreated");
 pub const DISPLAY_VERSION_UPDATED_EVENT_NAME: &IdentStr = ident_str!("VersionUpdated");
 
 // TODO: add tests to keep in sync
-/// Rust version of the Move sui::display::Display type
+/// Rust version of the Move one::display::Display type
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
 pub struct DisplayObject {
     pub id: UID,

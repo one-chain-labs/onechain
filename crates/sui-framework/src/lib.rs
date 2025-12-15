@@ -113,8 +113,8 @@ impl BuiltInFramework {
         // TODO: Is it possible to derive dependencies from the bytecode instead of manually specifying them?
         define_system_package_metadata!([
             (MOVE_STDLIB_PACKAGE_ID, "MoveStdlib", "move-stdlib", []),
-            (SUI_FRAMEWORK_PACKAGE_ID, "Sui", "sui-framework", [MOVE_STDLIB_PACKAGE_ID]),
-            (SUI_SYSTEM_PACKAGE_ID, "SuiSystem", "sui-system", [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]),
+            (SUI_FRAMEWORK_PACKAGE_ID, "One", "one-framework", [MOVE_STDLIB_PACKAGE_ID]),
+            (SUI_SYSTEM_PACKAGE_ID, "OneSystem", "one-system", [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]),
             (DEEPBOOK_PACKAGE_ID, "DeepBook", "deepbook", [MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]),
             (BRIDGE_PACKAGE_ID, "Bridge", "bridge", [
                 MOVE_STDLIB_PACKAGE_ID,

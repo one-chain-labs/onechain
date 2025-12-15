@@ -53,9 +53,9 @@ Considering the earlier `counter` example, which might have started life as foll
 
 ```move
 module example::counter {
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::TxContext;
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::TxContext;
 
     struct Counter has key {
         id: UID,
@@ -86,9 +86,9 @@ An upgrade-aware `counter` module that incorporates all these ideas looks as fol
 
 ```move
 module example::counter {
-    use sui::object::{Self, ID, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::object::{Self, ID, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     // 1. Track the current version of the module
     const VERSION: u64 = 1;
@@ -145,10 +145,10 @@ The following module is an upgraded `counter` that emits `Progress` events as or
 
 ```move
 module example::counter {
-    use sui::event;
-    use sui::object::{Self, ID, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::event;
+    use one::object::{Self, ID, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     // 1. Bump the `VERSION` of the package.
     const VERSION: u64 = 2;
@@ -259,9 +259,9 @@ Use the `sui client upgrade` command to upgrade packages that meet the previous 
 - `--gas-budget`: The maximum number of gas units that can be expended before the network cancels the transaction.
 - `--cap`: The ID of the `UpgradeCap`. You receive this ID as a return from the publish command.
 
-Developers upgrading packages using Move code have access to types and functions to define custom upgrade policies. For example, a Move developer might want to disallow upgrading a package, regardless of the current package owner. The [`make_immutable` function](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/docs/sui/package.md#0x2_package_make_immutable) is available to them to create this behavior. More advanced policies using available types like `UpgradeTicket` and `Upgrade Receipt` are also possible. For an example, see this [custom upgrade policy](https://github.com/MystenLabs/sui/issues/2045#:~:text=Implement%20a%20custom%20upgrade%20policy) on GitHub.
+Developers upgrading packages using Move code have access to types and functions to define custom upgrade policies. For example, a Move developer might want to disallow upgrading a package, regardless of the current package owner. The [`make_immutable` function](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui/package.md#0x2_package_make_immutable) is available to them to create this behavior. More advanced policies using available types like `UpgradeTicket` and `Upgrade Receipt` are also possible. For an example, see this [custom upgrade policy](https://github.com/one-chain-labs/onechain/issues/2045#:~:text=Implement%20a%20custom%20upgrade%20policy) on GitHub.
 
-When you use the Sui Client CLI, the `upgrade` command handles generating the upgrade digest, authorizing the upgrade with the `UpgradeCap` to get an `UpgradeTicket`, and updating the `UpgradeCap` with the `UpgradeReceipt` after a successful upgrade. To learn more about these processes, see the Move documentation for the [package module](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/docs/sui/package.md).
+When you use the Sui Client CLI, the `upgrade` command handles generating the upgrade digest, authorizing the upgrade with the `UpgradeCap` to get an `UpgradeTicket`, and updating the `UpgradeCap` with the `UpgradeReceipt` after a successful upgrade. To learn more about these processes, see the Move documentation for the [package module](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/docs/sui/package.md).
 
 ## Example
 
@@ -411,7 +411,7 @@ Transaction Digest: GPSpH264CjQPaXQPpMHpkzyGidZnQFvd1yUH5s9ncesi
 │  │ ObjectID: GAS-COIN-ID                                                                           │
 │  │ Sender: PUBLISHER-ID                                                                            │
 │  │ Owner: Account Address ( PUBLISHER-ID )                                                         │
-│  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                      │
+│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                      │
 │  │ Version: 3                                                                                      │
 │  │ Digest: 9Fet6LPSBsjYjVMEQxkB4LRHfAJDFCQQ2iUAiUQ5eygF                                            │
 │  └──                                                                                               │
@@ -428,7 +428,7 @@ Transaction Digest: GPSpH264CjQPaXQPpMHpkzyGidZnQFvd1yUH5s9ncesi
 ├───────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ┌──                                                                                              │
 │  │ Owner: Account Address ( PUBLISHER-ID )                                                        │
-│  │ CoinType: 0x2::sui::SUI                                                                        │
+│  │ CoinType: 0x2::one::OCT                                                                        │
 │  │ Amount: -10319880                                                                              │
 │  └──                                                                                              │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -618,7 +618,7 @@ Transaction Digest: 3NnJGryz2k2BJzjpndDVqVcdZmmefNMB8SJ9bCEQct22
 │  │ ObjectID: GAS-COIN-ID                                                                         │
 │  │ Sender: PUBLISHER-ID                                                                          │
 │  │ Owner: Account Address ( PUBLISHER-ID )                                                       │
-│  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                    │
+│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                    │
 │  │ Version: 4                                                                                    │
 │  │ Digest: G5PBJjLKJWL2J3rb8ZR4uLNgFPpyJNNXfXNoh3FDo1zK                                          │
 │  └──                                                                                             │
@@ -643,7 +643,7 @@ Transaction Digest: 3NnJGryz2k2BJzjpndDVqVcdZmmefNMB8SJ9bCEQct22
 ├───────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ┌──                                                                                              │
 │  │ Owner: Account Address ( PUBLISHER-ID )                                                        │
-│  │ CoinType: 0x2::sui::SUI                                                                        │
+│  │ CoinType: 0x2::one::OCT                                                                        │
 │  │ Amount: -7706620                                                                               │
 │  └──                                                                                              │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯

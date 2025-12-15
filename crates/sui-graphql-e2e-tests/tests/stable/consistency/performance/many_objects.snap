@@ -161,8 +161,8 @@ task 8, line 90:
 Owner: Account Address ( B )
 Version: 4
 Contents: Test::M1::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,498),
         },
     },
@@ -174,8 +174,8 @@ task 9, line 92:
 Owner: Account Address ( B )
 Version: 5
 Contents: Test::M1::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,497),
         },
     },
@@ -447,7 +447,7 @@ Response: {
                 }
               },
               "type": {
-                "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI>"
+                "repr": "0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>"
               }
             }
           },

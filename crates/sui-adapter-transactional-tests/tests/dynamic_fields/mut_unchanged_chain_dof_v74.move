@@ -13,7 +13,7 @@
 
 module test::m1;
 
-use sui::dynamic_object_field;
+use one::dynamic_object_field;
 
 public struct GreatGrandParent has key, store {
     id: UID,
@@ -38,7 +38,7 @@ public fun create(ctx: &mut TxContext) {
 }
 
 fun create_ggp(ctx: &mut TxContext): GreatGrandParent {
-    let data = sui::address::to_bytes(ctx.sender());
+    let data = one::address::to_bytes(ctx.sender());
     let mut gpp = GreatGrandParent { id: object::new(ctx) };
     let mut gp = GrandParent { id: object::new(ctx) };
     let mut p = Parent { id: object::new(ctx) };
@@ -72,7 +72,7 @@ public fun write_back(gpp: &mut GreatGrandParent, ctx: &mut TxContext) {
 
     let o: &mut ObjValue = dynamic_object_field::borrow_mut(&mut p.id, b"obj");
     o.data = vector[];
-    o.data = sui::address::to_bytes(ctx.sender());
+    o.data = one::address::to_bytes(ctx.sender());
 }
 
 //# run test::m1::create --sender A

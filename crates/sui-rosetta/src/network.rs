@@ -58,7 +58,7 @@ pub async fn status(
             peer_id: ObjectID::from(validator.sui_address).into(),
             metadata: Some(json!({
                 "public_key": Hex::from_bytes(&validator.protocol_pubkey_bytes),
-                "stake_amount": validator.staking_pool_sui_balance,
+                "stake_amount": validator.staking_pool_oct_balance,
             })),
         })
         .collect();

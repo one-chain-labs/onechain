@@ -148,7 +148,7 @@ pub enum SuiClientCommands {
         /// Address (or its alias)
         #[arg(value_parser)]
         address: Option<KeyIdentity>,
-        /// Show balance for the specified coin (e.g., 0x2::sui::SUI).
+        /// Show balance for the specified coin (e.g., 0x2::one::OCT).
         /// All coins will be shown if none is passed.
         #[clap(long, required = false)]
         coin_type: Option<String>,
@@ -211,7 +211,7 @@ pub enum SuiClientCommands {
 
     /// Execute a Signed Transaction. This is useful when the user prefers to sign elsewhere and use this command to execute.
     ExecuteSignedTx {
-        /// BCS serialized transaction data bytes without its type tag, as base64 encoded string. This is the output of sui client command using --serialize-unsigned-transaction.
+        /// BCS serialized transaction data bytes without its type tag, as base64 encoded string. This is the output of one client command using --serialize-unsigned-transaction.
         #[clap(long)]
         tx_bytes: String,
 
@@ -221,7 +221,7 @@ pub enum SuiClientCommands {
     },
     /// Execute a combined serialized SenderSignedData string.
     ExecuteCombinedSignedTx {
-        /// BCS serialized sender signed data, as base64 encoded string. This is the output of sui client command using --serialize-signed-transaction.
+        /// BCS serialized sender signed data, as base64 encoded string. This is the output of one client command using --serialize-signed-transaction.
         #[clap(long)]
         signed_tx_bytes: String,
     },
@@ -301,7 +301,7 @@ pub enum SuiClientCommands {
     #[clap(name = "objects")]
     Objects {
         /// Address owning the object. If no address is provided, it will show all
-        /// objects owned by `sui client active-address`.
+        /// objects owned by `one client active-address`.
         #[clap(name = "owner_address")]
         address: Option<KeyIdentity>,
     },
@@ -328,7 +328,7 @@ pub enum SuiClientCommands {
 
     /// Pay all residual SUI coins to the recipient with input coins, after deducting the gas cost.
     /// The input coins also include the coin for gas payment, so no extra gas coin is required.
-    PayAllSui {
+    PayAllOct {
         /// The input coins to be used for pay recipients, including the gas coin.
         #[clap(long, num_args(1..))]
         input_coins: Vec<ObjectID>,
@@ -344,7 +344,7 @@ pub enum SuiClientCommands {
     /// Pay SUI coins to recipients following following specified amounts, with input coins.
     /// Length of recipients must be the same as that of amounts.
     /// The input coins also include the coin for gas payment, so no extra gas coin is required.
-    PaySui {
+    PayOct {
         /// The input coins to be used for pay recipients, including the gas coin.
         #[clap(long, num_args(1..))]
         input_coins: Vec<ObjectID>,
@@ -450,15 +450,15 @@ pub enum SuiClientCommands {
     /// Transfer SUI, and pay gas with the same SUI coin object.
     /// If amount is specified, only the amount is transferred; otherwise the entire object
     /// is transferred.
-    #[clap(name = "transfer-sui")]
-    TransferSui {
+    #[clap(name = "transfer-oct")]
+    TransferOct {
         /// Recipient address (or its alias if it's an address in the keystore)
         #[clap(long)]
         to: KeyIdentity,
 
         /// ID of the coin to transfer. This is also the gas object.
         #[clap(long)]
-        sui_coin_object_id: ObjectID,
+        coin_object_id: ObjectID,
 
         /// The amount to transfer, if not specified, the entire coin object will be transferred.
         #[clap(long)]
@@ -636,13 +636,13 @@ pub struct Opts {
     pub dev_inspect: bool,
     /// Instead of executing the transaction, serialize the bcs bytes of the unsigned transaction data
     /// (TransactionData) using base64 encoding, and print out the string <TX_BYTES>. The string can
-    /// be used to execute transaction with `sui client execute-signed-tx --tx-bytes <TX_BYTES>`.
+    /// be used to execute transaction with `one client execute-signed-tx --tx-bytes <TX_BYTES>`.
     #[arg(long, required = false)]
     pub serialize_unsigned_transaction: bool,
     /// Instead of executing the transaction, serialize the bcs bytes of the signed transaction data
     /// (SenderSignedData) using base64 encoding, and print out the string <SIGNED_TX_BYTES>. The
     /// string can be used to execute transaction with
-    /// `sui client execute-combined-signed-tx --signed-tx-bytes <SIGNED_TX_BYTES>`.
+    /// `one client execute-combined-signed-tx --signed-tx-bytes <SIGNED_TX_BYTES>`.
     #[arg(long, required = false)]
     pub serialize_signed_transaction: bool,
 }
@@ -969,7 +969,7 @@ impl SuiClientCommands {
                             In order to fix this and publish the package without `--test`, \
                             remove any non-test dependencies on test-only code.\n\
                             You can ensure all test-only dependencies have been removed by \
-                            compiling the package normally with `sui move build`."
+                            compiling the package normally with `one move build`."
                             .to_string(),
                     }
                     .into());
@@ -1172,11 +1172,11 @@ impl SuiClientCommands {
                 dry_run_or_execute_or_serialize(signer, tx_kind, context, None, None, opts.gas, opts.rest).await?
             }
 
-            SuiClientCommands::TransferSui { to, sui_coin_object_id: object_id, amount, opts } => {
+            SuiClientCommands::TransferOct { to, coin_object_id: object_id, amount, opts } => {
                 let signer = context.get_object_owner(&object_id).await?;
                 let to = get_identity_address(Some(to), context)?;
                 let client = context.get_client().await?;
-                let tx_kind = client.transaction_builder().transfer_sui_tx_kind(to, amount);
+                let tx_kind = client.transaction_builder().transfer_oct_tx_kind(to, amount);
                 dry_run_or_execute_or_serialize(signer, tx_kind, context, None, None, Some(object_id), opts).await?
             }
 
@@ -1205,16 +1205,16 @@ impl SuiClientCommands {
 
                 if let Some(gas) = opts.gas {
                     if input_coins.contains(&gas) {
-                        bail!("Gas coin is in input coins of Pay transaction, use PaySui transaction instead!");
+                        bail!("Gas coin is in input coins of Pay transaction, use PayOct transaction instead!");
                     }
                 }
 
                 dry_run_or_execute_or_serialize(signer, tx_kind, context, None, None, opts.gas, opts.rest).await?
             }
 
-            SuiClientCommands::PaySui { input_coins, recipients, amounts, opts } => {
-                ensure!(!input_coins.is_empty(), "PaySui transaction requires a non-empty list of input coins");
-                ensure!(!recipients.is_empty(), "PaySui transaction requires a non-empty list of recipient addresses");
+            SuiClientCommands::PayOct { input_coins, recipients, amounts, opts } => {
+                ensure!(!input_coins.is_empty(), "PayOct transaction requires a non-empty list of input coins");
+                ensure!(!recipients.is_empty(), "PayOct transaction requires a non-empty list of recipient addresses");
                 ensure!(
                     recipients.len() == amounts.len(),
                     format!(
@@ -1230,17 +1230,17 @@ impl SuiClientCommands {
                     .map_err(|e| anyhow!("{e}"))?;
                 let signer = context.get_object_owner(&input_coins[0]).await?;
                 let client = context.get_client().await?;
-                let tx_kind = client.transaction_builder().pay_sui_tx_kind(recipients, amounts)?;
+                let tx_kind = client.transaction_builder().pay_oct_tx_kind(recipients, amounts)?;
 
                 dry_run_or_execute_or_serialize(signer, tx_kind, context, Some(input_coins), None, None, opts).await?
             }
 
-            SuiClientCommands::PayAllSui { input_coins, recipient, opts } => {
-                ensure!(!input_coins.is_empty(), "PayAllSui transaction requires a non-empty list of input coins");
+            SuiClientCommands::PayAllOct { input_coins, recipient, opts } => {
+                ensure!(!input_coins.is_empty(), "PayAllOct transaction requires a non-empty list of input coins");
                 let recipient = get_identity_address(Some(recipient), context)?;
                 let signer = context.get_object_owner(&input_coins[0]).await?;
                 let client = context.get_client().await?;
-                let tx_kind = client.transaction_builder().pay_all_sui_tx_kind(recipient);
+                let tx_kind = client.transaction_builder().pay_all_oct_tx_kind(recipient);
                 dry_run_or_execute_or_serialize(signer, tx_kind, context, Some(input_coins), None, None, opts).await?
             }
 
@@ -1305,8 +1305,8 @@ impl SuiClientCommands {
                 let address = get_identity_address(address, context)?;
                 let url = if let Some(url) = url {
                     ensure!(
-                        !url.starts_with("https://faucet.testnet.sui.io"),
-                        "For testnet tokens, please use the Web UI: https://faucet.sui.io/?address={address}"
+                        !url.starts_with("https://faucet.testnet.one.io"),
+                        "For testnet tokens, please use the Web UI: https://faucet.one.io/?address={address}"
                     );
                     url
                 } else {
@@ -1314,9 +1314,9 @@ impl SuiClientCommands {
 
                     if let Ok(env) = active_env {
                         let network = match env.rpc.as_str() {
-                            SUI_DEVNET_URL => "https://faucet.devnet.sui.io/v1/gas",
+                            SUI_DEVNET_URL => "https://faucet.devnet.one.io/v1/gas",
                             SUI_TESTNET_URL => {
-                                bail!("For testnet tokens, please use the Web UI: https://faucet.sui.io/?address={address}");
+                                bail!("For testnet tokens, please use the Web UI: https://faucet.one.io/?address={address}");
                             }
                             SUI_LOCAL_NETWORK_URL | SUI_LOCAL_NETWORK_URL_0 => "http://127.0.0.1:9123/gas",
                             _ => bail!("Cannot recognize the active network. Please provide the gas faucet full URL."),
@@ -1382,7 +1382,7 @@ impl SuiClientCommands {
                     .map_err(|_| anyhow!("Invalid Base64 encoding"))?
                     .to_vec()
                     .map_err(|_| anyhow!("Invalid Base64 encoding"))?
-                ).map_err(|_| anyhow!("Failed to parse tx bytes, check if it matches the output of sui client commands with --serialize-unsigned-transaction"))?;
+                ).map_err(|_| anyhow!("Failed to parse tx bytes, check if it matches the output of one client commands with --serialize-unsigned-transaction"))?;
 
                 let mut sigs = Vec::new();
                 for sig in signatures {
@@ -1407,7 +1407,7 @@ impl SuiClientCommands {
                         .map_err(|_| anyhow!("Invalid Base64 encoding"))?
                         .to_vec()
                         .map_err(|_| anyhow!("Invalid Base64 encoding"))?
-                ).map_err(|_| anyhow!("Failed to parse SenderSignedData bytes, check if it matches the output of sui client commands with --serialize-signed-transaction"))?;
+                ).map_err(|_| anyhow!("Failed to parse SenderSignedData bytes, check if it matches the output of one client commands with --serialize-signed-transaction"))?;
                 let transaction = Envelope::<SenderSignedData, EmptySignInfo>::new(data);
                 let response = context.execute_transaction_may_fail(transaction).await?;
                 SuiClientCommandResult::TransactionBlock(response)
@@ -1472,7 +1472,7 @@ impl SuiClientCommands {
 
     pub fn switch_env(config: &mut SuiClientConfig, env: &str) -> Result<(), anyhow::Error> {
         let env = Some(env.into());
-        ensure!(config.get_env(&env).is_some(), "Environment config not found for [{env:?}], add new environment config using the `sui client new-env` command.");
+        ensure!(config.get_env(&env).is_some(), "Environment config not found for [{env:?}], add new environment config using the `one client new-env` command.");
         config.active_env = env;
         Ok(())
     }
@@ -1561,8 +1561,8 @@ pub(crate) async fn upgrade_package(
                  You may want to:
 
                  - delete the published-at address in the `Move.toml` if the `Move.lock` address is correct; OR
-                 - update the `Move.lock` address using the `sui manage-package` command to be the same as the `Move.toml`; OR
-                 - check that your `sui active-env` {env_alias} corresponds to the chain on which the package is published (i.e., devnet, testnet, mainnet); OR
+                 - update the `Move.lock` address using the `one manage-package` command to be the same as the `Move.toml`; OR
+                 - check that your `one active-env` {env_alias} corresponds to the chain on which the package is published (i.e., devnet, testnet, mainnet); OR
                  - contact the maintainer if this package is a dependency and request resolving the conflict."
             )
         }
@@ -1760,7 +1760,7 @@ impl Display for SuiClientCommandResult {
                 }
 
                 let mut builder = TableBuilder::default();
-                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "suiBalance (SUI)"]);
+                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "balance (OCT)"]);
                 for coin in &gas_coins {
                     builder.push_record(vec![
                         coin.gas_coin_id.to_string(),
@@ -2178,7 +2178,7 @@ pub struct ObjectsOutput {
 impl ObjectsOutput {
     fn from(obj: SuiObjectResponse) -> Result<Self, anyhow::Error> {
         let obj = obj.into_object()?;
-        // this replicates the object type display as in the sui explorer
+        // this replicates the object type display as in the one explorer
         let object_type = match obj.type_ {
             Some(sui_types::base_types::ObjectType::Struct(x)) => {
                 let address = x.address().to_string();
@@ -2283,7 +2283,7 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, url: String) -> Res
             if let Some(err) = faucet_resp.error {
                 bail!("Faucet request was unsuccessful: {err}")
             } else {
-                println!("Request successful. It can take up to 1 minute to get the coin. Run sui client gas to check your gas coins.");
+                println!("Request successful. It can take up to 1 minute to get the coin. Run one client gas to check your gas coins.");
             }
         }
         StatusCode::BAD_REQUEST => {
@@ -2446,7 +2446,7 @@ pub async fn execute_dry_run(
 /// overhead
 ///
 /// This gas estimate is computed exactly as in the TypeScript SDK
-/// <https://github.com/MystenLabs/sui/blob/3c4369270605f78a243842098b7029daf8d883d9/sdk/typescript/src/transactions/TransactionBlock.ts#L845-L858>
+/// <https://github.com/MystenLabs/one/blob/3c4369270605f78a243842098b7029daf8d883d9/sdk/typescript/src/transactions/TransactionBlock.ts#L845-L858>
 pub async fn estimate_gas_budget(
     context: &mut WalletContext,
     signer: SuiAddress,
@@ -2630,7 +2630,7 @@ async fn check_protocol_version_and_warn(client: &SuiClient) -> Result<(), anyho
                 "[warning] CLI's protocol version is {cli_protocol_version}, but the active \
                 network's protocol version is {on_chain_protocol_version}. \
                 \n Consider installing the latest version of the CLI - \
-                https://docs.sui.io/guides/developer/getting-started/sui-install \n\n \
+                https://docs.one.io/guides/developer/getting-started/one-install \n\n \
                 If publishing/upgrading returns a dependency verification error, then install the \
                 latest CLI version."
             )

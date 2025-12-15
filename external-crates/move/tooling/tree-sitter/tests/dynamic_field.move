@@ -8,12 +8,12 @@
 /// the `copy`, `drop`, and `store` abilities, e.g. an integer, a boolean, or a string.
 /// This gives Sui programmers the flexibility to extend objects on-the-fly, and it also serves as a
 /// building block for core collection types
-module sui::dynamic_field {
+module one::dynamic_field {
     use std::option::{Self, Option};
-    use sui::object::{Self, ID, UID};
-    use sui::prover;
+    use one::object::{Self, ID, UID};
+    use one::prover;
 
-    friend sui::dynamic_object_field;
+    friend one::dynamic_object_field;
 
     /// The object already has a dynamic field with this name (with the value and type specified)
     const EFieldAlreadyExists: u64 = 0;

@@ -12,8 +12,8 @@
 //# publish --sender A
 module test::mod {
   use std::string::{String, utf8};
-  use sui::display;
-  use sui::package;
+  use one::display;
+  use one::package;
 
   public struct MOD() has drop;
 
@@ -70,12 +70,12 @@ module test::mod {
 }
 
 //# programmable --sender A --inputs @A 42 true "hello" 43u8
-//> 0: std::option::some<sui::object::ID>(Input(0));
+//> 0: std::option::some<one::object::ID>(Input(0));
 //> 1: test::mod::new(Input(1), Input(2), Input(3), Result(0), Input(4));
 //> 2: TransferObjects([Result(1)], Input(0))
 
 //# programmable --sender A --inputs @A 42 true "hello" 43u8
-//> 0: std::option::none<sui::object::ID>();
+//> 0: std::option::none<one::object::ID>();
 //> 1: test::mod::new(Input(1), Input(2), Input(3), Result(0), Input(4));
 //> 2: TransferObjects([Result(1)], Input(0))
 
@@ -112,8 +112,8 @@ module test::mod {
 }
 
 //# programmable --sender A --inputs object(1,1) "quy" "{bar.baz.qux.quy.val}!"
-//> 0: sui::display::edit<test::mod::Foo>(Input(0), Input(1), Input(2));
-//> 1: sui::display::update_version<test::mod::Foo>(Input(0));
+//> 0: one::display::edit<test::mod::Foo>(Input(0), Input(1), Input(2));
+//> 1: one::display::update_version<test::mod::Foo>(Input(0));
 
 //# create-checkpoint
 

@@ -10,7 +10,7 @@ use move_package::source_package::layout::SourcePackageLayout;
 const SUI_PKG_NAME: &str = "Sui";
 
 // Use testnet by default. Probably want to add options to make this configurable later
-const SUI_PKG_PATH: &str = "{ git = \"https://github.com/MystenLabs/sui.git\", subdir = \"crates/sui-framework/packages/sui-framework\", rev = \"framework/testnet\", override = true }";
+const SUI_PKG_PATH: &str = "{ git = \"https://github.com/one-chain-labs/onechain.git\", subdir = \"crates/sui-framework/packages/one-framework\", rev = \"framework/testnet\", override = true }";
 
 #[derive(Parser)]
 #[group(id = "sui-move-new")]

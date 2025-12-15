@@ -23,7 +23,7 @@ pub struct SystemPackage {
     pub package_name: String,
 
     /// The path to the package in the sui monorepo
-    /// e.g. "crates/sui-framework/packages/sui-framework"
+    /// e.g. "crates/sui-framework/packages/one-framework"
     pub repo_path: String,
 }
 

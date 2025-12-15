@@ -63,7 +63,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "47",
@@ -84,7 +84,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "48",
@@ -105,7 +105,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "46",
@@ -126,7 +126,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "43",
@@ -147,7 +147,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "44",
@@ -168,7 +168,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "42",
@@ -189,7 +189,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "299999991073850",
@@ -223,7 +223,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "49",
@@ -244,7 +244,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "45",
@@ -265,7 +265,7 @@ Response: {
           },
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "299999995026026",
@@ -296,7 +296,7 @@ Response: {
           "digest": "Bq17sSAUHGu31dcX834notozn39ujPCPTEraVXahX7MB",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "47",
@@ -314,7 +314,7 @@ Response: {
           "digest": "H6Rr8kyrJPyPEwFyYbZvmSyVouN6n598wmcTUcvBRJVw",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "48",
@@ -345,7 +345,7 @@ Response: {
           "digest": "DnK1jFMVh53uiV2kVcQQpekxHoKc7EMfTu1hPN4nLzXg",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "46",
@@ -363,7 +363,7 @@ Response: {
           "digest": "H83YervcNEB7YzasFRN3u81qSUdgij48JiTstqnej75i",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "43",
@@ -406,7 +406,7 @@ Response: {
           "digest": "APkEyUbe9tKMm1ndy25odsxUKLhKJbmWiXZTzY3vdf8h",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "21",
@@ -424,7 +424,7 @@ Response: {
           "digest": "BLzZRStLpS7tzrgWP6KPfELuyVHSFv6AhTif7s3qCRpJ",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "49",
@@ -442,7 +442,7 @@ Response: {
           "digest": "AVWvjj4vyn63Y9zmMNKxq8sM8VtvuGhNyaBCjorbPdj4",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "24",
@@ -460,7 +460,7 @@ Response: {
           "digest": "B9kLm4RWF1jJVRKJFDFwd1mrBuQajJqMQVUiNPvmFFpR",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "299999993018266",
@@ -501,7 +501,7 @@ Response: {
           "digest": "7abSh3b1wEYk7r8JNbTDGzwXhJewf4jZgdzoezJPn1WC",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "49",
@@ -519,7 +519,7 @@ Response: {
           "digest": "Bq17sSAUHGu31dcX834notozn39ujPCPTEraVXahX7MB",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "47",
@@ -537,7 +537,7 @@ Response: {
           "digest": "H6Rr8kyrJPyPEwFyYbZvmSyVouN6n598wmcTUcvBRJVw",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "48",
@@ -555,7 +555,7 @@ Response: {
           "digest": "DnK1jFMVh53uiV2kVcQQpekxHoKc7EMfTu1hPN4nLzXg",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "46",
@@ -573,7 +573,7 @@ Response: {
           "digest": "H83YervcNEB7YzasFRN3u81qSUdgij48JiTstqnej75i",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "43",
@@ -591,7 +591,7 @@ Response: {
           "digest": "Fsqs9wUPNELQ1gTpBTpbLhgjs9kqcj5g3RLGuRz2E8fL",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "44",
@@ -609,7 +609,7 @@ Response: {
           "digest": "BRK2ni4E7zT6DooqDPGE4i9DepEmvC5iTzbFb6ENjYkV",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "42",
@@ -627,7 +627,7 @@ Response: {
           "digest": "3zsSqaBnACz5HyweWi93TYhLWKasMSvZCHrWAP5c9sZs",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "299999991073850",
@@ -658,7 +658,7 @@ Response: {
           "digest": "APkEyUbe9tKMm1ndy25odsxUKLhKJbmWiXZTzY3vdf8h",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "21",
@@ -676,7 +676,7 @@ Response: {
           "digest": "AVWvjj4vyn63Y9zmMNKxq8sM8VtvuGhNyaBCjorbPdj4",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "24",
@@ -694,7 +694,7 @@ Response: {
           "digest": "JB1LcDwRzfSnBhFE9fqymjwrFA1YorfGFGYpNZLEep64",
           "content": {
             "dataType": "moveObject",
-            "type": "0x2::coin::Coin<0x2::sui::SUI>",
+            "type": "0x2::coin::Coin<0x2::one::OCT>",
             "hasPublicTransfer": true,
             "fields": {
               "balance": "299999991998506",

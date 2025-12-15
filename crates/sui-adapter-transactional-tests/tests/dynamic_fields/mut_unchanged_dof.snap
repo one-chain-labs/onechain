@@ -23,8 +23,8 @@ task 3, line 54:
 Owner: Shared( 2 )
 Version: 2
 Contents: test::m1::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,4),
         },
     },
@@ -35,8 +35,8 @@ task 4, lines 56-58:
 Owner: Account Address ( A )
 Version: 2
 Contents: test::m1::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,5),
         },
     },

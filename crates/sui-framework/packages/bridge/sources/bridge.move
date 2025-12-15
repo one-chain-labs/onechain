@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module bridge::bridge {
-    use sui::address;
-    use sui::clock::Clock;
-    use sui::coin::{Coin, TreasuryCap, CoinMetadata};
-    use sui::event::emit;
-    use sui::linked_table::{Self, LinkedTable};
-    use sui::package::UpgradeCap;
-    use sui::vec_map::{Self, VecMap};
-    use sui::versioned::{Self, Versioned};
-    use sui_system::sui_system::SuiSystemState;
+    use one::address;
+    use one::clock::Clock;
+    use one::coin::{Coin, TreasuryCap, CoinMetadata};
+    use one::event::emit;
+    use one::linked_table::{Self, LinkedTable};
+    use one::package::UpgradeCap;
+    use one::vec_map::{Self, VecMap};
+    use one::versioned::{Self, Versioned};
+    use one_system::one_system::SuiSystemState;
 
     use bridge::chain_ids;
     use bridge::committee::{Self, BridgeCommittee};

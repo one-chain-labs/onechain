@@ -4,12 +4,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use sui_core::test_utils::make_pay_sui_transaction;
+use sui_core::test_utils::make_pay_oct_transaction;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     crypto::get_key_pair,
     digests::ObjectDigest,
-    gas_coin::MIST_PER_SUI,
+    gas_coin::MIST_PER_OCT,
     object::Owner,
     transaction::Transaction,
 };
@@ -34,7 +34,7 @@ use crate::{
 /// Value of each address's "primary coin" in mist. The first transaction gives
 /// each address a coin worth PRIMARY_COIN_VALUE, and all subsequent transfers
 /// send TRANSFER_AMOUNT coins each time
-const PRIMARY_COIN_VALUE: u64 = 100 * MIST_PER_SUI;
+const PRIMARY_COIN_VALUE: u64 = 100 * MIST_PER_OCT;
 
 /// Number of mist sent to each address on each batch transfer
 const BATCH_TRANSFER_AMOUNT: u64 = 1;
@@ -104,7 +104,7 @@ impl Payload for BatchPaymentTestPayload {
         let coins = Vec::new();
         // create a sender -> all transfer, using all of the sender's coins
         // TODO: use a larger amount, fewer input coins?
-        make_pay_sui_transaction(
+        make_pay_oct_transaction(
             *gas_obj,
             coins,
             addrs,

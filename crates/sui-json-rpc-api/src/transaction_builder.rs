@@ -37,8 +37,8 @@ pub trait TransactionBuilder {
     ) -> RpcResult<TransactionBlockBytes>;
 
     /// Create an unsigned transaction to send SUI coin object to a Sui address. The SUI object is also used as the gas object.
-    #[method(name = "transferSui")]
-    async fn transfer_sui(
+    #[method(name = "transferOct")]
+    async fn transfer_oct(
         &self,
         /// the transaction signer's Sui address
         signer: SuiAddress,
@@ -75,15 +75,15 @@ pub trait TransactionBuilder {
 
     /// Send SUI coins to a list of addresses, following a list of amounts.
     /// This is for SUI coin only and does not require a separate gas coin object.
-    /// Specifically, what pay_sui does are:
+    /// Specifically, what pay_oct does are:
     /// 1. debit each input_coin to create new coin following the order of
     /// amounts and assign it to the corresponding recipient.
     /// 2. accumulate all residual SUI from input coins left and deposit all SUI to the first
     /// input coin, then use the first input coin as the gas coin object.
     /// 3. the balance of the first input coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost
     /// 4. all other input coints other than the first one are deleted.
-    #[method(name = "paySui")]
-    async fn pay_sui(
+    #[method(name = "payOct")]
+    async fn pay_oct(
         &self,
         /// the transaction signer's Sui address
         signer: SuiAddress,
@@ -99,13 +99,13 @@ pub trait TransactionBuilder {
 
     /// Send all SUI coins to one recipient.
     /// This is for SUI coin only and does not require a separate gas coin object.
-    /// Specifically, what pay_all_sui does are:
+    /// Specifically, what pay_all_oct does are:
     /// 1. accumulate all SUI from input coins and deposit all SUI to the first input coin
     /// 2. transfer the updated first coin to the recipient and also use this first coin as gas coin object.
     /// 3. the balance of the first input coin after tx is sum(input_coins) - actual_gas_cost.
     /// 4. all other input coins other than the first are deleted.
-    #[method(name = "payAllSui")]
-    async fn pay_all_sui(
+    #[method(name = "payAllOct")]
+    async fn pay_all_oct(
         &self,
         /// the transaction signer's Sui address
         signer: SuiAddress,
@@ -227,7 +227,7 @@ pub trait TransactionBuilder {
         &self,
         /// the transaction signer's Sui address
         signer: SuiAddress,
-        /// Coin<SUI> object to stake
+        /// Coin<OCT> object to stake
         coins: Vec<ObjectID>,
         /// stake amount
         amount: Option<BigInt<u64>>,
@@ -245,8 +245,8 @@ pub trait TransactionBuilder {
         &self,
         /// the transaction signer's Sui address
         signer: SuiAddress,
-        /// StakedSui object ID
-        staked_sui: ObjectID,
+        /// StakedOct object ID
+        staked_oct: ObjectID,
         /// gas object to be used in this transaction, node will pick one from the signer's possession if not provided
         gas: Option<ObjectID>,
         /// the gas budget, the transaction will fail if the gas cost exceed the budget

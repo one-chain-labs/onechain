@@ -3,8 +3,8 @@
 
 module usdc_usage::example;
 
-use sui::coin::Coin;
-use sui::sui::SUI;
+use one::coin::Coin;
+use one::oct::OCT;
 use usdc::usdc::USDC;
 
 public struct Sword has key, store {
@@ -24,7 +24,7 @@ public fun buy_sword_with_usdc(
 }
 
 public fun buy_sword_with_sui(
-  coin: Coin<SUI>,
+  coin: Coin<OCT>,
   tx_context: &mut TxContext
 ): Sword {
   let sword = create_sword(coin.value(), tx_context);

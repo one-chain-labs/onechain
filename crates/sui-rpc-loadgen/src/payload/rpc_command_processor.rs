@@ -94,7 +94,7 @@ impl RpcCommandProcessor {
         match command {
             CommandData::DryRun(ref v) => self.process(v, signer_info).await,
             CommandData::GetCheckpoints(ref v) => self.process(v, signer_info).await,
-            CommandData::PaySui(ref v) => self.process(v, signer_info).await,
+            CommandData::PayOct(ref v) => self.process(v, signer_info).await,
             CommandData::QueryTransactionBlocks(ref v) => self.process(v, signer_info).await,
             CommandData::MultiGetTransactionBlocks(ref v) => self.process(v, signer_info).await,
             CommandData::MultiGetObjects(ref v) => self.process(v, signer_info).await,
@@ -488,7 +488,7 @@ async fn prepare_new_signer_and_coins(
     let amount_per_coin = num_transactions_per_coin * DEFAULT_GAS_BUDGET;
     let pay_amount = amount_per_coin * num_coins as u64;
     let num_split_txns = num_transactions_needed(num_coins, MAX_NUM_NEW_OBJECTS_IN_SINGLE_TRANSACTION);
-    let (gas_fee_for_split, gas_fee_for_pay_sui) =
+    let (gas_fee_for_split, gas_fee_for_pay_oct) =
         (DEFAULT_LARGE_GAS_BUDGET * num_split_txns as u64, DEFAULT_GAS_BUDGET);
 
     let primary_keypair =
@@ -496,9 +496,9 @@ async fn prepare_new_signer_and_coins(
     let sender = SuiAddress::from(&primary_keypair.public());
     let (coin, balance) = get_coin_with_max_balance(client, sender).await;
     // The balance needs to cover `pay_amount` plus
-    // 1. gas fee for pay_sui from the primary address to the burner address
+    // 1. gas fee for pay_oct from the primary address to the burner address
     // 2. gas fee for splitting the primary coin into `num_coins`
-    let required_balance = pay_amount + gas_fee_for_split + gas_fee_for_pay_sui;
+    let required_balance = pay_amount + gas_fee_for_split + gas_fee_for_pay_oct;
     if required_balance > balance {
         panic!(
             "Current balance {balance} is smaller than require amount of MIST to fund the operation {required_balance}"
@@ -521,7 +521,7 @@ async fn prepare_new_signer_and_coins(
 
     debug!("pay_amounts {pay_amounts:?}");
 
-    pay_sui(
+    pay_oct(
         client,
         &primary_keypair,
         vec![coin],
@@ -613,7 +613,7 @@ async fn get_sui_coin_ids(client: &SuiClient, address: SuiAddress) -> Vec<(Objec
     // TODO: implement iteration over next page
 }
 
-async fn pay_sui(
+async fn pay_oct(
     client: &SuiClient,
     keypair: &SuiKeyPair,
     input_coins: Vec<ObjectID>,

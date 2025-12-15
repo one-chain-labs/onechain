@@ -1,5 +1,5 @@
 ---
-title: Module `sui::ecvrf`
+title: Module `one::ecvrf`
 ---
 
 

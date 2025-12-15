@@ -63,8 +63,8 @@ mod move_package_tests;
 #[path = "unit_tests/move_package_upgrade_tests.rs"]
 mod move_package_upgrade_tests;
 #[cfg(test)]
-#[path = "unit_tests/pay_sui_tests.rs"]
-mod pay_sui_tests;
+#[path = "unit_tests/pay_oct_tests.rs"]
+mod pay_oct_tests;
 #[cfg(test)]
 #[path = "unit_tests/shared_object_deletion_tests.rs"]
 mod shared_object_deletion_tests;

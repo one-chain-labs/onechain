@@ -13,7 +13,7 @@ This document highlights some new features to try out and shows how to migrate y
 
 :::info
 
-Please, provide any feedback or report any issues you encounter via [GitHub](https://github.com/MystenLabs/sui/issues/new/choose), [Discord](https://discord.gg/Sui), or [Telegram](https://t.me/SuiTokenNetwork).
+Please, provide any feedback or report any issues you encounter via [GitHub](https://github.com/one-chain-labs/onechain/issues/new/choose), [Discord](https://discord.gg/Sui), or [Telegram](https://t.me/SuiTokenNetwork).
 
 :::
 
@@ -37,7 +37,7 @@ After this is done, your console displays a diff of the changes the script inten
 Use the new [VSCode Move extension](https://marketplace.visualstudio.com/items?itemName=mysten.move) to get support for Move 2024 features. The new extension has a number of improvements over the original [move-analyzer extension](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer), but if you would like to keep using the original one, be sure to rebuild and reinstall the `move-analyzer` binary to get 2024 support:
 
 ```sh
-$ cargo install --git https://github.com/MystenLabs/sui.git move-analyzer
+$ cargo install --git https://github.com/one-chain-labs/onechain.git move-analyzer
 ```
 
 See the getting started guide on [Move IDEs and plugins](../../../references/contribute/sui-environment.mdx#move-ides-and-plugins) for more information.
@@ -109,7 +109,7 @@ And as this example shows, you can now declare abilities after the struct field 
 You can now nest `use` aliases for more conciseness.
 
 ```move
-use sui::{balance, coin::{Self, Coin}};
+use one::{balance, coin::{Self, Coin}};
 ```
 
 Additionally, the following `use` declarations are now automatically included in every module:
@@ -117,9 +117,9 @@ Additionally, the following `use` declarations are now automatically included in
 ```move
 use std::vector;
 use std::option::{Self, Option};
-use sui::object::{Self, ID, UID};
-use sui::transfer;
-use sui::tx_context::{Self, TxContext};
+use one::object::{Self, ID, UID};
+use one::transfer;
+use one::tx_context::{Self, TxContext};
 ```
 
 ### Automatic referencing in equality
@@ -292,9 +292,9 @@ Looking toward the future, Move 2024 Beta adds the following keywords to the lan
 Move 2024 revises how paths and namespaces work compared to legacy Move, toward easing `enum` aliasing in the future. Consider the following snippet from a test annotation in the `sui_system` library:
 
 ```move
-use sui_system::sui_system;
+use one_system::one_system;
 ...
-#[expected_failure(abort_code = sui_system::validator_set::EInvalidCap)]
+#[expected_failure(abort_code = one_system::validator_set::EInvalidCap)]
 ```
 
 Legacy Move would always treat a three-part name as an address(`sui_system`), module(`validator_set`), and module member (`EInvalidCap`). Move 2024 respects scope for `use`, so `sui_system` in the attribute resolves to the module, producing a name resolution error overall.
@@ -302,9 +302,9 @@ Legacy Move would always treat a three-part name as an address(`sui_system`), mo
 To avoid cases where this is the intended behavior, Move 2024 introduces a prefix operation for global qualification. To use, you can rewrite this annotation as:
 
 ```move
-use sui_system::sui_system;
+use one_system::one_system;
 ...
-#[expected_failure(abort_code = ::sui_system::validator_set::EInvalidCap)]
+#[expected_failure(abort_code = ::one_system::validator_set::EInvalidCap)]
                              // ^ note `::` here
 ```
 

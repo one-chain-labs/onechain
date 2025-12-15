@@ -169,7 +169,7 @@ fn get_registry() -> Result<Registry> {
     let ccd = CheckpointContentsDigest::random();
     tracer.trace_value(&mut samples, &ccd).unwrap();
 
-    let struct_tag = StructTag::from_str("0x2::coin::Coin<0x2::sui::SUI>").unwrap();
+    let struct_tag = StructTag::from_str("0x2::coin::Coin<0x2::one::OCT>").unwrap();
     tracer.trace_value(&mut samples, &struct_tag).unwrap();
 
     let ccd = CheckpointDigest::random();

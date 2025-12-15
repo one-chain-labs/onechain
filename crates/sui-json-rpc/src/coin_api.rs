@@ -1059,7 +1059,7 @@ mod tests {
                 .return_once(move |_, _| Ok((create_fake_transaction(), transaction_effects)));
 
             let coin_read_api = CoinReadApi::new_for_tests(Arc::new(mock_state), None);
-            let response = coin_read_api.get_coin_metadata("0x2::sui::SUI".to_string()).await;
+            let response = coin_read_api.get_coin_metadata("0x2::one::OCT".to_string()).await;
 
             assert!(response.is_ok());
             let result = response.unwrap();
@@ -1104,7 +1104,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_success_response_for_gas_coin() {
-            let coin_type = "0x2::sui::SUI";
+            let coin_type = "0x2::one::OCT";
             let mock_internal = MockCoinReadInternal::new();
             let coin_read_api = CoinReadApi { internal: Box::new(mock_internal) };
 

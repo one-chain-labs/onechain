@@ -134,7 +134,7 @@ fn to_clauses(filter: &SuiObjectDataFilter) -> Option<String> {
         )),
         SuiObjectDataFilter::StructType(s) => {
             // If people do not provide type_params, we will match all type_params
-            // e.g. `0x2::coin::Coin` can match `0x2::coin::Coin<0x2::sui::SUI>`
+            // e.g. `0x2::coin::Coin` can match `0x2::coin::Coin<0x2::one::OCT>`
             if s.type_params.is_empty() {
                 Some(format!("o.object_type LIKE '{s}%'"))
             } else {

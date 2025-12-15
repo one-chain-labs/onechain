@@ -1,18 +1,18 @@
 // invalid, Clock by value
 
 module a::m {
-    public entry fun no_clock_val(_: sui::clock::Clock) {
+    public entry fun no_clock_val(_: one::clock::Clock) {
         abort 0
     }
 }
 
-module sui::clock {
+module one::clock {
     struct Clock has key {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 }
 
-module sui::object {
+module one::object {
     struct UID has store {
         id: address,
     }

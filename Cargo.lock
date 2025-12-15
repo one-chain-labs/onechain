@@ -2719,10 +2719,10 @@ dependencies = [
  "serde",
  "shared-crypto",
  "strum_macros 0.24.3",
- "sui-http",
- "sui-macros",
- "sui-protocol-config",
- "sui-tls",
+ "one-http",
+ "one-macros",
+ "one-protocol-config",
+ "one-tls",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -2752,10 +2752,10 @@ dependencies = [
  "parking_lot 0.12.3",
  "prometheus",
  "rand 0.8.5",
- "sui-config",
- "sui-macros",
- "sui-protocol-config",
- "sui-simulator",
+ "one-config",
+ "one-macros",
+ "one-protocol-config",
+ "one-simulator",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -8213,8 +8213,8 @@ dependencies = [
  "prometheus",
  "reqwest 0.12.9",
  "snap",
- "sui-tls",
- "sui-types",
+ "one-tls",
+ "one-types",
  "tokio",
  "tracing",
 ]
@@ -8260,7 +8260,7 @@ dependencies = [
  "prometheus",
  "serde",
  "snap",
- "sui-http",
+ "one-http",
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-stream",
@@ -11951,16 +11951,16 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "shared-crypto",
- "sui-config",
- "sui-execution",
- "sui-framework",
- "sui-genesis-builder",
- "sui-keys",
- "sui-protocol-config",
- "sui-storage",
- "sui-swarm-config",
- "sui-transaction-checks",
- "sui-types",
+ "one-config",
+ "one-execution",
+ "one-framework",
+ "one-genesis-builder",
+ "one-keys",
+ "one-protocol-config",
+ "one-storage",
+ "one-swarm-config",
+ "one-transaction-checks",
+ "one-types",
  "tracing",
 ]
 
@@ -12381,7 +12381,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
-name = "sui"
+name = "one"
 version = "1.44.3"
 dependencies = [
  "anemo",
@@ -12440,30 +12440,30 @@ dependencies = [
  "shell-words",
  "shlex",
  "signature 1.6.4",
- "sui-bridge",
- "sui-config",
- "sui-execution",
- "sui-faucet",
- "sui-genesis-builder",
- "sui-graphql-rpc",
- "sui-indexer",
- "sui-json",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-macros",
- "sui-move",
- "sui-move-build",
- "sui-package-management",
- "sui-protocol-config",
- "sui-replay",
- "sui-sdk",
- "sui-simulator",
- "sui-source-validation",
- "sui-swarm",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-transaction-builder 0.0.0",
- "sui-types",
+ "one-bridge",
+ "one-config",
+ "one-execution",
+ "one-faucet",
+ "one-genesis-builder",
+ "one-graphql-rpc",
+ "one-indexer",
+ "one-json",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-macros",
+ "one-move",
+ "one-move-build",
+ "one-package-management",
+ "one-protocol-config",
+ "one-replay",
+ "one-sdk",
+ "one-simulator",
+ "one-source-validation",
+ "one-swarm",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-transaction-builder 0.0.0",
+ "one-types",
  "tabled",
  "tap",
  "telemetry-subscribers",
@@ -12481,7 +12481,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-adapter-latest"
+name = "one-adapter-latest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12500,24 +12500,24 @@ dependencies = [
  "mysten-metrics",
  "parking_lot 0.12.3",
  "serde",
- "sui-macros",
- "sui-move-natives-latest",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-latest",
+ "one-macros",
+ "one-move-natives-latest",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-latest",
  "tracing",
 ]
 
 [[package]]
-name = "sui-adapter-transactional-tests"
+name = "one-adapter-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
- "sui-transactional-test-runner",
+ "one-transactional-test-runner",
 ]
 
 [[package]]
-name = "sui-adapter-v0"
+name = "one-adapter-v0"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12536,16 +12536,16 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.3",
  "serde",
- "sui-macros",
- "sui-move-natives-v0",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-v0",
+ "one-macros",
+ "one-move-natives-v0",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-v0",
  "tracing",
 ]
 
 [[package]]
-name = "sui-adapter-v1"
+name = "one-adapter-v1"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12562,16 +12562,16 @@ dependencies = [
  "move-vm-types",
  "parking_lot 0.12.3",
  "serde",
- "sui-macros",
- "sui-move-natives-v1",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-v1",
+ "one-macros",
+ "one-move-natives-v1",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-v1",
  "tracing",
 ]
 
 [[package]]
-name = "sui-adapter-v2"
+name = "one-adapter-v2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12588,16 +12588,16 @@ dependencies = [
  "move-vm-types",
  "parking_lot 0.12.3",
  "serde",
- "sui-macros",
- "sui-move-natives-v2",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-v2",
+ "one-macros",
+ "one-move-natives-v2",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-v2",
  "tracing",
 ]
 
 [[package]]
-name = "sui-analytics-indexer"
+name = "one-analytics-indexer"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12628,15 +12628,15 @@ dependencies = [
  "snowflake-api",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-analytics-indexer-derive",
- "sui-config",
- "sui-data-ingestion-core",
- "sui-indexer",
- "sui-json-rpc-types",
- "sui-package-resolver",
- "sui-rpc-api",
- "sui-storage",
- "sui-types",
+ "one-analytics-indexer-derive",
+ "one-config",
+ "one-data-ingestion-core",
+ "one-indexer",
+ "one-json-rpc-types",
+ "one-package-resolver",
+ "one-rpc-api",
+ "one-storage",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -12649,7 +12649,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-analytics-indexer-derive"
+name = "one-analytics-indexer-derive"
 version = "1.44.3"
 dependencies = [
  "proc-macro2",
@@ -12658,7 +12658,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-archival"
+name = "one-archival"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12677,30 +12677,30 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "sui-config",
- "sui-macros",
- "sui-simulator",
- "sui-storage",
- "sui-swarm-config",
- "sui-types",
+ "one-config",
+ "one-macros",
+ "one-simulator",
+ "one-storage",
+ "one-swarm-config",
+ "one-types",
  "tempfile",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "sui-authority-aggregation"
+name = "one-authority-aggregation"
 version = "0.1.0"
 dependencies = [
  "futures",
  "mysten-metrics",
- "sui-types",
+ "one-types",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "sui-aws-orchestrator"
+name = "one-aws-orchestrator"
 version = "0.0.1"
 dependencies = [
  "async-trait",
@@ -12722,16 +12722,16 @@ dependencies = [
  "russh-keys",
  "serde",
  "serde_json",
- "sui-config",
- "sui-swarm-config",
- "sui-types",
+ "one-config",
+ "one-swarm-config",
+ "one-types",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]
 
 [[package]]
-name = "sui-benchmark"
+name = "one-benchmark"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -12755,22 +12755,22 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-config",
- "sui-core",
- "sui-framework",
- "sui-framework-snapshot",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-macros",
- "sui-network",
- "sui-protocol-config",
- "sui-sdk",
- "sui-simulator",
- "sui-storage",
- "sui-surfer",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-framework",
+ "one-framework-snapshot",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-macros",
+ "one-network",
+ "one-protocol-config",
+ "one-sdk",
+ "one-simulator",
+ "one-storage",
+ "one-surfer",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "sysinfo",
  "telemetry-subscribers",
  "test-cluster",
@@ -12781,7 +12781,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-bridge"
+name = "one-bridge"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12813,14 +12813,14 @@ dependencies = [
  "serde_with",
  "shared-crypto",
  "strum_macros 0.24.3",
- "sui-authority-aggregation",
- "sui-config",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-sdk",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-authority-aggregation",
+ "one-config",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-sdk",
+ "one-test-transaction-builder",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -12832,7 +12832,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-bridge-cli"
+name = "one-bridge-cli"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12846,19 +12846,19 @@ dependencies = [
  "serde_json",
  "serde_with",
  "shared-crypto",
- "sui-bridge",
- "sui-config",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-sdk",
- "sui-types",
+ "one-bridge",
+ "one-config",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-sdk",
+ "one-types",
  "telemetry-subscribers",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "sui-bridge-indexer"
+name = "one-bridge-indexer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12879,16 +12879,16 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "strum_macros 0.24.3",
- "sui-bridge",
- "sui-config",
- "sui-data-ingestion-core",
- "sui-indexer",
- "sui-indexer-builder",
- "sui-json-rpc-types",
- "sui-pg-db",
- "sui-sdk",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-bridge",
+ "one-config",
+ "one-data-ingestion-core",
+ "one-indexer",
+ "one-indexer-builder",
+ "one-json-rpc-types",
+ "one-pg-db",
+ "one-sdk",
+ "one-test-transaction-builder",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -12898,7 +12898,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-cluster-test"
+name = "one-cluster-test"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12914,21 +12914,21 @@ dependencies = [
  "reqwest 0.12.9",
  "serde_json",
  "shared-crypto",
- "sui-config",
- "sui-core",
- "sui-faucet",
- "sui-graphql-rpc",
- "sui-indexer",
- "sui-json",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-move-build",
- "sui-pg-db",
- "sui-sdk",
- "sui-swarm",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-faucet",
+ "one-graphql-rpc",
+ "one-indexer",
+ "one-json",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-move-build",
+ "one-pg-db",
+ "one-sdk",
+ "one-swarm",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -12939,7 +12939,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-config"
+name = "one-config"
 version = "0.0.0"
 dependencies = [
  "anemo",
@@ -12960,16 +12960,16 @@ dependencies = [
  "serde",
  "serde_with",
  "serde_yaml 0.8.26",
- "sui-keys",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-types",
+ "one-keys",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "sui-core"
+name = "one-core"
 version = "0.1.0"
 dependencies = [
  "anemo",
@@ -13034,25 +13034,25 @@ dependencies = [
  "shared-crypto",
  "simple_moving_average",
  "static_assertions",
- "sui-archival",
- "sui-authority-aggregation",
- "sui-config",
- "sui-execution",
- "sui-framework",
- "sui-genesis-builder",
- "sui-json-rpc-types",
- "sui-macros",
- "sui-move",
- "sui-move-build",
- "sui-network",
- "sui-protocol-config",
- "sui-simulator",
- "sui-storage",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-tls",
- "sui-transaction-checks",
- "sui-types",
+ "one-archival",
+ "one-authority-aggregation",
+ "one-config",
+ "one-execution",
+ "one-framework",
+ "one-genesis-builder",
+ "one-json-rpc-types",
+ "one-macros",
+ "one-move",
+ "one-move-build",
+ "one-network",
+ "one-protocol-config",
+ "one-simulator",
+ "one-storage",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-tls",
+ "one-transaction-checks",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13066,7 +13066,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-cost"
+name = "one-cost"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13076,18 +13076,18 @@ dependencies = [
  "serde",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-config",
- "sui-json-rpc-types",
- "sui-move-build",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-config",
+ "one-json-rpc-types",
+ "one-move-build",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "test-cluster",
  "tokio",
 ]
 
 [[package]]
-name = "sui-data-ingestion"
+name = "one-data-ingestion"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13107,11 +13107,11 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sui-archival",
- "sui-data-ingestion-core",
- "sui-kvstore",
- "sui-storage",
- "sui-types",
+ "one-archival",
+ "one-data-ingestion-core",
+ "one-kvstore",
+ "one-storage",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -13120,7 +13120,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-data-ingestion-core"
+name = "one-data-ingestion-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13135,10 +13135,10 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-storage",
- "sui-types",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-storage",
+ "one-types",
  "tap",
  "tempfile",
  "tokio",
@@ -13148,7 +13148,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-deepbook-indexer"
+name = "one-deepbook-indexer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13167,12 +13167,12 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sui-config",
- "sui-data-ingestion-core",
- "sui-indexer-builder",
- "sui-json-rpc-types",
- "sui-sdk",
- "sui-types",
+ "one-config",
+ "one-data-ingestion-core",
+ "one-indexer-builder",
+ "one-json-rpc-types",
+ "one-sdk",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13182,7 +13182,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-default-config"
+name = "one-default-config"
 version = "1.44.3"
 dependencies = [
  "quote",
@@ -13190,18 +13190,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-display"
+name = "one-display"
 version = "1.44.3"
 dependencies = [
  "anyhow",
  "move-core-types",
- "sui-json-rpc-types",
- "sui-types",
+ "one-json-rpc-types",
+ "one-types",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "sui-e2e-tests"
+name = "one-e2e-tests"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13231,30 +13231,30 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-crypto",
- "sui",
- "sui-config",
- "sui-core",
- "sui-framework",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-macros",
- "sui-move-build",
- "sui-network",
- "sui-node",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-sdk",
- "sui-sdk-types",
- "sui-simulator",
- "sui-storage",
- "sui-swarm",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-tool",
- "sui-transaction-builder 0.1.0",
- "sui-types",
+ "one",
+ "one-config",
+ "one-core",
+ "one-framework",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-macros",
+ "one-move-build",
+ "one-network",
+ "one-node",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-sdk",
+ "one-sdk-types",
+ "one-simulator",
+ "one-storage",
+ "one-swarm",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-tool",
+ "one-transaction-builder 0.1.0",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -13266,7 +13266,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-edge-proxy"
+name = "one-edge-proxy"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13290,14 +13290,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-enum-compat-util"
+name = "one-enum-compat-util"
 version = "0.1.0"
 dependencies = [
  "serde_yaml 0.8.26",
 ]
 
 [[package]]
-name = "sui-execution"
+name = "one-execution"
 version = "0.1.0"
 dependencies = [
  "cargo_metadata 0.15.4",
@@ -13316,24 +13316,24 @@ dependencies = [
  "move-vm-runtime-v1",
  "move-vm-runtime-v2",
  "petgraph 0.5.1",
- "sui-adapter-latest",
- "sui-adapter-v0",
- "sui-adapter-v1",
- "sui-adapter-v2",
- "sui-move-natives-latest",
- "sui-move-natives-v0",
- "sui-move-natives-v1",
- "sui-move-natives-v2",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-latest",
- "sui-verifier-v0",
- "sui-verifier-v1",
- "sui-verifier-v2",
+ "one-adapter-latest",
+ "one-adapter-v0",
+ "one-adapter-v1",
+ "one-adapter-v2",
+ "one-move-natives-latest",
+ "one-move-natives-v0",
+ "one-move-natives-v1",
+ "one-move-natives-v2",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-latest",
+ "one-verifier-v0",
+ "one-verifier-v1",
+ "one-verifier-v2",
 ]
 
 [[package]]
-name = "sui-execution-cut"
+name = "one-execution-cut"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13346,7 +13346,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-faucet"
+name = "one-faucet"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13369,11 +13369,11 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-crypto",
- "sui-config",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-sdk",
- "sui-types",
+ "one-config",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-sdk",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13392,14 +13392,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-field-count"
+name = "one-field-count"
 version = "1.44.3"
 dependencies = [
- "sui-field-count-derive",
+ "one-field-count-derive",
 ]
 
 [[package]]
-name = "sui-field-count-derive"
+name = "one-field-count-derive"
 version = "1.44.3"
 dependencies = [
  "quote",
@@ -13407,7 +13407,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-framework"
+name = "one-framework"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13419,15 +13419,15 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
- "sui-config",
- "sui-move-build",
- "sui-types",
+ "one-config",
+ "one-move-build",
+ "one-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "sui-framework-snapshot"
+name = "one-framework-snapshot"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13436,15 +13436,15 @@ dependencies = [
  "move-package",
  "serde",
  "serde_json",
- "sui-framework",
- "sui-move-build",
- "sui-protocol-config",
- "sui-types",
+ "one-framework",
+ "one-move-build",
+ "one-protocol-config",
+ "one-types",
  "tokio",
 ]
 
 [[package]]
-name = "sui-framework-tests"
+name = "one-framework-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
@@ -13454,18 +13454,18 @@ dependencies = [
  "move-package",
  "move-unit-test",
  "prometheus",
- "sui-adapter-latest",
- "sui-config",
- "sui-framework",
- "sui-move",
- "sui-move-build",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-latest",
+ "one-adapter-latest",
+ "one-config",
+ "one-framework",
+ "one-move",
+ "one-move-build",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-latest",
 ]
 
 [[package]]
-name = "sui-genesis-builder"
+name = "one-genesis-builder"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -13480,19 +13480,19 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "shared-crypto",
- "sui-config",
- "sui-execution",
- "sui-framework",
- "sui-framework-snapshot",
- "sui-protocol-config",
- "sui-simulator",
- "sui-types",
+ "one-config",
+ "one-execution",
+ "one-framework",
+ "one-framework-snapshot",
+ "one-protocol-config",
+ "one-simulator",
+ "one-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "sui-graphql-e2e-tests"
+name = "one-graphql-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13500,14 +13500,14 @@ dependencies = [
  "datatest-stable",
  "msim",
  "serde_json",
- "sui-graphql-rpc",
- "sui-transactional-test-runner",
+ "one-graphql-rpc",
+ "one-transactional-test-runner",
  "telemetry-subscribers",
  "tokio",
 ]
 
 [[package]]
-name = "sui-graphql-rpc"
+name = "one-graphql-rpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13556,23 +13556,23 @@ dependencies = [
  "shared-crypto",
  "similar",
  "simulacrum",
- "sui-default-config",
- "sui-framework",
- "sui-graphql-rpc-client",
- "sui-graphql-rpc-headers",
- "sui-indexer",
- "sui-json-rpc",
- "sui-json-rpc-types",
- "sui-move-build",
- "sui-name-service",
- "sui-package-resolver",
- "sui-pg-db",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-sdk",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-default-config",
+ "one-framework",
+ "one-graphql-rpc-client",
+ "one-graphql-rpc-headers",
+ "one-indexer",
+ "one-json-rpc",
+ "one-json-rpc-types",
+ "one-move-build",
+ "one-name-service",
+ "one-package-resolver",
+ "one-pg-db",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-sdk",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13588,7 +13588,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-graphql-rpc-client"
+name = "one-graphql-rpc-client"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
@@ -13596,19 +13596,19 @@ dependencies = [
  "hyper 1.5.2",
  "reqwest 0.12.9",
  "serde_json",
- "sui-graphql-rpc-headers",
+ "one-graphql-rpc-headers",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "sui-graphql-rpc-headers"
+name = "one-graphql-rpc-headers"
 version = "0.1.0"
 dependencies = [
  "axum 0.7.5",
 ]
 
 [[package]]
-name = "sui-http"
+name = "one-http"
 version = "0.0.0"
 dependencies = [
  "axum 0.7.5",
@@ -13629,7 +13629,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-indexer"
+name = "one-indexer"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13668,29 +13668,29 @@ dependencies = [
  "simulacrum",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-archival",
- "sui-config",
- "sui-core",
- "sui-data-ingestion-core",
- "sui-json",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-move-build",
- "sui-name-service",
- "sui-open-rpc",
- "sui-package-resolver",
- "sui-pg-db",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-sdk",
- "sui-snapshot",
- "sui-storage",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-transaction-builder 0.0.0",
- "sui-types",
+ "one-archival",
+ "one-config",
+ "one-core",
+ "one-data-ingestion-core",
+ "one-json",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-move-build",
+ "one-name-service",
+ "one-open-rpc",
+ "one-package-resolver",
+ "one-pg-db",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-sdk",
+ "one-snapshot",
+ "one-storage",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-transaction-builder 0.0.0",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13705,7 +13705,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-indexer-alt"
+name = "one-indexer-alt"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13722,15 +13722,15 @@ dependencies = [
  "prometheus",
  "rand 0.8.5",
  "serde",
- "sui-default-config",
- "sui-field-count",
- "sui-indexer-alt-framework",
- "sui-indexer-alt-metrics",
- "sui-indexer-alt-schema",
- "sui-pg-db",
- "sui-protocol-config",
- "sui-synthetic-ingestion",
- "sui-types",
+ "one-default-config",
+ "one-field-count",
+ "one-indexer-alt-framework",
+ "one-indexer-alt-metrics",
+ "one-indexer-alt-schema",
+ "one-pg-db",
+ "one-protocol-config",
+ "one-synthetic-ingestion",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -13741,7 +13741,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-indexer-alt-e2e-tests"
+name = "one-indexer-alt-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13756,13 +13756,13 @@ dependencies = [
  "reqwest 0.12.9",
  "serde_json",
  "simulacrum",
- "sui-indexer-alt",
- "sui-indexer-alt-framework",
- "sui-indexer-alt-jsonrpc",
- "sui-move-build",
- "sui-pg-db",
- "sui-transactional-test-runner",
- "sui-types",
+ "one-indexer-alt",
+ "one-indexer-alt-framework",
+ "one-indexer-alt-jsonrpc",
+ "one-move-build",
+ "one-pg-db",
+ "one-transactional-test-runner",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -13771,7 +13771,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-indexer-alt-framework"
+name = "one-indexer-alt-framework"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13789,12 +13789,12 @@ dependencies = [
  "rand 0.8.5",
  "reqwest 0.12.9",
  "serde",
- "sui-field-count",
- "sui-indexer-alt-metrics",
- "sui-pg-db",
- "sui-sql-macro",
- "sui-storage",
- "sui-types",
+ "one-field-count",
+ "one-indexer-alt-metrics",
+ "one-pg-db",
+ "one-sql-macro",
+ "one-storage",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "thiserror 1.0.69",
@@ -13807,7 +13807,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-indexer-alt-jsonrpc"
+name = "one-indexer-alt-jsonrpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13831,21 +13831,21 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sui-default-config",
- "sui-display",
- "sui-indexer-alt-metrics",
- "sui-indexer-alt-schema",
- "sui-json",
- "sui-json-rpc-types",
- "sui-kvstore",
- "sui-name-service",
- "sui-open-rpc",
- "sui-open-rpc-macros",
- "sui-package-resolver",
- "sui-pg-db",
- "sui-protocol-config",
- "sui-sql-macro",
- "sui-types",
+ "one-default-config",
+ "one-display",
+ "one-indexer-alt-metrics",
+ "one-indexer-alt-schema",
+ "one-json",
+ "one-json-rpc-types",
+ "one-kvstore",
+ "one-name-service",
+ "one-open-rpc",
+ "one-open-rpc-macros",
+ "one-package-resolver",
+ "one-pg-db",
+ "one-protocol-config",
+ "one-sql-macro",
+ "one-types",
  "telemetry-subscribers",
  "thiserror 1.0.69",
  "tokio",
@@ -13859,21 +13859,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-indexer-alt-metrics"
+name = "one-indexer-alt-metrics"
 version = "1.44.3"
 dependencies = [
  "anyhow",
  "axum 0.7.5",
  "clap",
  "prometheus",
- "sui-pg-db",
+ "one-pg-db",
  "tokio",
  "tokio-util 0.7.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing",
 ]
 
 [[package]]
-name = "sui-indexer-alt-restorer"
+name = "one-indexer-alt-restorer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13885,23 +13885,23 @@ dependencies = [
  "indicatif",
  "object_store",
  "prometheus",
- "sui-archival",
- "sui-config",
- "sui-core",
- "sui-field-count",
- "sui-indexer-alt-framework",
- "sui-indexer-alt-schema",
- "sui-pg-db",
- "sui-snapshot",
- "sui-storage",
- "sui-types",
+ "one-archival",
+ "one-config",
+ "one-core",
+ "one-field-count",
+ "one-indexer-alt-framework",
+ "one-indexer-alt-schema",
+ "one-pg-db",
+ "one-snapshot",
+ "one-storage",
+ "one-types",
  "telemetry-subscribers",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "sui-indexer-alt-schema"
+name = "one-indexer-alt-schema"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13909,13 +13909,13 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "serde",
- "sui-field-count",
- "sui-protocol-config",
- "sui-types",
+ "one-field-count",
+ "one-protocol-config",
+ "one-types",
 ]
 
 [[package]]
-name = "sui-indexer-builder"
+name = "one-indexer-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13923,10 +13923,10 @@ dependencies = [
  "futures",
  "mysten-metrics",
  "prometheus",
- "sui-data-ingestion-core",
- "sui-indexer-builder",
- "sui-sdk",
- "sui-types",
+ "one-data-ingestion-core",
+ "one-indexer-builder",
+ "one-sdk",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tokio",
@@ -13934,7 +13934,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-json"
+name = "one-json"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -13946,14 +13946,14 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "sui-framework",
- "sui-move-build",
- "sui-types",
+ "one-framework",
+ "one-move-build",
+ "one-types",
  "test-fuzz",
 ]
 
 [[package]]
-name = "sui-json-rpc"
+name = "one-json-rpc"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -13988,19 +13988,19 @@ dependencies = [
  "serde_json",
  "shared-crypto",
  "signature 1.6.4",
- "sui-config",
- "sui-core",
- "sui-json",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-macros",
- "sui-name-service",
- "sui-open-rpc",
- "sui-open-rpc-macros",
- "sui-protocol-config",
- "sui-storage",
- "sui-transaction-builder 0.0.0",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-json",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-macros",
+ "one-name-service",
+ "one-open-rpc",
+ "one-open-rpc-macros",
+ "one-protocol-config",
+ "one-storage",
+ "one-transaction-builder 0.0.0",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "thiserror 1.0.69",
@@ -14013,7 +14013,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-json-rpc-api"
+name = "one-json-rpc-api"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14022,17 +14022,17 @@ dependencies = [
  "mysten-metrics",
  "once_cell",
  "prometheus",
- "sui-json",
- "sui-json-rpc-types",
- "sui-open-rpc",
- "sui-open-rpc-macros",
- "sui-types",
+ "one-json",
+ "one-json-rpc-types",
+ "one-open-rpc",
+ "one-open-rpc-macros",
+ "one-types",
  "tap",
  "tracing",
 ]
 
 [[package]]
-name = "sui-json-rpc-tests"
+name = "one-json-rpc-tests"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14046,23 +14046,23 @@ dependencies = [
  "rand 0.8.5",
  "reqwest 0.12.9",
  "shared-crypto",
- "sui-config",
- "sui-core",
- "sui-json",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-macros",
- "sui-move-build",
- "sui-open-rpc",
- "sui-open-rpc-macros",
- "sui-protocol-config",
- "sui-sdk",
- "sui-simulator",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-json",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-macros",
+ "one-move-build",
+ "one-open-rpc",
+ "one-open-rpc-macros",
+ "one-protocol-config",
+ "one-sdk",
+ "one-simulator",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "telemetry-subscribers",
  "test-cluster",
  "tokio",
@@ -14070,7 +14070,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-json-rpc-types"
+name = "one-json-rpc-types"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14090,18 +14090,18 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sui-enum-compat-util",
- "sui-json",
- "sui-macros",
- "sui-package-resolver",
- "sui-protocol-config",
- "sui-types",
+ "one-enum-compat-util",
+ "one-json",
+ "one-macros",
+ "one-package-resolver",
+ "one-protocol-config",
+ "one-types",
  "tabled",
  "tracing",
 ]
 
 [[package]]
-name = "sui-keys"
+name = "one-keys"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14114,13 +14114,13 @@ dependencies = [
  "shared-crypto",
  "signature 1.6.4",
  "slip10_ed25519",
- "sui-types",
+ "one-types",
  "tempfile",
  "tiny-bip39",
 ]
 
 [[package]]
-name = "sui-kvstore"
+name = "one-kvstore"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14133,8 +14133,8 @@ dependencies = [
  "prost 0.13.3",
  "prost-types 0.13.3",
  "serde",
- "sui-data-ingestion-core",
- "sui-types",
+ "one-data-ingestion-core",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -14143,7 +14143,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-light-client"
+name = "one-light-client"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14160,28 +14160,28 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sui-config",
- "sui-json-rpc-types",
- "sui-package-resolver",
- "sui-rpc-api",
- "sui-sdk",
- "sui-types",
+ "one-config",
+ "one-json-rpc-types",
+ "one-package-resolver",
+ "one-rpc-api",
+ "one-sdk",
+ "one-types",
  "tokio",
  "url",
 ]
 
 [[package]]
-name = "sui-macros"
+name = "one-macros"
 version = "0.7.0"
 dependencies = [
  "futures",
  "once_cell",
- "sui-proc-macros",
+ "one-proc-macros",
  "tracing",
 ]
 
 [[package]]
-name = "sui-metric-checker"
+name = "one-metric-checker"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14202,7 +14202,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-move"
+name = "one-move"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14229,11 +14229,11 @@ dependencies = [
  "rand 0.8.5",
  "serde_json",
  "serde_yaml 0.8.26",
- "sui-macros",
- "sui-move-build",
- "sui-move-natives-latest",
- "sui-protocol-config",
- "sui-types",
+ "one-macros",
+ "one-move-build",
+ "one-move-natives-latest",
+ "one-protocol-config",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -14242,7 +14242,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-move-build"
+name = "one-move-build"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14257,15 +14257,15 @@ dependencies = [
  "move-package",
  "move-symbol-pool",
  "serde-reflection",
- "sui-package-management",
- "sui-protocol-config",
- "sui-types",
- "sui-verifier-latest",
+ "one-package-management",
+ "one-protocol-config",
+ "one-types",
+ "one-verifier-latest",
  "tempfile",
 ]
 
 [[package]]
-name = "sui-move-lsp"
+name = "one-move-lsp"
 version = "1.44.3"
 dependencies = [
  "bin-version",
@@ -14274,7 +14274,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-move-natives-latest"
+name = "one-move-natives-latest"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14290,13 +14290,13 @@ dependencies = [
  "move-vm-types",
  "rand 0.8.5",
  "smallvec",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
  "tracing",
 ]
 
 [[package]]
-name = "sui-move-natives-v0"
+name = "one-move-natives-v0"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14310,13 +14310,13 @@ dependencies = [
  "move-vm-runtime-v0",
  "move-vm-types",
  "smallvec",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
  "tracing",
 ]
 
 [[package]]
-name = "sui-move-natives-v1"
+name = "one-move-natives-v1"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14330,13 +14330,13 @@ dependencies = [
  "move-vm-runtime-v1",
  "move-vm-types",
  "smallvec",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
  "tracing",
 ]
 
 [[package]]
-name = "sui-move-natives-v2"
+name = "one-move-natives-v2"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14350,13 +14350,13 @@ dependencies = [
  "move-vm-runtime-v2",
  "move-vm-types",
  "smallvec",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
  "tracing",
 ]
 
 [[package]]
-name = "sui-mvr-graphql-e2e-tests"
+name = "one-mvr-graphql-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -14364,14 +14364,14 @@ dependencies = [
  "datatest-stable",
  "msim",
  "serde_json",
- "sui-mvr-graphql-rpc",
- "sui-transactional-test-runner",
+ "one-mvr-graphql-rpc",
+ "one-transactional-test-runner",
  "telemetry-subscribers",
  "tokio",
 ]
 
 [[package]]
-name = "sui-mvr-graphql-rpc"
+name = "one-mvr-graphql-rpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14420,23 +14420,23 @@ dependencies = [
  "shared-crypto",
  "similar",
  "simulacrum",
- "sui-default-config",
- "sui-framework",
- "sui-graphql-rpc-client",
- "sui-graphql-rpc-headers",
- "sui-indexer",
- "sui-json-rpc",
- "sui-json-rpc-types",
- "sui-move-build",
- "sui-name-service",
- "sui-package-resolver",
- "sui-pg-db",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-sdk",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-default-config",
+ "one-framework",
+ "one-graphql-rpc-client",
+ "one-graphql-rpc-headers",
+ "one-indexer",
+ "one-json-rpc",
+ "one-json-rpc-types",
+ "one-move-build",
+ "one-name-service",
+ "one-package-resolver",
+ "one-pg-db",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-sdk",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -14452,18 +14452,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-name-service"
+name = "one-name-service"
 version = "1.44.3"
 dependencies = [
  "bcs",
  "move-core-types",
  "serde",
- "sui-types",
+ "one-types",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "sui-network"
+name = "one-network"
 version = "0.0.0"
 dependencies = [
  "anemo",
@@ -14486,12 +14486,12 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "shared-crypto",
- "sui-archival",
- "sui-config",
- "sui-macros",
- "sui-storage",
- "sui-swarm-config",
- "sui-types",
+ "one-archival",
+ "one-config",
+ "one-macros",
+ "one-storage",
+ "one-swarm-config",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -14503,7 +14503,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-node"
+name = "one-node"
 version = "1.44.3"
 dependencies = [
  "anemo",
@@ -14530,23 +14530,23 @@ dependencies = [
  "prometheus",
  "reqwest 0.12.9",
  "serde",
- "sui-archival",
- "sui-config",
- "sui-core",
- "sui-http",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-macros",
- "sui-name-service",
- "sui-network",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-simulator",
- "sui-snapshot",
- "sui-storage",
- "sui-telemetry",
- "sui-tls",
- "sui-types",
+ "one-archival",
+ "one-config",
+ "one-core",
+ "one-http",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-macros",
+ "one-name-service",
+ "one-network",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-simulator",
+ "one-snapshot",
+ "one-storage",
+ "one-telemetry",
+ "one-tls",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tokio",
@@ -14558,7 +14558,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-open-rpc"
+name = "one-open-rpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14571,18 +14571,18 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "sui-json",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-protocol-config",
- "sui-types",
+ "one-json",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-protocol-config",
+ "one-types",
  "tokio",
  "versions",
 ]
 
 [[package]]
-name = "sui-open-rpc-macros"
+name = "one-open-rpc-macros"
 version = "0.1.0"
 dependencies = [
  "derive-syn-parse",
@@ -14594,7 +14594,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-oracle"
+name = "one-oracle"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14611,12 +14611,12 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-crypto",
- "sui-config",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-move-build",
- "sui-sdk",
- "sui-types",
+ "one-config",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-move-build",
+ "one-sdk",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tokio",
@@ -14624,7 +14624,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-package-dump"
+name = "one-package-dump"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14636,29 +14636,29 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "sui-types",
+ "one-types",
  "tracing",
 ]
 
 [[package]]
-name = "sui-package-management"
+name = "one-package-management"
 version = "1.44.3"
 dependencies = [
  "anyhow",
  "move-core-types",
  "move-package",
  "move-symbol-pool",
- "sui-framework-snapshot",
- "sui-json-rpc-types",
- "sui-protocol-config",
- "sui-sdk",
- "sui-types",
+ "one-framework-snapshot",
+ "one-json-rpc-types",
+ "one-protocol-config",
+ "one-sdk",
+ "one-types",
  "thiserror 1.0.69",
  "tracing",
 ]
 
 [[package]]
-name = "sui-package-resolver"
+name = "one-package-resolver"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -14673,16 +14673,16 @@ dependencies = [
  "move-core-types",
  "serde",
  "serde_json",
- "sui-move-build",
- "sui-rpc-api",
- "sui-types",
+ "one-move-build",
+ "one-rpc-api",
+ "one-types",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.4.13",
 ]
 
 [[package]]
-name = "sui-pg-db"
+name = "one-pg-db"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14699,18 +14699,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-proc-macros"
+name = "one-proc-macros"
 version = "0.7.0"
 dependencies = [
  "msim-macros",
  "proc-macro2",
  "quote",
- "sui-enum-compat-util",
+ "one-enum-compat-util",
  "syn 2.0.87",
 ]
 
 [[package]]
-name = "sui-protocol-config"
+name = "one-protocol-config"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -14720,12 +14720,12 @@ dependencies = [
  "serde",
  "serde-env",
  "serde_with",
- "sui-protocol-config-macros",
+ "one-protocol-config-macros",
  "tracing",
 ]
 
 [[package]]
-name = "sui-protocol-config-macros"
+name = "one-protocol-config-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -14734,7 +14734,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-proxy"
+name = "one-proxy"
 version = "0.0.2"
 dependencies = [
  "anyhow",
@@ -14767,8 +14767,8 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "snap",
- "sui-tls",
- "sui-types",
+ "one-tls",
+ "one-types",
  "telemetry-subscribers",
  "tokio",
  "tower 0.4.13",
@@ -14778,7 +14778,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-replay"
+name = "one-replay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -14805,17 +14805,17 @@ dependencies = [
  "shared-crypto",
  "shellexpand",
  "similar",
- "sui-config",
- "sui-core",
- "sui-execution",
- "sui-framework",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-protocol-config",
- "sui-sdk",
- "sui-storage",
- "sui-transaction-checks",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-execution",
+ "one-framework",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-protocol-config",
+ "one-sdk",
+ "one-storage",
+ "one-transaction-checks",
+ "one-types",
  "tabled",
  "tempfile",
  "thiserror 1.0.69",
@@ -14825,7 +14825,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-rosetta"
+name = "one-rosetta"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14852,14 +14852,14 @@ dependencies = [
  "signature 1.6.4",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-config",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-move-build",
- "sui-node",
- "sui-sdk",
- "sui-swarm-config",
- "sui-types",
+ "one-config",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-move-build",
+ "one-node",
+ "one-sdk",
+ "one-swarm-config",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -14870,7 +14870,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-rpc-api"
+name = "one-rpc-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -14898,10 +14898,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sui-protocol-config",
- "sui-sdk-types",
- "sui-transaction-builder 0.1.0",
- "sui-types",
+ "one-protocol-config",
+ "one-sdk-types",
+ "one-transaction-builder 0.1.0",
+ "one-types",
  "tap",
  "test-strategy",
  "thiserror 1.0.69",
@@ -14918,7 +14918,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-rpc-benchmark"
+name = "one-rpc-benchmark"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14933,7 +14933,7 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "sui-indexer-alt-framework",
+ "one-indexer-alt-framework",
  "telemetry-subscribers",
  "tokio",
  "tokio-postgres",
@@ -14942,7 +14942,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-rpc-loadgen"
+name = "one-rpc-loadgen"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14958,10 +14958,10 @@ dependencies = [
  "shellexpand",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-sdk",
- "sui-types",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-sdk",
+ "one-types",
  "telemetry-subscribers",
  "tokio",
  "tonic 0.12.3",
@@ -14969,7 +14969,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-sdk"
+name = "one-sdk"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14991,16 +14991,16 @@ dependencies = [
  "serde_json",
  "serde_with",
  "shared-crypto",
- "sui-config",
- "sui-json",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-macros",
- "sui-protocol-config",
- "sui-simulator",
- "sui-transaction-builder 0.0.0",
- "sui-types",
+ "one-config",
+ "one-json",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-macros",
+ "one-protocol-config",
+ "one-simulator",
+ "one-transaction-builder 0.0.0",
+ "one-types",
  "tempfile",
  "test-cluster",
  "thiserror 1.0.69",
@@ -15009,9 +15009,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-sdk-types"
+name = "one-sdk-types"
 version = "0.0.2"
-source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
+source = "git+https://github.com/MystenLabs/one-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
 dependencies = [
  "base64ct",
  "bcs",
@@ -15030,7 +15030,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-security-watchdog"
+name = "one-security-watchdog"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -15054,7 +15054,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-simulator"
+name = "one-simulator"
 version = "0.7.0"
 dependencies = [
  "anemo",
@@ -15067,9 +15067,9 @@ dependencies = [
  "mysten-network",
  "rand 0.8.5",
  "serde",
- "sui-framework",
- "sui-move-build",
- "sui-types",
+ "one-framework",
+ "one-move-build",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tower 0.4.13",
@@ -15077,7 +15077,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-single-node-benchmark"
+name = "one-single-node-benchmark"
 version = "1.44.3"
 dependencies = [
  "async-trait",
@@ -15095,23 +15095,23 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-config",
- "sui-core",
- "sui-macros",
- "sui-move-build",
- "sui-protocol-config",
- "sui-simulator",
- "sui-storage",
- "sui-test-transaction-builder",
- "sui-transaction-checks",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-macros",
+ "one-move-build",
+ "one-protocol-config",
+ "one-simulator",
+ "one-storage",
+ "one-test-transaction-builder",
+ "one-transaction-checks",
+ "one-types",
  "telemetry-subscribers",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "sui-snapshot"
+name = "one-snapshot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15127,12 +15127,12 @@ dependencies = [
  "prometheus",
  "serde",
  "serde_json",
- "sui-config",
- "sui-core",
- "sui-indexer-alt-framework",
- "sui-protocol-config",
- "sui-storage",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-indexer-alt-framework",
+ "one-protocol-config",
+ "one-storage",
+ "one-types",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -15140,7 +15140,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-source-validation"
+name = "one-source-validation"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -15156,12 +15156,12 @@ dependencies = [
  "move-package",
  "move-symbol-pool",
  "rand 0.8.5",
- "sui-json-rpc-types",
- "sui-move-build",
- "sui-package-management",
- "sui-sdk",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-json-rpc-types",
+ "one-move-build",
+ "one-package-management",
+ "one-sdk",
+ "one-test-transaction-builder",
+ "one-types",
  "tar",
  "tempfile",
  "test-cluster",
@@ -15172,7 +15172,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-source-validation-service"
+name = "one-source-validation-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15191,12 +15191,12 @@ dependencies = [
  "prometheus",
  "reqwest 0.12.9",
  "serde",
- "sui",
- "sui-json-rpc-types",
- "sui-move",
- "sui-move-build",
- "sui-sdk",
- "sui-source-validation",
+ "one",
+ "one-json-rpc-types",
+ "one-move",
+ "one-move-build",
+ "one-sdk",
+ "one-source-validation",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -15209,7 +15209,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-sql-macro"
+name = "one-sql-macro"
 version = "1.44.3"
 dependencies = [
  "quote",
@@ -15218,7 +15218,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-storage"
+name = "one-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15254,13 +15254,13 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "sui-config",
- "sui-json-rpc-types",
- "sui-macros",
- "sui-protocol-config",
- "sui-simulator",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-config",
+ "one-json-rpc-types",
+ "one-macros",
+ "one-protocol-config",
+ "one-simulator",
+ "one-test-transaction-builder",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -15272,7 +15272,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-surfer"
+name = "one-surfer"
 version = "1.44.3"
 dependencies = [
  "async-trait",
@@ -15285,14 +15285,14 @@ dependencies = [
  "move-package",
  "prometheus",
  "rand 0.8.5",
- "sui-core",
- "sui-json-rpc-types",
- "sui-macros",
- "sui-move-build",
- "sui-protocol-config",
- "sui-simulator",
- "sui-swarm-config",
- "sui-types",
+ "one-core",
+ "one-json-rpc-types",
+ "one-macros",
+ "one-move-build",
+ "one-protocol-config",
+ "one-simulator",
+ "one-swarm-config",
+ "one-types",
  "telemetry-subscribers",
  "test-cluster",
  "tokio",
@@ -15300,7 +15300,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-swarm"
+name = "one-swarm"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -15309,14 +15309,14 @@ dependencies = [
  "mysten-network",
  "prometheus",
  "rand 0.8.5",
- "sui-config",
- "sui-macros",
- "sui-node",
- "sui-protocol-config",
- "sui-simulator",
- "sui-swarm-config",
- "sui-tls",
- "sui-types",
+ "one-config",
+ "one-macros",
+ "one-node",
+ "one-protocol-config",
+ "one-simulator",
+ "one-swarm-config",
+ "one-tls",
+ "one-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -15326,7 +15326,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-swarm-config"
+name = "one-swarm-config"
 version = "0.0.0"
 dependencies = [
  "anemo",
@@ -15341,29 +15341,29 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "shared-crypto",
- "sui-config",
- "sui-execution",
- "sui-genesis-builder",
- "sui-macros",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-simulator",
- "sui-types",
+ "one-config",
+ "one-execution",
+ "one-genesis-builder",
+ "one-macros",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-simulator",
+ "one-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "sui-synthetic-ingestion"
+name = "one-synthetic-ingestion"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "clap",
  "simulacrum",
- "sui-storage",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-storage",
+ "one-test-transaction-builder",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -15371,34 +15371,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-telemetry"
+name = "one-telemetry"
 version = "0.1.0"
 dependencies = [
  "reqwest 0.12.9",
  "serde",
- "sui-core",
+ "one-core",
  "tracing",
 ]
 
 [[package]]
-name = "sui-test-transaction-builder"
+name = "one-test-transaction-builder"
 version = "0.1.0"
 dependencies = [
  "bcs",
  "move-core-types",
  "shared-crypto",
- "sui-genesis-builder",
- "sui-move-build",
- "sui-sdk",
- "sui-types",
+ "one-genesis-builder",
+ "one-move-build",
+ "one-sdk",
+ "one-types",
 ]
 
 [[package]]
-name = "sui-test-validator"
+name = "one-test-validator"
 version = "1.44.3"
 
 [[package]]
-name = "sui-tls"
+name = "one-tls"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -15420,7 +15420,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-tool"
+name = "one-tool"
 version = "1.44.3"
 dependencies = [
  "anemo",
@@ -15446,18 +15446,18 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-archival",
- "sui-config",
- "sui-core",
- "sui-network",
- "sui-package-dump",
- "sui-protocol-config",
- "sui-replay",
- "sui-sdk",
- "sui-snapshot",
- "sui-storage",
- "sui-tls",
- "sui-types",
+ "one-archival",
+ "one-config",
+ "one-core",
+ "one-network",
+ "one-package-dump",
+ "one-protocol-config",
+ "one-replay",
+ "one-sdk",
+ "one-snapshot",
+ "one-storage",
+ "one-tls",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -15466,7 +15466,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-transaction-builder"
+name = "one-transaction-builder"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -15475,42 +15475,42 @@ dependencies = [
  "futures",
  "move-binary-format",
  "move-core-types",
- "sui-json",
- "sui-json-rpc-types",
- "sui-protocol-config",
- "sui-types",
+ "one-json",
+ "one-json-rpc-types",
+ "one-protocol-config",
+ "one-types",
 ]
 
 [[package]]
-name = "sui-transaction-builder"
+name = "one-transaction-builder"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
+source = "git+https://github.com/MystenLabs/one-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
 dependencies = [
  "base64ct",
  "bcs",
  "serde",
  "serde_json",
  "serde_with",
- "sui-sdk-types",
+ "one-sdk-types",
  "thiserror 2.0.9",
 ]
 
 [[package]]
-name = "sui-transaction-checks"
+name = "one-transaction-checks"
 version = "0.1.0"
 dependencies = [
  "fastcrypto-zkp",
  "once_cell",
- "sui-config",
- "sui-execution",
- "sui-macros",
- "sui-protocol-config",
- "sui-types",
+ "one-config",
+ "one-execution",
+ "one-macros",
+ "one-protocol-config",
+ "one-types",
  "tracing",
 ]
 
 [[package]]
-name = "sui-transactional-test-runner"
+name = "one-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15539,19 +15539,19 @@ dependencies = [
  "serde",
  "serde_json",
  "simulacrum",
- "sui-config",
- "sui-core",
- "sui-framework",
- "sui-framework-snapshot",
- "sui-graphql-rpc",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-protocol-config",
- "sui-rpc-api",
- "sui-storage",
- "sui-swarm-config",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-framework",
+ "one-framework-snapshot",
+ "one-graphql-rpc",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-protocol-config",
+ "one-rpc-api",
+ "one-storage",
+ "one-swarm-config",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -15560,7 +15560,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-types"
+name = "one-types"
 version = "0.1.0"
 dependencies = [
  "anemo",
@@ -15622,10 +15622,10 @@ dependencies = [
  "static_assertions",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "sui-enum-compat-util",
- "sui-macros",
- "sui-protocol-config",
- "sui-sdk-types",
+ "one-enum-compat-util",
+ "one-macros",
+ "one-protocol-config",
+ "one-sdk-types",
  "tap",
  "thiserror 1.0.69",
  "tokio",
@@ -15637,7 +15637,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sui-upgrade-compatibility-transactional-tests"
+name = "one-upgrade-compatibility-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15647,11 +15647,11 @@ dependencies = [
  "move-command-line-common",
  "move-compiler",
  "move-package",
- "sui-move-build",
+ "one-move-build",
 ]
 
 [[package]]
-name = "sui-verifier-latest"
+name = "one-verifier-latest"
 version = "0.1.0"
 dependencies = [
  "move-abstract-interpreter",
@@ -15661,20 +15661,20 @@ dependencies = [
  "move-bytecode-verifier-meter",
  "move-core-types",
  "move-vm-config",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
 ]
 
 [[package]]
-name = "sui-verifier-transactional-tests"
+name = "one-verifier-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
- "sui-transactional-test-runner",
+ "one-transactional-test-runner",
 ]
 
 [[package]]
-name = "sui-verifier-v0"
+name = "one-verifier-v0"
 version = "0.1.0"
 dependencies = [
  "move-abstract-stack",
@@ -15684,12 +15684,12 @@ dependencies = [
  "move-bytecode-verifier-v0",
  "move-core-types",
  "move-vm-config",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
 ]
 
 [[package]]
-name = "sui-verifier-v1"
+name = "one-verifier-v1"
 version = "0.1.0"
 dependencies = [
  "move-abstract-stack",
@@ -15699,11 +15699,11 @@ dependencies = [
  "move-bytecode-verifier-v1",
  "move-core-types",
  "move-vm-config",
- "sui-types",
+ "one-types",
 ]
 
 [[package]]
-name = "sui-verifier-v2"
+name = "one-verifier-v2"
 version = "0.1.0"
 dependencies = [
  "move-abstract-stack",
@@ -15713,8 +15713,8 @@ dependencies = [
  "move-bytecode-verifier-v2",
  "move-core-types",
  "move-vm-config",
- "sui-protocol-config",
- "sui-types",
+ "one-protocol-config",
+ "one-types",
 ]
 
 [[package]]
@@ -15742,10 +15742,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sui-data-ingestion-core",
- "sui-name-service",
- "sui-storage",
- "sui-types",
+ "one-data-ingestion-core",
+ "one-name-service",
+ "one-storage",
+ "one-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -16101,24 +16101,24 @@ dependencies = [
  "mysten-common",
  "prometheus",
  "rand 0.8.5",
- "sui-config",
- "sui-core",
- "sui-framework",
- "sui-indexer",
- "sui-json-rpc",
- "sui-json-rpc-api",
- "sui-json-rpc-types",
- "sui-keys",
- "sui-macros",
- "sui-node",
- "sui-pg-db",
- "sui-protocol-config",
- "sui-sdk",
- "sui-simulator",
- "sui-swarm",
- "sui-swarm-config",
- "sui-test-transaction-builder",
- "sui-types",
+ "one-config",
+ "one-core",
+ "one-framework",
+ "one-indexer",
+ "one-json-rpc",
+ "one-json-rpc-api",
+ "one-json-rpc-types",
+ "one-keys",
+ "one-macros",
+ "one-node",
+ "one-pg-db",
+ "one-protocol-config",
+ "one-sdk",
+ "one-simulator",
+ "one-swarm",
+ "one-swarm-config",
+ "one-test-transaction-builder",
+ "one-types",
  "tempfile",
  "tokio",
  "tokio-util 0.7.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -17084,10 +17084,10 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.8.5",
- "sui-core",
- "sui-move-build",
- "sui-protocol-config",
- "sui-types",
+ "one-core",
+ "one-move-build",
+ "one-protocol-config",
+ "one-types",
  "tokio",
  "tracing",
 ]
@@ -17201,7 +17201,7 @@ dependencies = [
  "rocksdb",
  "rstest",
  "serde",
- "sui-macros",
+ "one-macros",
  "tap",
  "tempfile",
  "thiserror 1.0.69",

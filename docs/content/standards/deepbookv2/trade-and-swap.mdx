@@ -25,7 +25,7 @@ public fun create_pool<BaseAsset, QuoteAsset, SUI>(
     registry: &mut Registry,
     tick_size: u64,
     lot_size: u64,
-    coin: Coin<SUI>,
+    coin: Coin<OCT>,
     ctx: &mut TxContext,
 )
 ```
@@ -54,7 +54,7 @@ public createPool(
     // we have to split sui as a param into the code
     const [coin] = overrides.txb.splitCoins(overrides.txb.gas, [overrides.txb.pure(200000000)]);
     overrides.txb.moveCall({
-        typeArguments: [coinType1, coinType2, '0x2::sui::SUI'],
+        typeArguments: [coinType1, coinType2, '0x2::one::OCT'],
         target: `${this.configs.swapPackageId}::clob::create_pool`,
         arguments: [
             overrides.txb.object(String(this.configs.registryId)),

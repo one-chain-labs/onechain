@@ -12,10 +12,10 @@ use rand::rngs::OsRng;
 use sui_core::consensus_adapter::position_submit_certificate;
 use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::sim_test;
-use sui_node::SuiNodeHandle;
+use one_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolConfig;
 use sui_swarm_config::genesis_config::{ValidatorGenesisConfig, ValidatorGenesisConfigBuilder};
-use sui_test_transaction_builder::{make_transfer_sui_transaction, TestTransactionBuilder};
+use sui_test_transaction_builder::{make_transfer_oct_transaction, TestTransactionBuilder};
 use sui_types::{
     base_types::SuiAddress,
     effects::TransactionEffectsAPI,
@@ -84,7 +84,7 @@ async fn test_transaction_expiration() {
 
     let (sender, gas) = test_cluster.wallet.get_one_gas_object().await.unwrap().unwrap();
     let rgp = test_cluster.get_reference_gas_price().await;
-    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_sui(Some(1), sender).build();
+    let mut data = TestTransactionBuilder::new(sender, gas, rgp).transfer_oct(Some(1), sender).build();
     // Expired transaction returns an error
     let mut expired_data = data.clone();
     *expired_data.expiration_mut_for_testing() = TransactionExpiration::Epoch(0);
@@ -111,7 +111,7 @@ async fn reconfig_with_revert_end_to_end_test() {
     let gas1 = gas_objects.pop().unwrap();
     let tx = test_cluster
         .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_sui(None, sender).build());
+        .sign_transaction(&TestTransactionBuilder::new(sender, gas1, rgp).transfer_oct(None, sender).build());
     let effects1 = test_cluster.execute_transaction(tx).await;
     assert_eq!(0, effects1.effects.unwrap().executed_epoch());
 
@@ -119,7 +119,7 @@ async fn reconfig_with_revert_end_to_end_test() {
     let gas2 = gas_objects.pop().unwrap();
     let tx = test_cluster
         .wallet
-        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_sui(None, sender).build());
+        .sign_transaction(&TestTransactionBuilder::new(sender, gas2, rgp).transfer_oct(None, sender).build());
     let net = test_cluster.fullnode_handle.sui_node.with(|node| node.clone_authority_aggregator().unwrap());
     let cert = net.process_transaction(tx.clone(), None).await.unwrap().into_cert_for_testing();
 
@@ -234,15 +234,15 @@ async fn test_expired_locks() {
     let receiver = accounts_and_objs[1].0;
     let gas_object = accounts_and_objs[0].1[0];
 
-    let transfer_sui = |amount| {
+    let transfer_oct = |amount| {
         test_cluster.wallet.sign_transaction(
-            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_sui(Some(amount), receiver).build(),
+            &TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_oct(Some(amount), receiver).build(),
         )
     };
 
-    let t1 = transfer_sui(1);
+    let t1 = transfer_oct(1);
     // attempt to equivocate
-    let t2 = transfer_sui(2);
+    let t2 = transfer_oct(2);
 
     for (idx, validator) in test_cluster.all_validator_handles().into_iter().enumerate() {
         let state = validator.state();
@@ -348,7 +348,7 @@ async fn test_validator_resign_effects() {
     // in previous epochs. This allows authority aggregator to form a new effects certificate
     // in the new epoch.
     let test_cluster = TestClusterBuilder::new().build().await;
-    let tx = make_transfer_sui_transaction(&test_cluster.wallet, None, None).await;
+    let tx = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
     let effects0 = test_cluster.execute_transaction(tx.clone()).await.effects.unwrap();
     assert_eq!(effects0.executed_epoch(), 0);
     test_cluster.trigger_reconfiguration().await;

@@ -74,7 +74,7 @@ struct SwapRequest has key {
     id: UID,
     owner: address,
     object: Object,
-    fee: Balance<SUI>,
+    fee: Balance<OCT>,
 }
 ```
 
@@ -83,7 +83,7 @@ struct SwapRequest has key {
 ```move
 public fun request_swap(
     object: Object,
-    fee: Coin<SUI>,
+    fee: Coin<OCT>,
     service: address,
     ctx: &mut TxContext,
 ) {
@@ -101,14 +101,14 @@ public fun request_swap(
 
 ```
 
-In the preceding function, you must pass the object by value so that it's fully consumed and wrapped into `SwapRequest` to request swapping an `object`. The example also provides a fee (in the type of `Coin<SUI>`) and checks that the fee is sufficient. The example turns `Coin` into `Balance` when it's put into the `wrapper` object. This is because `Coin` is a Sui object type and used only to pass around as Sui objects (such as transaction inputs or objects sent to addresses). For coin balances that need to be embedded in other structs, use `Balance` instead because to avoid the overhead of carrying around an unnecessary `UID` field.
+In the preceding function, you must pass the object by value so that it's fully consumed and wrapped into `SwapRequest` to request swapping an `object`. The example also provides a fee (in the type of `Coin<OCT>`) and checks that the fee is sufficient. The example turns `Coin` into `Balance` when it's put into the `wrapper` object. This is because `Coin` is a Sui object type and used only to pass around as Sui objects (such as transaction inputs or objects sent to addresses). For coin balances that need to be embedded in other structs, use `Balance` instead because to avoid the overhead of carrying around an unnecessary `UID` field.
 
 The wrapper object is then sent to the service operator, with the address specified in the call as `service`.
 
 The function interface for the function that the service operator can call to perform a swap between two objects sent from two addresses resembles:
 
 ```move
-public fun execute_swap(s1: SwapRequest, s2: SwapRequest): Balance<SUI>;
+public fun execute_swap(s1: SwapRequest, s2: SwapRequest): Balance<OCT>;
 ```
 
 Where `s1` and `s2` are two wrapped objects that were sent from different object owners to the service operator. Both wrapped objects are passed by value because they eventually need to be [unpacked](https://move-book.com/advanced-topics/struct.html#destructing-structures).
@@ -152,9 +152,9 @@ After this call, the two objects are swapped and the service provider takes the 
 
 Since the contract defined only one way to deal with `SwapRequest` - `execute_swap` - there is no other way the service operator can interact with `SwapRequest` despite its ownership.
 
-Find the full source code in the [trusted_swap](https://github.com/MystenLabs/sui/blob/main/examples/move/trusted_swap) example.
+Find the full source code in the [trusted_swap](https://github.com/one-chain-labs/onechain/blob/main/examples/move/trusted_swap) example.
 
-To view a more complex example of how to use direct wrapping, see the [escrow](https://github.com/MystenLabs/sui/tree/main/examples/move/escrow) example.
+To view a more complex example of how to use direct wrapping, see the [escrow](https://github.com/one-chain-labs/onechain/tree/main/examples/move/escrow) example.
 
 ### Wrapping through `Option`
 
@@ -213,9 +213,9 @@ The function in the preceding example passes a `warrior` as a mutable reference 
 
 Note that because `Sword` is a Sui object type without `drop` ability, if the warrior already has a sword equipped, the warrior can't drop that sword. If you call `option::fill` without first checking and taking out the existing sword, an error occurs. In `equip_sword`, first check whether there is already a sword equipped. If so, remove it out and send it back to the sender. To a player, this returns an equipped sword to their inventory when they equip the new sword.
 
-Find the source code in the [simple_warrior](https://github.com/MystenLabs/sui/tree/main/examples/move/simple_warrior) example.
+Find the source code in the [simple_warrior](https://github.com/one-chain-labs/onechain/tree/main/examples/move/simple_warrior) example.
 
-To view a more complex example, see [hero](https://github.com/MystenLabs/sui/tree/main/examples/move/hero).
+To view a more complex example, see [hero](https://github.com/one-chain-labs/onechain/tree/main/examples/move/hero).
 
 ### Wrapping through `vector`
 

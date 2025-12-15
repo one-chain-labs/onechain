@@ -31,12 +31,12 @@ public fun transfer(o: a::m::Obj) {
 }
 }
 
-module sui::transfer {
+module one::transfer {
 public fun transfer<T: key>(_: T, _: address) {
     abort 0
 }
 }
 
-module sui::tx_context{
+module one::tx_context{
 public struct TxContext has drop {}
 }

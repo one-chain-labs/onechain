@@ -5,7 +5,7 @@
 
 //# publish --sender A
 module Test::fake {
-    use sui::coin;
+    use one::coin;
 
     public struct FAKE has drop {}
 
@@ -51,7 +51,7 @@ module Test::fake {
 //# run-jsonrpc
 {
   "method": "suix_getCoins",
-  "params": ["@{A}", "0x2::sui::SUI"]
+  "params": ["@{A}", "0x2::one::OCT"]
 }
 
 //# run-jsonrpc

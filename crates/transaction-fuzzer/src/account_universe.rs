@@ -120,14 +120,14 @@ pub fn assert_accounts_match(universe: &AccountUniverse, executor: &Executor) ->
     for (idx, account) in universe.accounts().iter().enumerate() {
         for (balance_idx, acc_object) in account.current_coins.iter().enumerate() {
             let object = object_store.get_object(&acc_object.id()).unwrap();
-            let total_sui_value = object.get_total_sui(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
+            let total_oct_value = object.get_total_oct(layout_resolver.as_mut()).unwrap() - object.storage_rebate;
             let account_balance_i = account.current_balances[balance_idx];
             prop_assert_eq!(
                 account_balance_i,
-                total_sui_value,
+                total_oct_value,
                 "account {} should have correct balance {} for object {} but got {}",
                 idx,
-                total_sui_value,
+                total_oct_value,
                 acc_object.id(),
                 account_balance_i
             );

@@ -4,7 +4,7 @@
 /// A mock of the SuiNS Domain type. It needs to be in its own module because
 /// we hash its type off-chain, and while we can control which address we find
 /// the package at, we don't control which module it is found in.
-module suins::domain;
+module octns::domain;
 
 use std::string::String;
 

@@ -4,9 +4,9 @@
 #[test_only]
 module bridge::committee_test {
 
-    use sui::vec_map;
-    use sui_system::sui_system;
-    use sui_system::sui_system::SuiSystemState;
+    use one::vec_map;
+    use one_system::one_system;
+    use one_system::one_system::SuiSystemState;
 
     use bridge::committee::{
         BridgeCommittee, CommitteeMember, blocklisted, bridge_pubkey_bytes, create,
@@ -19,9 +19,9 @@ module bridge::committee_test {
     use bridge::crypto;
     use bridge::message;
 
-    use sui::{hex, test_scenario, test_utils::{Self, assert_eq}};
+    use one::{hex, test_scenario, test_utils::{Self, assert_eq}};
     use bridge::chain_ids;
-    use sui_system::governance_test_utils::{
+    use one_system::governance_test_utils::{
         advance_epoch_with_reward_amounts,
         create_sui_system_state_for_testing,
         create_validator_for_testing
@@ -325,7 +325,7 @@ module bridge::committee_test {
         assert_eq(3, committee.member_registrations().size());
 
         // Validator 0xA become inactive, total voting power become 50%
-        sui_system::request_remove_validator(&mut system_state, &mut tx(@0xA, 0));
+        one_system::request_remove_validator(&mut system_state, &mut tx(@0xA, 0));
         test_scenario::return_shared(system_state);
         advance_epoch_with_reward_amounts(0, 0, &mut scenario);
 
@@ -333,7 +333,7 @@ module bridge::committee_test {
 
         // create committee should not create a committe because of not enough stake.
         let ctx = test_scenario::ctx(&mut scenario);
-        let voting_powers = sui_system::validator_voting_powers_for_testing(&mut system_state);
+        let voting_powers = one_system::validator_voting_powers_for_testing(&mut system_state);
         try_create_next_committee(&mut committee, voting_powers, 6000, ctx);
 
         assert!(committee.members().is_empty());
@@ -412,7 +412,7 @@ module bridge::committee_test {
         assert!(committee.members().is_empty());
 
         let ctx = test_scenario::ctx(&mut scenario);
-        let voting_powers = sui_system::validator_voting_powers_for_testing(&mut system_state);
+        let voting_powers = one_system::validator_voting_powers_for_testing(&mut system_state);
         try_create_next_committee(&mut committee, voting_powers, 6000, ctx);
 
         // committee should be empty because registration did not reach min stake threshold.
@@ -443,7 +443,7 @@ module bridge::committee_test {
         committee.register(&mut system_state, hex::decode(VALIDATOR2_PUBKEY), b"", &tx(@0xC, 0));
         assert!(committee.members().is_empty());
         let ctx = test_scenario::ctx(&mut scenario);
-        let voting_powers = sui_system::validator_voting_powers_for_testing(&mut system_state);
+        let voting_powers = one_system::validator_voting_powers_for_testing(&mut system_state);
         try_create_next_committee(&mut committee, voting_powers, 6000, ctx);
 
         test_scenario::next_tx(&mut scenario, @0x0);

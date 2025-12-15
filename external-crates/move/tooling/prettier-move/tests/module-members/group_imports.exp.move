@@ -16,12 +16,12 @@ use std::{
     type_name::get as type_name_get,
     vector::{Self as vec, Self as haha}
 };
-use sui::{
+use one::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,
     dynamic_object_field as dof,
-    sui::SUI,
+    one::OCT,
     table::{Self, Table},
     table_vec::{Self, TableVec as TV}
 };

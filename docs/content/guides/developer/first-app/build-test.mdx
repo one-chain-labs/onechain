@@ -15,7 +15,7 @@ $ sui move build
 A successful build returns a response similar to the following:
 
 ```sh
-UPDATING GIT DEPENDENCY https://github.com/MystenLabs/sui.git
+UPDATING GIT DEPENDENCY https://github.com/one-chain-labs/onechain.git
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING my_first_package
@@ -124,7 +124,7 @@ $ sui move test -h
 
 ## Sui-specific testing
 
-The previous testing example uses Move but isn't specific to Sui beyond using some Sui packages, such as `sui::tx_context` and `sui::transfer`. While this style of testing is already useful for writing Move code for Sui, you might also want to test additional Sui-specific features. In particular, a Move call in Sui is encapsulated in a Sui transaction, and you might want to test interactions between different transactions within a single test (for example, one transaction creating an object and the other one transferring it).
+The previous testing example uses Move but isn't specific to Sui beyond using some Sui packages, such as `one::tx_context` and `one::transfer`. While this style of testing is already useful for writing Move code for Sui, you might also want to test additional Sui-specific features. In particular, a Move call in Sui is encapsulated in a Sui transaction, and you might want to test interactions between different transactions within a single test (for example, one transaction creating an object and the other one transferring it).
 
 Sui-specific testing is supported through the `test_scenario` module that provides Sui-related testing functionality otherwise unavailable in pure Move and its testing framework.
 
@@ -154,7 +154,7 @@ Transaction effects, such as object creation and transfer become visible only af
 
 The final owner executes the third and final transaction that retrieves the `sword` object from storage and checks if it has the expected properties. Remember, as described in [Testing a package](#testing-a-package), in the pure Move testing scenario, after an object is available in Move code (after creation or retrieval from emulated storage), it cannot simply disappear.
 
-In the pure Move testing function, the function transfers the `sword` object to the fake address to handle the disappearing problem. The `test_scenario` package provides a more elegant solution, however, which is closer to what happens when Move code actually executes in the context of Sui - the package simply returns the `sword` to the object pool using the `test_scenario::return_to_sender` function. For scenarios where returning to the sender is not desirable or if you would like to simply destroy the object, the `test_utils` module also provides the generic `destroy<T>` function, that can be used on any type `T` regardless of its ability. It is advisable to check out other useful functions in the [`test_scenario`](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/test/test_scenario.move) and [`test_utils`](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/test/test_utils.move) modules as well.
+In the pure Move testing function, the function transfers the `sword` object to the fake address to handle the disappearing problem. The `test_scenario` package provides a more elegant solution, however, which is closer to what happens when Move code actually executes in the context of Sui - the package simply returns the `sword` to the object pool using the `test_scenario::return_to_sender` function. For scenarios where returning to the sender is not desirable or if you would like to simply destroy the object, the `test_utils` module also provides the generic `destroy<T>` function, that can be used on any type `T` regardless of its ability. It is advisable to check out other useful functions in the [`test_scenario`](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-framework/sources/test/test_scenario.move) and [`test_utils`](https://github.com/one-chain-labs/onechain/blob/main/crates/sui-framework/packages/one-framework/sources/test/test_utils.move) modules as well.
 
 Run the test command again to see two successful tests for our module:
 
@@ -201,7 +201,7 @@ Now, create a function to test the module initialization:
 
 As the new test function shows, the first transaction (explicitly) calls the initializer. The next transaction checks if the `Forge` object has been created and properly initialized. Finally, the admin uses the `Forge` to create a sword and transfer it to the initial owner.
 
-You can refer to the source code for the package (with all the tests and functions properly adjusted) in the [first_package](https://github.com/MystenLabs/sui/tree/main/examples/move/first_package/sources/example.move) module in the `sui/examples` directory. You can also use the following toggle to review the complete code.
+You can refer to the source code for the package (with all the tests and functions properly adjusted) in the [first_package](https://github.com/one-chain-labs/onechain/tree/main/examples/move/first_package/sources/example.move) module in the `sui/examples` directory. You can also use the following toggle to review the complete code.
 
 <details>
 <summary>

@@ -33,7 +33,7 @@ Each Sui release provides a set of binaries for several operating systems. You c
 <Tabs groupId="operating-systems">
 
 <TabItem value="linux" label="Linux">
-1. Go to https://github.com/MystenLabs/sui.
+1. Go to https://github.com/one-chain-labs/onechain.
 1. In the right pane, find the **Releases** section.
 
     ![Sui releases in GitHub](./images/releases.png)
@@ -51,7 +51,7 @@ Each Sui release provides a set of binaries for several operating systems. You c
 
 <TabItem value="mac" label="macOS">
 
-1. Go to https://github.com/MystenLabs/sui.
+1. Go to https://github.com/one-chain-labs/onechain.
 1. In the right pane, find the **Releases** section.
 
     ![Sui releases in GitHub](./images/releases.png)
@@ -70,7 +70,7 @@ Each Sui release provides a set of binaries for several operating systems. You c
 
 <TabItem value="win" label="Windows">
 
-1. Go to https://github.com/MystenLabs/sui.
+1. Go to https://github.com/one-chain-labs/onechain.
 1. In the right pane, find the **Releases** section.
 
     ![Sui releases in GitHub](./images/releases.png)
@@ -112,7 +112,7 @@ To confirm that Sui installed correctly, type `sui --version` in your console or
 Run the following command to install Sui binaries from the `testnet` branch:
 
 ```sh
-$ cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui --features tracing
+$ cargo install --locked --git https://github.com/one-chain-labs/onechain.git --branch testnet sui --features tracing
 ```
 
 Enabling the `tracing` feature is important as it adds Move test coverage and debugger support in the Sui CLI. Without it these two features will not be able to be used.
@@ -132,7 +132,7 @@ The command installs Sui components in the `~/.cargo/bin` folder.
 If you previously installed the Sui binaries, you can update them to the most recent release with the same command you used to install them (changing `testnet` to the desired branch):
 
 ```sh
-$ cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui --features tracing
+$ cargo install --locked --git https://github.com/one-chain-labs/onechain.git --branch testnet sui --features tracing
 ```
 
 The `tracing` feature is important as it adds Move test coverage and debugger support in the Sui CLI. Unless it is enabled you will not be able to use these two features.

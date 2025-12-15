@@ -1,8 +1,8 @@
 ---
-title: Module `sui::event`
+title: Module `one::event`
 ---
 
-Events module. Defines the <code><a href="../sui/event.md#sui_event_emit">sui::event::emit</a></code> function which
+Events module. Defines the <code><a href="../sui/event.md#sui_event_emit">one::event::emit</a></code> function which
 creates and sends a custom MoveEvent as a part of the effects
 certificate of the transaction.
 
@@ -16,7 +16,7 @@ Every MoveEvent has the following properties:
 Example:
 ```
 module my::marketplace {
-use sui::event;
+use one::event;
 /* ... */
 struct ItemPurchased has copy, drop {
 item_id: ID, buyer: address

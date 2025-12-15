@@ -838,12 +838,12 @@ mod tests {
             "address",
             "vector<u8>",
             // Structs
-            "sui::object::ID",
+            "one::object::ID",
             "0x2::object::UID",
-            "3::staking_pool::StakedSui",
+            "3::staking_pool::StakedOct",
             // Generic types
-            "0x2::coin::Coin<2::sui::SUI>",
-            "sui::table::Table<sui::object::ID, vector<0x1::option::Option<u32>>>",
+            "0x2::coin::Coin<2::one::OCT>",
+            "one::table::Table<one::object::ID, vector<0x1::option::Option<u32>>>",
         ];
         let mut parsed = Vec::new();
         for input in inputs {
@@ -900,7 +900,7 @@ mod tests {
             "--make-move-vec <u64> []",
             "--make-move-vec <u8> [1u8, 2u8]",
             // Move Call
-            "--move-call 0x3::sui_system::request_add_stake system coins.0 validator",
+            "--move-call 0x3::one_system::request_add_stake system coins.0 validator",
             "--move-call std::option::is_none <u64> p",
             "--move-call std::option::is_some<u32> q",
             // Assign

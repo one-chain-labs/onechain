@@ -19,7 +19,7 @@ use sui_config::{
     NodeConfig,
 };
 use sui_macros::nondeterministic;
-use sui_node::SuiNodeHandle;
+use one_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolVersion;
 use sui_swarm_config::{
     genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig},

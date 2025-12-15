@@ -28,7 +28,7 @@ const REQUIRE_MUTABLE_TX_CONTEXT_DIAG: DiagnosticInfo = custom(
 simple_visitor!(
     PreferMutableTxContext,
     fn visit_module_custom(&mut self, ident: ModuleIdent, _mdef: &T::ModuleDefinition) -> bool {
-        // skip if in 'sui::tx_context'
+        // skip if in 'one::tx_context'
         ident.value.is(&SUI_ADDR_VALUE, TX_CONTEXT_MODULE_NAME)
     },
     fn visit_function_custom(

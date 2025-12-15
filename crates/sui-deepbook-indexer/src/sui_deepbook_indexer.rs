@@ -850,7 +850,7 @@ fn process_sui_event(
                 txn_data
             }
             _ => {
-                // todo: metrics.total_sui_bridge_txn_other.inc();
+                // todo: metrics.total_oct_bridge_txn_other.inc();
                 None
             }
         }

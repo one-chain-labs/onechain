@@ -4,7 +4,7 @@
 use async_graphql::{connection::Connection, *};
 use sui_types::{
     coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap},
-    gas_coin::{GAS, TOTAL_SUPPLY_SUI},
+    gas_coin::{GAS, TOTAL_SUPPLY_OCT},
     TypeTag,
 };
 
@@ -19,7 +19,7 @@ use super::{
     move_value::MoveValue,
     object::{self, Object, ObjectFilter, ObjectImpl, ObjectOwner, ObjectStatus},
     owner::OwnerImpl,
-    stake::StakedSui,
+    stake::StakedOct,
     sui_address::SuiAddress,
     suins_registration::{DomainFormat, SuinsRegistration},
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
@@ -59,7 +59,7 @@ impl CoinMetadata {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::sui::SUI`.
+    /// it defaults to `0x2::one::OCT`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
@@ -78,7 +78,7 @@ impl CoinMetadata {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::sui::SUI`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::one::OCT`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,
@@ -91,16 +91,16 @@ impl CoinMetadata {
         OwnerImpl::from(&self.super_.super_).coins(ctx, first, after, last, before, type_).await
     }
 
-    /// The `0x3::staking_pool::StakedSui` objects owned by this object.
-    pub(crate) async fn staked_suis(
+    /// The `0x3::staking_pool::StakedOct` objects owned by this object.
+    pub(crate) async fn staked_octs(
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
         after: Option<object::Cursor>,
         last: Option<u64>,
         before: Option<object::Cursor>,
-    ) -> Result<Connection<String, StakedSui>> {
-        OwnerImpl::from(&self.super_.super_).staked_suis(ctx, first, after, last, before).await
+    ) -> Result<Connection<String, StakedOct>> {
+        OwnerImpl::from(&self.super_.super_).staked_octs(ctx, first, after, last, before).await
     }
 
     /// The domain explicitly configured as the default domain pointing to this object.
@@ -209,7 +209,7 @@ impl CoinMetadata {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(&self.super_).has_public_transfer(ctx).await
@@ -344,7 +344,7 @@ impl CoinMetadata {
         };
 
         Ok(Some(if GAS::is_gas(coin_struct.as_ref()) {
-            TOTAL_SUPPLY_SUI
+            TOTAL_SUPPLY_OCT
         } else {
             let cap_type = TreasuryCap::type_(*coin_struct);
             let Some(object) = Object::query_singleton(db, cap_type, checkpoint_viewed_at).await? else {

@@ -88,7 +88,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
         match ev.type_.name.as_str() {
             "TokenDepositedEvent" => {
                 info!("Observed Sui Deposit {:?}", ev);
-                metrics.total_sui_token_deposited.inc();
+                metrics.total_oct_token_deposited.inc();
                 let move_event: MoveTokenDepositedEvent = bcs::from_bytes(ev.bcs.bytes())?;
                 transfers.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: move_event.source_chain,
@@ -113,7 +113,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
             }
             "TokenTransferApproved" => {
                 info!("Observed Sui Approval {:?}", ev);
-                metrics.total_sui_token_transfer_approved.inc();
+                metrics.total_oct_token_transfer_approved.inc();
                 let event: MoveTokenTransferApproved = bcs::from_bytes(ev.bcs.bytes())?;
                 transfers.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -131,7 +131,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
             }
             "TokenTransferClaimed" => {
                 info!("Observed Sui Claim {:?}", ev);
-                metrics.total_sui_token_transfer_claimed.inc();
+                metrics.total_oct_token_transfer_claimed.inc();
                 let event: MoveTokenTransferClaimed = bcs::from_bytes(ev.bcs.bytes())?;
                 transfers.push(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -148,7 +148,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                 }));
             }
             _ => {
-                metrics.total_sui_bridge_txn_other.inc();
+                metrics.total_oct_bridge_txn_other.inc();
             }
         }
     }

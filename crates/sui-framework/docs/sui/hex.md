@@ -1,5 +1,5 @@
 ---
-title: Module `sui::hex`
+title: Module `one::hex`
 ---
 
 HEX (Base16) encoding utility.

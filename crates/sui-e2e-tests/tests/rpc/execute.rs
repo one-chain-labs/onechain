@@ -4,7 +4,7 @@
 use sui_macros::sim_test;
 use sui_rpc_api::Client;
 use sui_sdk_types::BalanceChange;
-use sui_test_transaction_builder::make_transfer_sui_transaction;
+use sui_test_transaction_builder::make_transfer_oct_transaction;
 use sui_types::{base_types::SuiAddress, effects::TransactionEffectsAPI, transaction::TransactionDataAPI};
 use test_cluster::TestClusterBuilder;
 
@@ -16,7 +16,7 @@ async fn execute_transaction_transfer() {
     let address = SuiAddress::random_for_testing_only();
     let amount = 9;
 
-    let txn = make_transfer_sui_transaction(&test_cluster.wallet, Some(address), Some(amount)).await;
+    let txn = make_transfer_oct_transaction(&test_cluster.wallet, Some(address), Some(amount)).await;
     let sender = txn.transaction_data().sender();
 
     let response = client.execute_transaction(&txn).await.unwrap();

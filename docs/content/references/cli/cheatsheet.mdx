@@ -71,15 +71,15 @@ The cheat sheet highlights common Sui CLI commands.
 	<tbody>
 		<tr>
 			<td class="w-2/3">`sui client faucet`</td>
-			<td class="w-1/3">Get a SUI coin from the faucet associated with the active network</td>
+			<td class="w-1/3">Get a OCT coin from the faucet associated with the active network</td>
 		</tr>
 		<tr>
 			<td class="w-2/3">`sui client faucet --address ADDRESS`</td>
-			<td class="w-1/3">Get a SUI coin for the address (accepts also an alias)</td>
+			<td class="w-1/3">Get a OCT coin for the address (accepts also an alias)</td>
 		</tr>
 		<tr>
 			<td class="w-2/3">`sui client faucet --url CUSTOM_FAUCET_URL`</td>
-			<td class="w-1/3">Get a SUI coin from custom faucet</td>
+			<td class="w-1/3">Get a OCT coin from custom faucet</td>
 		</tr>
 		<tr>
 			<td class="w-2/3">`sui client gas`</td>
@@ -194,12 +194,12 @@ The cheat sheet highlights common Sui CLI commands.
 		</tr>
 		<tr>
 			<td class="w-2/3">
-				`sui client pay-sui \`<br/>&nbsp;&nbsp;`--input-coins COIN_ID \`<br/>&nbsp;&nbsp;`--recipients ADDRESS \`<br/>&nbsp;&nbsp;`--amounts 100000000`
+				`sui client pay-oct \`<br/>&nbsp;&nbsp;`--input-coins COIN_ID \`<br/>&nbsp;&nbsp;`--recipients ADDRESS \`<br/>&nbsp;&nbsp;`--amounts 100000000`
 			</td>
 			<td class="w-1/3">Transfer 0.1 SUI to an address and use the same coin for gas</td>
 		</tr>
 		<tr>
-			<td class="w-2/3">`sui client transfer-sui \`<br/>&nbsp;&nbsp;`--sui-coin-object-id COIN_ID \`<br/>&nbsp;&nbsp;`--to ADDRESS`</td>
+			<td class="w-2/3">`sui client transfer-oct \`<br/>&nbsp;&nbsp;`--sui-coin-object-id COIN_ID \`<br/>&nbsp;&nbsp;`--to ADDRESS`</td>
 			<td class="w-1/3">Transfer SUI object to an address and use the same coin for gas</td>
 		</tr>
 	</tbody>
@@ -238,7 +238,7 @@ The cheat sheet highlights common Sui CLI commands.
 		</tr>
 		<tr>
 			<td class="w-2/3">
-				`sui client ptb \`<br/>&nbsp;&nbsp;`--move-call sui::tx_context::sender \`<br/>&nbsp;&nbsp;`--assign sender \`<br/>&nbsp;&nbsp;`--publish "." \`<br/>&nbsp;&nbsp;`--assign
+				`sui client ptb \`<br/>&nbsp;&nbsp;`--move-call one::tx_context::sender \`<br/>&nbsp;&nbsp;`--assign sender \`<br/>&nbsp;&nbsp;`--publish "." \`<br/>&nbsp;&nbsp;`--assign
 				upgrade_cap \`<br/>&nbsp;&nbsp;`--transfer-objects "[upgrade_cap]" sender`
 			</td>
 			<td class="w-1/3">Publish a Move package, and transfer the upgrade capability to sender</td>

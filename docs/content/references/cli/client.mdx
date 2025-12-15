@@ -34,15 +34,15 @@ Commands:
   object                      Get object info
   objects                     Obtain all objects owned by the address. It also accepts an address by its alias
   pay                         Pay coins to recipients following specified amounts, with input coins. Length of recipients must be the same as that of amounts
-  pay-all-sui                 Pay all residual SUI coins to the recipient with input coins, after deducting the gas cost. The input coins also include the coin for gas payment, so no extra gas coin is required
-  pay-sui                     Pay SUI coins to recipients following following specified amounts, with input coins. Length of recipients must be the same as that of amounts. The input coins also include the coin for
+  pay-all-oct                 Pay all residual OCT coins to the recipient with input coins, after deducting the gas cost. The input coins also include the coin for gas payment, so no extra gas coin is required
+  pay-oct                     Pay OCT coins to recipients following following specified amounts, with input coins. Length of recipients must be the same as that of amounts. The input coins also include the coin for
                                   gas payment, so no extra gas coin is required
   publish                     Publish Move modules
   split-coin                  Split a coin object into multiple coins
   switch                      Switch active address and network(e.g., devnet, local rpc server)
   tx-block                    Get the effects of executing the given transaction block
   transfer                    Transfer object
-  transfer-sui                Transfer SUI, and pay gas with the same SUI coin object. If amount is specified, only the amount is transferred; otherwise the entire object is transferred
+  transfer-oct                Transfer SUI, and pay gas with the same OCT coin object. If amount is specified, only the amount is transferred; otherwise the entire object is transferred
   upgrade                     Upgrade Move modules
   verify-bytecode-meter       Run the bytecode verifier on the package
   verify-source               Verify local Move packages against on-chain packages, and optionally their dependencies
@@ -114,7 +114,7 @@ $ sui client active-address
 0x514692f08249c3e9951234ce29074695840422564bff85e424b56de462913e0d
 ```
 
-### Request a SUI coin from faucet
+### Request a OCT coin from faucet
 
 If you use one of the standard public RPCs (for example, `fullnode.devnet.sui.io:443`), you can use the `faucet` command to request gas coins. If you use a custom faucet service, then pass in the URL to the faucet using the `--url` option.
 The `faucet` command works for a local network, as well. If you start your network with a custom faucet port, include the `--url` option. 
@@ -162,13 +162,13 @@ $ sui client object 0xfffbb30ccb631f15f6cd36700589fc9c31cb04af28a95f3ed26d62daf3
 │ objectId  	  │  0xfffbb30ccb631f15f6cd36700589fc9c31cb04af28a95f3ed26d62daf3acb57f                                             	  │
 │ version   	  │  33363559                                                                                                       	  │
 │ digest    	  │  3FzvXJVVVcXb9H6dEXdARaY9EmxXyyNFduet3X4eYV4x                                                                   	  │
-│ objType   	  │  0x2::coin::Coin<0x2::sui::SUI>                                                                                 	  │
+│ objType   	  │  0x2::coin::Coin<0x2::one::OCT>                                                                                 	  │
 │ ownerType 	  │  AddressOwner                                                                                                   	  │
 │ prevTx    	  │  ES2RQThjRE5u8rwiUEnhcnMoLA3cHeEGYJ8Pq98tmyAc                                                                   	  │
 │ storageRebate │  988000                                                                                                         	  │
 │ content   	  │ ╭───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │           	  │ │ dataType      	  │  moveObject                                                                            	    │ │
-│           	  │ │ type          	  │  0x2::coin::Coin<0x2::sui::SUI>                                                       	    │ │
+│           	  │ │ type          	  │  0x2::coin::Coin<0x2::one::OCT>                                                       	    │ │
 │           	  │ │ hasPublicTransfer │  true                                                                                    	  │ │
 │           	  │ │ fields        	  │ ╭─────────┬───────────────────────────────────────────────────────────────────────────────╮ │ │
 │           	  │ │               	  │ │ balance │  530076676                                                                	  │ │ │
@@ -211,14 +211,14 @@ $ sui client dynamic-field 0x5
 ### Send SUI or objects
 
 In this example, let's see how to transfer SUI or transfer an object from one address to another. First of all, there two main commands for sending SUI or transferring objects: `pay` and `transfer`. 
-Both `pay` and `transfer` have a few sister commands: `pay-sui`, `pay-all-sui`, `transfer-sui`. 
+Both `pay` and `transfer` have a few sister commands: `pay-oct`, `pay-all-oct`, `transfer-oct`. 
 
 The differences between these commands are:
 - commands that end in `-sui` deal with Sui's native coin, and they use the input coints to pay for gas and for transferring SUI or the object.
 - `pay-` commands typically deal with coins and handle gas smashing for you, whereas `transfer` commands can handle the transfer of any object that has public transfer, meaning any object that has the `store` ability. 
 - `pay` commands allow you to send coins to multiple recipients, whereas `transfer` commands only accept one recipient.
-- `pay-all-sui` is a special case of `pay-sui` that offers a way to transfer the entire balance after smashing.
-- `transfer-sui` is a legacy command and has been entirely superseded by `pay-sui` or `pay-all-sui` depending on whether an amount is specified or not.
+- `pay-all-oct` is a special case of `pay-oct` that offers a way to transfer the entire balance after smashing.
+- `transfer-oct` is a legacy command and has been entirely superseded by `pay-oct` or `pay-all-oct` depending on whether an amount is specified or not.
 
 Assume you have two addresses:
 
@@ -248,12 +248,12 @@ $ sui client gas hungry-spodumene
 ╰────────────────────────────────────────────────────────────────────┴────────────────────┴──────────────────╯
 ```
 
-You want to send 0.5 SUI to `eloquent-amber`. Given that you have a few gas coins, you can use `pay`. If only one gas coin exists, then you need to use `transfer-sui` or `pay-sui`, or you would need to split the coin first to have another coin to use for paying gas. In this case, let's use the `pay-sui` command as you do not need to provide a separate gas coin to be used for the gas fees. In the command below, you set the recipient to be `eloquent-amber`, which coin to use to transfer SUI from, and the amount of SUI to transfer.
+You want to send 0.5 SUI to `eloquent-amber`. Given that you have a few gas coins, you can use `pay`. If only one gas coin exists, then you need to use `transfer-oct` or `pay-oct`, or you would need to split the coin first to have another coin to use for paying gas. In this case, let's use the `pay-oct` command as you do not need to provide a separate gas coin to be used for the gas fees. In the command below, you set the recipient to be `eloquent-amber`, which coin to use to transfer SUI from, and the amount of SUI to transfer.
 
 {@include: ../../snippets/info-gas-budget.mdx}
 
 ```sh
-$ sui client pay-sui --recipients eloquent-amber --input-coins 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --amounts 500000000 --gas-budget 5000000
+$ sui client pay-oct --recipients eloquent-amber --input-coins 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --amounts 500000000 --gas-budget 5000000
 ```
 
 The result is:
@@ -352,7 +352,7 @@ Transaction Digest: AsWkciVhLHeCmqVipjjyAA7Hv5y87pFjHS59K8m4zBJV
 │  │ ObjectID: 0xa031d3f8fd53b5f9885172e1c6bd8b770b25e42371c9ee215c6d4b21b2b73241                  │
 │  │ Sender: 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea                    │
 │  │ Owner: Account Address ( 0x3d78abc33ccd173c521b4f9e78b21ea2c989960b631732c539efaa38bda30976 ) │
-│  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                    │
+│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                    │
 │  │ Version: 3                                                                                    │
 │  │ Digest: Fq3maqq3pShgKw58Ssm8cS2j1pspfhanedVK2MMxfQWQ                                          │
 │  └──                                                                                             │
@@ -361,7 +361,7 @@ Transaction Digest: AsWkciVhLHeCmqVipjjyAA7Hv5y87pFjHS59K8m4zBJV
 │  │ ObjectID: 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52                  │
 │  │ Sender: 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea                    │
 │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea ) │
-│  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                    │
+│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                    │
 │  │ Version: 3                                                                                    │
 │  │ Digest: GFB9mpxTP4z6CCShTbvD58FYxtu9G4mnxN3JtFeRupM3                                          │
 │  └──                                                                                             │
@@ -371,12 +371,12 @@ Transaction Digest: AsWkciVhLHeCmqVipjjyAA7Hv5y87pFjHS59K8m4zBJV
 ├───────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ┌──                                                                                              │
 │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea )  │
-│  │ CoinType: 0x2::sui::SUI                                                                        │
+│  │ CoinType: 0x2::one::OCT                                                                        │
 │  │ Amount: -501997880                                                                             │
 │  └──                                                                                              │
 │  ┌──                                                                                              │
 │  │ Owner: Account Address ( 0x3d78abc33ccd173c521b4f9e78b21ea2c989960b631732c539efaa38bda30976 )  │
-│  │ CoinType: 0x2::sui::SUI                                                                        │
+│  │ CoinType: 0x2::one::OCT                                                                        │
 │  │ Amount: 500000000                                                                              │
 │  └──                                                                                              │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -409,13 +409,13 @@ $ sui client gas eloquent-amber
 ╰────────────────────────────────────────────────────────────────────┴────────────────────┴──────────────────╯
 ```
 
-If you want to transfer the whole object, you can use `sui client pay-all-sui` or `sui client transfer-sui` (without passing the amount): 
+If you want to transfer the whole object, you can use `sui client pay-all-oct` or `sui client transfer-oct` (without passing the amount): 
 ```sh
-$ sui client pay-sui --recipient eloquent-amber --input-coins 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --gas-budget 5000000
+$ sui client pay-oct --recipient eloquent-amber --input-coins 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --gas-budget 5000000
 ```
 or
 ```sh
-$ sui client transfer-sui --to eloquent-amber --sui-coin-object-id 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --gas-budget 5000000
+$ sui client transfer-oct --to eloquent-amber --sui-coin-object-id 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52 --gas-budget 5000000
 ```
 
 Then check the gas for `eloquent-amber` again:
@@ -500,7 +500,7 @@ this command records all the Move function invocations and the gas cost breakdow
 To enable the profiler, you must either install or build the Sui Client binary locally with the `--features tracing` flag if it has not already been built with that feature enabled.
 
 ```sh
-$ cargo install --locked --git https://github.com/MystenLabs/sui.git --branch <BRANCH-NAME> --features tracing sui
+$ cargo install --locked --git https://github.com/one-chain-labs/onechain.git --branch <BRANCH-NAME> --features tracing sui
 ```
 
 The command outputs a profile to the current working directory in the format `gas_profile_{tx_digest}_{unix_timestamp}.json`.
@@ -538,7 +538,7 @@ your published smart contract, and finally run the profiler on the transaction t
 
 ## Publish a Move package
 
-One of the main uses of the `sui client` command is to publish smart contracts on the Sui network. This example switches the current environment to the Devnet network, then builds, tests, and publishes one of the existing Move examples available in the Sui repository: [sui/examples/move](https://github.com/MystenLabs/sui/tree/main/examples/move)
+One of the main uses of the `sui client` command is to publish smart contracts on the Sui network. This example switches the current environment to the Devnet network, then builds, tests, and publishes one of the existing Move examples available in the Sui repository: [sui/examples/move](https://github.com/one-chain-labs/onechain/tree/main/examples/move)
 
 This example also makes use of `sui move` commands. To learn more about those commands, see [Sui Move CLI](./move.mdx).
 
@@ -738,7 +738,7 @@ This example also makes use of `sui move` commands. To learn more about those co
     │  │ ObjectID: 0x01b2795ba5800c8f7cb7d7c56abe19e24c656ed6764f3ccc5e66da3de52402a8                    │
     │  │ Sender: 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea                      │
     │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea )   │
-    │  │ ObjectType: 0x2::coin::Coin<0x2::sui::SUI>                                                      │
+    │  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                      │
     │  │ Version: 3                                                                                      │
     │  │ Digest: 46rvdbXkw5qqsBYbUGChzgFatJAYPmarPmFHgRRJiiU9                                            │
     │  └──                                                                                               │
@@ -755,7 +755,7 @@ This example also makes use of `sui move` commands. To learn more about those co
     ├───────────────────────────────────────────────────────────────────────────────────────────────────┤
     │  ┌──                                                                                              │
     │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea )  │
-    │  │ CoinType: 0x2::sui::SUI                                                                        │
+    │  │ CoinType: 0x2::one::OCT                                                                        │
     │  │ Amount: -10000680                                                                              │
     │  └──                                                                                              │
     ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
