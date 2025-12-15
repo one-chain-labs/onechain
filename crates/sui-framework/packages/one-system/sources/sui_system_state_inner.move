@@ -414,7 +414,7 @@ public(package) fun request_add_validator(self: &mut SuiSystemStateInnerV2, ctx:
         ELimitExceeded,
     );
 
-    self.validators.request_add_validator(ctx);
+    self.validators.request_add_validator(self.parameters.min_validator_joining_stake, ctx);
 }
 
 /// A validator can call this function to request a removal in the next epoch.
@@ -481,7 +481,6 @@ public(package) fun request_set_commission_rate(
         )
 }
 
-///add
 public(package) fun request_set_revenue_receiving_address(
     self: &mut SuiSystemStateInnerV2,
     cap: &UnverifiedValidatorOperationCap,
@@ -522,7 +521,6 @@ public(package) fun request_add_stake(
         )
 }
 
-///add
 public(package) fun request_add_val_stake(
     self: &mut SuiSystemStateInnerV2,
     cap: &UnverifiedValidatorOperationCap,
@@ -543,7 +541,7 @@ public(package) fun request_add_val_stake(
 public(package) fun request_add_stake_mul_coin(
     self: &mut SuiSystemStateInnerV2,
     stakes: vector<Coin<OCT>>,
-    stake_amount: Option<u64>,
+    stake_amount: option::Option<u64>,
     validator_address: address,
     ctx: &mut TxContext,
 ): StakedOct {
@@ -1081,6 +1079,8 @@ public(package) fun advance_epoch(
             &mut storage_fund_reward,
             &mut self.validator_report_records,
             reward_slashing_rate,
+            self.parameters.validator_low_stake_threshold,
+            self.parameters.validator_very_low_stake_threshold,
             self.parameters.validator_low_stake_grace_period,
             ctx,
         );
@@ -1243,7 +1243,7 @@ public(package) fun active_validator_addresses(self: &SuiSystemStateInnerV2): ve
 /// Extract required Balance from vector of Coin<OCT>, transfer the remainder back to sender.
 fun extract_coin_balance(
     mut coins: vector<Coin<OCT>>,
-    amount: Option<u64>,
+    amount: option::Option<u64>,
     ctx: &mut TxContext,
 ): Balance<OCT> {
     let acc = coins.pop_back();
@@ -1285,7 +1285,6 @@ public(package) fun validators_mut(self: &mut SuiSystemStateInnerV2): &mut Valid
     &mut self.validators
 }
 
-///add
 #[test_only]
 public(package) fun execute_update_only_trusted_validator_action(
     self: &mut SuiSystemStateInnerV2,
@@ -1318,7 +1317,6 @@ public(package) fun execute_update_only_validator_staking_action(
         .create_update_only_validator_staking_action(validator_address, only_validator_staking);
     self.validators.execute_update_only_validator_staking_action(&action);
 }
-/// add end
 
 #[test_only]
 /// Return the currently active validator by address
