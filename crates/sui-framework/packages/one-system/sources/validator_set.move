@@ -53,7 +53,6 @@ const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 SUI
 
 const PHASE_LENGTH: u64 = 14; // phases are 14 days = 14 epochs
 
-///add
 const EOnlyTrustValidatorJoin: u64 = 201;
 const EValidatorOnlyStakingSame: u64 = 202;
 const ETrustValidatorExist: u64 = 203;
@@ -85,14 +84,12 @@ public struct ValidatorSet has store {
     validator_candidates: Table<address, ValidatorWrapper>,
     /// Table storing the number of epochs during which a validator's stake has been below the low stake threshold.
     at_risk_validators: VecMap<address, u64>,
-    /// add
     only_trusted_validator: bool,
     trusted_validators: VecSet<address>,
     /// Any extra fields that's not defined statically.
     extra_fields: Bag,
 }
 
-///add
 public struct UpdateOnlyTrustedValidatorAction has copy, drop, store {
     only_trusted_validator: bool,
 }
@@ -171,7 +168,6 @@ public(package) fun new(
         staking_pool_mappings.add(v.staking_pool_id(), v.sui_address());
     });
 
-    //update
     let mut trusted_validators = vec_set::empty<address>();
     init_active_validators.do_ref!(|val| trusted_validators.insert(val.sui_address()));
 
@@ -192,7 +188,6 @@ public(package) fun new(
     validators
 }
 
-///add
 public(package) fun create_update_only_trusted_validator_action(
     self: &ValidatorSet,
     only_trusted_validator: bool,
@@ -241,7 +236,6 @@ public(package) fun execute_update_trusted_validators_action(
     }
 }
 
-//add
 fun remove_validator(self: &mut ValidatorSet, validator_address: address) {
     let mut validator_index_opt = find_validator(&self.active_validators, validator_address);
     assert!(validator_index_opt.is_some(), ENotAValidator);
@@ -280,8 +274,6 @@ public(package) fun execute_update_only_validator_staking_action(
     );
     validator.set_only_validator_staking(action.only_validator_staking);
 }
-
-//add end
 
 // ==== functions to add or remove validators ====
 
@@ -331,9 +323,14 @@ public(package) fun request_remove_validator_candidate(
 
 /// Called by `sui_system` to add a new validator to `pending_active_validators`, which will be
 /// processed at the end of epoch.
-public(package) fun request_add_validator(self: &mut ValidatorSet, ctx: &TxContext) {
+public(package) fun request_add_validator(
+    self: &mut ValidatorSet,
+    min_joining_stake_amount: u64,
+    ctx: &TxContext,
+) {
     let validator_address = ctx.sender();
     assert!(self.validator_candidates.contains(validator_address), ENotValidatorCandidate);
+    assert!(self.is_trusted_validator(validator_address), EOnlyTrustValidatorJoin);
 
     assert!(self.is_trusted_validator(validator_address), EOnlyTrustValidatorJoin); //add
 
@@ -404,6 +401,14 @@ public(package) fun request_remove_validator(self: &mut ValidatorSet, ctx: &TxCo
     self.pending_removals.push_back(validator_index);
 }
 
+fun remove_validator(self: &mut ValidatorSet, validator_address: address) {
+    let mut validator_index_opt = find_validator(&self.active_validators, validator_address);
+    assert!(validator_index_opt.is_some(), ENotAValidator);
+    let validator_index = validator_index_opt.extract();
+    assert!(!self.pending_removals.contains(&validator_index), EValidatorAlreadyRemoved);
+    self.pending_removals.push_back(validator_index);
+}
+
 // ==== staking related functions ====
 
 /// Called by `sui_system`, to add a new stake to the validator.
@@ -435,7 +440,6 @@ public(package) fun request_withdraw_stake(
     staked_oct: StakedOct,
     ctx: &mut TxContext,
 ): (Balance<OCT>, Option<CoinVesting<OCT>>) {
-    //update
     let staking_pool_id = staked_oct.pool_id();
     let validator = if (self.staking_pool_mappings.contains(staking_pool_id)) {
         // This is an active validator.
@@ -515,6 +519,8 @@ public(package) fun advance_epoch(
     storage_fund_reward: &mut Balance<OCT>,
     validator_report_records: &mut VecMap<address, VecSet<address>>,
     reward_slashing_rate: u64,
+    low_stake_threshold: u64,
+    very_low_stake_threshold: u64,
     low_stake_grace_period: u64,
     ctx: &mut TxContext,
 ) {
@@ -629,6 +635,8 @@ public(package) fun advance_epoch(
 /// - activates pending validators if they have sufficient voting power
 fun update_validator_positions_and_calculate_total_stake(
     self: &mut ValidatorSet,
+    low_stake_threshold: u64,
+    very_low_stake_threshold: u64,
     low_stake_grace_period: u64,
     validator_report_records: &mut VecMap<address, VecSet<address>>,
     ctx: &mut TxContext,
