@@ -7,7 +7,6 @@
 
 #[test_only]
 module one_system::sui_system_tests;
-
 use one::test_scenario::{Self, Scenario};
 use one::oct::OCT;
 use one::coin::Self;
@@ -202,7 +201,7 @@ fun test_set_commission_rate_failure() {
     let mut system_state = scenario.take_shared<SuiSystemState>();
 
     // Fails here since the commission rate is too high.
-    system_state.request_set_commission_rate(2001, scenario.ctx());
+    system_state.request_set_commission_rate(10001, scenario.ctx());
     test_scenario::return_shared(system_state);
 
     scenario_val.end();
@@ -675,6 +674,7 @@ fun test_active_validator_update_metadata() {
     scenario.next_tx(new_validator_addr);
     {
         let ctx = scenario.ctx();
+        system_state.execute_update_trusted_validators_action(true, new_validator_addr);
         system_state.request_add_validator_candidate(
             new_pubkey,
             vector[33, 219, 38, 23, 242, 109, 116, 235, 225, 192, 219, 45, 40, 124, 162, 25, 33, 68, 52, 41, 123, 9, 98, 11, 184, 150, 214, 62, 60, 210, 121, 62],
@@ -688,6 +688,7 @@ fun test_active_validator_update_metadata() {
             b"/ip4/127.0.0.2/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
+            ctx.sender(),
             1,
             0,
             ctx,
@@ -866,6 +867,7 @@ fun test_add_validator_candidate_failure_invalid_metadata() {
         b"/ip4/127.0.0.2/udp/80",
         b"/ip4/127.0.0.1/udp/80",
         b"/ip4/127.0.0.1/udp/80",
+        new_validator_addr,
         1,
         0,
         scenario.ctx(),
@@ -899,6 +901,7 @@ fun test_add_validator_candidate_failure_double_register() {
         b"/ip4/127.0.0.2/udp/80",
         b"/ip4/127.0.0.1/udp/80",
         b"/ip4/127.0.0.1/udp/80",
+        new_validator_addr,
         1,
         0,
         scenario.ctx(),
@@ -918,6 +921,7 @@ fun test_add_validator_candidate_failure_double_register() {
         b"/ip4/127.0.0.2/udp/80",
         b"/ip4/127.0.0.1/udp/80",
         b"/ip4/127.0.0.1/udp/80",
+        new_validator_addr,
         1,
         0,
         scenario.ctx(),
@@ -985,6 +989,7 @@ fun test_add_validator_candidate_failure_duplicate_with_active() {
         b"/ip4/127.0.0.2/udp/80",
         b"/ip4/127.0.0.1/udp/80",
         b"/ip4/127.0.0.1/udp/80",
+        new_addr,
         1,
         0,
         scenario.ctx(),

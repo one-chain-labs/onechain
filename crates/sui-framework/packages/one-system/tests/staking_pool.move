@@ -3,7 +3,6 @@
 
 #[test_only]
 module one_system::staking_pool_tests;
-
 use one::test_scenario::{Self, Scenario};
 use one_system::staking_pool::{StakingPool, Self};
 use one::balance::{Self};
@@ -88,7 +87,7 @@ fun test_convert_to_fungible_staked_oct_fail_too_early() {
     let mut staking_pool = staking_pool::new(scenario.ctx());
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, false,scenario.ctx());
     let fungible_staked_oct = staking_pool.convert_to_fungible_staked_oct(staked_oct, scenario.ctx());
 
     one::test_utils::destroy(staking_pool);
@@ -105,7 +104,7 @@ fun test_convert_to_fungible_staked_oct_fail_wrong_pool() {
     let mut staking_pool_2 = staking_pool::new(scenario.ctx());
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct = staking_pool_1.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct = staking_pool_1.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
     let fungible_staked_oct = staking_pool_2.convert_to_fungible_staked_oct(staked_oct, scenario.ctx());
 
@@ -125,7 +124,7 @@ fun test_convert_to_fungible_staked_oct_happy() {
     // setup
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
     assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 0) == 1, 0);
 
@@ -134,7 +133,7 @@ fun test_convert_to_fungible_staked_oct_happy() {
     assert!(latest_exchange_rate.pool_token_amount() == 1_000_000_000, 0);
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
     assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 1_000_000_000) == 2, 0);
 
@@ -177,7 +176,7 @@ fun test_redeem_fungible_staked_oct_happy() {
     // setup
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
     assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 0) == 1, 0);
 
@@ -186,7 +185,7 @@ fun test_redeem_fungible_staked_oct_happy() {
     assert!(latest_exchange_rate.pool_token_amount() == 1_000_000_000, 0);
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, false,scenario.ctx());
 
     assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 1_000_000_000) == 2, 0);
 
@@ -257,7 +256,7 @@ fun test_redeem_fungible_staked_oct_regression_rounding() {
     // setup
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct_1 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1,false, scenario.ctx());
 
     assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 0) == 1, 0);
 
@@ -266,7 +265,7 @@ fun test_redeem_fungible_staked_oct_regression_rounding() {
     assert!(latest_exchange_rate.pool_token_amount() == 1_000_000_000, 0);
 
     let sui = balance::create_for_testing(1_000_000_001);
-    let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, scenario.ctx());
+    let staked_oct_2 = staking_pool.request_add_stake(sui, scenario.ctx().epoch() + 1, false,scenario.ctx());
 
     assert!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut scenario, 1_000_000_000) == 2, 0);
 

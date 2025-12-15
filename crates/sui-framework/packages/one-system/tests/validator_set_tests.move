@@ -3,7 +3,6 @@
 
 #[test_only]
 module one_system::validator_set_tests;
-
 use one::balance;
 use one::coin;
 use one_system::staking_pool::StakedOct;
@@ -53,6 +52,7 @@ fun test_validator_set_flow() {
         let stake = validator_set.request_add_stake(
             @0x1,
             coin::mint_for_testing(500 * MIST_PER_OCT, ctx1).into_balance(),
+            false,
             ctx1,
         );
         transfer::public_transfer(stake, @0x1);
@@ -159,6 +159,7 @@ fun test_staking_below_threshold() {
     let stake = validator_set.request_add_stake(
         @0x1,
         balance::create_for_testing(MIST_PER_OCT - 1), // 1 MIST lower than the threshold
+        false,
         ctx1,
     );
     transfer::public_transfer(stake, @0x1);
@@ -183,6 +184,7 @@ fun test_staking_min_threshold() {
     let stake = validator_set.request_add_stake(
         @0x1,
         balance::create_for_testing(MIST_PER_OCT), // min possible stake
+        false,
         ctx1,
     );
     transfer::public_transfer(stake, @0x1);
@@ -213,7 +215,13 @@ fun test_add_validator_failure_below_min_stake() {
     let mut scenario_val = test_scenario::begin(@0x1);
     let scenario = &mut scenario_val;
     let ctx1 = scenario.ctx();
+
+    let join_trusted_action = &validator_set.create_update_trusted_validator_action(true, @0x2);
+    validator_set.execute_update_trusted_validators_action(join_trusted_action);
     validator_set.request_add_validator_candidate(validator2, ctx1);
+
+    let update_only_validator_stake = &validator_set.create_update_only_validator_staking_action(@0x2, false);
+    validator_set.execute_update_only_validator_staking_action(update_only_validator_stake);
 
     scenario.next_tx(@0x42);
     {
@@ -221,6 +229,7 @@ fun test_add_validator_failure_below_min_stake() {
         let stake = validator_set.request_add_stake(
             @0x2,
             balance::create_for_testing(500 * MIST_PER_OCT),
+            false,
             ctx,
         );
         transfer::public_transfer(stake, @0x42);
@@ -254,7 +263,12 @@ fun test_add_validator_with_nonzero_min_stake() {
     let mut scenario_val = test_scenario::begin(@0x1);
     let scenario = &mut scenario_val;
     let ctx1 = scenario.ctx();
+    let join_trusted_action = &validator_set.create_update_trusted_validator_action(true, @0x2);
+    validator_set.execute_update_trusted_validators_action(join_trusted_action);
     validator_set.request_add_validator_candidate(validator2, ctx1);
+
+    let update_only_validator_stake = &validator_set.create_update_only_validator_staking_action(@0x2, false);
+    validator_set.execute_update_only_validator_staking_action(update_only_validator_stake);
 
     scenario.next_tx(@0x42);
     {
@@ -262,6 +276,7 @@ fun test_add_validator_with_nonzero_min_stake() {
         let stake = validator_set.request_add_stake(
             @0x2,
             balance::create_for_testing(500 * MIST_PER_OCT),
+            false,
             ctx,
         );
         transfer::public_transfer(stake, @0x42);
@@ -356,6 +371,7 @@ fun test_low_stake_departure() {
         let stake = validator_set.request_add_stake(
             @0x4,
             balance::create_for_testing(500 * MIST_PER_OCT),
+            false,
             ctx,
         );
         transfer::public_transfer(stake, @0x42);
@@ -372,10 +388,11 @@ fun test_low_stake_departure() {
     {
         let stake = scenario.take_from_sender<StakedOct>();
         let ctx = scenario.ctx();
-        let withdrawn_balance = validator_set.request_withdraw_stake(
+        let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(
             stake,
             ctx,
         );
+        coin_vesting.destroy_none();
         transfer::public_transfer(withdrawn_balance.into_coin(ctx), @0x42);
     };
 
@@ -401,7 +418,13 @@ fun test_low_stake_departure() {
     scenario_val.end();
 }
 
-fun create_validator(addr: address, hint: u8, gas_price: u64, is_initial_validator: bool, ctx: &mut TxContext): Validator {
+fun create_validator(
+    addr: address,
+    hint: u8,
+    gas_price: u64,
+    is_initial_validator: bool,
+    ctx: &mut TxContext
+): Validator {
     let stake_value = hint as u64 * 100 * MIST_PER_OCT;
     let name = hint_to_ascii(hint);
     let validator = validator::new_for_testing(
@@ -480,6 +503,8 @@ fun advance_epoch_with_low_stake_params(
 fun add_and_activate_validator(validator_set: &mut ValidatorSet, validator: Validator, scenario: &mut Scenario) {
     scenario.next_tx(validator.sui_address());
     let ctx = scenario.ctx();
+    let action = validator_set.create_update_trusted_validator_action(true, validator.sui_address());
+    validator_set.execute_update_trusted_validators_action(&action);
     validator_set.request_add_validator_candidate(validator, ctx);
     validator_set.request_add_validator(0, ctx);
 }
