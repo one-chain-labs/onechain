@@ -56,8 +56,12 @@ const EInvalidCap: u64 = 101;
 /// Validator trying to set gas price higher than threshold.
 const EGasPriceHigherThanThreshold: u64 = 102;
 
+const EOnlyValidatorStake: u64 = 201;
+const EValidatorStakeClosed: u64 = 202;
+const EStakedOctIsLock: u64 = 203;
+const EStakedOctNotLock: u64 = 204;
+
 // TODO: potentially move this value to onchain config.
-///update
 const MAX_COMMISSION_RATE: u64 = 10_000; // Max rate is 100%, which is 10000 base points
 
 const MAX_VALIDATOR_METADATA_LENGTH: u64 = 256;
@@ -66,15 +70,9 @@ const MAX_VALIDATOR_METADATA_LENGTH: u64 = 256;
 /// Max gas price a validator can set is 100K MIST.
 const MAX_VALIDATOR_GAS_PRICE: u64 = 100_000;
 
-//add
 const LOCK_CLIFF_EPOCH: u64 = 180;
 const LOCK_INTERVAL_EPOCH: u64 = 30;
 const LOCK_PERIOD: u64 = 24;
-//add
-const EOnlyValidatorStake: u64 = 201;
-const EValidatorStakeClosed: u64 = 202;
-const EStakedOctIsLock: u64 = 203;
-const EStakedOctNotLock: u64 = 204;
 
 public struct ValidatorMetadata has store {
     /// The Sui Address of the validator. This is the sender that created the Validator object,
@@ -120,7 +118,6 @@ public struct ValidatorMetadata has store {
 public struct Validator has store {
     /// Summary of the validator.
     metadata: ValidatorMetadata,
-    ///add
     revenue_receiving_address: address,
     only_validator_staking: bool,
     /// The voting power of this validator, which might be different from its
@@ -150,7 +147,6 @@ public struct StakingRequestEvent has copy, drop {
     validator_address: address,
     staker_address: address,
     epoch: u64,
-    ///add
     lock: bool,
     amount: u64,
 }
@@ -281,7 +277,7 @@ public(package) fun new(
         gas_price,
         commission_rate,
         ctx,
-    ) //update
+    )
 }
 
 /// Mark Validator's `StakingPool` as inactive by setting the `deactivation_epoch`.
@@ -300,7 +296,6 @@ public(package) fun adjust_stake_and_gas_price(self: &mut Validator) {
     self.commission_rate = self.next_epoch_commission_rate;
 }
 
-///update
 public(package) fun request_set_revenue_receiving_address(
     self: &mut Validator,
     verified_cap: ValidatorOperationCap,
@@ -427,8 +422,7 @@ public(package) fun request_withdraw_stake(
     staked_oct: StakedOct,
     ctx: &mut TxContext,
 ): (Balance<OCT>, Option<CoinVesting<OCT>>) {
-    //update
-    let lock = staked_oct.lock(); //add
+    let lock = staked_oct.lock(); 
     let principal_amount = staked_oct.amount();
     let stake_activation_epoch = staked_oct.activation_epoch();
     let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx); //update
@@ -444,7 +438,7 @@ public(package) fun request_withdraw_stake(
         principal_amount,
         reward_amount,
     });
-    //add
+
     if (lock) {
         let withdrawn_reward = withdrawn_stake.split(reward_amount);
 
@@ -463,7 +457,6 @@ public(package) fun request_withdraw_stake(
     }
 }
 
-///add
 public(package) fun set_only_validator_staking(self: &mut Validator, only_validator_staking: bool) {
     self.only_validator_staking = only_validator_staking
 }
@@ -637,7 +630,6 @@ public fun total_stake(self: &Validator): u64 {
     self.staking_pool.sui_balance()
 }
 
-///add
 public fun only_validator_staking(self: &Validator): bool {
     self.only_validator_staking
 }
@@ -660,7 +652,6 @@ public fun pending_stake_withdraw_amount(self: &Validator): u64 {
     self.staking_pool.pending_stake_withdraw_amount()
 }
 
-///add
 public fun revenue_receiving_address(self: &Validator): address {
     self.revenue_receiving_address
 }
@@ -1015,9 +1006,7 @@ fun new_from_metadata(
         // At the epoch change where this validator is actually added to the
         // active validator set, the voting power will be updated accordingly.
         voting_power: 0,
-        //add fun
         revenue_receiving_address,
-        //add fun
         only_validator_staking,
         operation_cap_id,
         gas_price,
