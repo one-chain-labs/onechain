@@ -43,7 +43,7 @@ public struct StakingPool has key, store {
     /// The epoch at which this staking pool ceased to be active. `None` = {pre-active, active},
     /// `Some(<epoch_number>)` if in-active, and it was de-activated at epoch `<epoch_number>`.
     deactivation_epoch: Option<u64>,
-    /// The total number of SUI tokens in this pool, including the SUI in the rewards_pool, as well as in all the principal
+    /// The total number of OCT tokens in this pool, including the OCT in the rewards_pool, as well as in all the principal
     /// in the `StakedOct` object, updated at epoch boundaries.
     sui_balance: u64,
     /// The epoch stake rewards will be added here at the end of each epoch.
@@ -58,7 +58,7 @@ public struct StakingPool has key, store {
     pending_stake: u64,
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
     /// This includes both the principal and rewards SUI withdrawn.
-    pending_total_oct_withdraw: u64,
+    pending_total_sui_withdraw: u64,
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
     pending_pool_token_withdraw: u64,
     /// Any extra fields that's not defined statically.
@@ -121,7 +121,7 @@ public(package) fun new(ctx: &mut TxContext): StakingPool {
         pool_token_balance: 0,
         exchange_rates: table::new(ctx),
         pending_stake: 0,
-        pending_total_oct_withdraw: 0,
+        pending_total_sui_withdraw: 0,
         pending_pool_token_withdraw: 0,
         extra_fields: bag::new(ctx),
     }
@@ -220,7 +220,7 @@ public(package) fun redeem_fungible_staked_oct(
     let mut sui_out = fungible_staked_oct_data.principal.split(principal_amount);
     sui_out.join(pool.rewards_pool.split(rewards_amount));
 
-    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + sui_out.value();
+    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + sui_out.value();
     pool.pending_pool_token_withdraw = pool.pending_pool_token_withdraw + value;
 
     sui_out
@@ -370,9 +370,9 @@ public(package) fun process_pending_stakes_and_withdraws(pool: &mut StakingPool,
 /// Called at epoch boundaries to process pending stake withdraws requested during the epoch.
 /// Also called immediately upon withdrawal if the pool is inactive.
 fun process_pending_stake_withdraw(pool: &mut StakingPool) {
-    pool.sui_balance = pool.sui_balance - pool.pending_total_oct_withdraw;
+    pool.sui_balance = pool.sui_balance - pool.pending_total_sui_withdraw;
     pool.pool_token_balance = pool.pool_token_balance - pool.pending_pool_token_withdraw;
-    pool.pending_total_oct_withdraw = 0;
+    pool.pending_total_sui_withdraw = 0;
     pool.pending_pool_token_withdraw = 0;
 }
 
@@ -453,7 +453,6 @@ public fun fungible_staked_oct_pool_id(fungible_staked_oct: &FungibleStakedOct):
 /// Allows calling `.amount()` on `StakedOct` to invoke `staked_oct_amount`
 public use fun staked_oct_amount as StakedOct.amount;
 
-//add
 public fun lock(staked_oct:&StakedOct):bool{staked_oct.lock}
 
 /// Returns the principal amount of `StakedOct`.
@@ -540,7 +539,6 @@ public fun split(self: &mut StakedOct, split_amount: u64, ctx: &mut TxContext): 
 /// Allows calling `.split_to_sender()` on `StakedOct` to invoke `split_staked_oct`
 public use fun split_staked_oct as StakedOct.split_to_sender;
 
-#[allow(lint(public_entry))]
 /// Split the given StakedOct to the two parts, one with principal `split_amount`,
 /// transfer the newly split part to the sender address.
 public entry fun split_staked_oct(stake: &mut StakedOct, split_amount: u64, ctx: &mut TxContext) {
@@ -550,7 +548,6 @@ public entry fun split_staked_oct(stake: &mut StakedOct, split_amount: u64, ctx:
 /// Allows calling `.join()` on `StakedOct` to invoke `join_staked_oct`
 public use fun join_staked_oct as StakedOct.join;
 
-#[allow(lint(public_entry))]
 /// Consume the staked sui `other` and add its value to `self`.
 /// Aborts if some of the staking parameters are incompatible (pool id, stake activation epoch, etc.)
 public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
@@ -597,7 +594,7 @@ public fun pending_stake_amount(staking_pool: &StakingPool): u64 {
 
 /// Returns the total withdrawal from the staking pool this epoch.
 public fun pending_stake_withdraw_amount(staking_pool: &StakingPool): u64 {
-    staking_pool.pending_total_oct_withdraw
+    staking_pool.pending_total_sui_withdraw
 }
 
 public(package) fun exchange_rates(pool: &StakingPool): &Table<u64, PoolTokenExchangeRate> {
