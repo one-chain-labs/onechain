@@ -144,7 +144,7 @@ module deepbook::clob {
         base_custodian: Custodian<BaseAsset>,
         quote_custodian: Custodian<QuoteAsset>,
         // Stores the fee paid to create this pool. These funds are not accessible.
-        creation_fee: Balance<SUI>,
+        creation_fee: Balance<OCT>,
         // Deprecated.
         base_asset_trading_fees: Balance<BaseAsset>,
         // Stores the trading fees paid in `QuoteAsset`. These funds are not accessible.
@@ -169,7 +169,7 @@ module deepbook::clob {
     public fun create_pool<BaseAsset, QuoteAsset>(
         _tick_size: u64,
         _lot_size: u64,
-        _creation_fee: Coin<SUI>,
+        _creation_fee: Coin<OCT>,
         _ctx: &mut TxContext,
     ) {
         abort DEPRECATED
