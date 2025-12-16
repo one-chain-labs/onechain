@@ -38,8 +38,8 @@ fn build_system_packages() {
 
     let bridge_path = packages_path.join("bridge");
     let deepbook_path = packages_path.join("deepbook");
-    let sui_system_path = packages_path.join("sui-system");
-    let sui_framework_path = packages_path.join("sui-framework");
+    let sui_system_path = packages_path.join("one-system");
+    let sui_framework_path = packages_path.join("one-framework");
     let move_stdlib_path = packages_path.join("move-stdlib");
 
     build_packages(
@@ -103,8 +103,8 @@ fn build_packages(
         out_dir,
         "bridge",
         "deepbook",
-        "sui-system",
-        "sui-framework",
+        "one-system",
+        "one-framework",
         "move-stdlib",
         config,
     );

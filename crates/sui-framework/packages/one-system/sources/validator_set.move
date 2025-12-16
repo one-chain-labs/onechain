@@ -184,7 +184,7 @@ public(package) fun new(
         trusted_validators,
         extra_fields: bag::new(ctx),
     };
-    voting_power::set_voting_power(&mut validators.active_validators, total_stake);
+    voting_power::set_voting_power(&mut validators.active_validators);
     validators
 }
 
