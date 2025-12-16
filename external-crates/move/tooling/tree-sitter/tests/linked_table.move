@@ -178,7 +178,7 @@ module one::linked_table {
         table.size
     }
 
-    /// Returns true iff the table is empty (if `length` returns `0`)
+    /// Returns true if the table is empty (if `length` returns `0`)
     public fun is_empty<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>): bool {
         table.size == 0
     }
