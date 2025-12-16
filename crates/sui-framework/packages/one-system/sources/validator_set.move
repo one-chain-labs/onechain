@@ -341,23 +341,9 @@ public(package) fun request_add_validator(
         EDuplicateValidator,
     );
     assert!(validator.is_preactive(), EValidatorNotCandidate);
-    assert!(self.can_join(validator.total_stake(), ctx), EMinJoiningStakeNotReached);
+    assert!(validator.total_stake_amount() >= min_joining_stake_amount, EMinJoiningStakeNotReached);
 
     self.pending_active_validators.push_back(validator);
-}
-
-/// Return `true` if a  candidate validator with `stake` will have sufficeint voting power to join the validator set
-fun can_join(self: &ValidatorSet, stake: u64, ctx: &TxContext): bool {
-    let (min_joining_voting_power, _, _) = self.get_voting_power_thresholds(ctx);
-
-    // if the validator will have at least `min_joining_voting_power` after joining, they can join.
-    // this formula comes from SIP-39: https://github.com/sui-foundation/sips/blob/main/sips/sip-39.md
-    let future_total_stake = self.total_stake + stake;
-    let future_validator_voting_power = voting_power::derive_raw_voting_power(
-        stake,
-        future_total_stake,
-    );
-    future_validator_voting_power >= min_joining_voting_power
 }
 
 /// return (min, low, very low voting power) thresholds

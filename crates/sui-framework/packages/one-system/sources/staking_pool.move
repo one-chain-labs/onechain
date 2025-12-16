@@ -180,7 +180,7 @@ public(package) fun request_withdraw_stake(
     );
     let total_sui_withdraw_amount = principal_withdraw_amount + rewards_withdraw.value();
 
-    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + total_sui_withdraw_amount;
+    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + total_sui_withdraw_amount;
     pool.pending_pool_token_withdraw =
         pool.pending_pool_token_withdraw + pool_token_withdraw_amount;
 
