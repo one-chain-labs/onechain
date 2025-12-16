@@ -10,7 +10,7 @@ use one_system::validator_cap::{Self, UnverifiedValidatorOperationCap, Validator
 use one_system::staking_pool::{PoolTokenExchangeRate, StakedOct, pool_id, FungibleStakedOct, fungible_staked_oct_pool_id};
 use one::priority_queue as pq;
 use one::vec_map::{Self, VecMap};
-use one::vec_set::VecSet;
+use one::vec_set::{Self,VecSet};
 use one::table::{Self, Table};
 use one::event;
 use one::table_vec::{Self, TableVec};
@@ -19,6 +19,7 @@ use one_system::validator_wrapper::ValidatorWrapper;
 use one_system::validator_wrapper;
 use one::bag::Bag;
 use one::bag;
+use one::coin_vesting::CoinVesting;
 
 public struct ValidatorSet has store {
     /// Total amount of stake from all active validators at the beginning of the epoch.
@@ -169,6 +170,10 @@ public(package) fun new(init_active_validators: vector<Validator>, ctx: &mut TxC
         staking_pool_mappings.add(staking_pool_id(validator), sui_address(validator));
         i = i + 1;
     };
+
+    let mut trusted_validators = vec_set::empty<address>();
+    init_active_validators.do_ref!(|val|trusted_validators.insert(val.sui_address()) );
+
     let mut validators = ValidatorSet {
         total_stake,
         active_validators: init_active_validators,
