@@ -227,7 +227,7 @@ module deepbook::clob_v2 {
         base_custodian: Custodian<BaseAsset>,
         quote_custodian: Custodian<QuoteAsset>,
         // Stores the fee paid to create this pool. These funds are not accessible.
-        creation_fee: Balance<SUI>,
+        creation_fee: Balance<OCT>,
         // Deprecated.
         base_asset_trading_fees: Balance<BaseAsset>,
         // Stores the trading fees paid in `QuoteAsset`. These funds are not accessible in the V1 of the Pools, but V2 Pools are accessible.
@@ -314,7 +314,7 @@ module deepbook::clob_v2 {
     public fun create_pool<BaseAsset, QuoteAsset>(
         _tick_size: u64,
         _lot_size: u64,
-        _creation_fee: Coin<SUI>,
+        _creation_fee: Coin<OCT>,
         _ctx: &mut TxContext,
     ) {
         
@@ -330,7 +330,7 @@ module deepbook::clob_v2 {
         _lot_size: u64,
         _taker_fee_rate: u64,
         _maker_rebate_rate: u64,
-        _creation_fee: Coin<SUI>,
+        _creation_fee: Coin<OCT>,
         _ctx: &mut TxContext,
     ) {
         
@@ -342,7 +342,7 @@ module deepbook::clob_v2 {
     public fun create_pool_with_return<BaseAsset, QuoteAsset>(
         _tick_size: u64,
         _lot_size: u64,
-        _creation_fee: Coin<SUI>,
+        _creation_fee: Coin<OCT>,
         _ctx: &mut TxContext,
     ): Pool<BaseAsset, QuoteAsset> {
         
@@ -358,7 +358,7 @@ module deepbook::clob_v2 {
         _lot_size: u64,
         _taker_fee_rate: u64,
         _maker_rebate_rate: u64,
-        _creation_fee: Coin<SUI>,
+        _creation_fee: Coin<OCT>,
         _ctx: &mut TxContext,
     ) : Pool<BaseAsset, QuoteAsset> {
         
@@ -374,7 +374,7 @@ module deepbook::clob_v2 {
         _lot_size: u64,
         _taker_fee_rate: u64,
         _maker_rebate_rate: u64,
-        _creation_fee: Coin<SUI>,
+        _creation_fee: Coin<OCT>,
         _ctx: &mut TxContext,
     ) : (Pool<BaseAsset, QuoteAsset>, PoolOwnerCap) {
         
