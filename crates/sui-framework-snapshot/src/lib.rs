@@ -1,13 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    io::Read,
+    path::PathBuf,
+};
+
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use std::{fs, io::Read, path::PathBuf};
 use sui_framework::{SystemPackage, SystemPackageMetadata};
-use sui_types::base_types::ObjectID;
 use sui_types::{
-    BRIDGE_PACKAGE_ID, DEEPBOOK_PACKAGE_ID, MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID,
+    base_types::ObjectID,
+    BRIDGE_PACKAGE_ID,
+    DEEPBOOK_PACKAGE_ID,
+    MOVE_STDLIB_PACKAGE_ID,
+    SUI_FRAMEWORK_PACKAGE_ID,
     SUI_SYSTEM_PACKAGE_ID,
 };
 
@@ -18,7 +26,7 @@ pub type SnapshotManifest = BTreeMap<u64, Snapshot>;
 ///
 // Note: the [Snapshot] and [SnapshotPackage] types are similar to the
 // [sui_framework::{SystemPackageMetadata, SystemPackage}] types,
-// and also to the [sui::framework_versions::{FrameworkVersion, FrameworkPackage}] types.
+// and also to the [one::framework_versions::{FrameworkVersion, FrameworkPackage}] types.
 // They are sort of a stepping stone from one to the other - the [sui_framework] types contain
 // additional information about the compiled bytecode of the package, while the
 // [framework_versions] types do not contain information about the object IDs of the packages.
@@ -55,47 +63,26 @@ impl Snapshot {
 
 impl SnapshotPackage {
     pub fn from_system_package_metadata(value: &SystemPackageMetadata) -> Self {
-        Self {
-            name: value.name.clone(),
-            path: value.path.clone(),
-            id: value.compiled.id,
-        }
+        Self { name: value.name.clone(), path: value.path.clone(), id: value.compiled.id }
     }
 }
 
-const SYSTEM_PACKAGE_PUBLISH_ORDER: &[ObjectID] = &[
-    MOVE_STDLIB_PACKAGE_ID,
-    SUI_FRAMEWORK_PACKAGE_ID,
-    SUI_SYSTEM_PACKAGE_ID,
-    DEEPBOOK_PACKAGE_ID,
-    BRIDGE_PACKAGE_ID,
-];
+const SYSTEM_PACKAGE_PUBLISH_ORDER: &[ObjectID] =
+    &[MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID, SUI_SYSTEM_PACKAGE_ID, DEEPBOOK_PACKAGE_ID, BRIDGE_PACKAGE_ID];
 
 pub fn load_bytecode_snapshot_manifest() -> SnapshotManifest {
     let Ok(bytes) = fs::read(manifest_path()) else {
         return SnapshotManifest::default();
     };
-    serde_json::from_slice::<SnapshotManifest>(&bytes)
-        .expect("Could not deserialize SnapshotManifest")
+    serde_json::from_slice::<SnapshotManifest>(&bytes).expect("Could not deserialize SnapshotManifest")
 }
 
-pub fn update_bytecode_snapshot_manifest(
-    git_revision: &str,
-    version: u64,
-    files: Vec<SnapshotPackage>,
-) {
+pub fn update_bytecode_snapshot_manifest(git_revision: &str, version: u64, files: Vec<SnapshotPackage>) {
     let mut snapshot = load_bytecode_snapshot_manifest();
 
-    snapshot.insert(
-        version,
-        Snapshot {
-            git_revision: git_revision.to_string(),
-            packages: files,
-        },
-    );
+    snapshot.insert(version, Snapshot { git_revision: git_revision.to_string(), packages: files });
 
-    let json =
-        serde_json::to_string_pretty(&snapshot).expect("Could not serialize SnapshotManifest");
+    let json = serde_json::to_string_pretty(&snapshot).expect("Could not serialize SnapshotManifest");
     fs::write(manifest_path(), json).expect("Could not update manifest file");
 }
 
@@ -141,10 +128,7 @@ fn snapshot_path_for_version(version: u64) -> anyhow::Result<PathBuf> {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            if let Some(snapshot_number) = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .and_then(|n| n.parse::<u64>().ok())
+            if let Some(snapshot_number) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.parse::<u64>().ok())
             {
                 snapshots.insert(snapshot_number);
             }
@@ -152,7 +136,7 @@ fn snapshot_path_for_version(version: u64) -> anyhow::Result<PathBuf> {
     }
 
     snapshots
-        .range(version..)
+        .range(version ..)
         .next()
         .map(|v| snapshot_dir.join(v.to_string()))
         .ok_or_else(|| anyhow::anyhow!("No snapshot found for version {}", version))

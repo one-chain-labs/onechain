@@ -21,7 +21,6 @@ use std::{
 
 use expect_test::expect;
 use move_package::{lock_file::schema::ManagedPackage, BuildConfig as MoveBuildConfig};
-use serde_json::json;
 use one::{
     client_commands::{
         estimate_gas_budget,
@@ -35,6 +34,7 @@ use one::{
     key_identity::{get_identity_address, KeyIdentity},
     sui_commands::{parse_host_port, IndexerArgs, SuiCommand},
 };
+use serde_json::json;
 use sui_config::{
     PersistedConfig,
     SUI_CLIENT_CONFIG,

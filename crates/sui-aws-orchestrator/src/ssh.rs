@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_trait::async_trait;
 use std::{
     io::Write,
     net::SocketAddr,
@@ -10,12 +9,10 @@ use std::{
     time::Duration,
 };
 
+use async_trait::async_trait;
 use futures::future::try_join_all;
-use russh::{
-    client::{self, Msg},
-    keys::{load_secret_key, PrivateKeyWithHashAlg},
-    Channel,
-};
+use russh::{client, client::Msg, Channel};
+use russh_keys::key;
 use tokio::{task::JoinHandle, time::sleep};
 
 use crate::{
@@ -25,7 +22,7 @@ use crate::{
 };
 
 #[derive(PartialEq, Eq)]
-/// The status of a ssh command running in the background.
+/// The status of an ssh command running in the background.
 pub enum CommandStatus {
     Running,
     Terminated,
@@ -131,7 +128,7 @@ impl SshConnectionManager {
     /// Create a new ssh connection with the provided host.
     pub async fn connect(&self, address: SocketAddr) -> SshResult<SshConnection> {
         let mut error = None;
-        for _ in 0..self.retries + 1 {
+        for _ in 0 .. self.retries + 1 {
             match SshConnection::new(
                 address,
                 &self.username,
@@ -251,9 +248,9 @@ struct Session {}
 impl client::Handler for Session {
     type Error = russh::Error;
 
-    // async fn check_server_key(self, _server_public_key: &PublicKey) -> Result<(Self, bool), Self::Error> {
-    //     Ok((self, true))
-    // }
+    async fn check_server_key(self, _server_public_key: &key::PublicKey) -> Result<(Self, bool), Self::Error> {
+        Ok((self, true))
+    }
 }
 
 /// Representation of an ssh connection.
@@ -278,8 +275,8 @@ impl SshConnection {
         inactivity_timeout: Option<Duration>,
         retries: Option<usize>,
     ) -> SshResult<Self> {
-        let key =
-            load_secret_key(private_key_file, None).map_err(|error| SshError::PrivateKeyError { address, error })?;
+        let key = russh_keys::load_secret_key(private_key_file, None)
+            .map_err(|error| SshError::PrivateKeyError { address, error })?;
 
         let config =
             client::Config { inactivity_timeout: inactivity_timeout.or(Some(Self::DEFAULT_TIMEOUT)), ..<_>::default() };
@@ -288,10 +285,8 @@ impl SshConnection {
             .await
             .map_err(|error| SshError::ConnectionError { address, error })?;
 
-        let k = PrivateKeyWithHashAlg::new(Arc::new(key), None);
-
         let _auth_res = session
-            .authenticate_publickey(username, k)
+            .authenticate_publickey(username, Arc::new(key))
             .await
             .map_err(|error| SshError::SessionError { address, error })?;
 
@@ -303,10 +298,10 @@ impl SshConnection {
         SshError::SessionError { address: self.address, error }
     }
 
-    /// Execute a ssh command on the remote machine.
+    /// Execute an ssh command on the remote machine.
     pub async fn execute(&self, command: String) -> SshResult<(String, String)> {
         let mut error = None;
-        for _ in 0..self.retries + 1 {
+        for _ in 0 .. self.retries + 1 {
             let channel = match self.session.channel_open_session().await {
                 Ok(x) => x,
                 Err(e) => {
@@ -354,7 +349,7 @@ impl SshConnection {
     /// TODO: if the files get too big then we should leverage a simple S3 bucket instead.
     pub async fn download<P: AsRef<Path>>(&self, path: P) -> SshResult<String> {
         let mut error = None;
-        for _ in 0..self.retries + 1 {
+        for _ in 0 .. self.retries + 1 {
             match self.execute(format!("cat {}", path.as_ref().to_str().unwrap())).await {
                 Ok((file_data, _)) => return Ok(file_data),
                 Err(err) => error = Some(err),

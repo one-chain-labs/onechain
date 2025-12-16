@@ -54,6 +54,7 @@ pub struct StakedOct {
     pool_id: ID,
     stake_activation_epoch: u64,
     principal: Balance,
+    lock: bool,
 }
 
 impl StakedOct {

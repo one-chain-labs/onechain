@@ -12,8 +12,8 @@ use std::{
 use expect_test::expect;
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
-use reqwest::Client;
 use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
+use reqwest::Client;
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::{BuildConfig, SuiPackageHooks};
 use sui_sdk::{

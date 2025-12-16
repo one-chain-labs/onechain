@@ -13,6 +13,7 @@ use std::{
 use futures::{future::join_all, StreamExt};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use mysten_common::fatal;
+use one_node::SuiNodeHandle;
 use rand::{distributions::*, rngs::OsRng, seq::SliceRandom};
 use sui_config::{
     genesis::Genesis,
@@ -33,7 +34,6 @@ use sui_json_rpc_types::{
     TransactionFilter,
 };
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
-use one_node::SuiNodeHandle;
 use sui_protocol_config::ProtocolVersion;
 use sui_sdk::{
     apis::QuorumDriverApi,

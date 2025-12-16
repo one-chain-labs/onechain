@@ -51,7 +51,7 @@ pub async fn execution_process(
             return;
         };
 
-        state.get_chain_identifier().map(|chain_id| chain_id.chain()) == Some(Chain::Mainnet)
+        state.get_chain_identifier().chain() == Chain::Mainnet
     };
 
     // Loop whenever there is a signal that a new transactions is ready to process.
@@ -111,7 +111,7 @@ pub async fn execution_process(
         // the semaphore in this context.
         let permit = limit.acquire_owned().await.unwrap();
 
-        if rng.gen_range(0.0..1.0) < QUEUEING_DELAY_SAMPLING_RATIO {
+        if rng.gen_range(0.0 .. 1.0) < QUEUEING_DELAY_SAMPLING_RATIO {
             authority.metrics.execution_queueing_latency.report(txn_ready_time.elapsed());
             if let Some(latency) = authority.metrics.execution_queueing_latency.latency() {
                 authority.metrics.execution_queueing_delay_s.observe(latency.as_secs_f64());

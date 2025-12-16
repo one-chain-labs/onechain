@@ -198,7 +198,6 @@ impl<'a> TestAuthorityBuilder<'a> {
                     perpetual_tables,
                     &genesis_committee,
                     genesis,
-                    0,
                 )
                 .await
                 .unwrap()
@@ -238,10 +237,13 @@ impl<'a> TestAuthorityBuilder<'a> {
         let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
         let backpressure_manager =
             BackpressureManager::new_from_checkpoint_store(&checkpoint_store);
+        let highest_executed_checkpoint = checkpoint_store
+            .get_highest_executed_checkpoint_seq_number()
+            .expect("db error")
+            .unwrap_or_default();
 
         let cache_traits = build_execution_cache(
             &Default::default(),
-            &epoch_start_configuration,
             &registry,
             &authority_store,
             backpressure_manager.clone(),
@@ -260,6 +262,7 @@ impl<'a> TestAuthorityBuilder<'a> {
             signature_verifier_metrics,
             &expensive_safety_checks,
             ChainIdentifier::from(*genesis.checkpoint().digest()),
+            highest_executed_checkpoint,
         );
         let committee_store = Arc::new(CommitteeStore::new(
             path.join("epochs"),
@@ -267,7 +270,6 @@ impl<'a> TestAuthorityBuilder<'a> {
             None,
         ));
 
-        let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
         if self.insert_genesis_checkpoint {
             checkpoint_store.insert_genesis_checkpoint(
                 genesis.checkpoint(),
@@ -334,10 +336,10 @@ impl<'a> TestAuthorityBuilder<'a> {
             genesis.objects(),
             &DBCheckpointConfig::default(),
             config.clone(),
-            usize::MAX,
             ArchiveReaderBalancer::default(),
             None,
             chain_identifier,
+            None,
         )
         .await;
 
@@ -383,8 +385,14 @@ impl<'a> TestAuthorityBuilder<'a> {
 
         state
             .get_cache_commit()
-            .commit_transaction_outputs(epoch_store.epoch(), &[*genesis.transaction().digest()])
-            .await;
+            .commit_transaction_outputs(
+                epoch_store.epoch(),
+                &[*genesis.transaction().digest()],
+                epoch_store
+                    .protocol_config()
+                    .use_object_per_epoch_marker_table_v2_as_option()
+                    .unwrap_or(false),
+            );
 
         // We want to insert these objects directly instead of relying on genesis because
         // genesis process would set the previous transaction field for these objects, which would
