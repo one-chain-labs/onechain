@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Oct types helpers and utilities
+/// Sui types helpers and utilities
 module one::types;
 
 // === one-time witness ===

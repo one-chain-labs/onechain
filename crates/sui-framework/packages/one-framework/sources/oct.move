@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Coin<OCT> is the token used to pay for gas in Oct.
+/// Coin<OCT> is the token used to pay for gas in OCT.
 /// It has 9 decimals, and the smallest unit (10^-9) is called "mist".
 module one::oct;
 
@@ -13,15 +13,15 @@ const EAlreadyMinted: u64 = 0;
 const ENotSystemAddress: u64 = 1;
 
 #[allow(unused_const)]
-/// The amount of Mist per Oct token based on the fact that mist is
-/// 10^-9 of a Oct token
+/// The amount of Mist per Sui token based on the fact that mist is
+/// 10^-9 of a Sui token
 const MIST_PER_OCT: u64 = 1_000_000_000;
 
 #[allow(unused_const)]
-/// The total supply of Oct denominated in whole Oct tokens (10 Billion)
+/// The total supply of Sui denominated in whole Sui tokens (10 Billion)
 const TOTAL_SUPPLY_OCT: u64 = 10_000_000_000;
 
-/// The total supply of Oct denominated in Mist (10 Billion * 10^9)
+/// The total supply of Sui denominated in Mist (10 Billion * 10^9)
 const TOTAL_SUPPLY_MIST: u64 = 10_000_000_000_000_000_000;
 
 /// Name of the coin
@@ -46,9 +46,9 @@ fun new(ctx: &mut TxContext): Balance<OCT> {
     );
     transfer::public_freeze_object(metadata);
     let mut supply = treasury.treasury_into_supply();
-    let total_oct = supply.increase_supply(TOTAL_SUPPLY_MIST);
+    let total_sui = supply.increase_supply(TOTAL_SUPPLY_MIST);
     supply.destroy_supply();
-    total_oct
+    total_sui
 }
 
 public entry fun transfer(c: coin::Coin<OCT>, recipient: address) {

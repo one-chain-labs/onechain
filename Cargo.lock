@@ -333,6 +333,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "argon2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c3610892ee6e0cbce8ae2700349fcf8f98adb0dbfbee85aec3c9179d29cc072"
+dependencies = [
+ "base64ct",
+ "blake2",
+ "cpufeatures",
+ "password-hash 0.5.0",
+]
+
+[[package]]
 name = "ark-bn254"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2392,6 +2404,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cfg_aliases"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
 name = "chacha20"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2719,10 +2737,10 @@ dependencies = [
  "serde",
  "shared-crypto",
  "strum_macros 0.24.3",
- "one-http",
- "one-macros",
- "one-protocol-config",
- "one-tls",
+ "sui-http",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-tls",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -2752,10 +2770,10 @@ dependencies = [
  "parking_lot 0.12.3",
  "prometheus",
  "rand 0.8.5",
- "one-config",
- "one-macros",
- "one-protocol-config",
- "one-simulator",
+ "sui-config",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-simulator",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -2961,9 +2979,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.9"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a17b76ff3a4162b0b27f354a0c87015ddad39d35f9c0c36607a3bdd175dde1f1"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
@@ -3483,6 +3501,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "delegate"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "780eb241654bf097afb00fc5f054a09b687dad862e485fdcf8399bb056565370"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3982,10 +4011,11 @@ dependencies = [
  "ff 0.13.0",
  "generic-array",
  "group 0.13.0",
+ "hkdf",
  "pem-rfc7468 0.7.0",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
- "sec1 0.7.1",
+ "sec1 0.7.3",
  "serde_json",
  "serdect",
  "subtle",
@@ -4067,14 +4097,14 @@ dependencies = [
 
 [[package]]
 name = "enum_dispatch"
-version = "0.3.9"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1693044dcf452888dd3a6a6a0dab67f0652094e3920dfe029a54d2f37d9b7394"
+checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
 dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 1.0.107",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -4208,7 +4238,7 @@ dependencies = [
  "hmac",
  "pbkdf2 0.11.0",
  "rand 0.8.5",
- "scrypt",
+ "scrypt 0.10.0",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -4575,7 +4605,7 @@ dependencies = [
 [[package]]
 name = "fastcrypto"
 version = "0.1.8"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=69d496c71fb37e3d22fe85e5bbfd4256d61422b9#69d496c71fb37e3d22fe85e5bbfd4256d61422b9"
+source = "git+https://github.com/one-chain-labs/fastcrypto?rev=6abdbd0e9f2c54aad54184afb273895aea7e736d#6abdbd0e9f2c54aad54184afb273895aea7e736d"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -4629,7 +4659,7 @@ dependencies = [
 [[package]]
 name = "fastcrypto-derive"
 version = "0.1.3"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=69d496c71fb37e3d22fe85e5bbfd4256d61422b9#69d496c71fb37e3d22fe85e5bbfd4256d61422b9"
+source = "git+https://github.com/one-chain-labs/fastcrypto?rev=6abdbd0e9f2c54aad54184afb273895aea7e736d#6abdbd0e9f2c54aad54184afb273895aea7e736d"
 dependencies = [
  "quote",
  "syn 1.0.107",
@@ -4638,7 +4668,7 @@ dependencies = [
 [[package]]
 name = "fastcrypto-tbls"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=69d496c71fb37e3d22fe85e5bbfd4256d61422b9#69d496c71fb37e3d22fe85e5bbfd4256d61422b9"
+source = "git+https://github.com/one-chain-labs/fastcrypto?rev=6abdbd0e9f2c54aad54184afb273895aea7e736d#6abdbd0e9f2c54aad54184afb273895aea7e736d"
 dependencies = [
  "bcs",
  "digest 0.10.7",
@@ -4657,7 +4687,7 @@ dependencies = [
 [[package]]
 name = "fastcrypto-vdf"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=69d496c71fb37e3d22fe85e5bbfd4256d61422b9#69d496c71fb37e3d22fe85e5bbfd4256d61422b9"
+source = "git+https://github.com/one-chain-labs/fastcrypto?rev=6abdbd0e9f2c54aad54184afb273895aea7e736d#6abdbd0e9f2c54aad54184afb273895aea7e736d"
 dependencies = [
  "bcs",
  "fastcrypto",
@@ -4674,7 +4704,7 @@ dependencies = [
 [[package]]
 name = "fastcrypto-zkp"
 version = "0.1.3"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=69d496c71fb37e3d22fe85e5bbfd4256d61422b9#69d496c71fb37e3d22fe85e5bbfd4256d61422b9"
+source = "git+https://github.com/one-chain-labs/fastcrypto?rev=6abdbd0e9f2c54aad54184afb273895aea7e736d#6abdbd0e9f2c54aad54184afb273895aea7e736d"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -6229,6 +6259,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
+name = "internal-russh-forked-ssh-key"
+version = "0.6.10+upstream-0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33555bd765ace379fe85d97bb6d48b5783054f6048a7d5ec24cd9155e490e266"
+dependencies = [
+ "argon2",
+ "bcrypt-pbkdf",
+ "ecdsa 0.16.9",
+ "ed25519-dalek",
+ "hex",
+ "hmac",
+ "num-bigint-dig",
+ "p256",
+ "p384",
+ "p521",
+ "rand_core 0.6.4",
+ "rsa 0.9.1",
+ "sec1 0.7.3",
+ "sha1",
+ "sha2 0.10.8",
+ "signature 2.2.0",
+ "ssh-cipher",
+ "ssh-encoding",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "io-lifetimes"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6386,10 +6444,11 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.64"
+version = "0.3.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5f195fe497f702db0f318b07fdd68edb16955aed830df8363d837542f8f935a"
+checksum = "464a3709c7f55f1f721e5389aa6ea4e3bc6aba669353300af094b29ffbdde1d8"
 dependencies = [
+ "once_cell",
  "wasm-bindgen",
 ]
 
@@ -8213,8 +8272,8 @@ dependencies = [
  "prometheus",
  "reqwest 0.12.9",
  "snap",
- "one-tls",
- "one-types",
+ "sui-tls",
+ "sui-types",
  "tokio",
  "tracing",
 ]
@@ -8260,7 +8319,7 @@ dependencies = [
  "prometheus",
  "serde",
  "snap",
- "one-http",
+ "sui-http",
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-stream",
@@ -8436,6 +8495,18 @@ checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
 dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
+dependencies = [
+ "bitflags 2.6.0",
+ "cfg-if",
+ "cfg_aliases",
  "libc",
 ]
 
@@ -8801,6 +8872,207 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
+name = "one"
+version = "1.44.3"
+dependencies = [
+ "anemo",
+ "anyhow",
+ "assert_cmd",
+ "async-recursion",
+ "async-trait",
+ "aws-config",
+ "aws-sdk-kms",
+ "axum 0.7.5",
+ "bcs",
+ "bin-version",
+ "bip32",
+ "camino",
+ "clap",
+ "codespan-reporting",
+ "colored",
+ "csv",
+ "datatest-stable",
+ "expect-test",
+ "fastcrypto",
+ "fastcrypto-zkp",
+ "fs_extra",
+ "futures",
+ "http 1.1.0",
+ "im",
+ "inquire",
+ "insta",
+ "insta-cmd",
+ "jemalloc-ctl",
+ "json_to_table",
+ "miette",
+ "move-analyzer",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier-meter",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-ir-types",
+ "move-package",
+ "move-vm-config",
+ "move-vm-profiler",
+ "msim",
+ "num-bigint 0.4.4",
+ "prometheus",
+ "rand 0.8.5",
+ "regex",
+ "reqwest 0.12.9",
+ "rustyline",
+ "rustyline-derive",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "shared-crypto",
+ "shell-words",
+ "shlex",
+ "signature 1.6.4",
+ "sui-bridge",
+ "sui-config",
+ "sui-execution",
+ "sui-faucet",
+ "sui-genesis-builder",
+ "sui-graphql-rpc",
+ "sui-indexer",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-macros",
+ "sui-move",
+ "sui-move-build",
+ "sui-package-management",
+ "sui-protocol-config",
+ "sui-replay",
+ "sui-sdk",
+ "sui-simulator",
+ "sui-source-validation",
+ "sui-swarm",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-transaction-builder 0.0.0",
+ "sui-types",
+ "tabled",
+ "tap",
+ "telemetry-subscribers",
+ "tempfile",
+ "test-cluster",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.7.4",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "unescape",
+ "url",
+ "uuid 1.2.2",
+]
+
+[[package]]
+name = "one-node"
+version = "1.44.3"
+dependencies = [
+ "anemo",
+ "anemo-tower",
+ "anyhow",
+ "arc-swap",
+ "axum 0.7.5",
+ "base64 0.21.7",
+ "bcs",
+ "bin-version",
+ "clap",
+ "consensus-core",
+ "fastcrypto",
+ "fastcrypto-zkp",
+ "futures",
+ "http 1.1.0",
+ "humantime",
+ "move-vm-profiler",
+ "mysten-common",
+ "mysten-metrics",
+ "mysten-network",
+ "mysten-service",
+ "parking_lot 0.12.3",
+ "prometheus",
+ "reqwest 0.12.9",
+ "serde",
+ "sui-archival",
+ "sui-config",
+ "sui-core",
+ "sui-http",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-macros",
+ "sui-name-service",
+ "sui-network",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-simulator",
+ "sui-snapshot",
+ "sui-storage",
+ "sui-telemetry",
+ "sui-tls",
+ "sui-types",
+ "tap",
+ "telemetry-subscribers",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "typed-store",
+ "url",
+]
+
+[[package]]
+name = "one-tool"
+version = "1.44.3"
+dependencies = [
+ "anemo",
+ "anemo-cli",
+ "anyhow",
+ "bcs",
+ "bin-version",
+ "clap",
+ "colored",
+ "comfy-table",
+ "eyre",
+ "fastcrypto",
+ "futures",
+ "hex",
+ "indicatif",
+ "itertools 0.13.0",
+ "move-core-types",
+ "num_cpus",
+ "object_store",
+ "prometheus",
+ "ron",
+ "serde",
+ "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "sui-archival",
+ "sui-config",
+ "sui-core",
+ "sui-network",
+ "sui-package-dump",
+ "sui-protocol-config",
+ "sui-replay",
+ "sui-sdk",
+ "sui-snapshot",
+ "sui-storage",
+ "sui-tls",
+ "sui-types",
+ "telemetry-subscribers",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "typed-store",
+]
+
+[[package]]
 name = "oorandom"
 version = "11.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9060,6 +9332,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "p521"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fc9e2161f1f215afdfce23677034ae137bbd45016a880c2eb3ba8eb95f085b2"
+dependencies = [
+ "base16ct 0.2.0",
+ "ecdsa 0.16.9",
+ "elliptic-curve 0.13.8",
+ "primeorder",
+ "rand_core 0.6.4",
+ "sha2 0.10.8",
+]
+
+[[package]]
+name = "pageant"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdd27df01428302f915ea74737fe88170dd1bab4cbd00ff9548ca85618fcd4e4"
+dependencies = [
+ "bytes",
+ "delegate",
+ "futures",
+ "log",
+ "rand 0.8.5",
+ "thiserror 1.0.69",
+ "tokio",
+ "windows",
+]
+
+[[package]]
 name = "pairing"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9285,6 +9587,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "password-hash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
+dependencies = [
+ "base64ct",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
 name = "pasta_curves"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9330,7 +9643,7 @@ checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
  "hmac",
- "password-hash",
+ "password-hash 0.4.2",
  "sha2 0.10.8",
 ]
 
@@ -9575,6 +9888,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkcs5"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e847e2c91a18bfa887dd028ec33f2fe6f25db77db3619024764914affe8b69a6"
+dependencies = [
+ "aes",
+ "cbc",
+ "der 0.7.9",
+ "pbkdf2 0.12.1",
+ "scrypt 0.11.0",
+ "sha2 0.10.8",
+ "spki 0.7.3",
+]
+
+[[package]]
 name = "pkcs8"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9591,6 +9919,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
  "der 0.7.9",
+ "pkcs5",
+ "rand_core 0.6.4",
  "spki 0.7.3",
 ]
 
@@ -9793,9 +10123,9 @@ dependencies = [
 
 [[package]]
 name = "primeorder"
-version = "0.13.0"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7613fdcc0831c10060fa69833ea8fa2caa94b6456f51e25356a885b530a2e3d0"
+checksum = "353e1ca18966c16d9deb1c69278edbc5f194139612772bd9537af60ac231e1e6"
 dependencies = [
  "elliptic-curve 0.13.8",
 ]
@@ -10857,6 +11187,7 @@ dependencies = [
  "pkcs1 0.7.5",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
+ "sha2 0.10.8",
  "signature 2.2.0",
  "subtle",
  "zeroize",
@@ -10890,83 +11221,91 @@ dependencies = [
 
 [[package]]
 name = "russh"
-version = "0.38.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae0efcc0f4cd6c062c07e572ce4b806e3967fa029fcbfcc0aa98fb5910a37925"
+checksum = "c4816b748109d26daa30e72d231a3a6e42f9e2fffe6c08cbfed63113db0ce884"
 dependencies = [
  "aes",
  "aes-gcm",
- "async-trait",
  "bitflags 2.6.0",
+ "block-padding 0.3.2",
  "byteorder",
+ "bytes",
+ "cbc",
  "chacha20",
  "ctr",
  "curve25519-dalek",
+ "data-encoding",
+ "delegate",
+ "der 0.7.9",
  "digest 0.10.7",
+ "ecdsa 0.16.9",
+ "ed25519-dalek",
+ "elliptic-curve 0.13.8",
+ "enum_dispatch",
  "flate2",
  "futures",
  "generic-array",
+ "getrandom 0.2.15",
  "hex-literal 0.4.1",
  "hmac",
+ "home",
+ "inout",
+ "internal-russh-forked-ssh-key",
  "log",
+ "md5",
  "num-bigint 0.4.4",
  "once_cell",
+ "p256",
+ "p384",
+ "p521",
+ "pageant",
+ "pbkdf2 0.12.1",
+ "pkcs1 0.7.5",
+ "pkcs5",
+ "pkcs8 0.10.2",
  "poly1305",
  "rand 0.8.5",
+ "rand_core 0.6.4",
+ "rsa 0.9.1",
  "russh-cryptovec",
- "russh-keys",
+ "russh-util",
+ "sec1 0.7.3",
  "sha1",
  "sha2 0.10.8",
+ "signature 2.2.0",
+ "spki 0.7.3",
+ "ssh-encoding",
  "subtle",
  "thiserror 1.0.69",
  "tokio",
- "tokio-util 0.7.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typenum",
+ "zeroize",
 ]
 
 [[package]]
 name = "russh-cryptovec"
-version = "0.7.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3fdf036c2216b554053d19d4af45c1722d13b00ac494ea19825daf4beac034e"
+checksum = "5b722480e7117893a8a14ba22298dca3387b24fa1c40eb06f3105b82875c7497"
 dependencies = [
  "libc",
+ "log",
+ "nix 0.29.0",
+ "ssh-encoding",
  "winapi",
 ]
 
 [[package]]
-name = "russh-keys"
-version = "0.38.0"
+name = "russh-util"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "557ab9190022dff78116ebed5e391abbd3f424b06cd643dfe262346ab91ed8c9"
+checksum = "c0c3f1ba8f8ccbe1af83c1a5dc325ecb0b6e176d1444c241c1d684ab216d1b24"
 dependencies = [
- "aes",
- "async-trait",
- "bcrypt-pbkdf",
- "bit-vec 0.6.3",
- "block-padding 0.3.2",
- "byteorder",
- "cbc",
- "ctr",
- "data-encoding",
- "dirs 5.0.1",
- "ed25519-dalek",
- "futures",
- "hmac",
- "inout",
- "log",
- "md5",
- "num-bigint 0.4.4",
- "num-integer",
- "pbkdf2 0.11.0",
- "rand 0.7.3",
- "rand_core 0.6.4",
- "russh-cryptovec",
- "serde",
- "sha2 0.10.8",
- "thiserror 1.0.69",
+ "chrono",
  "tokio",
- "tokio-stream",
- "yasna",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -11369,6 +11708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "scrypt"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0516a385866c09368f0b5bcd1caff3366aace790fcd46e2bb032697bb172fd1f"
+dependencies = [
+ "pbkdf2 0.12.1",
+ "salsa20",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "sct"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11399,9 +11749,9 @@ dependencies = [
 
 [[package]]
 name = "sec1"
-version = "0.7.1"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48518a2b5775ba8ca5b46596aae011caa431e6ce7e4a67ead66d92f08884220e"
+checksum = "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
 dependencies = [
  "base16ct 0.2.0",
  "der 0.7.9",
@@ -11951,16 +12301,16 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "shared-crypto",
- "one-config",
- "one-execution",
- "one-framework",
- "one-genesis-builder",
- "one-keys",
- "one-protocol-config",
- "one-storage",
- "one-swarm-config",
- "one-transaction-checks",
- "one-types",
+ "sui-config",
+ "sui-execution",
+ "sui-framework",
+ "sui-genesis-builder",
+ "sui-keys",
+ "sui-protocol-config",
+ "sui-storage",
+ "sui-swarm-config",
+ "sui-transaction-checks",
+ "sui-types",
  "tracing",
 ]
 
@@ -12188,6 +12538,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "ssh-cipher"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caac132742f0d33c3af65bfcde7f6aa8f62f0e991d80db99149eb9d44708784f"
+dependencies = [
+ "aes",
+ "aes-gcm",
+ "cbc",
+ "chacha20",
+ "cipher",
+ "ctr",
+ "poly1305",
+ "ssh-encoding",
+ "subtle",
+]
+
+[[package]]
+name = "ssh-encoding"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb9242b9ef4108a78e8cd1a2c98e193ef372437f8c22be363075233321dd4a15"
+dependencies = [
+ "base64ct",
+ "bytes",
+ "pem-rfc7468 0.7.0",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12381,107 +12760,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
-name = "one"
-version = "1.44.3"
-dependencies = [
- "anemo",
- "anyhow",
- "assert_cmd",
- "async-recursion",
- "async-trait",
- "aws-config",
- "aws-sdk-kms",
- "axum 0.7.5",
- "bcs",
- "bin-version",
- "bip32",
- "camino",
- "clap",
- "codespan-reporting",
- "colored",
- "csv",
- "datatest-stable",
- "expect-test",
- "fastcrypto",
- "fastcrypto-zkp",
- "fs_extra",
- "futures",
- "http 1.1.0",
- "im",
- "inquire",
- "insta",
- "insta-cmd",
- "jemalloc-ctl",
- "json_to_table",
- "miette",
- "move-analyzer",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-verifier-meter",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
- "move-package",
- "move-vm-config",
- "move-vm-profiler",
- "msim",
- "num-bigint 0.4.4",
- "prometheus",
- "rand 0.8.5",
- "regex",
- "reqwest 0.12.9",
- "rustyline",
- "rustyline-derive",
- "serde",
- "serde_json",
- "serde_yaml 0.8.26",
- "shared-crypto",
- "shell-words",
- "shlex",
- "signature 1.6.4",
- "one-bridge",
- "one-config",
- "one-execution",
- "one-faucet",
- "one-genesis-builder",
- "one-graphql-rpc",
- "one-indexer",
- "one-json",
- "one-json-rpc-types",
- "one-keys",
- "one-macros",
- "one-move",
- "one-move-build",
- "one-package-management",
- "one-protocol-config",
- "one-replay",
- "one-sdk",
- "one-simulator",
- "one-source-validation",
- "one-swarm",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-transaction-builder 0.0.0",
- "one-types",
- "tabled",
- "tap",
- "telemetry-subscribers",
- "tempfile",
- "test-cluster",
- "thiserror 1.0.69",
- "tokio",
- "toml 0.7.4",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "unescape",
- "url",
- "uuid 1.2.2",
-]
-
-[[package]]
-name = "one-adapter-latest"
+name = "sui-adapter-latest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12500,24 +12779,24 @@ dependencies = [
  "mysten-metrics",
  "parking_lot 0.12.3",
  "serde",
- "one-macros",
- "one-move-natives-latest",
- "one-protocol-config",
- "one-types",
- "one-verifier-latest",
+ "sui-macros",
+ "sui-move-natives-latest",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-latest",
  "tracing",
 ]
 
 [[package]]
-name = "one-adapter-transactional-tests"
+name = "sui-adapter-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
- "one-transactional-test-runner",
+ "sui-transactional-test-runner",
 ]
 
 [[package]]
-name = "one-adapter-v0"
+name = "sui-adapter-v0"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12536,16 +12815,16 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.3",
  "serde",
- "one-macros",
- "one-move-natives-v0",
- "one-protocol-config",
- "one-types",
- "one-verifier-v0",
+ "sui-macros",
+ "sui-move-natives-v0",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-v0",
  "tracing",
 ]
 
 [[package]]
-name = "one-adapter-v1"
+name = "sui-adapter-v1"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12562,16 +12841,16 @@ dependencies = [
  "move-vm-types",
  "parking_lot 0.12.3",
  "serde",
- "one-macros",
- "one-move-natives-v1",
- "one-protocol-config",
- "one-types",
- "one-verifier-v1",
+ "sui-macros",
+ "sui-move-natives-v1",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-v1",
  "tracing",
 ]
 
 [[package]]
-name = "one-adapter-v2"
+name = "sui-adapter-v2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12588,16 +12867,16 @@ dependencies = [
  "move-vm-types",
  "parking_lot 0.12.3",
  "serde",
- "one-macros",
- "one-move-natives-v2",
- "one-protocol-config",
- "one-types",
- "one-verifier-v2",
+ "sui-macros",
+ "sui-move-natives-v2",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-v2",
  "tracing",
 ]
 
 [[package]]
-name = "one-analytics-indexer"
+name = "sui-analytics-indexer"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12628,15 +12907,15 @@ dependencies = [
  "snowflake-api",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-analytics-indexer-derive",
- "one-config",
- "one-data-ingestion-core",
- "one-indexer",
- "one-json-rpc-types",
- "one-package-resolver",
- "one-rpc-api",
- "one-storage",
- "one-types",
+ "sui-analytics-indexer-derive",
+ "sui-config",
+ "sui-data-ingestion-core",
+ "sui-indexer",
+ "sui-json-rpc-types",
+ "sui-package-resolver",
+ "sui-rpc-api",
+ "sui-storage",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -12649,7 +12928,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-analytics-indexer-derive"
+name = "sui-analytics-indexer-derive"
 version = "1.44.3"
 dependencies = [
  "proc-macro2",
@@ -12658,7 +12937,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-archival"
+name = "sui-archival"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12677,30 +12956,30 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "one-config",
- "one-macros",
- "one-simulator",
- "one-storage",
- "one-swarm-config",
- "one-types",
+ "sui-config",
+ "sui-macros",
+ "sui-simulator",
+ "sui-storage",
+ "sui-swarm-config",
+ "sui-types",
  "tempfile",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "one-authority-aggregation"
+name = "sui-authority-aggregation"
 version = "0.1.0"
 dependencies = [
  "futures",
  "mysten-metrics",
- "one-types",
+ "sui-types",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "one-aws-orchestrator"
+name = "sui-aws-orchestrator"
 version = "0.0.1"
 dependencies = [
  "async-trait",
@@ -12719,19 +12998,18 @@ dependencies = [
  "prometheus-parse",
  "reqwest 0.12.9",
  "russh",
- "russh-keys",
  "serde",
  "serde_json",
- "one-config",
- "one-swarm-config",
- "one-types",
+ "sui-config",
+ "sui-swarm-config",
+ "sui-types",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]
 
 [[package]]
-name = "one-benchmark"
+name = "sui-benchmark"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -12755,22 +13033,22 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-config",
- "one-core",
- "one-framework",
- "one-framework-snapshot",
- "one-json-rpc-types",
- "one-keys",
- "one-macros",
- "one-network",
- "one-protocol-config",
- "one-sdk",
- "one-simulator",
- "one-storage",
- "one-surfer",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-framework",
+ "sui-framework-snapshot",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-macros",
+ "sui-network",
+ "sui-protocol-config",
+ "sui-sdk",
+ "sui-simulator",
+ "sui-storage",
+ "sui-surfer",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "sysinfo",
  "telemetry-subscribers",
  "test-cluster",
@@ -12781,7 +13059,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-bridge"
+name = "sui-bridge"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12813,14 +13091,14 @@ dependencies = [
  "serde_with",
  "shared-crypto",
  "strum_macros 0.24.3",
- "one-authority-aggregation",
- "one-config",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-keys",
- "one-sdk",
- "one-test-transaction-builder",
- "one-types",
+ "sui-authority-aggregation",
+ "sui-config",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-sdk",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -12832,7 +13110,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-bridge-cli"
+name = "sui-bridge-cli"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12846,19 +13124,19 @@ dependencies = [
  "serde_json",
  "serde_with",
  "shared-crypto",
- "one-bridge",
- "one-config",
- "one-json-rpc-types",
- "one-keys",
- "one-sdk",
- "one-types",
+ "sui-bridge",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-sdk",
+ "sui-types",
  "telemetry-subscribers",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "one-bridge-indexer"
+name = "sui-bridge-indexer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -12879,16 +13157,16 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "strum_macros 0.24.3",
- "one-bridge",
- "one-config",
- "one-data-ingestion-core",
- "one-indexer",
- "one-indexer-builder",
- "one-json-rpc-types",
- "one-pg-db",
- "one-sdk",
- "one-test-transaction-builder",
- "one-types",
+ "sui-bridge",
+ "sui-config",
+ "sui-data-ingestion-core",
+ "sui-indexer",
+ "sui-indexer-builder",
+ "sui-json-rpc-types",
+ "sui-pg-db",
+ "sui-sdk",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -12898,7 +13176,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-cluster-test"
+name = "sui-cluster-test"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -12914,21 +13192,21 @@ dependencies = [
  "reqwest 0.12.9",
  "serde_json",
  "shared-crypto",
- "one-config",
- "one-core",
- "one-faucet",
- "one-graphql-rpc",
- "one-indexer",
- "one-json",
- "one-json-rpc-types",
- "one-keys",
- "one-move-build",
- "one-pg-db",
- "one-sdk",
- "one-swarm",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-faucet",
+ "sui-graphql-rpc",
+ "sui-indexer",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-move-build",
+ "sui-pg-db",
+ "sui-sdk",
+ "sui-swarm",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -12939,7 +13217,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-config"
+name = "sui-config"
 version = "0.0.0"
 dependencies = [
  "anemo",
@@ -12960,16 +13238,16 @@ dependencies = [
  "serde",
  "serde_with",
  "serde_yaml 0.8.26",
- "one-keys",
- "one-protocol-config",
- "one-rpc-api",
- "one-types",
+ "sui-keys",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "one-core"
+name = "sui-core"
 version = "0.1.0"
 dependencies = [
  "anemo",
@@ -13034,25 +13312,25 @@ dependencies = [
  "shared-crypto",
  "simple_moving_average",
  "static_assertions",
- "one-archival",
- "one-authority-aggregation",
- "one-config",
- "one-execution",
- "one-framework",
- "one-genesis-builder",
- "one-json-rpc-types",
- "one-macros",
- "one-move",
- "one-move-build",
- "one-network",
- "one-protocol-config",
- "one-simulator",
- "one-storage",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-tls",
- "one-transaction-checks",
- "one-types",
+ "sui-archival",
+ "sui-authority-aggregation",
+ "sui-config",
+ "sui-execution",
+ "sui-framework",
+ "sui-genesis-builder",
+ "sui-json-rpc-types",
+ "sui-macros",
+ "sui-move",
+ "sui-move-build",
+ "sui-network",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-storage",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-tls",
+ "sui-transaction-checks",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13066,7 +13344,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-cost"
+name = "sui-cost"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13076,18 +13354,18 @@ dependencies = [
  "serde",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-config",
- "one-json-rpc-types",
- "one-move-build",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-move-build",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "test-cluster",
  "tokio",
 ]
 
 [[package]]
-name = "one-data-ingestion"
+name = "sui-data-ingestion"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13107,11 +13385,11 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "one-archival",
- "one-data-ingestion-core",
- "one-kvstore",
- "one-storage",
- "one-types",
+ "sui-archival",
+ "sui-data-ingestion-core",
+ "sui-kvstore",
+ "sui-storage",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -13120,7 +13398,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-data-ingestion-core"
+name = "sui-data-ingestion-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13135,10 +13413,10 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "one-protocol-config",
- "one-rpc-api",
- "one-storage",
- "one-types",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-storage",
+ "sui-types",
  "tap",
  "tempfile",
  "tokio",
@@ -13148,7 +13426,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-deepbook-indexer"
+name = "sui-deepbook-indexer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13167,12 +13445,12 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "one-config",
- "one-data-ingestion-core",
- "one-indexer-builder",
- "one-json-rpc-types",
- "one-sdk",
- "one-types",
+ "sui-config",
+ "sui-data-ingestion-core",
+ "sui-indexer-builder",
+ "sui-json-rpc-types",
+ "sui-sdk",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13182,7 +13460,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-default-config"
+name = "sui-default-config"
 version = "1.44.3"
 dependencies = [
  "quote",
@@ -13190,18 +13468,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-display"
+name = "sui-display"
 version = "1.44.3"
 dependencies = [
  "anyhow",
  "move-core-types",
- "one-json-rpc-types",
- "one-types",
+ "sui-json-rpc-types",
+ "sui-types",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "one-e2e-tests"
+name = "sui-e2e-tests"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13219,6 +13497,9 @@ dependencies = [
  "move-core-types",
  "move-package",
  "mysten-metrics",
+ "one",
+ "one-node",
+ "one-tool",
  "p256",
  "passkey-authenticator",
  "passkey-client",
@@ -13231,30 +13512,27 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-crypto",
- "one",
- "one-config",
- "one-core",
- "one-framework",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-keys",
- "one-macros",
- "one-move-build",
- "one-network",
- "one-node",
- "one-protocol-config",
- "one-rpc-api",
- "one-sdk",
- "one-sdk-types",
- "one-simulator",
- "one-storage",
- "one-swarm",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-tool",
- "one-transaction-builder 0.1.0",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-framework",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-macros",
+ "sui-move-build",
+ "sui-network",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-sdk",
+ "sui-sdk-types",
+ "sui-simulator",
+ "sui-storage",
+ "sui-swarm",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-transaction-builder 0.1.0",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -13266,7 +13544,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-edge-proxy"
+name = "sui-edge-proxy"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13290,14 +13568,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-enum-compat-util"
+name = "sui-enum-compat-util"
 version = "0.1.0"
 dependencies = [
  "serde_yaml 0.8.26",
 ]
 
 [[package]]
-name = "one-execution"
+name = "sui-execution"
 version = "0.1.0"
 dependencies = [
  "cargo_metadata 0.15.4",
@@ -13316,24 +13594,24 @@ dependencies = [
  "move-vm-runtime-v1",
  "move-vm-runtime-v2",
  "petgraph 0.5.1",
- "one-adapter-latest",
- "one-adapter-v0",
- "one-adapter-v1",
- "one-adapter-v2",
- "one-move-natives-latest",
- "one-move-natives-v0",
- "one-move-natives-v1",
- "one-move-natives-v2",
- "one-protocol-config",
- "one-types",
- "one-verifier-latest",
- "one-verifier-v0",
- "one-verifier-v1",
- "one-verifier-v2",
+ "sui-adapter-latest",
+ "sui-adapter-v0",
+ "sui-adapter-v1",
+ "sui-adapter-v2",
+ "sui-move-natives-latest",
+ "sui-move-natives-v0",
+ "sui-move-natives-v1",
+ "sui-move-natives-v2",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-latest",
+ "sui-verifier-v0",
+ "sui-verifier-v1",
+ "sui-verifier-v2",
 ]
 
 [[package]]
-name = "one-execution-cut"
+name = "sui-execution-cut"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13346,8 +13624,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-faucet"
-version = "1.44.3"
+name = "sui-faucet"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -13369,11 +13647,11 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-crypto",
- "one-config",
- "one-json-rpc-types",
- "one-keys",
- "one-sdk",
- "one-types",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-sdk",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13392,14 +13670,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-field-count"
+name = "sui-field-count"
 version = "1.44.3"
 dependencies = [
- "one-field-count-derive",
+ "sui-field-count-derive",
 ]
 
 [[package]]
-name = "one-field-count-derive"
+name = "sui-field-count-derive"
 version = "1.44.3"
 dependencies = [
  "quote",
@@ -13407,7 +13685,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-framework"
+name = "sui-framework"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13419,15 +13697,15 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
- "one-config",
- "one-move-build",
- "one-types",
+ "sui-config",
+ "sui-move-build",
+ "sui-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "one-framework-snapshot"
+name = "sui-framework-snapshot"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13436,15 +13714,15 @@ dependencies = [
  "move-package",
  "serde",
  "serde_json",
- "one-framework",
- "one-move-build",
- "one-protocol-config",
- "one-types",
+ "sui-framework",
+ "sui-move-build",
+ "sui-protocol-config",
+ "sui-types",
  "tokio",
 ]
 
 [[package]]
-name = "one-framework-tests"
+name = "sui-framework-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
@@ -13454,18 +13732,18 @@ dependencies = [
  "move-package",
  "move-unit-test",
  "prometheus",
- "one-adapter-latest",
- "one-config",
- "one-framework",
- "one-move",
- "one-move-build",
- "one-protocol-config",
- "one-types",
- "one-verifier-latest",
+ "sui-adapter-latest",
+ "sui-config",
+ "sui-framework",
+ "sui-move",
+ "sui-move-build",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-latest",
 ]
 
 [[package]]
-name = "one-genesis-builder"
+name = "sui-genesis-builder"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -13480,19 +13758,19 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "shared-crypto",
- "one-config",
- "one-execution",
- "one-framework",
- "one-framework-snapshot",
- "one-protocol-config",
- "one-simulator",
- "one-types",
+ "sui-config",
+ "sui-execution",
+ "sui-framework",
+ "sui-framework-snapshot",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "one-graphql-e2e-tests"
+name = "sui-graphql-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13500,14 +13778,14 @@ dependencies = [
  "datatest-stable",
  "msim",
  "serde_json",
- "one-graphql-rpc",
- "one-transactional-test-runner",
+ "sui-graphql-rpc",
+ "sui-transactional-test-runner",
  "telemetry-subscribers",
  "tokio",
 ]
 
 [[package]]
-name = "one-graphql-rpc"
+name = "sui-graphql-rpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13556,23 +13834,23 @@ dependencies = [
  "shared-crypto",
  "similar",
  "simulacrum",
- "one-default-config",
- "one-framework",
- "one-graphql-rpc-client",
- "one-graphql-rpc-headers",
- "one-indexer",
- "one-json-rpc",
- "one-json-rpc-types",
- "one-move-build",
- "one-name-service",
- "one-package-resolver",
- "one-pg-db",
- "one-protocol-config",
- "one-rpc-api",
- "one-sdk",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-default-config",
+ "sui-framework",
+ "sui-graphql-rpc-client",
+ "sui-graphql-rpc-headers",
+ "sui-indexer",
+ "sui-json-rpc",
+ "sui-json-rpc-types",
+ "sui-move-build",
+ "sui-name-service",
+ "sui-package-resolver",
+ "sui-pg-db",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-sdk",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13588,7 +13866,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-graphql-rpc-client"
+name = "sui-graphql-rpc-client"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
@@ -13596,19 +13874,19 @@ dependencies = [
  "hyper 1.5.2",
  "reqwest 0.12.9",
  "serde_json",
- "one-graphql-rpc-headers",
+ "sui-graphql-rpc-headers",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "one-graphql-rpc-headers"
+name = "sui-graphql-rpc-headers"
 version = "0.1.0"
 dependencies = [
  "axum 0.7.5",
 ]
 
 [[package]]
-name = "one-http"
+name = "sui-http"
 version = "0.0.0"
 dependencies = [
  "axum 0.7.5",
@@ -13629,7 +13907,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-indexer"
+name = "sui-indexer"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13668,29 +13946,29 @@ dependencies = [
  "simulacrum",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-archival",
- "one-config",
- "one-core",
- "one-data-ingestion-core",
- "one-json",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-keys",
- "one-move-build",
- "one-name-service",
- "one-open-rpc",
- "one-package-resolver",
- "one-pg-db",
- "one-protocol-config",
- "one-rpc-api",
- "one-sdk",
- "one-snapshot",
- "one-storage",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-transaction-builder 0.0.0",
- "one-types",
+ "sui-archival",
+ "sui-config",
+ "sui-core",
+ "sui-data-ingestion-core",
+ "sui-json",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-move-build",
+ "sui-name-service",
+ "sui-open-rpc",
+ "sui-package-resolver",
+ "sui-pg-db",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-sdk",
+ "sui-snapshot",
+ "sui-storage",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-transaction-builder 0.0.0",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -13705,7 +13983,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-indexer-alt"
+name = "sui-indexer-alt"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13722,15 +14000,15 @@ dependencies = [
  "prometheus",
  "rand 0.8.5",
  "serde",
- "one-default-config",
- "one-field-count",
- "one-indexer-alt-framework",
- "one-indexer-alt-metrics",
- "one-indexer-alt-schema",
- "one-pg-db",
- "one-protocol-config",
- "one-synthetic-ingestion",
- "one-types",
+ "sui-default-config",
+ "sui-field-count",
+ "sui-indexer-alt-framework",
+ "sui-indexer-alt-metrics",
+ "sui-indexer-alt-schema",
+ "sui-pg-db",
+ "sui-protocol-config",
+ "sui-synthetic-ingestion",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -13741,7 +14019,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-indexer-alt-e2e-tests"
+name = "sui-indexer-alt-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13756,13 +14034,13 @@ dependencies = [
  "reqwest 0.12.9",
  "serde_json",
  "simulacrum",
- "one-indexer-alt",
- "one-indexer-alt-framework",
- "one-indexer-alt-jsonrpc",
- "one-move-build",
- "one-pg-db",
- "one-transactional-test-runner",
- "one-types",
+ "sui-indexer-alt",
+ "sui-indexer-alt-framework",
+ "sui-indexer-alt-jsonrpc",
+ "sui-move-build",
+ "sui-pg-db",
+ "sui-transactional-test-runner",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -13771,7 +14049,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-indexer-alt-framework"
+name = "sui-indexer-alt-framework"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13789,12 +14067,12 @@ dependencies = [
  "rand 0.8.5",
  "reqwest 0.12.9",
  "serde",
- "one-field-count",
- "one-indexer-alt-metrics",
- "one-pg-db",
- "one-sql-macro",
- "one-storage",
- "one-types",
+ "sui-field-count",
+ "sui-indexer-alt-metrics",
+ "sui-pg-db",
+ "sui-sql-macro",
+ "sui-storage",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "thiserror 1.0.69",
@@ -13807,7 +14085,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-indexer-alt-jsonrpc"
+name = "sui-indexer-alt-jsonrpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13831,21 +14109,21 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "one-default-config",
- "one-display",
- "one-indexer-alt-metrics",
- "one-indexer-alt-schema",
- "one-json",
- "one-json-rpc-types",
- "one-kvstore",
- "one-name-service",
- "one-open-rpc",
- "one-open-rpc-macros",
- "one-package-resolver",
- "one-pg-db",
- "one-protocol-config",
- "one-sql-macro",
- "one-types",
+ "sui-default-config",
+ "sui-display",
+ "sui-indexer-alt-metrics",
+ "sui-indexer-alt-schema",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-kvstore",
+ "sui-name-service",
+ "sui-open-rpc",
+ "sui-open-rpc-macros",
+ "sui-package-resolver",
+ "sui-pg-db",
+ "sui-protocol-config",
+ "sui-sql-macro",
+ "sui-types",
  "telemetry-subscribers",
  "thiserror 1.0.69",
  "tokio",
@@ -13859,21 +14137,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-indexer-alt-metrics"
+name = "sui-indexer-alt-metrics"
 version = "1.44.3"
 dependencies = [
  "anyhow",
  "axum 0.7.5",
  "clap",
  "prometheus",
- "one-pg-db",
+ "sui-pg-db",
  "tokio",
  "tokio-util 0.7.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing",
 ]
 
 [[package]]
-name = "one-indexer-alt-restorer"
+name = "sui-indexer-alt-restorer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13885,23 +14163,23 @@ dependencies = [
  "indicatif",
  "object_store",
  "prometheus",
- "one-archival",
- "one-config",
- "one-core",
- "one-field-count",
- "one-indexer-alt-framework",
- "one-indexer-alt-schema",
- "one-pg-db",
- "one-snapshot",
- "one-storage",
- "one-types",
+ "sui-archival",
+ "sui-config",
+ "sui-core",
+ "sui-field-count",
+ "sui-indexer-alt-framework",
+ "sui-indexer-alt-schema",
+ "sui-pg-db",
+ "sui-snapshot",
+ "sui-storage",
+ "sui-types",
  "telemetry-subscribers",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "one-indexer-alt-schema"
+name = "sui-indexer-alt-schema"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -13909,13 +14187,13 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "serde",
- "one-field-count",
- "one-protocol-config",
- "one-types",
+ "sui-field-count",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
-name = "one-indexer-builder"
+name = "sui-indexer-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -13923,10 +14201,10 @@ dependencies = [
  "futures",
  "mysten-metrics",
  "prometheus",
- "one-data-ingestion-core",
- "one-indexer-builder",
- "one-sdk",
- "one-types",
+ "sui-data-ingestion-core",
+ "sui-indexer-builder",
+ "sui-sdk",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tokio",
@@ -13934,7 +14212,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-json"
+name = "sui-json"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -13946,14 +14224,14 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "one-framework",
- "one-move-build",
- "one-types",
+ "sui-framework",
+ "sui-move-build",
+ "sui-types",
  "test-fuzz",
 ]
 
 [[package]]
-name = "one-json-rpc"
+name = "sui-json-rpc"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -13988,19 +14266,19 @@ dependencies = [
  "serde_json",
  "shared-crypto",
  "signature 1.6.4",
- "one-config",
- "one-core",
- "one-json",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-macros",
- "one-name-service",
- "one-open-rpc",
- "one-open-rpc-macros",
- "one-protocol-config",
- "one-storage",
- "one-transaction-builder 0.0.0",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-json",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-macros",
+ "sui-name-service",
+ "sui-open-rpc",
+ "sui-open-rpc-macros",
+ "sui-protocol-config",
+ "sui-storage",
+ "sui-transaction-builder 0.0.0",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "thiserror 1.0.69",
@@ -14013,7 +14291,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-json-rpc-api"
+name = "sui-json-rpc-api"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14022,17 +14300,17 @@ dependencies = [
  "mysten-metrics",
  "once_cell",
  "prometheus",
- "one-json",
- "one-json-rpc-types",
- "one-open-rpc",
- "one-open-rpc-macros",
- "one-types",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-open-rpc",
+ "sui-open-rpc-macros",
+ "sui-types",
  "tap",
  "tracing",
 ]
 
 [[package]]
-name = "one-json-rpc-tests"
+name = "sui-json-rpc-tests"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14046,23 +14324,23 @@ dependencies = [
  "rand 0.8.5",
  "reqwest 0.12.9",
  "shared-crypto",
- "one-config",
- "one-core",
- "one-json",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-keys",
- "one-macros",
- "one-move-build",
- "one-open-rpc",
- "one-open-rpc-macros",
- "one-protocol-config",
- "one-sdk",
- "one-simulator",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-json",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-macros",
+ "sui-move-build",
+ "sui-open-rpc",
+ "sui-open-rpc-macros",
+ "sui-protocol-config",
+ "sui-sdk",
+ "sui-simulator",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "telemetry-subscribers",
  "test-cluster",
  "tokio",
@@ -14070,7 +14348,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-json-rpc-types"
+name = "sui-json-rpc-types"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -14090,19 +14368,19 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "one-enum-compat-util",
- "one-json",
- "one-macros",
- "one-package-resolver",
- "one-protocol-config",
- "one-types",
+ "sui-enum-compat-util",
+ "sui-json",
+ "sui-macros",
+ "sui-package-resolver",
+ "sui-protocol-config",
+ "sui-types",
  "tabled",
  "tracing",
 ]
 
 [[package]]
-name = "one-keys"
-version = "0.0.0"
+name = "sui-keys"
+version = "1.44.3"
 dependencies = [
  "anyhow",
  "bip32",
@@ -14114,13 +14392,13 @@ dependencies = [
  "shared-crypto",
  "signature 1.6.4",
  "slip10_ed25519",
- "one-types",
+ "sui-types",
  "tempfile",
  "tiny-bip39",
 ]
 
 [[package]]
-name = "one-kvstore"
+name = "sui-kvstore"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14133,8 +14411,8 @@ dependencies = [
  "prost 0.13.3",
  "prost-types 0.13.3",
  "serde",
- "one-data-ingestion-core",
- "one-types",
+ "sui-data-ingestion-core",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -14143,7 +14421,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-light-client"
+name = "sui-light-client"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14160,28 +14438,28 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "one-config",
- "one-json-rpc-types",
- "one-package-resolver",
- "one-rpc-api",
- "one-sdk",
- "one-types",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-package-resolver",
+ "sui-rpc-api",
+ "sui-sdk",
+ "sui-types",
  "tokio",
  "url",
 ]
 
 [[package]]
-name = "one-macros"
+name = "sui-macros"
 version = "0.7.0"
 dependencies = [
  "futures",
  "once_cell",
- "one-proc-macros",
+ "sui-proc-macros",
  "tracing",
 ]
 
 [[package]]
-name = "one-metric-checker"
+name = "sui-metric-checker"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14202,7 +14480,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-move"
+name = "sui-move"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14229,11 +14507,11 @@ dependencies = [
  "rand 0.8.5",
  "serde_json",
  "serde_yaml 0.8.26",
- "one-macros",
- "one-move-build",
- "one-move-natives-latest",
- "one-protocol-config",
- "one-types",
+ "sui-macros",
+ "sui-move-build",
+ "sui-move-natives-latest",
+ "sui-protocol-config",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -14242,7 +14520,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-move-build"
+name = "sui-move-build"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14257,15 +14535,15 @@ dependencies = [
  "move-package",
  "move-symbol-pool",
  "serde-reflection",
- "one-package-management",
- "one-protocol-config",
- "one-types",
- "one-verifier-latest",
+ "sui-package-management",
+ "sui-protocol-config",
+ "sui-types",
+ "sui-verifier-latest",
  "tempfile",
 ]
 
 [[package]]
-name = "one-move-lsp"
+name = "sui-move-lsp"
 version = "1.44.3"
 dependencies = [
  "bin-version",
@@ -14274,7 +14552,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-move-natives-latest"
+name = "sui-move-natives-latest"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14290,13 +14568,13 @@ dependencies = [
  "move-vm-types",
  "rand 0.8.5",
  "smallvec",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
 [[package]]
-name = "one-move-natives-v0"
+name = "sui-move-natives-v0"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14310,13 +14588,13 @@ dependencies = [
  "move-vm-runtime-v0",
  "move-vm-types",
  "smallvec",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
 [[package]]
-name = "one-move-natives-v1"
+name = "sui-move-natives-v1"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14330,13 +14608,13 @@ dependencies = [
  "move-vm-runtime-v1",
  "move-vm-types",
  "smallvec",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
 [[package]]
-name = "one-move-natives-v2"
+name = "sui-move-natives-v2"
 version = "0.1.0"
 dependencies = [
  "bcs",
@@ -14350,13 +14628,13 @@ dependencies = [
  "move-vm-runtime-v2",
  "move-vm-types",
  "smallvec",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
 [[package]]
-name = "one-mvr-graphql-e2e-tests"
+name = "sui-mvr-graphql-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -14364,14 +14642,14 @@ dependencies = [
  "datatest-stable",
  "msim",
  "serde_json",
- "one-mvr-graphql-rpc",
- "one-transactional-test-runner",
+ "sui-mvr-graphql-rpc",
+ "sui-transactional-test-runner",
  "telemetry-subscribers",
  "tokio",
 ]
 
 [[package]]
-name = "one-mvr-graphql-rpc"
+name = "sui-mvr-graphql-rpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14420,23 +14698,22 @@ dependencies = [
  "shared-crypto",
  "similar",
  "simulacrum",
- "one-default-config",
- "one-framework",
- "one-graphql-rpc-client",
- "one-graphql-rpc-headers",
- "one-indexer",
- "one-json-rpc",
- "one-json-rpc-types",
- "one-move-build",
- "one-name-service",
- "one-package-resolver",
- "one-pg-db",
- "one-protocol-config",
- "one-rpc-api",
- "one-sdk",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-default-config",
+ "sui-framework",
+ "sui-graphql-rpc-client",
+ "sui-graphql-rpc-headers",
+ "sui-indexer",
+ "sui-json-rpc",
+ "sui-json-rpc-types",
+ "sui-move-build",
+ "sui-package-resolver",
+ "sui-pg-db",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-sdk",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -14452,18 +14729,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-name-service"
+name = "sui-name-service"
 version = "1.44.3"
 dependencies = [
  "bcs",
  "move-core-types",
  "serde",
- "one-types",
+ "sui-types",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "one-network"
+name = "sui-network"
 version = "0.0.0"
 dependencies = [
  "anemo",
@@ -14486,12 +14763,12 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "shared-crypto",
- "one-archival",
- "one-config",
- "one-macros",
- "one-storage",
- "one-swarm-config",
- "one-types",
+ "sui-archival",
+ "sui-config",
+ "sui-macros",
+ "sui-storage",
+ "sui-swarm-config",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -14503,62 +14780,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-node"
-version = "1.44.3"
-dependencies = [
- "anemo",
- "anemo-tower",
- "anyhow",
- "arc-swap",
- "axum 0.7.5",
- "base64 0.21.7",
- "bcs",
- "bin-version",
- "clap",
- "consensus-core",
- "fastcrypto",
- "fastcrypto-zkp",
- "futures",
- "http 1.1.0",
- "humantime",
- "move-vm-profiler",
- "mysten-common",
- "mysten-metrics",
- "mysten-network",
- "mysten-service",
- "parking_lot 0.12.3",
- "prometheus",
- "reqwest 0.12.9",
- "serde",
- "one-archival",
- "one-config",
- "one-core",
- "one-http",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-macros",
- "one-name-service",
- "one-network",
- "one-protocol-config",
- "one-rpc-api",
- "one-simulator",
- "one-snapshot",
- "one-storage",
- "one-telemetry",
- "one-tls",
- "one-types",
- "tap",
- "telemetry-subscribers",
- "tokio",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "typed-store",
- "url",
-]
-
-[[package]]
-name = "one-open-rpc"
+name = "sui-open-rpc"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14571,18 +14793,18 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "one-json",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-protocol-config",
- "one-types",
+ "sui-json",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-protocol-config",
+ "sui-types",
  "tokio",
  "versions",
 ]
 
 [[package]]
-name = "one-open-rpc-macros"
+name = "sui-open-rpc-macros"
 version = "0.1.0"
 dependencies = [
  "derive-syn-parse",
@@ -14594,7 +14816,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-oracle"
+name = "sui-oracle"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14611,12 +14833,12 @@ dependencies = [
  "serde",
  "serde_json",
  "shared-crypto",
- "one-config",
- "one-json-rpc-types",
- "one-keys",
- "one-move-build",
- "one-sdk",
- "one-types",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-move-build",
+ "sui-sdk",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tokio",
@@ -14624,7 +14846,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-package-dump"
+name = "sui-package-dump"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14636,29 +14858,29 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "one-types",
+ "sui-types",
  "tracing",
 ]
 
 [[package]]
-name = "one-package-management"
+name = "sui-package-management"
 version = "1.44.3"
 dependencies = [
  "anyhow",
  "move-core-types",
  "move-package",
  "move-symbol-pool",
- "one-framework-snapshot",
- "one-json-rpc-types",
- "one-protocol-config",
- "one-sdk",
- "one-types",
+ "sui-framework-snapshot",
+ "sui-json-rpc-types",
+ "sui-protocol-config",
+ "sui-sdk",
+ "sui-types",
  "thiserror 1.0.69",
  "tracing",
 ]
 
 [[package]]
-name = "one-package-resolver"
+name = "sui-package-resolver"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -14673,16 +14895,16 @@ dependencies = [
  "move-core-types",
  "serde",
  "serde_json",
- "one-move-build",
- "one-rpc-api",
- "one-types",
+ "sui-move-build",
+ "sui-rpc-api",
+ "sui-types",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.4.13",
 ]
 
 [[package]]
-name = "one-pg-db"
+name = "sui-pg-db"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14699,18 +14921,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-proc-macros"
+name = "sui-proc-macros"
 version = "0.7.0"
 dependencies = [
  "msim-macros",
  "proc-macro2",
  "quote",
- "one-enum-compat-util",
+ "sui-enum-compat-util",
  "syn 2.0.87",
 ]
 
 [[package]]
-name = "one-protocol-config"
+name = "sui-protocol-config"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -14720,12 +14942,12 @@ dependencies = [
  "serde",
  "serde-env",
  "serde_with",
- "one-protocol-config-macros",
+ "sui-protocol-config-macros",
  "tracing",
 ]
 
 [[package]]
-name = "one-protocol-config-macros"
+name = "sui-protocol-config-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -14734,7 +14956,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-proxy"
+name = "sui-proxy"
 version = "0.0.2"
 dependencies = [
  "anyhow",
@@ -14767,8 +14989,8 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "snap",
- "one-tls",
- "one-types",
+ "sui-tls",
+ "sui-types",
  "telemetry-subscribers",
  "tokio",
  "tower 0.4.13",
@@ -14778,7 +15000,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-replay"
+name = "sui-replay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -14805,17 +15027,17 @@ dependencies = [
  "shared-crypto",
  "shellexpand",
  "similar",
- "one-config",
- "one-core",
- "one-execution",
- "one-framework",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-protocol-config",
- "one-sdk",
- "one-storage",
- "one-transaction-checks",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-execution",
+ "sui-framework",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-protocol-config",
+ "sui-sdk",
+ "sui-storage",
+ "sui-transaction-checks",
+ "sui-types",
  "tabled",
  "tempfile",
  "thiserror 1.0.69",
@@ -14825,7 +15047,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-rosetta"
+name = "sui-rosetta"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14843,6 +15065,7 @@ dependencies = [
  "move-core-types",
  "mysten-metrics",
  "once_cell",
+ "one-node",
  "quick-js",
  "rand 0.8.5",
  "reqwest 0.12.9",
@@ -14852,14 +15075,13 @@ dependencies = [
  "signature 1.6.4",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-config",
- "one-json-rpc-types",
- "one-keys",
- "one-move-build",
- "one-node",
- "one-sdk",
- "one-swarm-config",
- "one-types",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-move-build",
+ "sui-sdk",
+ "sui-swarm-config",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -14870,7 +15092,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-rpc-api"
+name = "sui-rpc-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -14898,10 +15120,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "one-protocol-config",
- "one-sdk-types",
- "one-transaction-builder 0.1.0",
- "one-types",
+ "sui-protocol-config",
+ "sui-sdk-types",
+ "sui-transaction-builder 0.1.0",
+ "sui-types",
  "tap",
  "test-strategy",
  "thiserror 1.0.69",
@@ -14918,7 +15140,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-rpc-benchmark"
+name = "sui-rpc-benchmark"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14933,7 +15155,7 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "one-indexer-alt-framework",
+ "sui-indexer-alt-framework",
  "telemetry-subscribers",
  "tokio",
  "tokio-postgres",
@@ -14942,7 +15164,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-rpc-loadgen"
+name = "sui-rpc-loadgen"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14958,10 +15180,10 @@ dependencies = [
  "shellexpand",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-json-rpc-types",
- "one-keys",
- "one-sdk",
- "one-types",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-sdk",
+ "sui-types",
  "telemetry-subscribers",
  "tokio",
  "tonic 0.12.3",
@@ -14969,7 +15191,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-sdk"
+name = "sui-sdk"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -14991,16 +15213,16 @@ dependencies = [
  "serde_json",
  "serde_with",
  "shared-crypto",
- "one-config",
- "one-json",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-keys",
- "one-macros",
- "one-protocol-config",
- "one-simulator",
- "one-transaction-builder 0.0.0",
- "one-types",
+ "sui-config",
+ "sui-json",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-transaction-builder 0.0.0",
+ "sui-types",
  "tempfile",
  "test-cluster",
  "thiserror 1.0.69",
@@ -15009,9 +15231,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-sdk-types"
+name = "sui-sdk-types"
 version = "0.0.2"
-source = "git+https://github.com/MystenLabs/one-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
+source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
 dependencies = [
  "base64ct",
  "bcs",
@@ -15030,7 +15252,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-security-watchdog"
+name = "sui-security-watchdog"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -15054,7 +15276,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-simulator"
+name = "sui-simulator"
 version = "0.7.0"
 dependencies = [
  "anemo",
@@ -15067,9 +15289,9 @@ dependencies = [
  "mysten-network",
  "rand 0.8.5",
  "serde",
- "one-framework",
- "one-move-build",
- "one-types",
+ "sui-framework",
+ "sui-move-build",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tower 0.4.13",
@@ -15077,7 +15299,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-single-node-benchmark"
+name = "sui-single-node-benchmark"
 version = "1.44.3"
 dependencies = [
  "async-trait",
@@ -15095,23 +15317,23 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-config",
- "one-core",
- "one-macros",
- "one-move-build",
- "one-protocol-config",
- "one-simulator",
- "one-storage",
- "one-test-transaction-builder",
- "one-transaction-checks",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-macros",
+ "sui-move-build",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-storage",
+ "sui-test-transaction-builder",
+ "sui-transaction-checks",
+ "sui-types",
  "telemetry-subscribers",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "one-snapshot"
+name = "sui-snapshot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15127,12 +15349,12 @@ dependencies = [
  "prometheus",
  "serde",
  "serde_json",
- "one-config",
- "one-core",
- "one-indexer-alt-framework",
- "one-protocol-config",
- "one-storage",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-indexer-alt-framework",
+ "sui-protocol-config",
+ "sui-storage",
+ "sui-types",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -15140,7 +15362,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-source-validation"
+name = "sui-source-validation"
 version = "1.44.3"
 dependencies = [
  "anyhow",
@@ -15156,12 +15378,12 @@ dependencies = [
  "move-package",
  "move-symbol-pool",
  "rand 0.8.5",
- "one-json-rpc-types",
- "one-move-build",
- "one-package-management",
- "one-sdk",
- "one-test-transaction-builder",
- "one-types",
+ "sui-json-rpc-types",
+ "sui-move-build",
+ "sui-package-management",
+ "sui-sdk",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tar",
  "tempfile",
  "test-cluster",
@@ -15172,7 +15394,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-source-validation-service"
+name = "sui-source-validation-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15188,15 +15410,15 @@ dependencies = [
  "move-package",
  "move-symbol-pool",
  "mysten-metrics",
+ "one",
  "prometheus",
  "reqwest 0.12.9",
  "serde",
- "one",
- "one-json-rpc-types",
- "one-move",
- "one-move-build",
- "one-sdk",
- "one-source-validation",
+ "sui-json-rpc-types",
+ "sui-move",
+ "sui-move-build",
+ "sui-sdk",
+ "sui-source-validation",
  "telemetry-subscribers",
  "tempfile",
  "test-cluster",
@@ -15209,7 +15431,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-sql-macro"
+name = "sui-sql-macro"
 version = "1.44.3"
 dependencies = [
  "quote",
@@ -15218,7 +15440,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-storage"
+name = "sui-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15254,13 +15476,13 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "one-config",
- "one-json-rpc-types",
- "one-macros",
- "one-protocol-config",
- "one-simulator",
- "one-test-transaction-builder",
- "one-types",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -15272,7 +15494,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-surfer"
+name = "sui-surfer"
 version = "1.44.3"
 dependencies = [
  "async-trait",
@@ -15285,14 +15507,14 @@ dependencies = [
  "move-package",
  "prometheus",
  "rand 0.8.5",
- "one-core",
- "one-json-rpc-types",
- "one-macros",
- "one-move-build",
- "one-protocol-config",
- "one-simulator",
- "one-swarm-config",
- "one-types",
+ "sui-core",
+ "sui-json-rpc-types",
+ "sui-macros",
+ "sui-move-build",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-swarm-config",
+ "sui-types",
  "telemetry-subscribers",
  "test-cluster",
  "tokio",
@@ -15300,23 +15522,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-swarm"
+name = "sui-swarm"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "futures",
  "mysten-metrics",
  "mysten-network",
+ "one-node",
  "prometheus",
  "rand 0.8.5",
- "one-config",
- "one-macros",
- "one-node",
- "one-protocol-config",
- "one-simulator",
- "one-swarm-config",
- "one-tls",
- "one-types",
+ "sui-config",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-simulator",
+ "sui-swarm-config",
+ "sui-tls",
+ "sui-types",
  "tap",
  "telemetry-subscribers",
  "tempfile",
@@ -15326,7 +15548,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-swarm-config"
+name = "sui-swarm-config"
 version = "0.0.0"
 dependencies = [
  "anemo",
@@ -15341,29 +15563,29 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "shared-crypto",
- "one-config",
- "one-execution",
- "one-genesis-builder",
- "one-macros",
- "one-protocol-config",
- "one-rpc-api",
- "one-simulator",
- "one-types",
+ "sui-config",
+ "sui-execution",
+ "sui-genesis-builder",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-simulator",
+ "sui-types",
  "tempfile",
  "tracing",
 ]
 
 [[package]]
-name = "one-synthetic-ingestion"
+name = "sui-synthetic-ingestion"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "clap",
  "simulacrum",
- "one-storage",
- "one-test-transaction-builder",
- "one-types",
+ "sui-storage",
+ "sui-test-transaction-builder",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -15371,34 +15593,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-telemetry"
+name = "sui-telemetry"
 version = "0.1.0"
 dependencies = [
  "reqwest 0.12.9",
  "serde",
- "one-core",
+ "sui-core",
  "tracing",
 ]
 
 [[package]]
-name = "one-test-transaction-builder"
+name = "sui-test-transaction-builder"
 version = "0.1.0"
 dependencies = [
  "bcs",
  "move-core-types",
  "shared-crypto",
- "one-genesis-builder",
- "one-move-build",
- "one-sdk",
- "one-types",
+ "sui-genesis-builder",
+ "sui-move-build",
+ "sui-sdk",
+ "sui-types",
 ]
 
 [[package]]
-name = "one-test-validator"
+name = "sui-test-validator"
 version = "1.44.3"
 
 [[package]]
-name = "one-tls"
+name = "sui-tls"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -15420,53 +15642,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-tool"
-version = "1.44.3"
-dependencies = [
- "anemo",
- "anemo-cli",
- "anyhow",
- "bcs",
- "bin-version",
- "clap",
- "colored",
- "comfy-table",
- "eyre",
- "fastcrypto",
- "futures",
- "hex",
- "indicatif",
- "itertools 0.13.0",
- "move-core-types",
- "num_cpus",
- "object_store",
- "prometheus",
- "ron",
- "serde",
- "serde_json",
- "strum 0.24.1",
- "strum_macros 0.24.3",
- "one-archival",
- "one-config",
- "one-core",
- "one-network",
- "one-package-dump",
- "one-protocol-config",
- "one-replay",
- "one-sdk",
- "one-snapshot",
- "one-storage",
- "one-tls",
- "one-types",
- "telemetry-subscribers",
- "tempfile",
- "tokio",
- "tracing",
- "typed-store",
-]
-
-[[package]]
-name = "one-transaction-builder"
+name = "sui-transaction-builder"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -15475,42 +15651,42 @@ dependencies = [
  "futures",
  "move-binary-format",
  "move-core-types",
- "one-json",
- "one-json-rpc-types",
- "one-protocol-config",
- "one-types",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
-name = "one-transaction-builder"
+name = "sui-transaction-builder"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/one-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
+source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=5e11579031793f086178332219f5847ec94da0c4#5e11579031793f086178332219f5847ec94da0c4"
 dependencies = [
  "base64ct",
  "bcs",
  "serde",
  "serde_json",
  "serde_with",
- "one-sdk-types",
+ "sui-sdk-types",
  "thiserror 2.0.9",
 ]
 
 [[package]]
-name = "one-transaction-checks"
+name = "sui-transaction-checks"
 version = "0.1.0"
 dependencies = [
  "fastcrypto-zkp",
  "once_cell",
- "one-config",
- "one-execution",
- "one-macros",
- "one-protocol-config",
- "one-types",
+ "sui-config",
+ "sui-execution",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
 [[package]]
-name = "one-transactional-test-runner"
+name = "sui-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15539,19 +15715,19 @@ dependencies = [
  "serde",
  "serde_json",
  "simulacrum",
- "one-config",
- "one-core",
- "one-framework",
- "one-framework-snapshot",
- "one-graphql-rpc",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-protocol-config",
- "one-rpc-api",
- "one-storage",
- "one-swarm-config",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-framework",
+ "sui-framework-snapshot",
+ "sui-graphql-rpc",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-protocol-config",
+ "sui-rpc-api",
+ "sui-storage",
+ "sui-swarm-config",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -15560,7 +15736,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-types"
+name = "sui-types"
 version = "0.1.0"
 dependencies = [
  "anemo",
@@ -15622,10 +15798,10 @@ dependencies = [
  "static_assertions",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "one-enum-compat-util",
- "one-macros",
- "one-protocol-config",
- "one-sdk-types",
+ "sui-enum-compat-util",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-sdk-types",
  "tap",
  "thiserror 1.0.69",
  "tokio",
@@ -15637,7 +15813,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "one-upgrade-compatibility-transactional-tests"
+name = "sui-upgrade-compatibility-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -15647,11 +15823,11 @@ dependencies = [
  "move-command-line-common",
  "move-compiler",
  "move-package",
- "one-move-build",
+ "sui-move-build",
 ]
 
 [[package]]
-name = "one-verifier-latest"
+name = "sui-verifier-latest"
 version = "0.1.0"
 dependencies = [
  "move-abstract-interpreter",
@@ -15661,20 +15837,20 @@ dependencies = [
  "move-bytecode-verifier-meter",
  "move-core-types",
  "move-vm-config",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
-name = "one-verifier-transactional-tests"
+name = "sui-verifier-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
- "one-transactional-test-runner",
+ "sui-transactional-test-runner",
 ]
 
 [[package]]
-name = "one-verifier-v0"
+name = "sui-verifier-v0"
 version = "0.1.0"
 dependencies = [
  "move-abstract-stack",
@@ -15684,12 +15860,12 @@ dependencies = [
  "move-bytecode-verifier-v0",
  "move-core-types",
  "move-vm-config",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
-name = "one-verifier-v1"
+name = "sui-verifier-v1"
 version = "0.1.0"
 dependencies = [
  "move-abstract-stack",
@@ -15699,11 +15875,11 @@ dependencies = [
  "move-bytecode-verifier-v1",
  "move-core-types",
  "move-vm-config",
- "one-types",
+ "sui-types",
 ]
 
 [[package]]
-name = "one-verifier-v2"
+name = "sui-verifier-v2"
 version = "0.1.0"
 dependencies = [
  "move-abstract-stack",
@@ -15713,8 +15889,8 @@ dependencies = [
  "move-bytecode-verifier-v2",
  "move-core-types",
  "move-vm-config",
- "one-protocol-config",
- "one-types",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -15742,10 +15918,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "one-data-ingestion-core",
- "one-name-service",
- "one-storage",
- "one-types",
+ "sui-data-ingestion-core",
+ "sui-name-service",
+ "sui-storage",
+ "sui-types",
  "telemetry-subscribers",
  "tempfile",
  "tokio",
@@ -16099,26 +16275,26 @@ dependencies = [
  "jsonrpsee",
  "move-binary-format",
  "mysten-common",
+ "one-node",
  "prometheus",
  "rand 0.8.5",
- "one-config",
- "one-core",
- "one-framework",
- "one-indexer",
- "one-json-rpc",
- "one-json-rpc-api",
- "one-json-rpc-types",
- "one-keys",
- "one-macros",
- "one-node",
- "one-pg-db",
- "one-protocol-config",
- "one-sdk",
- "one-simulator",
- "one-swarm",
- "one-swarm-config",
- "one-test-transaction-builder",
- "one-types",
+ "sui-config",
+ "sui-core",
+ "sui-framework",
+ "sui-indexer",
+ "sui-json-rpc",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-macros",
+ "sui-pg-db",
+ "sui-protocol-config",
+ "sui-sdk",
+ "sui-simulator",
+ "sui-swarm",
+ "sui-swarm-config",
+ "sui-test-transaction-builder",
+ "sui-types",
  "tempfile",
  "tokio",
  "tokio-util 0.7.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -17084,10 +17260,10 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.8.5",
- "one-core",
- "one-move-build",
- "one-protocol-config",
- "one-types",
+ "sui-core",
+ "sui-move-build",
+ "sui-protocol-config",
+ "sui-types",
  "tokio",
  "tracing",
 ]
@@ -17201,7 +17377,7 @@ dependencies = [
  "rocksdb",
  "rstest",
  "serde",
- "one-macros",
+ "sui-macros",
  "tap",
  "tempfile",
  "thiserror 1.0.69",
@@ -17256,9 +17432,9 @@ checksum = "0e13db2e0ccd5e14a544e8a246ba2312cd25223f616442d7f2cb0e3db614236e"
 
 [[package]]
 name = "typenum"
-version = "1.16.0"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "typeshare"
@@ -17621,47 +17797,35 @@ checksum = "b8dad83b4f25e74f184f64c43b150b91efe7647395b42289f38e50566d82855b"
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.93"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a82edfc16a6c469f5f44dc7b571814045d60404b55a0ee849f9bcfa2e63dd9b5"
+checksum = "0d759f433fa64a2d763d1340820e46e111a7a5ab75f993d1852d70b03dbb80fd"
 dependencies = [
  "cfg-if",
  "once_cell",
+ "rustversion",
  "wasm-bindgen-macro",
-]
-
-[[package]]
-name = "wasm-bindgen-backend"
-version = "0.2.93"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9de396da306523044d3302746f1208fa71d7532227f15e347e2d93e4145dd77b"
-dependencies = [
- "bumpalo",
- "log",
- "once_cell",
- "proc-macro2",
- "quote",
- "syn 2.0.87",
  "wasm-bindgen-shared",
 ]
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.37"
+version = "0.4.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c02dbc21516f9f1f04f187958890d7e6026df8d16540b7ad9492bc34a67cea03"
+checksum = "836d9622d604feee9e5de25ac10e3ea5f2d65b41eac0d9ce72eb5deae707ce7c"
 dependencies = [
  "cfg-if",
  "js-sys",
+ "once_cell",
  "wasm-bindgen",
  "web-sys",
 ]
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.93"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "585c4c91a46b072c92e908d99cb1dcdf95c5218eeb6f3bf1efa991ee7a68cccf"
+checksum = "48cb0d2638f8baedbc542ed444afc0644a29166f1595371af4fecf8ce1e7eeb3"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -17669,22 +17833,25 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.93"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afc340c74d9005395cf9dd098506f7f44e38f2b4a21c6aaacf9a105ea5e1e836"
+checksum = "cefb59d5cd5f92d9dcf80e4683949f15ca4b511f4ac0a6e14d4e1ac60c6ecd40"
 dependencies = [
+ "bumpalo",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
- "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.93"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c62a0a307cb4a311d3a07867860911ca130c3494e8c2719593806c08bc5d0484"
+checksum = "cbc538057e648b67f72a982e708d485b2efa771e1ac05fec311f9f63e5800db4"
+dependencies = [
+ "unicode-ident",
+]
 
 [[package]]
 name = "wasm-streams"
@@ -17716,9 +17883,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.64"
+version = "0.3.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b85cbef8c220a6abc02aefd892dfc0fc23afb1c6a426316ec33253a3877249b"
+checksum = "9b32828d774c412041098d182a8b38b16ea816958e07cf40eec2bc080ae137ac"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -17796,6 +17963,51 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "windows"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
+dependencies = [
+ "windows-core",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
+dependencies = [
+ "windows-implement",
+ "windows-interface",
+ "windows-result",
+ "windows-strings",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-implement"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bbd5b46c938e506ecbce286b6628a02171d56153ba733b6c741fc627ec9579b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "windows-interface"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
 
 [[package]]
 name = "windows-registry"
@@ -18245,8 +18457,6 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
 dependencies = [
- "bit-vec 0.6.3",
- "num-bigint 0.4.4",
  "time",
 ]
 
