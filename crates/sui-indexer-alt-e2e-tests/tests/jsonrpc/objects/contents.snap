@@ -123,7 +123,7 @@ Response: {
       "digest": "AeAb1PukmXSZNcUMrQmqqWeEwSwyoKXhSGogxN37Wdym",
       "content": {
         "dataType": "moveObject",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "hasPublicTransfer": true,
         "fields": {
           "balance": "42",
@@ -134,7 +134,7 @@ Response: {
       },
       "bcs": {
         "dataType": "moveObject",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "hasPublicTransfer": true,
         "version": 3,
         "bcsBytes": "8qaDPsXS3XfmVqP+Yr3U5GCbI/oHOTEuOE/bsGCAFV4qAAAAAAAAAA=="

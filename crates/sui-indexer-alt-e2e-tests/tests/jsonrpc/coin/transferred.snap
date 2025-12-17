@@ -64,7 +64,7 @@ Response: {
   "result": {
     "data": [
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0x2834d85dbfefdcd66f04811231ba818893793e83a895d53402fd99e132e36562",
         "version": "3",
         "digest": "BGqvhSkz3SYePbLs4rwrKCGSjmZCQi98wj5XmPEZ3KAF",
@@ -72,7 +72,7 @@ Response: {
         "previousTransaction": "AasjzjtKdtrQeZqXEquUBDp3Wb8mbLziGxg6np4mhf56"
       },
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0x57f42279a1d36e456374da161a332ad4f4fe7919fdb44dba456447a6f4d25e8e",
         "version": "3",
         "digest": "5edeWFmMJatCEtNanqj2Qx91HcBGyq9F1EzbCnbZtY69",
@@ -80,7 +80,7 @@ Response: {
         "previousTransaction": "AasjzjtKdtrQeZqXEquUBDp3Wb8mbLziGxg6np4mhf56"
       },
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0x25c9a04c7ccfe4bba96596c73d14363121e0d6a6c979e65893877266f7f82074",
         "version": "2",
         "digest": "3xXGpcHsghX2BCcmWQ8CspNsWP8sD93LRdzzstTMt1Dx",
@@ -110,7 +110,7 @@ Response: {
   "result": {
     "data": [
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0x2834d85dbfefdcd66f04811231ba818893793e83a895d53402fd99e132e36562",
         "version": "4",
         "digest": "E3ZC4SDS6NLFuUt49XLDLakLKeRt3K5Z8vRi46VWS5WH",
@@ -118,7 +118,7 @@ Response: {
         "previousTransaction": "7NrtfspjR8UyxKK5hQMDnZmLEbgk9WnkLwSZjchzwPyH"
       },
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0x57f42279a1d36e456374da161a332ad4f4fe7919fdb44dba456447a6f4d25e8e",
         "version": "3",
         "digest": "5edeWFmMJatCEtNanqj2Qx91HcBGyq9F1EzbCnbZtY69",
@@ -139,7 +139,7 @@ Response: {
   "result": {
     "data": [
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0xfdc25bc3b2d2b3664199d08f5275c3a6bb360b0629ab5784672f083149163417",
         "version": "1",
         "digest": "4hY6HbcSgDuyD5TcKhxom1cPPdPTQtcoNUStc8BYoZt5",
@@ -147,7 +147,7 @@ Response: {
         "previousTransaction": "9YaSDYB2hY7DwGwATGe2y5D4d8BwtQjE8bj2wRQecqnr"
       },
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
         "coinObjectId": "0x25c9a04c7ccfe4bba96596c73d14363121e0d6a6c979e65893877266f7f82074",
         "version": "4",
         "digest": "CWZpsBtv4atiPHN1gt3L162sWwNXQuotS82ob6vUWC6N",

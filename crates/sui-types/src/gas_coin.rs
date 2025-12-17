@@ -69,7 +69,7 @@ mod checked {
         }
     }
 
-    /// Rust version of the Move one::coin::Coin<Sui::one::OCT> type
+    /// Rust version of the Move one::coin::Coin<Sui::oct::OCT> type
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct GasCoin(pub Coin);
 
@@ -86,12 +86,12 @@ mod checked {
             Coin::type_(TypeTag::Struct(Box::new(GAS::type_())))
         }
 
-        /// Return `true` if `s` is the type of a gas coin (i.e., 0x2::coin::Coin<0x2::one::OCT>)
+        /// Return `true` if `s` is the type of a gas coin (i.e., 0x2::coin::Coin<0x2::oct::OCT>)
         pub fn is_gas_coin(s: &StructTag) -> bool {
             Coin::is_coin(s) && s.type_params.len() == 1 && GAS::is_gas_type(&s.type_params[0])
         }
 
-        /// Return `true` if `s` is the type of a gas balance (i.e., 0x2::balance::Balance<0x2::one::OCT>)
+        /// Return `true` if `s` is the type of a gas balance (i.e., 0x2::balance::Balance<0x2::oct::OCT>)
         pub fn is_gas_balance(s: &StructTag) -> bool {
             Balance::is_balance(s) && s.type_params.len() == 1 && GAS::is_gas_type(&s.type_params[0])
         }

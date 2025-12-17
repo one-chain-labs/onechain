@@ -15,7 +15,7 @@ pub trait CoinReadApi {
         &self,
         /// the owner's Sui address
         owner: SuiAddress,
-        /// optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::one::OCT if not specified.
+        /// optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::oct::OCT if not specified.
         coin_type: Option<String>,
         /// optional paging cursor
         cursor: Option<String>,
@@ -41,7 +41,7 @@ pub trait CoinReadApi {
         &self,
         /// the owner's Sui address
         owner: SuiAddress,
-        /// optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::one::OCT if not specified.
+        /// optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::oct::OCT if not specified.
         coin_type: Option<String>,
     ) -> RpcResult<Balance>;
 

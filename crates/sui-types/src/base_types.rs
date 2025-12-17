@@ -172,11 +172,11 @@ pub struct MoveObjectType(MoveObjectType_);
 pub enum MoveObjectType_ {
     /// A type that is not `0x2::coin::Coin<T>`
     Other(StructTag),
-    /// A SUI coin (i.e., `0x2::coin::Coin<0x2::one::OCT>`)
+    /// A SUI coin (i.e., `0x2::coin::Coin<0x2::oct::OCT>`)
     GasCoin,
     /// A record of a staked OCT coin (i.e., `0x3::staking_pool::StakedOct`)
     StakedOct,
-    /// A non-SUI coin type (i.e., `0x2::coin::Coin<T> where T != 0x2::one::OCT`)
+    /// A non-SUI coin type (i.e., `0x2::coin::Coin<T> where T != 0x2::oct::OCT`)
     Coin(TypeTag),
     // NOTE: if adding a new type here, and there are existing on-chain objects of that
     // type with Other(_), that is ok, but you must hand-roll PartialEq/Eq/Ord/maybe Hash
@@ -269,7 +269,7 @@ impl MoveObjectType {
         }
     }
 
-    /// Return true if `self` is 0x2::coin::Coin<0x2::one::OCT>
+    /// Return true if `self` is 0x2::coin::Coin<0x2::oct::OCT>
     pub fn is_gas_coin(&self) -> bool {
         match &self.0 {
             MoveObjectType_::GasCoin => true,

@@ -46,7 +46,7 @@ Response: {
         "owner": {
           "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
         },
-        "objectType": "0x2::coin::Coin<0x2::one::OCT>",
+        "objectType": "0x2::coin::Coin<0x2::oct::OCT>",
         "objectId": "0xbff5e96a4a5c0f7348259c7abfdfd999405c02b9e9c0d0d59ec669a53b104c7a",
         "version": "3",
         "previousVersion": "2",

@@ -147,7 +147,7 @@ Response: {
         "objectId": "0xc442f9431f789a6c80078a63e707de84c7815c3150e08f1e44be256bd05a2b81",
         "version": "2",
         "digest": "4wV3VBJGNaMCv9zfjSna8c4as6EkuYoqTHHjueS6S745",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "owner": {
           "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
         },
@@ -161,7 +161,7 @@ Response: {
         "objectId": "0xf2945213c986e35d59aae258ef1b094e81ead5cc982b0d1519625bf3f81bee68",
         "version": "3",
         "digest": "9wMLcUMLvkbqNFyoPtUJ1GPuVuXVqpLA3GP2DHL2SyL6",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "owner": {
           "AddressOwner": "0xa7b032703878aa74c3126935789fd1d4d7e111d5911b09247d6963061c312b5a"
         },
@@ -175,7 +175,7 @@ Response: {
         "objectId": "0x0918a1917bda4d05f1cb4db824532a63476c57d65c548930406fe02051f22819",
         "version": "4",
         "digest": "8pirmp97ym3pzSCabaPsoPYVPbKYQHfnPqEbCyk32Au2",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "owner": {
           "Shared": {
             "initial_shared_version": 4
@@ -191,7 +191,7 @@ Response: {
         "objectId": "0xf079987ab8a34791ae4dd8b2d2a9af3485496a49b382b22239c4ca43902fe18a",
         "version": "5",
         "digest": "EEF6GF5DCZRZ4zxsubwzaQhYWysCdGJ63sLRLE15d9F",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "owner": "Immutable",
         "previousTransaction": "4ZmQdHopY1d8eg5zsTVciezKwhTbuQGaybXXBMWjs7ax",
         "storageRebate": "988000"

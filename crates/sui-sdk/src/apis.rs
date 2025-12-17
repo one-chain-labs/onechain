@@ -904,7 +904,7 @@ impl CoinReadApi {
     ///     let sui = SuiClientBuilder::default().build_localnet().await?;
     ///     let coin_metadata = sui
     ///         .coin_read_api()
-    ///         .get_coin_metadata("0x2::one::OCT".to_string())
+    ///         .get_coin_metadata("0x2::oct::OCT".to_string())
     ///         .await?;
     ///     Ok(())
     /// }
@@ -925,7 +925,7 @@ impl CoinReadApi {
     ///     let sui = SuiClientBuilder::default().build_localnet().await?;
     ///     let total_supply = sui
     ///         .coin_read_api()
-    ///         .get_total_supply("0x2::one::OCT".to_string())
+    ///         .get_total_supply("0x2::oct::OCT".to_string())
     ///         .await?;
     ///     Ok(())
     /// }

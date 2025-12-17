@@ -1,5 +1,5 @@
 query CoinMetadata {
-  coinMetadata(coinType: "0x2::one::OCT") {
+  coinMetadata(coinType: "0x2::oct::OCT") {
     decimals
     name
     symbol

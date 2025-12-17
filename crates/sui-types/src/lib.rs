@@ -339,72 +339,72 @@ mod tests {
 
     #[test]
     fn test_parse_sui_struct_tag_short_account_addr() {
-        let result = parse_sui_struct_tag("0x2::one::OCT").expect("should not error");
+        let result = parse_sui_struct_tag("0x2::oct::OCT").expect("should not error");
 
-        let expected = expect!["0x2::one::OCT"];
+        let expected = expect!["0x2::oct::OCT"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_parse_sui_struct_tag_long_account_addr() {
         let result =
-            parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT")
+            parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT")
                 .expect("should not error");
 
-        let expected = expect!["0x2::one::OCT"];
+        let expected = expect!["0x2::oct::OCT"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_parse_sui_struct_with_type_param_short_addr() {
-        let result = parse_sui_struct_tag("0x2::coin::COIN<0x2::one::OCT>").expect("should not error");
+        let result = parse_sui_struct_tag("0x2::coin::COIN<0x2::oct::OCT>").expect("should not error");
 
-        let expected = expect!["0x2::coin::COIN<0x2::one::OCT>"];
+        let expected = expect!["0x2::coin::COIN<0x2::oct::OCT>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_parse_sui_struct_with_type_param_long_addr() {
-        let result = parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>")
+        let result = parse_sui_struct_tag("0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>")
             .expect("should not error");
 
-        let expected = expect!["0x2::coin::COIN<0x2::one::OCT>"];
+        let expected = expect!["0x2::coin::COIN<0x2::oct::OCT>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>"];
+        let expected = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::COIN<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_complex_struct_tag_with_short_addr() {
-        let result = parse_sui_struct_tag("0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::one::OCT>>>")
+        let result = parse_sui_struct_tag("0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>")
             .expect("should not error");
 
-        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::one::OCT>>>"];
+        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>>>"];
+        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 
     #[test]
     fn test_complex_struct_tag_with_long_addr() {
-        let result = parse_sui_struct_tag("0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>>>")
+        let result = parse_sui_struct_tag("0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>")
             .expect("should not error");
 
-        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::one::OCT>>>"];
+        let expected = expect!["0xe7::vec_coin::VecCoin<vector<0x2::coin::Coin<0x2::oct::OCT>>>"];
         expected.assert_eq(&result.to_string());
 
-        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>>>"];
+        let expected = expect!["0x00000000000000000000000000000000000000000000000000000000000000e7::vec_coin::VecCoin<vector<0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>>>"];
         expected.assert_eq(&result.to_canonical_string(/* with_prefix */ true));
     }
 

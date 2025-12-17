@@ -1051,7 +1051,7 @@ impl SuiObjectDataFilter {
                     ObjectType::Struct(s) => s.clone().into(),
                 };
                 // If people do not provide type_params, we will match all type_params
-                // e.g. `0x2::coin::Coin` can match `0x2::coin::Coin<0x2::one::OCT>`
+                // e.g. `0x2::coin::Coin` can match `0x2::coin::Coin<0x2::oct::OCT>`
                 if !s.type_params.is_empty() && s.type_params != obj_tag.type_params {
                     false
                 } else {

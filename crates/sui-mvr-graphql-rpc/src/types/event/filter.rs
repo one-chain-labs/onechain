@@ -37,7 +37,7 @@ pub(crate) struct EventFilter {
     ///
     /// Generic types can be queried by either the generic type name, e.g.
     /// `0x2::coin::Coin`, or by the full type name, such as
-    /// `0x2::coin::Coin<0x2::one::OCT>`.
+    /// `0x2::coin::Coin<0x2::oct::OCT>`.
     pub event_type: Option<TypeFilter>,
     // Enhancement (post-MVP)
     // pub start_time

@@ -10,7 +10,7 @@
 ///
 module slot_machine::example;
 
-use one::{balance::Balance, coin::{Self, Coin}, random::{Random, new_generator}, one::OCT};
+use one::{balance::Balance, coin::{Self, Coin}, random::{Random, new_generator}, oct::OCT};
 
 /// Error codes
 const EInvalidAmount: u64 = 0;

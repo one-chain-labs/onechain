@@ -8,7 +8,7 @@ module examples::coffee;
 use one::{
     balance::{Self, Balance},
     coin::{Self, TreasuryCap, Coin},
-    one::OCT,
+    oct::OCT,
     token::{Self, Token},
     tx_context::sender
 };

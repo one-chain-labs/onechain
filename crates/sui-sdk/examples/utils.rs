@@ -155,7 +155,7 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
 
 /// Return the coin owned by the address that has at least 5_000_000 MIST, otherwise returns None
 pub async fn fetch_coin(sui: &SuiClient, sender: &SuiAddress) -> Result<Option<Coin>, anyhow::Error> {
-    let coin_type = "0x2::one::OCT".to_string();
+    let coin_type = "0x2::oct::OCT".to_string();
     let coins_stream = sui.coin_read_api().get_coins_stream(*sender, Some(coin_type));
 
     let mut coins = coins_stream.skip_while(|c| future::ready(c.balance < 5_000_000)).boxed();

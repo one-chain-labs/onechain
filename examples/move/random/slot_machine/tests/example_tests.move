@@ -8,7 +8,7 @@ use slot_machine::example;
 use one::{
     coin::{Self, Coin},
     random::{Self, update_randomness_state_for_testing, Random},
-    one::OCT,
+    oct::OCT,
     test_scenario as ts
 };
 

@@ -148,7 +148,7 @@ pub enum SuiClientCommands {
         /// Address (or its alias)
         #[arg(value_parser)]
         address: Option<KeyIdentity>,
-        /// Show balance for the specified coin (e.g., 0x2::one::OCT).
+        /// Show balance for the specified coin (e.g., 0x2::oct::OCT).
         /// All coins will be shown if none is passed.
         #[clap(long, required = false)]
         coin_type: Option<String>,

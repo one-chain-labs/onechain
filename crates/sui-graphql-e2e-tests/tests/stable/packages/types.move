@@ -7,7 +7,7 @@
 # Happy path -- valid type, get everything
 
 {
-    type(type: "0x2::priority_queue::PriorityQueue<0x2::coin::Coin<0x2::one::OCT>>") {
+    type(type: "0x2::priority_queue::PriorityQueue<0x2::coin::Coin<0x2::oct::OCT>>") {
         repr
         signature
         layout
@@ -80,19 +80,19 @@
 # Querying abilities for concrete types
 
 {
-    token: type(type: "0x2::token::Token<0x2::one::OCT>") {
+    token: type(type: "0x2::token::Token<0x2::oct::OCT>") {
         abilities
     }
 
-    coin: type(type: "0x2::coin::Coin<0x2::one::OCT>") {
+    coin: type(type: "0x2::coin::Coin<0x2::oct::OCT>") {
         abilities
     }
 
-    balance: type(type: "0x2::balance::Balance<0x2::one::OCT>") {
+    balance: type(type: "0x2::balance::Balance<0x2::oct::OCT>") {
         abilities
     }
 
-    coin_vector: type(type: "vector<0x2::coin::Coin<0x2::one::OCT>>") {
+    coin_vector: type(type: "vector<0x2::coin::Coin<0x2::oct::OCT>>") {
         abilities
     }
 

@@ -108,7 +108,7 @@ impl TestCaseImpl for CoinIndexTest {
         old_total_balance = total_balance;
 
         info!("token package published, package: {:?}, cap: {:?}", package, cap);
-        let sui_type_str = "0x2::one::OCT";
+        let sui_type_str = "0x2::oct::OCT";
         let coin_type_str = format!("{}::managed::MANAGED", package.0);
         info!("coin type: {}", coin_type_str);
 

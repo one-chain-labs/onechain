@@ -15,7 +15,7 @@ use one::{
     clock::Clock,
     coin::{Self, Coin},
     random::{Random, new_generator},
-    one::OCT,
+    oct::OCT,
     table_vec::{Self, TableVec},
     tx_context::sender
 };

@@ -731,7 +731,7 @@ Response: {
                 "module": "coin",
                 "function": "value",
                 "type_arguments": [
-                  "0x2::one::OCT"
+                  "0x2::oct::OCT"
                 ],
                 "arguments": [
                   "GasCoin"
@@ -925,7 +925,7 @@ Response: {
         "owner": {
           "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
         },
-        "coinType": "0x2::one::OCT",
+        "coinType": "0x2::oct::OCT",
         "amount": "-3331604"
       }
     ]
@@ -944,14 +944,14 @@ Response: {
         "owner": {
           "AddressOwner": "0xa7b032703878aa74c3126935789fd1d4d7e111d5911b09247d6963061c312b5a"
         },
-        "coinType": "0x2::one::OCT",
+        "coinType": "0x2::oct::OCT",
         "amount": "42"
       },
       {
         "owner": {
           "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
         },
-        "coinType": "0x2::one::OCT",
+        "coinType": "0x2::oct::OCT",
         "amount": "-1997922"
       }
     ]

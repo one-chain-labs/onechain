@@ -12,7 +12,7 @@ async fn test_currency_defaults() {
     let expected = Currency {
         symbol: "SUI".to_string(),
         decimals: 9,
-        metadata: CurrencyMetadata { coin_type: "0x2::one::OCT".to_string() },
+        metadata: CurrencyMetadata { coin_type: "0x2::oct::OCT".to_string() },
     };
 
     let currency: Currency = serde_json::from_value(json!(

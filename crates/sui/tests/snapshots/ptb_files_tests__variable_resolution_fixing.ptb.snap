@@ -14,5 +14,5 @@ expression: "results.join(\"\\n\")"
 ╰───────────────┴───────────────────────────────────╯
  === BUILT PTB === 
 Input 0: ImmutableOrOwnedObject
-Command 0: MoveCall(0x0000000000000000000000000000000000000000000000000000000000000002::coin::value<0x2::one::OCT>(Input(0)))
+Command 0: MoveCall(0x0000000000000000000000000000000000000000000000000000000000000002::coin::value<0x2::oct::OCT>(Input(0)))
 Command 1: MakeMoveVec(Someaddress,[Input(0)])

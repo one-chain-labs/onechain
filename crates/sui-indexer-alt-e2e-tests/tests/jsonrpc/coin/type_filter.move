@@ -51,7 +51,7 @@ module Test::fake {
 //# run-jsonrpc
 {
   "method": "suix_getCoins",
-  "params": ["@{A}", "0x2::one::OCT"]
+  "params": ["@{A}", "0x2::oct::OCT"]
 }
 
 //# run-jsonrpc

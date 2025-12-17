@@ -112,7 +112,7 @@ pub mod sui_client_config;
 pub mod verify_personal_message_signature;
 pub mod wallet_context;
 
-pub const SUI_COIN_TYPE: &str = "0x2::one::OCT";
+pub const SUI_COIN_TYPE: &str = "0x2::oct::OCT";
 pub const SUI_LOCAL_NETWORK_URL: &str = "http://127.0.0.1:9000";
 pub const SUI_LOCAL_NETWORK_URL_0: &str = "http://0.0.0.0:9000";
 pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/gas";

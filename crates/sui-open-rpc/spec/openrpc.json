@@ -1234,7 +1234,7 @@
                 "objectId": "0x53e4567ccafa5f36ce84c80aa8bc9be64e0d5ae796884274aef3005ae6733809",
                 "version": "1",
                 "digest": "33K5ZXJ3RyubvYaHuEnQ1QXmmbhgtrFwp199dnEbL4n7",
-                "type": "0x2::coin::Coin<0x2::one::OCT>",
+                "type": "0x2::coin::Coin<0x2::oct::OCT>",
                 "owner": {
                   "AddressOwner": "0xc8ec1d5b84dd6289e193b9f88de4a994358c9f856135236c3e75a925e1c77ac3"
                 },
@@ -1242,7 +1242,7 @@
                 "storageRebate": "100",
                 "content": {
                   "dataType": "moveObject",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "hasPublicTransfer": true,
                   "fields": {
                     "balance": "100000000",
@@ -2257,7 +2257,7 @@
                   "objectId": "0x77b3482580ee8d5bdc5b824808df54bfec4fc817622e5add0e48f749f01def98",
                   "version": "1",
                   "digest": "2QwXW3qzMEZPAyyP9VHtXbC2tp7iomypQc5XnkyPsu5d",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0x504d411325e3c7f89d412044fe99007efb0f94f1e64d2e8090c619a39299d87e"
                   },
@@ -2265,7 +2265,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2281,7 +2281,7 @@
                   "objectId": "0x9060d87664c26a3f9a509228c21b16dc6797cf787c839a07edc03e6338421091",
                   "version": "1",
                   "digest": "5itvhMFvtJcV6fY2VY4x7F9Ex18q2N4Rr5WU4FXTJsFU",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0x23618df6438d21a48040e6bb568cafc13246bd847c60448160e0358cac4a1134"
                   },
@@ -2289,7 +2289,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2305,7 +2305,7 @@
                   "objectId": "0xb37379c527753c5c8ab783f697e7b61439368cd75ebe63d633af32ffb4a022d1",
                   "version": "1",
                   "digest": "8rsTRNPs13DZvD2xneZEtf2nAAipep6uHXPXWVXfzDBr",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0x8b95b4eaa9fd3b22b43f6b2c8e92090bd6d16522a6fd4fa83ec70a5f197ad656"
                   },
@@ -2313,7 +2313,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2329,7 +2329,7 @@
                   "objectId": "0xee309e94ff5c9f6b02c5637f018f6ea7bed8f6c3d80f2a595c2305e12dd6d07c",
                   "version": "1",
                   "digest": "3w6ars2tmgBST4ozGxPWzSpEGyn4AdxMBv3K9sdkCWfR",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0x3fbbd3ebef7dbcc7b02346cdf05674452cc61f316af5d5d7c02b94b023242685"
                   },
@@ -2337,7 +2337,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2353,7 +2353,7 @@
                   "objectId": "0x29bc7c8d230db3b417edb1184cf075da5e934f672d3da3e003d989075efaecc7",
                   "version": "1",
                   "digest": "BE9GoMd7Mr8fGte3EdsXxUMwYjcErW71n6Gsm4iPvDmv",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0x9b5cd5df0df2a168259b7115a41ccc0a372b6fd0026e0c63043492ce4d0c19a6"
                   },
@@ -2361,7 +2361,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "100000000",
@@ -2869,7 +2869,7 @@
                 "objectId": "0x11af4b844ff94b3fbef6e36b518da3ad4c5856fa686464524a876b463d129760",
                 "version": "4",
                 "digest": "5VPAwDXy3BL72ehFc7gSJoz27ahMd6spUg5YwYc4ibcv",
-                "type": "0x2::coin::Coin<0x2::one::OCT>",
+                "type": "0x2::coin::Coin<0x2::oct::OCT>",
                 "owner": {
                   "AddressOwner": "0x3568c40e814d9d5396d23087a0fd641e91e0e00df6c012cded9ef9ba5e5bf042"
                 },
@@ -2877,7 +2877,7 @@
                 "storageRebate": "100",
                 "content": {
                   "dataType": "moveObject",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "hasPublicTransfer": true,
                   "fields": {
                     "balance": "10000",
@@ -2969,7 +2969,7 @@
                   "objectId": "0x38b3186a7bb26a1ab2c982a0a9b482aa70f5a010fffc60f20194ef0f597474e8",
                   "version": "4",
                   "digest": "hvBGBXvKVhC7XYgVPujuiLjxASR6UGAkSFrCRtVxX1F",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0x47866ff92885a3c21a7703f564721c198308aa0c71b771ada6b96c16fc9c0fa7"
                   },
@@ -2977,7 +2977,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "10000",
@@ -2994,7 +2994,7 @@
                   "objectId": "0xceaf9ee4582d3a233101e322a22cb2a5bea2e681ea5af4e59bd1abb0bb4fcb27",
                   "version": "12",
                   "digest": "B5z4YkAgTi78fdxMbxG3fv2V4YBkhpc8PRCPz8MzLtbf",
-                  "type": "0x2::coin::Coin<0x2::one::OCT>",
+                  "type": "0x2::coin::Coin<0x2::oct::OCT>",
                   "owner": {
                     "AddressOwner": "0xa6ced287081357950315a8842c3870f2d83f980fe0996a92d351d6749a0a0b47"
                   },
@@ -3002,7 +3002,7 @@
                   "storageRebate": "100",
                   "content": {
                     "dataType": "moveObject",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "hasPublicTransfer": true,
                     "fields": {
                       "balance": "20000",
@@ -3109,7 +3109,7 @@
             "name": "Result",
             "value": [
               {
-                "coinType": "0x2::one::OCT",
+                "coinType": "0x2::oct::OCT",
                 "coinObjectCount": 15,
                 "totalBalance": "3000000000",
                 "lockedBalance": {}
@@ -3182,7 +3182,7 @@
             "value": {
               "data": [
                 {
-                  "coinType": "0x2::one::OCT",
+                  "coinType": "0x2::oct::OCT",
                   "coinObjectId": "0x861c5e055605b2bb1199faf653a8771e448930bc95a0369fad43a9870a2e5878",
                   "version": "103626",
                   "digest": "Ao1QyN9UTmYzb2ead3D5xhSBk7TvACRvmnJW8gRbwP99",
@@ -3190,7 +3190,7 @@
                   "previousTransaction": "7dp5WtTmtGp83EXYYFMzjBJRFeSgR67AzqMETLrfgeFx"
                 },
                 {
-                  "coinType": "0x2::one::OCT",
+                  "coinType": "0x2::oct::OCT",
                   "coinObjectId": "0x7e769678d059761bff8a8f3944642e4c33a6e4fb0b55f8face36fadaa22f2a0d",
                   "version": "103626",
                   "digest": "5taVxHU9QLQD5cNdqxt8kNGAab93GMG4vX7zYDxEaohx",
@@ -3198,7 +3198,7 @@
                   "previousTransaction": "9xLdMXezY8d1yRA2TtN6pYjapyy2EVKHWNriGPFGCFvd"
                 },
                 {
-                  "coinType": "0x2::one::OCT",
+                  "coinType": "0x2::oct::OCT",
                   "coinObjectId": "0xa323d541ba5cf9e34919d2644cda38a263f69f47ae954dec65295231e0d2c7c8",
                   "version": "103626",
                   "digest": "82ZNKSSueWUQkpFNbBZGHSr3sUL5Rxfr7ucVRsvgQzz2",
@@ -3232,7 +3232,7 @@
         },
         {
           "name": "coin_type",
-          "description": "optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::one::OCT if not specified.",
+          "description": "optional type names for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::oct::OCT if not specified.",
           "schema": {
             "type": "string"
           }
@@ -3336,7 +3336,7 @@
         },
         {
           "name": "coin_type",
-          "description": "optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::one::OCT if not specified.",
+          "description": "optional type name for the coin (e.g., 0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC), default to 0x2::oct::OCT if not specified.",
           "schema": {
             "type": "string"
           }
@@ -3375,7 +3375,7 @@
             },
             {
               "name": "coin_type",
-              "value": "0x2::one::OCT"
+              "value": "0x2::oct::OCT"
             },
             {
               "name": "cursor",
@@ -3391,7 +3391,7 @@
             "value": {
               "data": [
                 {
-                  "coinType": "0x2::one::OCT",
+                  "coinType": "0x2::oct::OCT",
                   "coinObjectId": "0xd62ca040aba24f862a763851c54908cd2a0ee7d709c11b93d4a2083747b76856",
                   "version": "103626",
                   "digest": "C9fdokK19BpDCgUgWsJv3cfd4LDyk7WGYBeGhFHbEL2Z",
@@ -3399,7 +3399,7 @@
                   "previousTransaction": "tw5DzJTfdxTn4f3rekFrhN7dQTUezBgsEhycDobTBLb"
                 },
                 {
-                  "coinType": "0x2::one::OCT",
+                  "coinType": "0x2::oct::OCT",
                   "coinObjectId": "0xf44d295a385dc3544d211411b865e8bc4f01f49186970c7cf61e1cc829cc0be7",
                   "version": "103626",
                   "digest": "5qZkmtN5J5uGHURtiy9BtBhnXATPR2Wa6BJBDLrMzCaf",
@@ -3407,7 +3407,7 @@
                   "previousTransaction": "AfgFe7ZfjJ5dWV6VAy2LbtvBFhcABkvdvwEjLrRcFqtr"
                 },
                 {
-                  "coinType": "0x2::one::OCT",
+                  "coinType": "0x2::oct::OCT",
                   "coinObjectId": "0x42ef9314ccc792dd4401a88e69c66b4c5e43f21e9e57f4abe3c702649d3a7dd0",
                   "version": "103626",
                   "digest": "FLE2nB2Wio3oUyTx6HyzkrMsWiZxDg9Kk8s7ivvuoBbD",
@@ -3754,7 +3754,7 @@
                 "filter": {
                   "MatchAll": [
                     {
-                      "StructType": "0x2::coin::Coin<0x2::one::OCT>"
+                      "StructType": "0x2::coin::Coin<0x2::oct::OCT>"
                     },
                     {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
@@ -3793,7 +3793,7 @@
                     "objectId": "0x0b37a91692359a98496738a58c17a9334aeacc435c70ab9635e47a277d8f8dd9",
                     "version": "13488",
                     "digest": "FZzfCnKCSRW2jN9AwkiarjYQapViUQAh799aiRMZ4YC2",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "owner": {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
                     },
@@ -3806,7 +3806,7 @@
                     "objectId": "0xd4feace07fc863a2eef286c3e95ed48e2c181bb65db5beaf7ea664b4ca6b744c",
                     "version": "13488",
                     "digest": "3cxBDcfnkVgtXWhnMnKKkMGtZdiEorUhb1vdp2DkVyfi",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "owner": {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
                     },
@@ -3819,7 +3819,7 @@
                     "objectId": "0xe26860fac6839ce2d7ed7e6f29d276a1b4c23f2d9a9b6f0d8b2c17beace292b7",
                     "version": "13488",
                     "digest": "3tX9sgYC4A6nVKGjKEE5xxW6t4zkvDL9BwjuaxMg8arP",
-                    "type": "0x2::coin::Coin<0x2::one::OCT>",
+                    "type": "0x2::coin::Coin<0x2::oct::OCT>",
                     "owner": {
                       "AddressOwner": "0xdbc9abc01a87906b033a75750e741edb2df5ea5d55c96a611371d22799d26827"
                     },

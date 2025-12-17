@@ -16,7 +16,7 @@ async fn get_coin_info() {
 
     let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned()).await.unwrap();
 
-    let coin_type_sdk: TypeTag = "0x2::one::OCT".parse().unwrap();
+    let coin_type_sdk: TypeTag = "0x2::oct::OCT".parse().unwrap();
     let request = GetCoinInfoRequest { coin_type: Some(coin_type_sdk.clone().into()) };
 
     let GetCoinInfoResponse { coin_type, metadata, treasury } =

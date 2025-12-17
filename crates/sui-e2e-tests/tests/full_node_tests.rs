@@ -273,19 +273,19 @@ async fn test_full_node_indexes() -> Result<(), anyhow::Error> {
     let sender_balance_change = BalanceChange {
         change_type: BalanceChangeType::Pay,
         owner: sender,
-        coin_type: parse_struct_tag("0x2::one::OCT").unwrap(),
+        coin_type: parse_struct_tag("0x2::oct::OCT").unwrap(),
         amount: -100000000000000,
     };
     let recipient_balance_change = BalanceChange {
         change_type: BalanceChangeType::Receive,
         owner: receiver,
-        coin_type: parse_struct_tag("0x2::one::OCT").unwrap(),
+        coin_type: parse_struct_tag("0x2::oct::OCT").unwrap(),
         amount: 100000000000000,
     };
     let gas_balance_change = BalanceChange {
         change_type: BalanceChangeType::Gas,
         owner: sender,
-        coin_type: parse_struct_tag("0x2::one::OCT").unwrap(),
+        coin_type: parse_struct_tag("0x2::oct::OCT").unwrap(),
         amount: (gas_used as i128).neg(),
     };
 

@@ -4,7 +4,7 @@ module a::n {
     use oct::OCT;
     use one::tx_context;
 
-    fun init(_otw: one::OCT, _ctx: &mut tx_context::TxContext) {
+    fun init(_otw: oct::OCT, _ctx: &mut tx_context::TxContext) {
     }
 
 }

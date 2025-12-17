@@ -54,7 +54,7 @@ public createPool(
     // we have to split sui as a param into the code
     const [coin] = overrides.txb.splitCoins(overrides.txb.gas, [overrides.txb.pure(200000000)]);
     overrides.txb.moveCall({
-        typeArguments: [coinType1, coinType2, '0x2::one::OCT'],
+        typeArguments: [coinType1, coinType2, '0x2::oct::OCT'],
         target: `${this.configs.swapPackageId}::clob::create_pool`,
         arguments: [
             overrides.txb.object(String(this.configs.registryId)),

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS coin_balance_buckets
     -- address-owned).
     owner_id                    BYTEA,
     -- The type of the coin, as a BCS-serialized `TypeTag`. This is only the
-    -- marker type, and not the full object type (e.g. `0x0...02::one::OCT`).
+    -- marker type, and not the full object type (e.g. `0x0...02::oct::OCT`).
     coin_type                   BYTEA,
     -- The balance bucket of the coin, which is log10(coin_balance).
     coin_balance_bucket         SMALLINT,

@@ -38,7 +38,7 @@ Response: {
       "digest": "7xrrTER6S874SBJBszf4CDxmF79DpGELaMbi9xnNx9yC",
       "content": {
         "dataType": "moveObject",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "hasPublicTransfer": true,
         "fields": {
           "balance": "42",
@@ -74,7 +74,7 @@ Response: {
       "digest": "4ChF24sgkRSajSk9i9mwjTKXgyJPnb2PMxiAdUoAZLKH",
       "content": {
         "dataType": "moveObject",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "hasPublicTransfer": true,
         "fields": {
           "balance": "21",
@@ -137,7 +137,7 @@ Response: {
       "digest": "EgjhvDZUPAmiGDmZZgqVWRyfjsAc88wua5jnTbjwidQ1",
       "content": {
         "dataType": "moveObject",
-        "type": "0x2::coin::Coin<0x2::one::OCT>",
+        "type": "0x2::coin::Coin<0x2::oct::OCT>",
         "hasPublicTransfer": true,
         "fields": {
           "balance": "21",

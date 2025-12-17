@@ -74,11 +74,11 @@ impl NativeTransferTest {
         }
         BalanceChangeChecker::new()
             .owner(Owner::AddressOwner(recipient))
-            .coin_type("0x2::one::OCT")
+            .coin_type("0x2::oct::OCT")
             .check(&balance_changes.remove(0));
         BalanceChangeChecker::new()
             .owner(Owner::AddressOwner(signer))
-            .coin_type("0x2::one::OCT")
+            .coin_type("0x2::oct::OCT")
             .check(&balance_changes.remove(0));
         // Verify fullnode observes the txn
         ctx.let_fullnode_sync(vec![response.digest], 5).await;

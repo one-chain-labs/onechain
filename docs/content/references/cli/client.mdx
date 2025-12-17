@@ -162,13 +162,13 @@ $ sui client object 0xfffbb30ccb631f15f6cd36700589fc9c31cb04af28a95f3ed26d62daf3
 │ objectId  	  │  0xfffbb30ccb631f15f6cd36700589fc9c31cb04af28a95f3ed26d62daf3acb57f                                             	  │
 │ version   	  │  33363559                                                                                                       	  │
 │ digest    	  │  3FzvXJVVVcXb9H6dEXdARaY9EmxXyyNFduet3X4eYV4x                                                                   	  │
-│ objType   	  │  0x2::coin::Coin<0x2::one::OCT>                                                                                 	  │
+│ objType   	  │  0x2::coin::Coin<0x2::oct::OCT>                                                                                 	  │
 │ ownerType 	  │  AddressOwner                                                                                                   	  │
 │ prevTx    	  │  ES2RQThjRE5u8rwiUEnhcnMoLA3cHeEGYJ8Pq98tmyAc                                                                   	  │
 │ storageRebate │  988000                                                                                                         	  │
 │ content   	  │ ╭───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │           	  │ │ dataType      	  │  moveObject                                                                            	    │ │
-│           	  │ │ type          	  │  0x2::coin::Coin<0x2::one::OCT>                                                       	    │ │
+│           	  │ │ type          	  │  0x2::coin::Coin<0x2::oct::OCT>                                                       	    │ │
 │           	  │ │ hasPublicTransfer │  true                                                                                    	  │ │
 │           	  │ │ fields        	  │ ╭─────────┬───────────────────────────────────────────────────────────────────────────────╮ │ │
 │           	  │ │               	  │ │ balance │  530076676                                                                	  │ │ │
@@ -352,7 +352,7 @@ Transaction Digest: AsWkciVhLHeCmqVipjjyAA7Hv5y87pFjHS59K8m4zBJV
 │  │ ObjectID: 0xa031d3f8fd53b5f9885172e1c6bd8b770b25e42371c9ee215c6d4b21b2b73241                  │
 │  │ Sender: 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea                    │
 │  │ Owner: Account Address ( 0x3d78abc33ccd173c521b4f9e78b21ea2c989960b631732c539efaa38bda30976 ) │
-│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                    │
+│  │ ObjectType: 0x2::coin::Coin<0x2::oct::OCT>                                                    │
 │  │ Version: 3                                                                                    │
 │  │ Digest: Fq3maqq3pShgKw58Ssm8cS2j1pspfhanedVK2MMxfQWQ                                          │
 │  └──                                                                                             │
@@ -361,7 +361,7 @@ Transaction Digest: AsWkciVhLHeCmqVipjjyAA7Hv5y87pFjHS59K8m4zBJV
 │  │ ObjectID: 0xc9b447fff18f13fa035e028534b8344d5fc8a8760248fad10155e78f44dc3a52                  │
 │  │ Sender: 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea                    │
 │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea ) │
-│  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                    │
+│  │ ObjectType: 0x2::coin::Coin<0x2::oct::OCT>                                                    │
 │  │ Version: 3                                                                                    │
 │  │ Digest: GFB9mpxTP4z6CCShTbvD58FYxtu9G4mnxN3JtFeRupM3                                          │
 │  └──                                                                                             │
@@ -371,12 +371,12 @@ Transaction Digest: AsWkciVhLHeCmqVipjjyAA7Hv5y87pFjHS59K8m4zBJV
 ├───────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  ┌──                                                                                              │
 │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea )  │
-│  │ CoinType: 0x2::one::OCT                                                                        │
+│  │ CoinType: 0x2::oct::OCT                                                                        │
 │  │ Amount: -501997880                                                                             │
 │  └──                                                                                              │
 │  ┌──                                                                                              │
 │  │ Owner: Account Address ( 0x3d78abc33ccd173c521b4f9e78b21ea2c989960b631732c539efaa38bda30976 )  │
-│  │ CoinType: 0x2::one::OCT                                                                        │
+│  │ CoinType: 0x2::oct::OCT                                                                        │
 │  │ Amount: 500000000                                                                              │
 │  └──                                                                                              │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -738,7 +738,7 @@ This example also makes use of `sui move` commands. To learn more about those co
     │  │ ObjectID: 0x01b2795ba5800c8f7cb7d7c56abe19e24c656ed6764f3ccc5e66da3de52402a8                    │
     │  │ Sender: 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea                      │
     │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea )   │
-    │  │ ObjectType: 0x2::coin::Coin<0x2::one::OCT>                                                      │
+    │  │ ObjectType: 0x2::coin::Coin<0x2::oct::OCT>                                                      │
     │  │ Version: 3                                                                                      │
     │  │ Digest: 46rvdbXkw5qqsBYbUGChzgFatJAYPmarPmFHgRRJiiU9                                            │
     │  └──                                                                                               │
@@ -755,7 +755,7 @@ This example also makes use of `sui move` commands. To learn more about those co
     ├───────────────────────────────────────────────────────────────────────────────────────────────────┤
     │  ┌──                                                                                              │
     │  │ Owner: Account Address ( 0x0fe375fff0ee40d20c54a7f2478b9b5c7eaa3625b7611f9661ec5faefb4a6fea )  │
-    │  │ CoinType: 0x2::one::OCT                                                                        │
+    │  │ CoinType: 0x2::oct::OCT                                                                        │
     │  │ Amount: -10000680                                                                              │
     │  └──                                                                                              │
     ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯

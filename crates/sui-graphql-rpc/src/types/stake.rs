@@ -75,7 +75,7 @@ impl StakedOct {
     }
 
     /// Total balance of all coins with marker type owned by this object. If type is not supplied,
-    /// it defaults to `0x2::one::OCT`.
+    /// it defaults to `0x2::oct::OCT`.
     pub(crate) async fn balance(&self, ctx: &Context<'_>, type_: Option<ExactTypeFilter>) -> Result<Option<Balance>> {
         OwnerImpl::from(&self.super_.super_).balance(ctx, type_).await
     }
@@ -94,7 +94,7 @@ impl StakedOct {
 
     /// The coin objects for this object.
     ///
-    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::one::OCT`.
+    ///`type` is a filter on the coin's type parameter, defaulting to `0x2::oct::OCT`.
     pub(crate) async fn coins(
         &self,
         ctx: &Context<'_>,

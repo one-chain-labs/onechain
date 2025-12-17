@@ -68,25 +68,25 @@ async fn test_get_coins() -> Result<(), anyhow::Error> {
     assert_eq!(0, result.data.len());
 
     // We should get all the 5 coins for SUI with the right balance.
-    let result: CoinPage = http_client.get_coins(address, Some("0x2::one::OCT".into()), None, None).await?;
+    let result: CoinPage = http_client.get_coins(address, Some("0x2::oct::OCT".into()), None, None).await?;
     assert_eq!(5, result.data.len());
     assert_eq!(result.data[0].balance, DEFAULT_GAS_AMOUNT);
     assert!(!result.has_next_page);
 
     // When we have more than 3 coins, we should get a next page.
-    let result: CoinPage = http_client.get_coins(address, Some("0x2::one::OCT".into()), None, Some(3)).await?;
+    let result: CoinPage = http_client.get_coins(address, Some("0x2::oct::OCT".into()), None, Some(3)).await?;
     assert_eq!(3, result.data.len());
     assert!(result.has_next_page);
 
     // We should get the remaining 2 coins with the next page.
     let result: CoinPage =
-        http_client.get_coins(address, Some("0x2::one::OCT".into()), result.next_cursor, Some(3)).await?;
+        http_client.get_coins(address, Some("0x2::oct::OCT".into()), result.next_cursor, Some(3)).await?;
     assert_eq!(2, result.data.len(), "{:?}", result);
     assert!(!result.has_next_page);
 
     // No more coins after the last page.
     let result: CoinPage =
-        http_client.get_coins(address, Some("0x2::one::OCT".into()), result.next_cursor, None).await?;
+        http_client.get_coins(address, Some("0x2::oct::OCT".into()), result.next_cursor, None).await?;
     assert_eq!(0, result.data.len(), "{:?}", result);
     assert!(!result.has_next_page);
 

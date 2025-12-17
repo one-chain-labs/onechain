@@ -115,7 +115,7 @@ Response: {
       "objectId": "0xc442f9431f789a6c80078a63e707de84c7815c3150e08f1e44be256bd05a2b81",
       "version": "2",
       "digest": "4wV3VBJGNaMCv9zfjSna8c4as6EkuYoqTHHjueS6S745",
-      "type": "0x2::coin::Coin<0x2::one::OCT>",
+      "type": "0x2::coin::Coin<0x2::oct::OCT>",
       "owner": {
         "AddressOwner": "0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e"
       },

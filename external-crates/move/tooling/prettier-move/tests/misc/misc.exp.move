@@ -17,7 +17,7 @@ use one::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,
-    one::OCT,
+    oct::OCT,
     table::{Self, Table}
 };
 
