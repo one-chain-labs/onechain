@@ -1,7 +1,6 @@
 ---
 source: crates/sui-swarm-config/tests/snapshot_tests.rs
 expression: network_config
-snapshot_kind: text
 ---
 validator_configs:
   - protocol-key-pair:
@@ -44,10 +43,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -86,9 +86,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -100,26 +103,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -206,10 +216,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -248,9 +259,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -262,26 +276,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -368,10 +389,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -410,9 +432,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -424,26 +449,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -530,10 +562,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -572,9 +605,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -586,26 +622,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -692,10 +735,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -734,9 +778,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -748,26 +795,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -854,10 +908,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -896,9 +951,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -910,26 +968,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -1016,10 +1081,11 @@ validator_configs:
       max-transactions-in-batch: 1000
     end-of-epoch-broadcast-channel-capacity: 128
     checkpoint-executor-config:
-      checkpoint-execution-max-concurrency: 40
+      checkpoint-execution-max-concurrency: 200
       local-execution-timeout-sec: 30
     db-checkpoint-config:
       perform-db-checkpoints-at-epoch-end: false
+    indirect-objects-threshold: 18446744073709551615
     expensive-safety-check-config:
       enable-epoch-sui-conservation-check: false
       enable-deep-per-tx-sui-conservation-check: false
@@ -1058,9 +1124,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -1072,26 +1141,33 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
         - Apple
         - Arden
         - "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es"
+        - "AwsTenant-region:us-east-1-tenant_id:us-east-1_LPSLCkC3A"
         - "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8"
         - Credenza3
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
