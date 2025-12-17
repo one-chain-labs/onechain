@@ -80,6 +80,7 @@ impl ValidatorGenesisConfig {
             worker_key,
             network_key,
             account_address: SuiAddress::from(&account_key),
+            revenue_receiving_address: SuiAddress::from(&account_key),
             gas_price: self.gas_price,
             commission_rate: self.commission_rate,
             network_address,

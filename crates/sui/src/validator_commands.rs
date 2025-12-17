@@ -350,6 +350,7 @@ impl SuiValidatorCommand {
                     CallArg::Pure(bcs::to_bytes(validator.p2p_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_primary_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_worker_address()).unwrap()),
+                    CallArg::Pure(bcs::to_bytes(&validator.revenue_receiving_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
