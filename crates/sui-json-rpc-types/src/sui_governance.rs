@@ -68,6 +68,7 @@ pub struct Stake {
     #[schemars(with = "BigInt<u64>")]
     #[serde_as(as = "BigInt<u64>")]
     pub principal: u64,
+    pub lock: bool,
     #[serde(flatten)]
     pub status: StakeStatus,
 }
