@@ -7,7 +7,7 @@
 module one::balance {
     use one::tx_context::{Self, TxContext};
 
-    friend one::sui;
+    friend oct::OCT;
 
     /// For when trying to destroy a non-zero balance.
     const ENonZero: u64 = 0;
