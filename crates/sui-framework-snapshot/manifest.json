@@ -1678,5 +1678,35 @@
         "id": "0x000000000000000000000000000000000000000000000000000000000000000b"
       }
     ]
+  },
+  "77": {
+    "git_revision": "92bf13ce072f-dirty",
+    "packages": [
+      {
+        "name": "MoveStdlib",
+        "path": "crates/sui-framework/packages/move-stdlib",
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      {
+        "name": "One",
+        "path": "crates/sui-framework/packages/one-framework",
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000002"
+      },
+      {
+        "name": "OneSystem",
+        "path": "crates/sui-framework/packages/one-system",
+        "id": "0x0000000000000000000000000000000000000000000000000000000000000003"
+      },
+      {
+        "name": "DeepBook",
+        "path": "crates/sui-framework/packages/deepbook",
+        "id": "0x000000000000000000000000000000000000000000000000000000000000dee9"
+      },
+      {
+        "name": "Bridge",
+        "path": "crates/sui-framework/packages/bridge",
+        "id": "0x000000000000000000000000000000000000000000000000000000000000000b"
+      }
+    ]
   }
 }
