@@ -2626,7 +2626,7 @@ async fn test_stake_with_none_amount() -> Result<(), anyhow::Error> {
     let coins = client.coin_read_api().get_coins(address, None, None, None).await?.data;
 
     let config_path = test_cluster.swarm.dir().join(SUI_CLIENT_CONFIG);
-    let validator_addr = client.governance_api().get_latest_one_system_state().await?.active_validators[0].sui_address;
+    let validator_addr = client.governance_api().get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
     test_with_sui_binary(&[
         "client",
@@ -2666,7 +2666,7 @@ async fn test_stake_with_u64_amount() -> Result<(), anyhow::Error> {
     let coins = client.coin_read_api().get_coins(address, None, None, None).await?.data;
 
     let config_path = test_cluster.swarm.dir().join(SUI_CLIENT_CONFIG);
-    let validator_addr = client.governance_api().get_latest_one_system_state().await?.active_validators[0].sui_address;
+    let validator_addr = client.governance_api().get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
     test_with_sui_binary(&[
         "client",
