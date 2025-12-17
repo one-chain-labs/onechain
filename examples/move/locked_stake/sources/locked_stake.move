@@ -54,7 +54,7 @@ public fun deposit_sui(ls: &mut LockedStake, sui: Balance<OCT>) {
 }
 
 /// Take `amount` of SUI from the sui balance, stakes it, and puts the stake object
-/// back into the staked sui vec map.
+/// back into the staked oct vec map.
 public fun stake(
     ls: &mut LockedStake,
     sui_system: &mut SuiSystemState,
@@ -76,6 +76,7 @@ public fun stake(
 /// and rewards back into the locked sui balance.
 /// Returns the amount of SUI unstaked, including both principal and rewards.
 /// Aborts if no stake exists with the given id.
+#[allow(lint(self_transfer))]
 public fun unstake(
     ls: &mut LockedStake,
     sui_system: &mut SuiSystemState,

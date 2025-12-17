@@ -1254,6 +1254,24 @@ public(package) fun store_execution_time_estimates(self: &mut SuiSystemStateInne
 }
 
 #[test_only]
+public(package) fun execute_update_only_trusted_validator_action(self: &mut SuiSystemStateInnerV2,only_trusted_validator:bool){
+    let action = self.validators.create_update_only_trusted_validator_action(only_trusted_validator);
+    self.validators.execute_update_only_trusted_validator_action(&action);
+}
+
+#[test_only]
+public(package) fun execute_update_trusted_validators_action(self: &mut SuiSystemStateInnerV2,operate: bool,validator: address){
+    let action  = self.validators.create_update_trusted_validator_action(operate, validator);
+    self.validators.execute_update_trusted_validators_action(&action);
+}
+
+#[test_only]
+public(package) fun execute_update_only_validator_staking_action(self: &mut SuiSystemStateInnerV2,validator_address: address, only_validator_staking: bool){
+    let action = self.validators.create_update_only_validator_staking_action(validator_address, only_validator_staking);
+    self.validators.execute_update_only_validator_staking_action(&action);
+}
+
+#[test_only]
 /// Return the current validator set
 public(package) fun validators(self: &SuiSystemStateInnerV2): &ValidatorSet {
     &self.validators

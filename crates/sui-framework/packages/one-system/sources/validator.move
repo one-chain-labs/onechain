@@ -1060,6 +1060,8 @@ public(package) fun new_for_testing(
             worker_address.to_ascii_string().to_string(),
             bag::new(ctx),
         ),
+        sui_address,
+        false,
         gas_price,
         commission_rate,
         ctx
@@ -1071,6 +1073,7 @@ public(package) fun new_for_testing(
             &mut validator,
             initial_stake_option.extract(),
             sui_address, // give the stake to the validator
+            false,
             ctx
         );
     };
