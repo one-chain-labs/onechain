@@ -1,7 +1,7 @@
 # Copyright (c) Mysten Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-# tests that sui move new followed by sui move build succeeds
+# tests that sui move new followed by one move build succeeds
 
 sui move new example
 
@@ -15,4 +15,4 @@ cat example/Move.toml \
   > Move.toml
 mv Move.toml example/Move.toml
 
-cd example && sui move build
+cd example && one move build

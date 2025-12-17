@@ -97,7 +97,7 @@ bytecode or source code for ahead of time. Sui calculates the digest as follows:
 Refer to the [implementation for digest calculation](https://github.com/one-chain-labs/onechain/blob/d8cb153d886d54752763fbdab631b062da7d894b/crates/sui-types/src/move_package.rs#L232-L251) for more information, but in most cases, you can rely on the Move toolchain to output the digest as part of the build, when passing the `--dump-bytecode-as-base64` flag:
 
 ```sh
-$ sui move build --dump-bytecode-as-base64
+$ one move build --dump-bytecode-as-base64
 ```
 ```sh
 FETCHING GIT DEPENDENCY https://github.com/one-chain-labs/onechain.git

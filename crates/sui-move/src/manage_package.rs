@@ -14,7 +14,7 @@ use move_package::{
 use sui_types::base_types::ObjectID;
 
 const NO_LOCK_FILE: &str = "Expected a `Move.lock` file to exist in the package path, \
-                            but none found. Consider running `sui move build` to \
+                            but none found. Consider running `one move build` to \
                             generate the `Move.lock` file in the package directory.";
 
 /// Record addresses (Object IDs) for where this package is published on chain (this command sets variables in
