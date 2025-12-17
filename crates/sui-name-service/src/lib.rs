@@ -196,10 +196,9 @@ impl NameServiceConfig {
 
     // Create a config based on the package and object ids published on mainnet
     pub fn mainnet() -> Self {
-        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0xb518b15510de80320a046288ca391a2a06b8aa4ca979287549edc123dbe8313f";
-        const MAINNET_NS_REGISTRY_ID: &str = "0x7bd439c354340ced161f29bbd9ee8c4799402fb83ec43eec0277a356e68878cf";
-        const MAINNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0x83b34ff1aeb4a11a983133625479abdec2820e2cbeafe11b8b817944a223586d";
+        const MAINNET_NS_PACKAGE_ADDRESS: &str = "0x8b7c0a7c54600a499dc43d6e17804346c1e817b6a0f41ea929d0ff78394b544f";
+        const MAINNET_NS_REGISTRY_ID: &str = "0xd9143c07013d18413832f05d1c91de444a728097648aee9efac889ca05f5260d";
+        const MAINNET_NS_REVERSE_REGISTRY_ID: &str ="0x2e7ba1284387b5183074d6bc51aa68a63a4baa70d410ba7629ff968eb3f41795";
 
         let package_address = SuiAddress::from_str(MAINNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(MAINNET_NS_REGISTRY_ID).unwrap();
@@ -210,10 +209,9 @@ impl NameServiceConfig {
 
     // Create a config based on the package and object ids published on testnet
     pub fn testnet() -> Self {
-        const TESTNET_NS_PACKAGE_ADDRESS: &str = "0x22fa05f21b1ad71442491220bb9338f7b7095fe35000ef88d5400d28523bdd93";
-        const TESTNET_NS_REGISTRY_ID: &str = "0xb01097dfebb8fe21fe91a4502051e94920cc78c5382708271732b430e1af281f";
-        const TESTNET_NS_REVERSE_REGISTRY_ID: &str =
-            "0x6f35cfef2e07be3323901211a4e5cdd9ab8fef5274489ca0481ab38a754e0eb4";
+        const TESTNET_NS_PACKAGE_ADDRESS: &str = "0xc0a15dd8e3acf16024e9b7c99de19c601e8cce51a170214c605b8a5e2ebc984b";
+        const TESTNET_NS_REGISTRY_ID: &str = "0x335eee629c31d834b99fe9c9fc797ea25d506e565c836efe7e415599c1469166";
+        const TESTNET_NS_REVERSE_REGISTRY_ID: &str ="0x0a60054c3850ae18e4fa0413e60b6dda9df636295918994c3388bc29b010b4c3";
 
         let package_address = SuiAddress::from_str(TESTNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(TESTNET_NS_REGISTRY_ID).unwrap();
