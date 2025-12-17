@@ -198,7 +198,8 @@ impl NameServiceConfig {
     pub fn mainnet() -> Self {
         const MAINNET_NS_PACKAGE_ADDRESS: &str = "0x8b7c0a7c54600a499dc43d6e17804346c1e817b6a0f41ea929d0ff78394b544f";
         const MAINNET_NS_REGISTRY_ID: &str = "0xd9143c07013d18413832f05d1c91de444a728097648aee9efac889ca05f5260d";
-        const MAINNET_NS_REVERSE_REGISTRY_ID: &str ="0x2e7ba1284387b5183074d6bc51aa68a63a4baa70d410ba7629ff968eb3f41795";
+        const MAINNET_NS_REVERSE_REGISTRY_ID: &str =
+            "0x2e7ba1284387b5183074d6bc51aa68a63a4baa70d410ba7629ff968eb3f41795";
 
         let package_address = SuiAddress::from_str(MAINNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(MAINNET_NS_REGISTRY_ID).unwrap();
@@ -211,7 +212,8 @@ impl NameServiceConfig {
     pub fn testnet() -> Self {
         const TESTNET_NS_PACKAGE_ADDRESS: &str = "0xc0a15dd8e3acf16024e9b7c99de19c601e8cce51a170214c605b8a5e2ebc984b";
         const TESTNET_NS_REGISTRY_ID: &str = "0x335eee629c31d834b99fe9c9fc797ea25d506e565c836efe7e415599c1469166";
-        const TESTNET_NS_REVERSE_REGISTRY_ID: &str ="0x0a60054c3850ae18e4fa0413e60b6dda9df636295918994c3388bc29b010b4c3";
+        const TESTNET_NS_REVERSE_REGISTRY_ID: &str =
+            "0x0a60054c3850ae18e4fa0413e60b6dda9df636295918994c3388bc29b010b4c3";
 
         let package_address = SuiAddress::from_str(TESTNET_NS_PACKAGE_ADDRESS).unwrap();
         let registry_id = ObjectID::from_str(TESTNET_NS_REGISTRY_ID).unwrap();

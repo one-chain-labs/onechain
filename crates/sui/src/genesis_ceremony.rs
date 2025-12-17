@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, str::FromStr};
+
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use fastcrypto::encoding::{Encoding, Hex};
-use std::{path::PathBuf, str::FromStr};
 use sui_config::{genesis::UnsignedGenesis, SUI_GENESIS_FILENAME};
 use sui_genesis_builder::Builder;
 use sui_keys::keypair_file::{read_authority_keypair_from_file, read_keypair_from_file, read_network_keypair_from_file};
@@ -124,13 +125,13 @@ pub fn run(cmd: Ceremony) -> Result<()> {
             let worker_keypair: NetworkKeyPair = read_network_keypair_from_file(worker_key_file)?;
             let network_keypair: NetworkKeyPair = read_network_keypair_from_file(network_key_file)?;
             let pop = generate_proof_of_possession(&keypair, (&account_keypair.public()).into());
-            
+
             let revenue_receiving_address = if let Some(revenue_receiving_address) = revenue_receiving_address {
                 SuiAddress::from_str(&revenue_receiving_address)?
             } else {
                 SuiAddress::from(&account_keypair.public())
             };
-            
+
             builder = builder.add_validator(
                 sui_genesis_builder::validator_info::ValidatorInfo {
                     name,
