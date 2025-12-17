@@ -94,6 +94,10 @@ impl StakedOct {
     pub fn principal(&self) -> u64 {
         self.principal.value()
     }
+
+    pub fn lock(&self) -> bool {
+        self.lock
+    }
 }
 
 impl TryFrom<&Object> for StakedOct {
