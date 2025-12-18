@@ -76,6 +76,7 @@ public fun stake(
 /// and rewards back into the locked sui balance.
 /// Returns the amount of SUI unstaked, including both principal and rewards.
 /// Aborts if no stake exists with the given id.
+#[allow(lint(self_transfer))]
 public fun unstake(
     ls: &mut LockedStake,
     sui_system: &mut SuiSystemState,
