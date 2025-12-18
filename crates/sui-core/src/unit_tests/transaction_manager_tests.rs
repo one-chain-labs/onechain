@@ -182,14 +182,14 @@ async fn transaction_manager_object_dependency() {
     let transaction_read_1 = make_transaction(gas_objects[1].clone(), vec![CallArg::Object(shared_object_arg_read)]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(transaction_read_0.digest(), &[(
+        .set_shared_object_versions_for_testing(transaction_read_0.digest(), vec![(
             (shared_object.id(), shared_object.owner().start_version().unwrap()),
             shared_version,
         )])
         .unwrap();
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(transaction_read_1.digest(), &[(
+        .set_shared_object_versions_for_testing(transaction_read_1.digest(), vec![(
             (shared_object.id(), shared_object.owner().start_version().unwrap()),
             shared_version,
         )])
@@ -201,7 +201,7 @@ async fn transaction_manager_object_dependency() {
     let transaction_default = make_transaction(gas_objects[2].clone(), vec![CallArg::Object(shared_object_arg_default)]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(transaction_default.digest(), &[(
+        .set_shared_object_versions_for_testing(transaction_default.digest(), vec![(
             (shared_object.id(), shared_object.owner().start_version().unwrap()),
             shared_version,
         )])
@@ -220,7 +220,7 @@ async fn transaction_manager_object_dependency() {
     ]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(transaction_read_2.digest(), &[
+        .set_shared_object_versions_for_testing(transaction_read_2.digest(), vec![
             ((shared_object.id(), shared_object.owner().start_version().unwrap()), shared_version),
             ((shared_object_2.id(), shared_object_2.owner().start_version().unwrap()), shared_version_2),
         ])
@@ -633,7 +633,7 @@ async fn transaction_manager_with_cancelled_transactions() {
     ]);
     state
         .epoch_store_for_testing()
-        .set_shared_object_versions_for_testing(cancelled_transaction.digest(), &[
+        .set_shared_object_versions_for_testing(cancelled_transaction.digest(), vec![
             ((shared_object_1.id(), shared_object_1.owner().start_version().unwrap()), SequenceNumber::CANCELLED_READ),
             ((shared_object_2.id(), shared_object_2.owner().start_version().unwrap()), SequenceNumber::CONGESTED),
         ])

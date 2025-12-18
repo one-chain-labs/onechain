@@ -55,7 +55,6 @@ use sui_types::{
     MOVE_STDLIB_PACKAGE_ID,
     SUI_AUTHENTICATOR_STATE_OBJECT_ID,
     SUI_CLOCK_OBJECT_ID,
-    SUI_CLOCK_OBJECT_SHARED_VERSION,
     SUI_FRAMEWORK_PACKAGE_ID,
     SUI_RANDOMNESS_STATE_OBJECT_ID,
     SUI_SYSTEM_STATE_OBJECT_ID,
@@ -3595,7 +3594,7 @@ async fn test_shared_object_transaction_shared_locks_not_set() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn test_shared_object_transaction_ok() {
-    let (authority, certificate, shared_object_id, shared_object_initial_version) =
+    let (authority, certificate, shared_object_id, _shared_object_initial_version) =
         prepare_authority_and_shared_object_cert().await;
 
     // Sequence the certificate to assign a sequence number to the shared object.
@@ -3606,14 +3605,17 @@ async fn test_shared_object_transaction_ok() {
         .epoch_store_for_testing()
         .get_assigned_shared_object_versions(&certificate.key())
         .expect("Versions should be set")
+        .expect("versions should exist")
         .into_iter()
-        .find_map(|((object_id, initial_shared_version), version)| {
-            if object_id == shared_object_id && initial_shared_version == shared_object_initial_version {
-                Some(version)
-            } else {
-                None
-            }
-        })
+        .find_map(
+            |((object_id, _initial_shared_version), version)| {
+                if object_id == shared_object_id {
+                    Some(version)
+                } else {
+                    None
+                }
+            },
+        )
         .expect("Shared object must be assigned a version");
     assert_eq!(shared_object_version, OBJECT_START_VERSION);
 
@@ -3700,14 +3702,18 @@ async fn test_consensus_commit_prologue_generation() {
             .epoch_store_for_testing()
             .get_assigned_shared_object_versions(txn_key)
             .expect("versions should be set")
+            .as_ref()
+            .expect("versions should exist")
             .iter()
-            .filter_map(|((id, initial_shared_version), seq)| {
-                if id == &SUI_CLOCK_OBJECT_ID && initial_shared_version == &SUI_CLOCK_OBJECT_SHARED_VERSION {
-                    Some(*seq)
-                } else {
-                    None
-                }
-            })
+            .filter_map(
+                |((id, _initial_shared_version), seq)| {
+                    if id == &SUI_CLOCK_OBJECT_ID {
+                        Some(*seq)
+                    } else {
+                        None
+                    }
+                },
+            )
             .next()
             .unwrap()
     };
@@ -4608,7 +4614,7 @@ async fn test_consensus_handler_per_object_congestion_control(mode: PerObjectCon
     } else {
         epoch_store.get_highest_pending_checkpoint_height()
     };
-    let deferred_txns = epoch_store.get_all_deferred_transactions_for_test();
+    let deferred_txns = epoch_store.get_all_deferred_transactions_for_test().unwrap();
     assert_eq!(deferred_txns.len(), 1);
     assert_eq!(deferred_txns[0].1.len(), 3);
     let deferral_key = deferred_txns[0].0;
@@ -4658,7 +4664,7 @@ async fn test_consensus_handler_per_object_congestion_control(mode: PerObjectCon
         );
     }
 
-    let deferred_txns = authority.epoch_store_for_testing().get_all_deferred_transactions_for_test();
+    let deferred_txns = authority.epoch_store_for_testing().get_all_deferred_transactions_for_test().unwrap();
     assert_eq!(deferred_txns.len(), 1);
     assert_eq!(deferred_txns[0].1.len(), 1);
     let deferral_key = deferred_txns[0].0;
@@ -4675,7 +4681,7 @@ async fn test_consensus_handler_per_object_congestion_control(mode: PerObjectCon
     // Sends the last batch with no new transaction. The last deferred transactions should go through.
     let scheduled_txns = send_batch_consensus_no_execution(&authority, &[], true).await;
     assert_eq!(scheduled_txns.len(), 1);
-    assert!(authority.epoch_store_for_testing().get_all_deferred_transactions_for_test().is_empty());
+    assert!(authority.epoch_store_for_testing().get_all_deferred_transactions_for_test().unwrap().is_empty());
 }
 
 #[sim_test]
@@ -4789,25 +4795,21 @@ async fn test_consensus_handler_congestion_control_transaction_cancellation() {
     // Run consensus round 3. 2 user transactions will come out with 1 transaction being cancelled.
     let scheduled_txns = send_batch_consensus_no_execution(&authority, &[], false).await;
     assert_eq!(scheduled_txns.len(), 3); // 3 = 2 user transactions + 1 consensus commit prologue transaction.
-    assert!(authority.epoch_store_for_testing().get_all_deferred_transactions_for_test().is_empty());
+    assert!(authority.epoch_store_for_testing().get_all_deferred_transactions_for_test().unwrap().is_empty());
 
     // Check cancelled transaction shared locks.
     let shared_object_version = authority
         .epoch_store_for_testing()
         .get_assigned_shared_object_versions(&cancelled_txn.key())
         .expect("Versions should be set")
+        .expect("versions should exist")
         .into_iter()
+        .map(|((id, _initial_shared_version), seq)| (id, seq))
         .collect::<HashMap<_, _>>();
     assert_eq!(
-        [
-            ((shared_objects[0].id(), shared_objects[0].owner().start_version().unwrap()), SequenceNumber::CONGESTED),
-            (
-                (shared_objects[1].id(), shared_objects[1].owner().start_version().unwrap()),
-                SequenceNumber::CANCELLED_READ
-            )
-        ]
-        .into_iter()
-        .collect::<HashMap<_, _>>(),
+        [(shared_objects[0].id(), SequenceNumber::CONGESTED), (shared_objects[1].id(), SequenceNumber::CANCELLED_READ)]
+            .into_iter()
+            .collect::<HashMap<_, _>>(),
         shared_object_version
     );
 

@@ -74,6 +74,11 @@ impl ConsensusCommitOutput {
         Self { consensus_round, ..Default::default() }
     }
 
+    #[cfg(test)]
+    pub fn set_default_commit_stats_for_testing(&mut self) {
+        self.record_consensus_commit_stats(Default::default());
+    }
+
     pub fn insert_end_of_publish(&mut self, authority: AuthorityName) {
         self.end_of_publish.insert(authority);
     }
