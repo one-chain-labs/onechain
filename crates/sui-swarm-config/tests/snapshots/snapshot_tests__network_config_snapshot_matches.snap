@@ -109,9 +109,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -122,9 +125,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -137,12 +143,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -291,9 +300,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -304,9 +316,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -319,12 +334,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -473,9 +491,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -486,9 +507,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -501,12 +525,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -655,9 +682,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -668,9 +698,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -683,12 +716,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -837,9 +873,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -850,9 +889,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -865,12 +907,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -1019,9 +1064,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -1032,9 +1080,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -1047,12 +1098,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -1201,9 +1255,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -1214,9 +1271,12 @@ validator_configs:
         - Credenza3
         - Facebook
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -1229,12 +1289,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -1284,4 +1347,3 @@ account_keys:
   - mfPjCoE6SX0Sl84MnmNS/LS+tfPpkn7I8tziuk2g0WM=
   - 5RWlYF22jS9i76zLl8jP2D3D8GC5ht+IP1dWUBGZxi8=
 genesis: "[fake genesis]"
-

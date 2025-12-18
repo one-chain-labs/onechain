@@ -12,7 +12,7 @@
       "name": "Apache-2.0",
       "url": "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE"
     },
-    "version": "1.39.4"
+    "version": "1.0.1"
   },
   "methods": [
     {
@@ -9434,7 +9434,7 @@
         }
       },
       "SuiSupperCommitteeSummary": {
-        "description": "This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the SUI system state type.",
+        "description": "This is the JSON-RPC type for the OCT system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the OCT system state type.",
         "type": "object",
         "required": [
           "proposalList"
@@ -9652,7 +9652,7 @@
             ]
           },
           "stakeSubsidyBalance": {
-            "description": "Balance of SUI set aside for stake subsidies that will be drawn down over time.",
+            "description": "Balance of OCT set aside for stake subsidies that will be drawn down over time.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
@@ -10005,7 +10005,7 @@
         ]
       },
       "SuiValidatorSummary": {
-        "description": "This is the JSON-RPC type for the SUI validator. It flattens all inner structures to top-level fields so that they are decoupled from the internal definitions.",
+        "description": "This is the JSON-RPC type for the OCT validator. It flattens all inner structures to top-level fields so that they are decoupled from the internal definitions.",
         "type": "object",
         "required": [
           "commissionRate",
@@ -10025,7 +10025,7 @@
           "p2pAddress",
           "pendingPoolTokenWithdraw",
           "pendingStake",
-          "pendingTotalSuiWithdraw",
+          "pendingTotalOctWithdraw",
           "poolTokenBalance",
           "primaryAddress",
           "projectUrl",
@@ -10034,7 +10034,7 @@
           "revenueReceivingAddress",
           "rewardsPool",
           "stakingPoolId",
-          "stakingPoolSuiBalance",
+          "stakingPoolOctBalance",
           "suiAddress",
           "votingPower",
           "workerAddress",
@@ -10180,7 +10180,7 @@
               }
             ]
           },
-          "pendingTotalSuiWithdraw": {
+          "pendingTotalOctWithdraw": {
             "description": "Pending stake withdrawn during the current epoch, emptied at epoch boundaries.",
             "allOf": [
               {
@@ -10251,8 +10251,8 @@
               }
             ]
           },
-          "stakingPoolSuiBalance": {
-            "description": "The total number of SUI tokens in this pool.",
+          "stakingPoolOctBalance": {
+            "description": "The total number of OCT tokens in this pool.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
@@ -11314,6 +11314,13 @@
             "$ref": "#/components/schemas/ZkLoginProof"
           }
         }
+      },
+      "ZkLoginIntentScope": {
+        "type": "string",
+        "enum": [
+          "TransactionData",
+          "PersonalMessage"
+        ]
       },
       "ZkLoginProof": {
         "description": "The struct for zk login proof.",
