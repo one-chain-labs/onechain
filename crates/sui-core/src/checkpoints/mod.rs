@@ -2183,7 +2183,7 @@ impl CheckpointService {
         let mut output = ConsensusCommitOutput::new(0);
         epoch_store.write_pending_checkpoint(&mut output, &checkpoint)?;
         output.set_default_commit_stats_for_testing();
-        epoch_store.push_consensus_output_for_tests(output);
+        // epoch_store.push_consensus_output_for_tests(output);
         self.notify_checkpoint()?;
         Ok(())
     }

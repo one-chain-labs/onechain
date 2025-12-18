@@ -2294,13 +2294,13 @@ impl AuthorityPerEpochStore {
         self.consensus_notify_read.notify(&key, &());
     }
 
-    #[cfg(test)]
-    pub(crate) fn push_consensus_output_for_tests(&self, output: ConsensusCommitOutput) {
-        self.consensus_quarantine
-            .write()
-            .push_consensus_output(output, self)
-            .expect("push_consensus_output should not fail");
-    }
+    // #[cfg(test)]
+    // pub(crate) fn push_consensus_output_for_tests(&self, output: ConsensusCommitOutput) {
+    //     self.consensus_quarantine
+    //         .write()
+    //         .push_consensus_output(output, self)
+    //         .expect("push_consensus_output should not fail");
+    // }
 
     fn finish_consensus_certificate_process_with_batch(
         &self,
