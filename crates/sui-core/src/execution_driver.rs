@@ -51,7 +51,7 @@ pub async fn execution_process(
             return;
         };
 
-        state.get_chain_identifier().chain() == Chain::Mainnet
+        state.get_chain_identifier().map(|chain_id| chain_id.chain()) == Some(Chain::Mainnet)
     };
 
     // Loop whenever there is a signal that a new transactions is ready to process.

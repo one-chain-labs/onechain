@@ -1772,8 +1772,8 @@ fn build_kv_store(
         error!("failed to parse config.transaction_kv_store_config.base_url ({:?}) as url: {}", base_url, e)
     })?;
 
-    let network_str = match state.get_chain_identifier().chain() {
-        Chain::Mainnet => "/mainnet",
+    let network_str = match state.get_chain_identifier().map(|c| c.chain()) {
+        Some(Chain::Mainnet) => "/mainnet",
         _ => {
             info!("using local db only for kv store");
             return Ok(Arc::new(db_store));

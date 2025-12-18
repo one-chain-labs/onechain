@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::anyhow;
 use arc_swap::Guard;
 use async_trait::async_trait;
 #[cfg(test)]
@@ -473,7 +474,7 @@ impl StateRead for AuthorityState {
     }
 
     fn get_chain_identifier(&self) -> StateReadResult<ChainIdentifier> {
-        Ok(AuthorityState::get_chain_identifier(self))
+        Ok(self.get_chain_identifier().ok_or(anyhow!("Chain identifier not found"))?)
     }
 }
 

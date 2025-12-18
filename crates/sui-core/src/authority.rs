@@ -160,7 +160,7 @@ use sui_types::{
     TypeTag,
     SUI_SYSTEM_ADDRESS,
 };
-use tap::TapFallible;
+use tap::{TapFallible, TapOptional};
 use tokio::{
     sync::{mpsc, mpsc::unbounded_channel, oneshot, RwLock},
     task::JoinHandle,
@@ -864,7 +864,7 @@ pub struct AuthorityState {
     pub validator_tx_finalizer: Option<Arc<ValidatorTxFinalizer<NetworkAuthorityClient>>>,
 
     /// The chain identifier is derived from the digest of the genesis checkpoint.
-    chain_identifier: ChainIdentifier,
+    pub chain_identifier: ChainIdentifier,
 
     pub(crate) congestion_tracker: Arc<CongestionTracker>,
 }
@@ -2166,21 +2166,21 @@ impl AuthorityState {
             .tap_err(|e| warn!(tx_digest=?digest, "Failed to process object index, index_tx is skipped: {e}"))?;
 
         indexes.index_tx(
-                cert.data().intent_message().value.sender(),
-                cert.data().intent_message().value.input_objects()?.iter().map(|o| o.object_id()),
-                effects.all_changed_objects().into_iter().map(|(obj_ref, owner, _kind)| (obj_ref, owner)),
-                cert.data()
-                    .intent_message()
-                    .value
-                    .move_calls()
-                    .into_iter()
-                    .map(|(package, module, function)| (*package, module.to_owned(), function.to_owned())),
-                events,
-                changes,
-                digest,
-                timestamp_ms,
-                tx_coins,
-            )
+            cert.data().intent_message().value.sender(),
+            cert.data().intent_message().value.input_objects()?.iter().map(|o| o.object_id()),
+            effects.all_changed_objects().into_iter().map(|(obj_ref, owner, _kind)| (obj_ref, owner)),
+            cert.data()
+                .intent_message()
+                .value
+                .move_calls()
+                .into_iter()
+                .map(|(package, module, function)| (*package, module.to_owned(), function.to_owned())),
+            events,
+            changes,
+            digest,
+            timestamp_ms,
+            tx_coins,
+        )
     }
 
     #[cfg(msim)]
@@ -3187,8 +3187,19 @@ impl AuthorityState {
     }
 
     /// Chain Identifier is the digest of the genesis checkpoint.
-    pub fn get_chain_identifier(&self) -> ChainIdentifier {
-        self.chain_identifier
+    pub fn get_chain_identifier(&self) -> Option<ChainIdentifier> {
+        if let Some(digest) = CHAIN_IDENTIFIER.get() {
+            return Some(*digest);
+        }
+
+        let checkpoint = self
+            .get_checkpoint_by_sequence_number(0)
+            .tap_err(|e| error!("Failed to get genesis checkpoint: {:?}", e))
+            .ok()?
+            .tap_none(|| error!("Genesis checkpoint is missing from DB"))?;
+        // It's ok if the value is already set due to data races.
+        let _ = CHAIN_IDENTIFIER.set(ChainIdentifier::from(*checkpoint.digest()));
+        Some(ChainIdentifier::from(*checkpoint.digest()))
     }
 
     #[instrument(level = "trace", skip_all)]
