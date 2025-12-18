@@ -450,7 +450,7 @@ impl StateAccumulator {
             }
         }
 
-        let Some(prior_running_root) = epoch_store.get_running_root_accumulator(checkpoint_seq_num - 1)? else {
+        let Some(prior_running_root) = epoch_store.get_running_root_accumulator(&(checkpoint_seq_num - 1))? else {
             fatal!("Running root accumulator must exist for checkpoint {}", checkpoint_seq_num - 1);
         };
 
@@ -469,7 +469,7 @@ impl StateAccumulator {
         tracing::info!("accumulating running root for checkpoint {}", checkpoint_seq_num);
 
         // Idempotency.
-        if epoch_store.get_running_root_accumulator(checkpoint_seq_num)?.is_some() {
+        if epoch_store.get_running_root_accumulator(&checkpoint_seq_num)?.is_some() {
             debug!("accumulate_running_root {:?} {:?} already exists", epoch_store.epoch(), checkpoint_seq_num);
             return Ok(());
         }
@@ -495,7 +495,7 @@ impl StateAccumulator {
     ) -> SuiResult<Accumulator> {
         let _scope = monitored_scope("AccumulateEpochV2");
         let running_root = epoch_store
-            .get_running_root_accumulator(last_checkpoint_of_epoch)?
+            .get_running_root_accumulator(&last_checkpoint_of_epoch)?
             .expect("Expected running root accumulator to exist up to last checkpoint of epoch");
 
         self.store.insert_state_accumulator_for_epoch(epoch_store.epoch(), &last_checkpoint_of_epoch, &running_root)?;

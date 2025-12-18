@@ -2918,13 +2918,7 @@ impl AuthorityState {
 
         let new_epoch = new_committee.epoch;
         let new_epoch_store = self
-            .reopen_epoch_db(
-                cur_epoch_store,
-                new_committee,
-                epoch_start_configuration,
-                expensive_safety_check_config,
-                epoch_last_checkpoint,
-            )
+            .reopen_epoch_db(cur_epoch_store, new_committee, epoch_start_configuration, expensive_safety_check_config)
             .await?;
         assert_eq!(new_epoch_store.epoch(), new_epoch);
         self.transaction_manager.reconfigure(new_epoch);
@@ -2953,11 +2947,6 @@ impl AuthorityState {
             self.get_backing_package_store().clone(),
             self.get_object_store().clone(),
             &self.config.expensive_safety_check_config,
-            self.checkpoint_store
-                .get_epoch_last_checkpoint(epoch_store.epoch())
-                .unwrap()
-                .map(|c| *c.sequence_number())
-                .unwrap_or_default(),
         );
         let new_epoch = new_epoch_store.epoch();
         self.transaction_manager.reconfigure(new_epoch);
@@ -4724,7 +4713,6 @@ impl AuthorityState {
         new_committee: Committee,
         epoch_start_configuration: EpochStartConfiguration,
         expensive_safety_check_config: &ExpensiveSafetyCheckConfig,
-        epoch_last_checkpoint: CheckpointSequenceNumber,
     ) -> SuiResult<Arc<AuthorityPerEpochStore>> {
         let new_epoch = new_committee.epoch;
         info!(new_epoch = ?new_epoch, "re-opening AuthorityEpochTables for new epoch");
@@ -4738,7 +4726,6 @@ impl AuthorityState {
             self.get_object_store().clone(),
             expensive_safety_check_config,
             cur_epoch_store.get_chain_identifier(),
-            epoch_last_checkpoint,
         );
         self.epoch_store.store(new_epoch_store.clone());
         Ok(new_epoch_store)

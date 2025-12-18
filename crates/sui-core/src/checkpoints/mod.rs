@@ -1180,7 +1180,7 @@ impl CheckpointBuilder {
         }
 
         self.notify_aggregator.notify_one();
-        self.epoch_store.process_constructed_checkpoint(height, new_checkpoints);
+        self.epoch_store.process_constructed_checkpoint(height, new_checkpoints)?;
         Ok(())
     }
 
@@ -1711,12 +1711,10 @@ impl CheckpointAggregator {
                 self.current.as_mut().unwrap()
             };
 
-            let epoch_tables = self.epoch_store.tables().expect("should not run past end of epoch");
-            let iter = epoch_tables
-                .pending_checkpoint_signatures
-                .safe_iter_with_bounds(Some((current.summary.sequence_number, current.next_index)), None);
-            for item in iter {
-                let ((seq, index), data) = item?;
+            let iter = self
+                .epoch_store
+                .pending_checkpoint_signatures_iter(current.summary.sequence_number, current.next_index)?;
+            for ((seq, index), data) in iter {
                 if seq != current.summary.sequence_number {
                     trace!(
                         checkpoint_seq =? current.summary.sequence_number,

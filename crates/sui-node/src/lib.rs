@@ -450,8 +450,6 @@ impl SuiNode {
             store.get_epoch_start_configuration()?.expect("EpochStartConfiguration of the current epoch must exist");
         let cache_metrics = Arc::new(ResolverMetrics::new(&prometheus_registry));
         let signature_verifier_metrics = SignatureVerifierMetrics::new(&prometheus_registry);
-        let highest_executed_checkpoint =
-            checkpoint_store.get_highest_executed_checkpoint_seq_number().expect("db error").unwrap_or_default();
 
         let cache_traits =
             build_execution_cache(&config.execution_cache, &prometheus_registry, &store, backpressure_manager.clone());
@@ -481,7 +479,6 @@ impl SuiNode {
             signature_verifier_metrics,
             &config.expensive_safety_check_config,
             ChainIdentifier::from(*genesis.checkpoint().digest()),
-            highest_executed_checkpoint,
         );
 
         info!("created epoch store");
