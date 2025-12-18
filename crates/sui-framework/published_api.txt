@@ -316,6 +316,9 @@ stake_amount
 total_stake
 	public fun
 	0x3::validator
+only_validator_staking
+	public fun
+	0x3::validator
 voting_power
 	public fun
 	0x3::validator
