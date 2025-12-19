@@ -650,6 +650,7 @@ public fun total_stake_amount(self: &Validator): u64 {
     self.staking_pool.sui_balance()
 }
 
+
 public fun stake_amount(self: &Validator): u64 {
     self.staking_pool.sui_balance()
 }
@@ -657,6 +658,10 @@ public fun stake_amount(self: &Validator): u64 {
 /// Return the total amount staked with this validator
 public fun total_stake(self: &Validator): u64 {
     stake_amount(self)
+}
+
+public fun only_validator_staking(self: &Validator): bool {
+    self.only_validator_staking
 }
 
 /// Return the voting power of this validator.

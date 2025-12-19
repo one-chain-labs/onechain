@@ -58,6 +58,7 @@ title: Module `one_system::validator`
 -  [Function `total_stake_amount`](#one_system_validator_total_stake_amount)
 -  [Function `stake_amount`](#one_system_validator_stake_amount)
 -  [Function `total_stake`](#one_system_validator_total_stake)
+-  [Function `only_validator_staking`](#one_system_validator_only_validator_staking)
 -  [Function `voting_power`](#one_system_validator_voting_power)
 -  [Function `set_voting_power`](#one_system_validator_set_voting_power)
 -  [Function `pending_stake_amount`](#one_system_validator_pending_stake_amount)
@@ -304,7 +305,7 @@ title: Module `one_system::validator`
 <dd>
 </dd>
 <dt>
-<code>only_validator_staking: bool</code>
+<code><a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>: bool</code>
 </dt>
 <dd>
 </dd>
@@ -1083,7 +1084,7 @@ Request to add stake to the validator's staking pool, processed at the end of th
         is_validator: bool,
         ctx: &<b>mut</b> TxContext,
     ): StakedOct {
-        <b>if</b> (self.only_validator_staking) {
+        <b>if</b> (self.<a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>) {
             <b>assert</b>!(is_validator, <a href="../one_system/validator.md#one_system_validator_EOnlyValidatorStake">EOnlyValidatorStake</a>);
         }<b>else</b> {
             <b>assert</b>!(!is_validator, <a href="../one_system/validator.md#one_system_validator_EValidatorStakeClosed">EValidatorStakeClosed</a>);
@@ -1337,7 +1338,7 @@ Request to withdraw stake from the validator's staking pool, processed at the en
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator.md#one_system_validator_set_only_validator_staking">set_only_validator_staking</a>(self: &<b>mut</b> <a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>, only_validator_staking: bool)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator.md#one_system_validator_set_only_validator_staking">set_only_validator_staking</a>(self: &<b>mut</b> <a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>, <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>: bool)
 </code></pre>
 
 
@@ -1348,9 +1349,9 @@ Request to withdraw stake from the validator's staking pool, processed at the en
 
 <pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator.md#one_system_validator_set_only_validator_staking">set_only_validator_staking</a>(
     self: &<b>mut</b> <a href="../one_system/validator.md#one_system_validator_Validator">Validator</a>,
-    only_validator_staking: bool
+    <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>: bool
 ) {
-    self.only_validator_staking = only_validator_staking
+    self.<a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a> = <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>
 }
 </code></pre>
 
@@ -2198,6 +2199,30 @@ Return the total amount staked with this validator
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/validator.md#one_system_validator_total_stake">total_stake</a>(self: &<a href="../one_system/validator.md#one_system_validator_Validator">Validator</a>): u64 {
     <a href="../one_system/validator.md#one_system_validator_stake_amount">stake_amount</a>(self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_system_validator_only_validator_staking"></a>
+
+## Function `only_validator_staking`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>(self: &<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>(self: &<a href="../one_system/validator.md#one_system_validator_Validator">Validator</a>): bool {
+    self.<a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>
 }
 </code></pre>
 
@@ -3227,7 +3252,7 @@ Aborts if validator metadata is valid
 Create a new validator from the given <code><a href="../one_system/validator.md#one_system_validator_ValidatorMetadata">ValidatorMetadata</a></code>, called by both <code><a href="../one_system/validator.md#one_system_validator_new">new</a></code> and <code>new_for_testing</code>.
 
 
-<pre><code><b>fun</b> <a href="../one_system/validator.md#one_system_validator_new_from_metadata">new_from_metadata</a>(<a href="../one_system/validator.md#one_system_validator_metadata">metadata</a>: <a href="../one_system/validator.md#one_system_validator_ValidatorMetadata">one_system::validator::ValidatorMetadata</a>, <a href="../one_system/validator.md#one_system_validator_revenue_receiving_address">revenue_receiving_address</a>: <b>address</b>, only_validator_staking: bool, <a href="../one_system/validator.md#one_system_validator_gas_price">gas_price</a>: u64, <a href="../one_system/validator.md#one_system_validator_commission_rate">commission_rate</a>: u64, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>
+<pre><code><b>fun</b> <a href="../one_system/validator.md#one_system_validator_new_from_metadata">new_from_metadata</a>(<a href="../one_system/validator.md#one_system_validator_metadata">metadata</a>: <a href="../one_system/validator.md#one_system_validator_ValidatorMetadata">one_system::validator::ValidatorMetadata</a>, <a href="../one_system/validator.md#one_system_validator_revenue_receiving_address">revenue_receiving_address</a>: <b>address</b>, <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>: bool, <a href="../one_system/validator.md#one_system_validator_gas_price">gas_price</a>: u64, <a href="../one_system/validator.md#one_system_validator_commission_rate">commission_rate</a>: u64, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>
 </code></pre>
 
 
@@ -3239,7 +3264,7 @@ Create a new validator from the given <code><a href="../one_system/validator.md#
 <pre><code><b>fun</b> <a href="../one_system/validator.md#one_system_validator_new_from_metadata">new_from_metadata</a>(
     <a href="../one_system/validator.md#one_system_validator_metadata">metadata</a>: <a href="../one_system/validator.md#one_system_validator_ValidatorMetadata">ValidatorMetadata</a>,
     <a href="../one_system/validator.md#one_system_validator_revenue_receiving_address">revenue_receiving_address</a>: <b>address</b>,
-    only_validator_staking:bool,
+    <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>:bool,
     <a href="../one_system/validator.md#one_system_validator_gas_price">gas_price</a>: u64,
     <a href="../one_system/validator.md#one_system_validator_commission_rate">commission_rate</a>: u64,
     ctx: &<b>mut</b> TxContext
@@ -3254,7 +3279,7 @@ Create a new validator from the given <code><a href="../one_system/validator.md#
         // active <a href="../one_system/validator.md#one_system_validator">validator</a> set, the voting power will be updated accordingly.
         <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>: 0,
         <a href="../one_system/validator.md#one_system_validator_revenue_receiving_address">revenue_receiving_address</a>,
-        only_validator_staking,
+        <a href="../one_system/validator.md#one_system_validator_only_validator_staking">only_validator_staking</a>,
         <a href="../one_system/validator.md#one_system_validator_operation_cap_id">operation_cap_id</a>,
         <a href="../one_system/validator.md#one_system_validator_gas_price">gas_price</a>,
         <a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>,
