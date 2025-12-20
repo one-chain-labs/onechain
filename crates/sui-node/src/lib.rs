@@ -1883,7 +1883,15 @@ pub async fn build_http_server(
     let listener = tokio::net::TcpListener::bind(&config.json_rpc_address).await.unwrap();
     let addr = listener.local_addr().unwrap();
 
-    router = router.layer(axum::middleware::from_fn(server_timing_middleware));
+    router = router
+        .layer(axum::middleware::from_fn(server_timing_middleware))
+        // Setup a permissive CORS policy
+        .layer(
+            tower_http::cors::CorsLayer::new()
+                .allow_methods([http::Method::GET, http::Method::POST])
+                .allow_origin(tower_http::cors::Any)
+                .allow_headers(tower_http::cors::Any),
+        );
 
     let handle = tokio::spawn(async move {
         axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap()
