@@ -17,9 +17,13 @@ use move_core_types::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, Bytes};
+use sui_protocol_config::ProtocolConfig;
 
+use self::{balance_traversal::BalanceTraversal, bounded_visitor::BoundedVisitor};
 use crate::{
     base_types::{
+        FullObjectID,
+        FullObjectRef,
         MoveObjectType,
         ObjectDigest,
         ObjectID,
@@ -37,9 +41,6 @@ use crate::{
     layout_resolver::LayoutResolver,
     move_package::MovePackage,
 };
-use sui_protocol_config::ProtocolConfig;
-
-use self::{balance_traversal::BalanceTraversal, bounded_visitor::BoundedVisitor};
 
 mod balance_traversal;
 pub mod bounded_visitor;
@@ -129,11 +130,17 @@ impl MoveObject {
         }
     }
 
-    pub fn new_coin(coin_type: MoveObjectType, version: SequenceNumber, id: ObjectID, value: u64) -> Self {
+    pub fn new_coin(coin_type: TypeTag, version: SequenceNumber, id: ObjectID, value: u64) -> Self {
         // unwrap safe because coins are always smaller than the max object size
         unsafe {
-            Self::new_from_execution_with_limit(coin_type, true, version, GasCoin::new(id, value).to_bcs_bytes(), 256)
-                .unwrap()
+            Self::new_from_execution_with_limit(
+                MoveObjectType::coin(coin_type),
+                true,
+                version,
+                Coin::new(id, value).to_bcs_bytes(),
+                256,
+            )
+            .unwrap()
         }
     }
 
@@ -157,7 +164,7 @@ impl MoveObject {
         if ID_END_INDEX > contents.len() {
             return Err(ObjectIDParseError::TryFromSliceError);
         }
-        ObjectID::try_from(&contents[0..ID_END_INDEX])
+        ObjectID::try_from(&contents[0 .. ID_END_INDEX])
     }
 
     /// Return the `value: u64` field of a `Coin<T>` type.
@@ -170,7 +177,7 @@ impl MoveObject {
         debug_assert!(self.contents.len() == 40);
 
         // unwrap safe because we checked that it is a coin
-        u64::from_le_bytes(<[u8; 8]>::try_from(&self.contents[ID_END_INDEX..]).unwrap())
+        u64::from_le_bytes(<[u8; 8]>::try_from(&self.contents[ID_END_INDEX ..]).unwrap())
     }
 
     /// Update the `value: u64` field of a `Coin<T>` type.
@@ -182,7 +189,7 @@ impl MoveObject {
         // 32 bytes for object ID, 8 for balance
         debug_assert!(self.contents.len() == 40);
 
-        self.contents.splice(ID_END_INDEX.., value.to_le_bytes());
+        self.contents.splice(ID_END_INDEX .., value.to_le_bytes());
     }
 
     /// Update the `timestamp_ms: u64` field of the `Clock` type.
@@ -193,7 +200,7 @@ impl MoveObject {
         // 32 bytes for object ID, 8 for timestamp
         assert!(self.contents.len() == 40);
 
-        self.contents.splice(ID_END_INDEX.., timestamp_ms.to_le_bytes());
+        self.contents.splice(ID_END_INDEX .., timestamp_ms.to_le_bytes());
     }
 
     pub fn is_coin(&self) -> bool {
@@ -217,7 +224,7 @@ impl MoveObject {
     /// this returns the slice containing `f1` and `f2`.
     #[cfg(test)]
     pub fn type_specific_contents(&self) -> &[u8] {
-        &self.contents[ID_END_INDEX..]
+        &self.contents[ID_END_INDEX ..]
     }
 
     /// Update the contents of this object but does not increment its version
@@ -324,7 +331,7 @@ impl MoveObject {
         self.contents.len() + serialized_type_tag_size + 1 + 8
     }
 
-    /// Get the total amount of OCT embedded in `self`. Intended for testing purposes
+    /// Get the total amount of SUI embedded in `self`. Intended for testing purposes
     pub fn get_total_oct(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
         let balances = self.get_coin_balances(layout_resolver)?;
         Ok(balances.get(&GAS::type_tag()).copied().unwrap_or(0))
@@ -497,6 +504,15 @@ impl Owner {
         }
     }
 
+    // Returns initial_shared_version for Shared objects, and start_version for ConsensusV2 objects.
+    pub fn start_version(&self) -> Option<SequenceNumber> {
+        match self {
+            Self::Shared { initial_shared_version } => Some(*initial_shared_version),
+            Self::ConsensusV2 { start_version, .. } => Some(*start_version),
+            Self::Immutable | Self::AddressOwner(_) | Self::ObjectOwner(_) => None,
+        }
+    }
+
     pub fn is_immutable(&self) -> bool {
         matches!(self, Owner::Immutable)
     }
@@ -511,6 +527,10 @@ impl Owner {
 
     pub fn is_shared(&self) -> bool {
         matches!(self, Owner::Shared { .. })
+    }
+
+    pub fn is_consensus(&self) -> bool {
+        matches!(self, Owner::Shared { .. } | Owner::ConsensusV2 { .. })
     }
 }
 
@@ -565,7 +585,7 @@ pub struct ObjectInner {
     pub owner: Owner,
     /// The digest of the transaction that created or last mutated this object
     pub previous_transaction: TransactionDigest,
-    /// The amount of OCT we would rebate if this object gets deleted.
+    /// The amount of SUI we would rebate if this object gets deleted.
     /// This number is re-calculated each time the object is mutated based on
     /// the present storage gas price.
     pub storage_rebate: u64,
@@ -719,6 +739,10 @@ impl ObjectInner {
         self.owner.is_shared()
     }
 
+    pub fn is_consensus(&self) -> bool {
+        self.owner.is_consensus()
+    }
+
     pub fn get_single_owner(&self) -> Option<SuiAddress> {
         self.owner.get_owner_address().ok()
     }
@@ -738,6 +762,10 @@ impl ObjectInner {
         (self.id(), self.version(), self.digest())
     }
 
+    pub fn compute_full_object_reference(&self) -> FullObjectRef {
+        (self.full_id(), self.version(), self.digest())
+    }
+
     pub fn digest(&self) -> ObjectDigest {
         ObjectDigest::new(default_hash(self))
     }
@@ -748,6 +776,15 @@ impl ObjectInner {
         match &self.data {
             Move(v) => v.id(),
             Package(m) => m.id(),
+        }
+    }
+
+    pub fn full_id(&self) -> FullObjectID {
+        let id = self.id();
+        if let Some(start_version) = self.owner.start_version() {
+            FullObjectID::Consensus((id, start_version))
+        } else {
+            FullObjectID::Fastpath(id)
         }
     }
 
@@ -877,7 +914,7 @@ impl ObjectInner {
 
 // Testing-related APIs.
 impl Object {
-    /// Get the total amount of OCT embedded in `self`, including both Move objects and the storage rebate
+    /// Get the total amount of SUI embedded in `self`, including both Move objects and the storage rebate
     pub fn get_total_oct(&self, layout_resolver: &mut dyn LayoutResolver) -> Result<u64, SuiError> {
         Ok(self.storage_rebate
             + match &self.data {
@@ -987,20 +1024,14 @@ impl Object {
         Self::with_id_owner_gas_for_testing(id, owner, GAS_VALUE_FOR_TESTING)
     }
 
-    pub fn with_id_owner_version_for_testing(id: ObjectID, version: SequenceNumber, owner: SuiAddress) -> Self {
+    pub fn with_id_owner_version_for_testing(id: ObjectID, version: SequenceNumber, owner: Owner) -> Self {
         let data = Data::Move(MoveObject {
             type_: GasCoin::type_().into(),
             has_public_transfer: true,
             version,
             contents: GasCoin::new(id, GAS_VALUE_FOR_TESTING).to_bcs_bytes(),
         });
-        ObjectInner {
-            owner: Owner::AddressOwner(owner),
-            data,
-            previous_transaction: TransactionDigest::genesis_marker(),
-            storage_rebate: 0,
-        }
-        .into()
+        ObjectInner { owner, data, previous_transaction: TransactionDigest::genesis_marker(), storage_rebate: 0 }.into()
     }
 
     pub fn with_owner_for_testing(owner: SuiAddress) -> Self {

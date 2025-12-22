@@ -1,14 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    balance::{Balance, Supply},
-    base_types::ObjectID,
-    error::{ExecutionError, ExecutionErrorKind, SuiError},
-    id::UID,
-    object::{Data, Object},
-    SUI_FRAMEWORK_ADDRESS,
-};
 use move_core_types::{
     annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     ident_str,
@@ -17,6 +9,15 @@ use move_core_types::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    balance::{Balance, Supply},
+    base_types::ObjectID,
+    error::{ExecutionError, ExecutionErrorKind, SuiError},
+    id::UID,
+    object::{Data, Object},
+    SUI_FRAMEWORK_ADDRESS,
+};
 
 pub const COIN_MODULE_NAME: &IdentStr = ident_str!("coin");
 pub const COIN_STRUCT_NAME: &IdentStr = ident_str!("Coin");
@@ -28,7 +29,7 @@ pub const PAY_JOIN_FUNC_NAME: &IdentStr = ident_str!("join");
 pub const PAY_SPLIT_N_FUNC_NAME: &IdentStr = ident_str!("divide_and_keep");
 pub const PAY_SPLIT_VEC_FUNC_NAME: &IdentStr = ident_str!("split_vec");
 
-// Rust version of the Move sui::coin::Coin type
+// Rust version of the Move one::coin::Coin type
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema, Eq, PartialEq)]
 pub struct Coin {
     pub id: UID,
@@ -36,8 +37,8 @@ pub struct Coin {
 }
 
 impl Coin {
-    pub fn new(id: UID, value: u64) -> Self {
-        Self { id, balance: Balance::new(value) }
+    pub fn new(id: ObjectID, value: u64) -> Self {
+        Self { id: UID::new(id), balance: Balance::new(value) }
     }
 
     pub fn type_(type_param: TypeTag) -> StructTag {
@@ -92,13 +93,13 @@ impl Coin {
     pub fn layout(type_param: TypeTag) -> MoveStructLayout {
         MoveStructLayout {
             type_: Self::type_(type_param.clone()),
-            fields: Box::new(vec![
+            fields: vec![
                 MoveFieldLayout::new(ident_str!("id").to_owned(), MoveTypeLayout::Struct(Box::new(UID::layout()))),
                 MoveFieldLayout::new(
                     ident_str!("balance").to_owned(),
                     MoveTypeLayout::Struct(Box::new(Balance::layout(type_param))),
                 ),
-            ]),
+            ],
         }
     }
 
@@ -114,13 +115,13 @@ impl Coin {
     // Split amount out of this coin to a new coin.
     // Related coin objects need to be updated in temporary_store to persist the changes,
     // including creating the coin object related to the newly created coin.
-    pub fn split(&mut self, amount: u64, new_coin_id: UID) -> Result<Coin, ExecutionError> {
+    pub fn split(&mut self, amount: u64, new_coin_id: ObjectID) -> Result<Coin, ExecutionError> {
         self.balance.withdraw(amount)?;
         Ok(Coin::new(new_coin_id, amount))
     }
 }
 
-// Rust version of the Move sui::coin::TreasuryCap type
+// Rust version of the Move one::coin::TreasuryCap type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, JsonSchema)]
 pub struct TreasuryCap {
     pub id: UID,
@@ -180,7 +181,7 @@ impl TryFrom<Object> for TreasuryCap {
     }
 }
 
-// Rust version of the Move sui::coin::CoinMetadata type
+// Rust version of the Move one::coin::CoinMetadata type
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema, Eq, PartialEq)]
 pub struct CoinMetadata {
     pub id: UID,

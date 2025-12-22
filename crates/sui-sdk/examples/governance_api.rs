@@ -4,10 +4,10 @@
 mod utils;
 use utils::setup_for_read;
 
-// This example connects to the OneChain testnet
+// This example connects to the Sui testnet
 // and collects information about the stakes in the network,
 // the committee information,
-// lists all the validators' name, description, and OneChain address,
+// lists all the validators' name, description, and sui address,
 // and prints the reference gas price.
 
 #[tokio::main]

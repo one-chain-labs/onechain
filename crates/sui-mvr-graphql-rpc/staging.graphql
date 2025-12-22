@@ -587,7 +587,7 @@ type Coin implements IMoveObject & IObject & IOwner {
 	contents: MoveValue
 	"""
 	Determines whether a transaction can transfer this object, using the TransferObjects
-	transaction command or `sui::transfer::public_transfer`, both of which require the object to
+	transaction command or `one::transfer::public_transfer`, both of which require the object to
 	have the `key` and `store` abilities.
 	"""
 	hasPublicTransfer: Boolean!
@@ -765,7 +765,7 @@ type CoinMetadata implements IMoveObject & IObject & IOwner {
 	contents: MoveValue
 	"""
 	Determines whether a transaction can transfer this object, using the TransferObjects
-	transaction command or `sui::transfer::public_transfer`, both of which require the object to
+	transaction command or `one::transfer::public_transfer`, both of which require the object to
 	have the `key` and `store` abilities.
 	"""
 	hasPublicTransfer: Boolean!
@@ -1144,7 +1144,7 @@ type Epoch {
 	"""
 	safeMode: SafeMode
 	"""
-	The value of the `version` field of `0x5`, the `0x3::sui::SuiSystemState` object.  This
+	The value of the `version` field of `0x5`, the `0x3::one::SuiSystemState` object.  This
 	version changes whenever the fields contained in the system state object (held in a dynamic
 	field attached to `0x5`) change.
 	"""
@@ -1492,7 +1492,7 @@ interface IMoveObject {
 	"""
 	contents: MoveValue
 	"""
-	Determines whether a transaction can transfer this object, using the TransferObjects transaction command or `sui::transfer::public_transfer`, both of which require the object to have the `key` and `store` abilities.
+	Determines whether a transaction can transfer this object, using the TransferObjects transaction command or `one::transfer::public_transfer`, both of which require the object to have the `key` and `store` abilities.
 	"""
 	hasPublicTransfer: Boolean!
 	"""
@@ -2125,7 +2125,7 @@ type MoveObject implements IMoveObject & IObject & IOwner {
 	contents: MoveValue
 	"""
 	Determines whether a transaction can transfer this object, using the TransferObjects
-	transaction command or `sui::transfer::public_transfer`, both of which require the object to
+	transaction command or `one::transfer::public_transfer`, both of which require the object to
 	have the `key` and `store` abilities.
 	"""
 	hasPublicTransfer: Boolean!
@@ -2880,7 +2880,9 @@ input ObjectFilter {
 	"""
 	objectIds: [SuiAddress!]
 	"""
-	Filter for live or potentially historical objects by their ID and version.
+	Filter for live objects by their ID and version. NOTE:  this input filter has been
+	deprecated in favor of `multiGetObjects` query as it does not make sense to query for live
+	objects by their versions. This filter will be removed with v1.42.0 release.
 	"""
 	objectKeys: [ObjectKey!]
 }
@@ -3306,6 +3308,10 @@ type Query {
 	"""
 	transactionBlock(digest: String!): TransactionBlock
 	"""
+	Fetch a list of objects by their IDs and versions.
+	"""
+	multiGetObjects(keys: [ObjectKey!]!): [Object!]!
+	"""
 	The coin objects that exist in the network.
 	
 	The type field is a string of the inner type of the coin by which to filter (e.g.
@@ -3579,6 +3585,10 @@ type ServiceConfig {
 	"""
 	maxTransactionIds: Int!
 	"""
+	Maximum number of keys that can be passed to a `multiGetObjects` query.
+	"""
+	maxMultiGetObjectsKeys: Int!
+	"""
 	Maximum number of candidates to scan when gathering a page of results.
 	"""
 	maxScanLimit: Int!
@@ -3832,7 +3842,7 @@ type StakedOct implements IMoveObject & IObject & IOwner {
 	contents: MoveValue
 	"""
 	Determines whether a transaction can transfer this object, using the TransferObjects
-	transaction command or `sui::transfer::public_transfer`, both of which require the object to
+	transaction command or `one::transfer::public_transfer`, both of which require the object to
 	have the `key` and `store` abilities.
 	"""
 	hasPublicTransfer: Boolean!
@@ -4053,7 +4063,7 @@ type SuinsRegistration implements IMoveObject & IObject & IOwner {
 	contents: MoveValue
 	"""
 	Determines whether a transaction can transfer this object, using the TransferObjects
-	transaction command or `sui::transfer::public_transfer`, both of which require the object to
+	transaction command or `one::transfer::public_transfer`, both of which require the object to
 	have the `key` and `store` abilities.
 	"""
 	hasPublicTransfer: Boolean!

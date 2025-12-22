@@ -2,13 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use proptest::{prelude::*, strategy::ValueTree};
-use transaction_fuzzer::{
-    account_universe::{AccountCurrent, AccountData},
-    executor::Executor,
-    programmable_transaction_gen::{gen_many_input_match, gen_programmable_transaction, MAX_ITERATIONS_INPUT_MATCH},
-    type_arg_fuzzer::{run_pt, run_pt_effects},
-};
-
 use sui_types::{
     base_types::ObjectRef,
     effects::TransactionEffectsAPI,
@@ -18,6 +11,12 @@ use sui_types::{
     MOVE_STDLIB_PACKAGE_ID,
     SUI_FRAMEWORK_PACKAGE_ID,
 };
+use transaction_fuzzer::{
+    account_universe::{AccountCurrent, AccountData},
+    executor::Executor,
+    programmable_transaction_gen::{gen_many_input_match, gen_programmable_transaction, MAX_ITERATIONS_INPUT_MATCH},
+    type_arg_fuzzer::{run_pt, run_pt_effects},
+};
 
 #[test]
 #[cfg_attr(msim, ignore)]
@@ -26,7 +25,7 @@ fn invalid_pt_fuzz() {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let mut account = AccountCurrent::new(AccountData::new_random());
     let strategy = gen_programmable_transaction();
-    for _ in 0..50 {
+    for _ in 0 .. 50 {
         let pt = strategy.new_tree(&mut runner).unwrap().current();
         run_pt(&mut account, &mut exec, pt)
     }
@@ -60,7 +59,7 @@ pub fn run_pt_success(
     mut pt: ProgrammableTransaction,
     cap: ObjectRef,
 ) -> ObjectRef {
-    for i in 0..pt.inputs.len() {
+    for i in 0 .. pt.inputs.len() {
         if let CallArg::Object(ObjectArg::ImmOrOwnedObject(obj_ref)) = pt.inputs[i] {
             if obj_ref.0 == cap.0 {
                 pt.inputs[i] = CallArg::Object(ObjectArg::ImmOrOwnedObject(cap));
@@ -77,7 +76,7 @@ pub fn run_pt_success(
     assert!(
         matches!(status, ExecutionStatus::Failure {
             error: ExecutionFailureStatus::UnusedValueWithoutDrop { .. },
-            command: _
+            command: _,
         }),
         "{:?}",
         status
@@ -107,7 +106,7 @@ fn pt_fuzz_input_match() {
 
     let strategy = gen_many_input_match(account.initial_data.account.address, package.0, cap);
     let mut new_cap = cap;
-    for _ in 0..MAX_ITERATIONS_INPUT_MATCH {
+    for _ in 0 .. MAX_ITERATIONS_INPUT_MATCH {
         let pt = strategy.new_tree(&mut runner).unwrap().current();
         new_cap = run_pt_success(&mut account, &mut exec, pt, new_cap);
     }

@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::PathBuf;
+
 use clap::*;
 use regex::Regex;
-use std::path::PathBuf;
 
 #[derive(Parser, Clone, ValueEnum, Debug)]
 pub enum Env {

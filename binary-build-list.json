@@ -1,6 +1,6 @@
 {
     "release_binaries": [
-        "sui",
+        "oct",
         "sui-node",
         "sui-tool",
         "sui-faucet",

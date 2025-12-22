@@ -3,6 +3,19 @@
 
 //! BridgeAuthorityAggregator aggregates signatures from BridgeCommittee.
 
+use std::{
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
+    sync::Arc,
+    time::Duration,
+};
+
+use sui_authority_aggregation::{quorum_map_then_reduce_with_timeout_and_prefs, ReduceOutput, SigRequestPrefs};
+use sui_types::{
+    base_types::ConciseableName,
+    committee::{StakeUnit, TOTAL_VOTING_POWER},
+};
+use tracing::{error, info, warn};
+
 use crate::{
     client::bridge_client::BridgeClient,
     crypto::{BridgeAuthorityPublicKeyBytes, BridgeAuthoritySignInfo},
@@ -17,17 +30,6 @@ use crate::{
         VerifiedSignedBridgeAction,
     },
 };
-use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    sync::Arc,
-    time::Duration,
-};
-use sui_authority_aggregation::{quorum_map_then_reduce_with_timeout_and_prefs, ReduceOutput, SigRequestPrefs};
-use sui_types::{
-    base_types::ConciseableName,
-    committee::{StakeUnit, TOTAL_VOTING_POWER},
-};
-use tracing::{error, info, warn};
 
 const TOTAL_TIMEOUT_MS: u64 = 5_000;
 const PREFETCH_TIMEOUT_MS: u64 = 1_500;
@@ -314,10 +316,10 @@ mod tests {
     use fastcrypto::traits::ToFromBytes;
     use sui_types::{committee::VALIDITY_THRESHOLD, digests::TransactionDigest};
 
-    use crate::{crypto::BridgeAuthorityPublicKey, server::mock_handler::BridgeRequestMockHandler};
-
     use super::*;
     use crate::{
+        crypto::BridgeAuthorityPublicKey,
+        server::mock_handler::BridgeRequestMockHandler,
         test_utils::{
             get_test_authorities_and_run_mock_bridge_server,
             get_test_authority_and_key,
@@ -332,7 +334,7 @@ mod tests {
         telemetry_subscribers::init_for_testing();
 
         let mut authorities = vec![];
-        for _i in 0..4 {
+        for _i in 0 .. 4 {
             let (authority, _, _) = get_test_authority_and_key(2500, 12345);
             authorities.push(authority);
         }
@@ -716,7 +718,7 @@ mod tests {
 
         let mut authorities = vec![];
         let mut secrets = vec![];
-        for _i in 0..4 {
+        for _i in 0 .. 4 {
             let (authority, _, secret) = get_test_authority_and_key(2500, 12345);
             authorities.push(authority);
             secrets.push(secret);

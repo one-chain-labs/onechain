@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{fs, path::Path};
+
 use anyhow::{Context, Result};
 use fastcrypto::{
     encoding::{Base64, Encoding},
     hash::HashFunction,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{fs, path::Path};
 use sui_types::{
     authenticator_state::{get_authenticator_state, AuthenticatorStateInner},
     base_types::{ObjectID, SuiAddress},

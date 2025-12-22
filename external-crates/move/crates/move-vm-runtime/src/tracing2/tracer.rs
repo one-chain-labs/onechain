@@ -15,16 +15,8 @@ use move_core_types::{
     language_storage::TypeTag,
 };
 use move_trace_format::format::{
-    DataLoad,
-    Effect as EF,
-    Location,
-    MoveTraceBuilder,
-    Read,
-    RefType,
-    TraceIndex,
-    TraceValue,
-    TypeTagWithRefs,
-    Write,
+    DataLoad, Effect as EF, Location, MoveTraceBuilder, Read, RefType, TraceIndex, TraceValue,
+    TypeTagWithRefs, Write,
 };
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::SmallVec;
@@ -91,8 +83,13 @@ enum RuntimeLocation {
 #[derive(Debug, Clone)]
 enum ReferenceType {
     Value,
-    Empty { ref_type: RefType },
-    Filled { ref_type: RefType, location: RuntimeLocation },
+    Empty {
+        ref_type: RefType,
+    },
+    Filled {
+        ref_type: RefType,
+        location: RuntimeLocation,
+    },
 }
 
 /// A `RootedType` is a a type layout with reference information, where any reference type is
@@ -115,7 +112,10 @@ struct LocalType {
 
 impl TagWithLayoutInfoOpt {
     pub fn as_tag_with_refs(&self) -> TypeTagWithRefs {
-        TypeTagWithRefs { type_: self.tag.clone(), ref_type: self.layout.1.clone() }
+        TypeTagWithRefs {
+            type_: self.tag.clone(),
+            ref_type: self.layout.1.clone(),
+        }
     }
 }
 
@@ -126,7 +126,9 @@ impl RuntimeLocation {
                 panic!("Cannot convert stack location to trace location")
             }
             RuntimeLocation::Local(fidx, lidx) => Location::Local(*fidx, *lidx),
-            RuntimeLocation::Indexed(loc, idx) => Location::Indexed(Box::new(loc.as_trace_location()), *idx),
+            RuntimeLocation::Indexed(loc, idx) => {
+                Location::Indexed(Box::new(loc.as_trace_location()), *idx)
+            }
             RuntimeLocation::Global(id) => Location::Global(*id),
         }
     }
@@ -149,7 +151,10 @@ impl LocalType {
             ReferenceType::Empty { .. } => panic!("Empty reference type"),
             ReferenceType::Filled { ref_type, location } => Some((ref_type, location)),
         };
-        Some(RootedType { layout: self.layout?, ref_type })
+        Some(RootedType {
+            layout: self.layout?,
+            ref_type,
+        })
     }
 }
 
@@ -159,15 +164,20 @@ impl RootedType {
             None => ReferenceType::Value,
             Some((ref_type, location)) => ReferenceType::Filled { ref_type, location },
         };
-        LocalType { layout: Some(self.layout), ref_type }
+        LocalType {
+            layout: Some(self.layout),
+            ref_type,
+        }
     }
 }
 
-impl<'a> VMTracer<'a> {
+impl VMTracer<'_> {
     /// Emit an error event to the trace if `true`
     fn emit_trace_error_if_err(&mut self, is_err: bool) {
         if is_err {
-            self.trace.effect(EF::ExecutionError("!! TRACING ERROR !! Events below this may be incorrect.".to_string()));
+            self.trace.effect(EF::ExecutionError(
+                "!! TRACING ERROR !! Events below this may be incorrect.".to_string(),
+            ));
         }
     }
 
@@ -192,7 +202,11 @@ impl<'a> VMTracer<'a> {
 
     /// Given the trace index for a frame, return the index of the frame in the call stack.
     fn trace_index_to_frame_index(&self, idx: TraceIndex) -> Option<usize> {
-        self.active_frames.range(..=idx).enumerate().last().map(|(i, _)| i)
+        self.active_frames
+            .range(..=idx)
+            .enumerate()
+            .last()
+            .map(|(i, _)| i)
     }
 
     /// Register the pre-effects for the instruction (i.e., reads, pops.)
@@ -208,19 +222,27 @@ impl<'a> VMTracer<'a> {
         std::mem::take(&mut self.effects)
     }
 
-    /// Insert a local with a specifice runtime location into the current frame.
+    /// Insert a local with a specific runtime location into the current frame.
     fn insert_local(&mut self, local_index: usize, local: RootedType) -> Option<()> {
-        *self.current_frame_mut()?.locals_types.get_mut(local_index)? = local.into_local_type();
+        *self
+            .current_frame_mut()?
+            .locals_types
+            .get_mut(local_index)? = local.into_local_type();
         Some(())
     }
 
     /// Invalidate a local in the current frame. This is used to mark a local as uninitialized and
     /// remove its reference information.
     fn invalidate_local(&mut self, local_index: usize) -> Option<()> {
-        let local = self.current_frame_mut()?.locals_types.get_mut(local_index)?;
+        let local = self
+            .current_frame_mut()?
+            .locals_types
+            .get_mut(local_index)?;
         match &local.ref_type {
             ReferenceType::Filled { ref_type, .. } => {
-                local.ref_type = ReferenceType::Empty { ref_type: ref_type.clone() }
+                local.ref_type = ReferenceType::Empty {
+                    ref_type: ref_type.clone(),
+                }
             }
             ReferenceType::Empty { .. } => (),
             ReferenceType::Value => (),
@@ -240,12 +262,21 @@ impl<'a> VMTracer<'a> {
             return None;
         }
         let offset = self.type_stack.len() - 1;
-        self.resolve_location(&RuntimeLocation::Stack(offset - stack_idx), frame, interpreter)
+        self.resolve_location(
+            &RuntimeLocation::Stack(offset - stack_idx),
+            frame,
+            interpreter,
+        )
     }
 
     /// Resolve a value in a local to a TraceValue. References are fully rooted all the way back to
     /// their root location in a local.
-    fn resolve_local(&self, frame: &Frame, interpreter: &Interpreter, local_index: usize) -> Option<TraceValue> {
+    fn resolve_local(
+        &self,
+        frame: &Frame,
+        interpreter: &Interpreter,
+        local_index: usize,
+    ) -> Option<TraceValue> {
         self.resolve_location(
             &RuntimeLocation::Local(self.current_frame_identifier()?, local_index),
             Some(frame),
@@ -264,12 +295,14 @@ impl<'a> VMTracer<'a> {
     ) -> Option<TraceValue> {
         let value = self.root_location_snapshot(&location, frame, interpreter)?;
         Some(match ref_info {
-            Some(RefType::Imm) => {
-                TraceValue::ImmRef { location: location.as_trace_location(), snapshot: Box::new(value) }
-            }
-            Some(RefType::Mut) => {
-                TraceValue::MutRef { location: location.as_trace_location(), snapshot: Box::new(value) }
-            }
+            Some(RefType::Imm) => TraceValue::ImmRef {
+                location: location.as_trace_location(),
+                snapshot: Box::new(value),
+            },
+            Some(RefType::Mut) => TraceValue::MutRef {
+                location: location.as_trace_location(),
+                snapshot: Box::new(value),
+            },
             None => TraceValue::RuntimeValue { value },
         })
     }
@@ -286,7 +319,11 @@ impl<'a> VMTracer<'a> {
             RuntimeLocation::Stack(sidx) => {
                 let ty = self.type_stack.get(*sidx)?;
                 let ref_ty = ty.ref_type.as_ref().map(|(r, _)| r.clone());
-                let location = ty.ref_type.as_ref().map(|(_, l)| l.clone()).unwrap_or_else(|| loc.clone());
+                let location = ty
+                    .ref_type
+                    .as_ref()
+                    .map(|(_, l)| l.clone())
+                    .unwrap_or_else(|| loc.clone());
                 self.make_trace_value(location, ref_ty, frame, interpreter)?
             }
             RuntimeLocation::Local(fidx, lidx) => {
@@ -299,11 +336,16 @@ impl<'a> VMTracer<'a> {
                 let location = match &ty.ref_type {
                     ReferenceType::Filled { location, .. } => location.clone(),
                     ReferenceType::Value => loc.clone(),
-                    _ => panic!("We tried to access a local that was not initialized at {:?}", loc),
+                    _ => panic!(
+                        "We tried to access a local that was not initialized at {:?}",
+                        loc
+                    ),
                 };
                 self.make_trace_value(location, ref_ty, frame, interpreter)?
             }
-            RuntimeLocation::Indexed(location, _) => self.resolve_location(location, frame, interpreter)?,
+            RuntimeLocation::Indexed(location, _) => {
+                self.resolve_location(location, frame, interpreter)?
+            }
             RuntimeLocation::Global(id) => self.loaded_data.get(id)?.clone(),
         })
     }
@@ -318,7 +360,12 @@ impl<'a> VMTracer<'a> {
     ) -> Option<MoveValue> {
         Some(match loc {
             RuntimeLocation::Local(fidx, loc_idx) => {
-                let local_ty = self.active_frames.get(fidx)?.locals_types.get(*loc_idx)?.clone();
+                let local_ty = self
+                    .active_frames
+                    .get(fidx)?
+                    .locals_types
+                    .get(*loc_idx)?
+                    .clone();
                 let call_stack_index = self.trace_index_to_frame_index(*fidx)?;
                 match local_ty.ref_type {
                     ReferenceType::Value => {
@@ -344,20 +391,25 @@ impl<'a> VMTracer<'a> {
             RuntimeLocation::Stack(stack_idx) => {
                 let ty = self.type_stack.get(*stack_idx)?;
                 match &ty.ref_type {
-                    Some((_, location)) => self.root_location_snapshot(location, frame, interpreter)?,
+                    Some((_, location)) => {
+                        self.root_location_snapshot(location, frame, interpreter)?
+                    }
                     None => {
                         let value = interpreter.operand_stack.value.get(*stack_idx)?;
                         value.as_annotated_move_value_for_tracing_only(&ty.layout)?
                     }
                 }
             }
-            RuntimeLocation::Indexed(loc, _) => self.root_location_snapshot(loc, frame, interpreter)?,
+            RuntimeLocation::Indexed(loc, _) => {
+                self.root_location_snapshot(loc, frame, interpreter)?
+            }
             RuntimeLocation::Global(id) => self.loaded_data.get(id)?.snapshot().clone(),
         })
     }
 
     fn link_context(&self) -> AccountAddress {
-        self.link_context.expect("Link context always set by this point")
+        self.link_context
+            .expect("Link context always set by this point")
     }
 
     /// Load data returned by a native function into the tracer state.
@@ -387,23 +439,40 @@ impl<'a> VMTracer<'a> {
             snapshot: value.clone(),
         }));
         let trace_value = match &ref_type {
-            RefType::Imm => TraceValue::ImmRef { location: location.as_trace_location(), snapshot: Box::new(value) },
-            RefType::Mut => TraceValue::MutRef { location: location.as_trace_location(), snapshot: Box::new(value) },
+            RefType::Imm => TraceValue::ImmRef {
+                location: location.as_trace_location(),
+                snapshot: Box::new(value),
+            },
+            RefType::Mut => TraceValue::MutRef {
+                location: location.as_trace_location(),
+                snapshot: Box::new(value),
+            },
         };
         self.loaded_data.insert(id, trace_value);
         Some((ref_type.clone(), location))
     }
 
     /// Handle (and load) any data returned by a native function.
-    fn handle_native_return(&mut self, function: &Function, interpreter: &Interpreter) -> Option<()> {
+    fn handle_native_return(
+        &mut self,
+        function: &Function,
+        interpreter: &Interpreter,
+    ) -> Option<()> {
         assert!(function.is_native());
         let trace_frame = self.current_frame()?.clone();
         assert!(trace_frame.is_native);
         let len = interpreter.operand_stack.value.len();
         for (i, r_ty) in trace_frame.return_types.iter().cloned().enumerate() {
             let r_ty = r_ty.layout;
-            let ref_type = self.load_data(r_ty.0.as_ref()?, &r_ty.1, interpreter.operand_stack.value.get(len - i - 1)?);
-            self.type_stack.push(RootedType { layout: r_ty.0?, ref_type });
+            let ref_type = self.load_data(
+                r_ty.0.as_ref()?,
+                &r_ty.1,
+                interpreter.operand_stack.value.get(len - i - 1)?,
+            );
+            self.type_stack.push(RootedType {
+                layout: r_ty.0?,
+                ref_type,
+            });
         }
         Some(())
     }
@@ -457,12 +526,15 @@ impl<'a> VMTracer<'a> {
             .collect();
 
         let current_trace_offset = self.trace.current_trace_offset();
-        self.active_frames.insert(current_trace_offset, FrameInfo {
-            frame_identifier: current_trace_offset,
-            is_native: function.is_native(),
-            locals_types,
-            return_types: function_type_info.return_types.clone(),
-        });
+        self.active_frames.insert(
+            current_trace_offset,
+            FrameInfo {
+                frame_identifier: current_trace_offset,
+                is_native: function.is_native(),
+                locals_types,
+                return_types: function_type_info.return_types.clone(),
+            },
+        );
 
         self.trace.open_frame(
             self.current_frame_identifier()?,
@@ -499,8 +571,14 @@ impl<'a> VMTracer<'a> {
                 Some(TraceValue::RuntimeValue { value: move_value })
             })
             .collect::<Option<_>>()?;
-        self.trace.close_frame(self.current_frame_identifier()?, return_values, remaining_gas);
-        self.active_frames.pop_last().expect("Unbalanced frame close");
+        self.trace.close_frame(
+            self.current_frame_identifier()?,
+            return_values,
+            remaining_gas,
+        );
+        self.active_frames
+            .pop_last()
+            .expect("Unbalanced frame close");
         Some(())
     }
 
@@ -521,7 +599,9 @@ impl<'a> VMTracer<'a> {
             .map(|i| self.resolve_stack_value(Some(calling_frame), interpreter, i))
             .collect::<Option<Vec<_>>>()?;
 
-        let call_args_types = self.type_stack.split_off(self.type_stack.len() - function.arg_count());
+        let call_args_types = self
+            .type_stack
+            .split_off(self.type_stack.len() - function.arg_count());
         let function_type_info = FunctionTypeInfo::new(function, loader, ty_args, link_context)?;
 
         let locals_types = function_type_info
@@ -536,23 +616,30 @@ impl<'a> VMTracer<'a> {
                         Some((ref_type, location)) => ReferenceType::Filled { ref_type, location },
                         None => ReferenceType::Value,
                     };
-                    LocalType { layout: Some(a_layout.layout), ref_type }
+                    LocalType {
+                        layout: Some(a_layout.layout),
+                        ref_type,
+                    }
                 } else {
                     let (layout, ref_type) = tag_with_layout_info_opt.layout;
-                    let ref_type =
-                        ref_type.map(|ref_type| ReferenceType::Empty { ref_type }).unwrap_or(ReferenceType::Value);
+                    let ref_type = ref_type
+                        .map(|ref_type| ReferenceType::Empty { ref_type })
+                        .unwrap_or(ReferenceType::Value);
                     LocalType { layout, ref_type }
                 }
             })
             .collect();
 
         let current_trace_offset = self.trace.current_trace_offset();
-        self.active_frames.insert(current_trace_offset, FrameInfo {
-            frame_identifier: current_trace_offset,
-            is_native: function.is_native(),
-            locals_types,
-            return_types: function_type_info.return_types.clone(),
-        });
+        self.active_frames.insert(
+            current_trace_offset,
+            FrameInfo {
+                frame_identifier: current_trace_offset,
+                is_native: function.is_native(),
+                locals_types,
+                return_types: function_type_info.return_types.clone(),
+            },
+        );
 
         self.trace.open_frame(
             self.current_frame_identifier()?,
@@ -604,8 +691,14 @@ impl<'a> VMTracer<'a> {
             }
         }
 
-        self.trace.close_frame(self.current_frame_identifier()?, return_values, remaining_gas);
-        self.active_frames.pop_last().expect("Unbalanced frame close");
+        self.trace.close_frame(
+            self.current_frame_identifier()?,
+            return_values,
+            remaining_gas,
+        );
+        self.active_frames
+            .pop_last()
+            .expect("Unbalanced frame close");
         Some(())
     }
 
@@ -726,7 +819,11 @@ impl<'a> VMTracer<'a> {
             B::ImmBorrowLoc(l_idx) | B::MutBorrowLoc(l_idx) => {
                 let val = self.resolve_local(frame, interpreter, *l_idx as usize)?;
                 let location = Location::Local(self.current_frame_identifier()?, *l_idx as usize);
-                self.register_pre_effects(vec![EF::Read(Read { location, root_value_read: val, moved: false })]);
+                self.register_pre_effects(vec![EF::Read(Read {
+                    location,
+                    root_value_read: val,
+                    moved: false,
+                })]);
             }
             // Handled by open frame
             B::Call(_) | B::CallGeneric(_) => {}
@@ -747,7 +844,8 @@ impl<'a> VMTracer<'a> {
             }
             B::PackVariantGeneric(vidx) => {
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
-                let (field_count, _variant_tag) = resolver.variant_instantiantiation_field_count_and_tag(*vidx);
+                let (field_count, _variant_tag) =
+                    resolver.variant_instantiantiation_field_count_and_tag(*vidx);
                 self.register_pre_effects(popn(field_count as usize)?);
             }
             B::ReadRef => {
@@ -757,7 +855,11 @@ impl<'a> VMTracer<'a> {
                 let value = self.resolve_location(&runtime_location, Some(frame), interpreter)?;
                 self.register_pre_effects(vec![
                     EF::Pop(ref_value),
-                    EF::Read(Read { location, root_value_read: value.clone(), moved: false }),
+                    EF::Read(Read {
+                        location,
+                        root_value_read: value.clone(),
+                        moved: false,
+                    }),
                 ]);
             }
 
@@ -786,7 +888,9 @@ impl<'a> VMTracer<'a> {
 
         // NB: Do _not_ use the frames pc here, as it will be incremented by the interpreter to the
         // next instruction already.
-        let pc = self.pc.expect("PC always set by this point by `open_instruction`");
+        let pc = self
+            .pc
+            .expect("PC always set by this point by `open_instruction`");
 
         // NB: At the start of this function (i.e., at this point) the operand stack in the VM, and
         // the type stack in the tracer are _out of sync_. This is because the VM has already
@@ -797,11 +901,13 @@ impl<'a> VMTracer<'a> {
             B::Pop | B::BrTrue(_) | B::BrFalse(_) => {
                 self.type_stack.pop()?;
                 let effects = self.register_post_effects(vec![]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Branch(_) | B::Ret => {
                 let effects = self.register_post_effects(vec![]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::LdU8(_)
             | B::LdU16(_)
@@ -821,21 +927,32 @@ impl<'a> VMTracer<'a> {
                     B::LdU256(_) => MoveTypeLayout::U256,
                     B::LdTrue => MoveTypeLayout::Bool,
                     B::LdFalse => MoveTypeLayout::Bool,
-                    B::LdConst(const_idx) => {
-                        get_constant_type_layout(&frame.function, loader, self.link_context(), *const_idx)?
-                    }
+                    B::LdConst(const_idx) => get_constant_type_layout(
+                        &frame.function,
+                        loader,
+                        self.link_context(),
+                        *const_idx,
+                    )?,
                     _ => unreachable!(),
                 };
-                let a_layout = RootedType { layout, ref_type: None };
+                let a_layout = RootedType {
+                    layout,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
 
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = vec![EF::Push(value)];
                 let effects = self.register_post_effects(effects);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::MoveLoc(l) | B::CopyLoc(l)) => {
-                let local_annot_type = self.current_frame_locals()?.get(*l as usize)?.clone().into_rooted_type()?;
+                let local_annot_type = self
+                    .current_frame_locals()?
+                    .get(*l as usize)?
+                    .clone()
+                    .into_rooted_type()?;
                 self.type_stack.push(local_annot_type);
                 if matches!(i, B::MoveLoc(_)) {
                     self.invalidate_local(*l as usize)?;
@@ -843,7 +960,8 @@ impl<'a> VMTracer<'a> {
                 // This was pushed on the stack during execution so read it off from there.
                 let v = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(v.clone())]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::CastU8 | B::CastU16 | B::CastU32 | B::CastU64 | B::CastU128 | B::CastU256) => {
                 let layout = match i {
@@ -855,14 +973,18 @@ impl<'a> VMTracer<'a> {
                     B::CastU256 => MoveTypeLayout::U256,
                     _ => unreachable!(),
                 };
-                let annot_layout = RootedType { layout, ref_type: None };
+                let annot_layout = RootedType {
+                    layout,
+                    ref_type: None,
+                };
                 self.type_stack.pop()?;
                 self.type_stack.push(annot_layout);
 
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = vec![EF::Push(value.clone())];
                 let effects = self.register_post_effects(effects);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::StLoc(lidx) => {
                 let ty = self.type_stack.pop()?;
@@ -872,9 +994,19 @@ impl<'a> VMTracer<'a> {
                     location: Location::Local(self.current_frame_identifier()?, *lidx as usize),
                     root_value_after_write: v.clone(),
                 })]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
-            B::Add | B::Sub | B::Mul | B::Mod | B::Div | B::BitOr | B::BitAnd | B::Xor | B::Shl | B::Shr => {
+            B::Add
+            | B::Sub
+            | B::Mul
+            | B::Mod
+            | B::Div
+            | B::BitOr
+            | B::BitAnd
+            | B::Xor
+            | B::Shl
+            | B::Shr => {
                 self.type_stack.pop()?;
                 // NB in the case of shift left and shift right the second operand is the resultant
                 // value type.
@@ -883,22 +1015,28 @@ impl<'a> VMTracer<'a> {
 
                 let result = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(result)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Lt | B::Gt | B::Le | B::Ge => {
                 self.type_stack.pop()?;
                 self.type_stack.pop()?;
-                let a_layout = RootedType { layout: MoveTypeLayout::Bool, ref_type: None };
+                let a_layout = RootedType {
+                    layout: MoveTypeLayout::Bool,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
 
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Call(_) | B::CallGeneric(_) => {
                 // NB: We don't register effects for calls as they will be handled by
                 // open_frame.
-                self.trace.instruction(instruction, vec![], vec![], remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], vec![], remaining_gas, pc);
             }
             B::Pack(sidx) => {
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
@@ -907,21 +1045,30 @@ impl<'a> VMTracer<'a> {
                 let stack_len = self.type_stack.len();
                 let _ = self.type_stack.split_off(stack_len - field_count);
                 let ty = loader.type_to_fully_annotated_layout(&struct_type).ok()?;
-                let a_layout = RootedType { layout: ty, ref_type: None };
+                let a_layout = RootedType {
+                    layout: ty,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
 
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::PackGeneric(sidx) => {
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
                 let field_count = resolver.field_instantiation_count(*sidx) as usize;
-                let struct_type = resolver.instantiate_struct_type(*sidx, &frame.ty_args).ok()?;
+                let struct_type = resolver
+                    .instantiate_struct_type(*sidx, &frame.ty_args)
+                    .ok()?;
                 let stack_len = self.type_stack.len();
                 let _ = self.type_stack.split_off(stack_len - field_count);
                 let ty = loader.type_to_fully_annotated_layout(&struct_type).ok()?;
-                let a_layout = RootedType { layout: ty, ref_type: None };
+                let a_layout = RootedType {
+                    layout: ty,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
 
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
@@ -929,7 +1076,8 @@ impl<'a> VMTracer<'a> {
                 let TypeTag::Struct(s_type) = loader.type_to_type_tag(&struct_type).ok()? else {
                     panic!("Expected struct, got {:#?}", struct_type);
                 };
-                self.trace.instruction(instruction, s_type.type_params, effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, s_type.type_params, effects, remaining_gas, pc);
             }
             B::Unpack(_) | B::UnpackGeneric(_) => {
                 let ty = self.type_stack.pop()?;
@@ -938,7 +1086,10 @@ impl<'a> VMTracer<'a> {
                 };
                 let field_tys = s.fields.iter().map(|t| t.layout.clone());
                 for field_ty in field_tys {
-                    self.type_stack.push(RootedType { layout: field_ty.clone(), ref_type: None });
+                    self.type_stack.push(RootedType {
+                        layout: field_ty.clone(),
+                        ref_type: None,
+                    });
                 }
 
                 let mut effects = vec![];
@@ -948,49 +1099,65 @@ impl<'a> VMTracer<'a> {
                 }
 
                 let effects = self.register_post_effects(effects);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Eq | B::Neq => {
                 self.type_stack.pop()?;
                 self.type_stack.pop()?;
-                let a_layout = RootedType { layout: MoveTypeLayout::Bool, ref_type: None };
+                let a_layout = RootedType {
+                    layout: MoveTypeLayout::Bool,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Or | B::And => {
                 self.type_stack.pop()?;
                 self.type_stack.pop()?;
-                let a_layout = RootedType { layout: MoveTypeLayout::Bool, ref_type: None };
+                let a_layout = RootedType {
+                    layout: MoveTypeLayout::Bool,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Not => {
                 let a_ty = self.type_stack.pop()?;
                 self.type_stack.push(a_ty);
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::Nop => {
-                self.trace.instruction(instruction, vec![], vec![], remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], vec![], remaining_gas, pc);
             }
             B::Abort => {
                 self.type_stack.pop()?;
                 let effects = self.register_post_effects(vec![]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::ReadRef => {
                 let ref_ty = self.type_stack.pop()?;
-                let a_layout = RootedType { layout: ref_ty.layout.clone(), ref_type: None };
+                let a_layout = RootedType {
+                    layout: ref_ty.layout.clone(),
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
 
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::ImmBorrowLoc(l_idx) | B::MutBorrowLoc(l_idx)) => {
                 let non_imm_ty = self.current_frame_locals()?.get(*l_idx as usize)?.clone();
@@ -1010,18 +1177,22 @@ impl<'a> VMTracer<'a> {
 
                 let val = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(val)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::WriteRef => {
                 let reference_ty = self.type_stack.pop()?;
                 let _value_ty = self.type_stack.pop()?;
                 let location = reference_ty.ref_type.as_ref()?.1.clone();
-                let root_value_after_write = self.resolve_location(&location, Some(frame), interpreter)?.clone();
+                let root_value_after_write = self
+                    .resolve_location(&location, Some(frame), interpreter)?
+                    .clone();
                 let effects = self.register_post_effects(vec![EF::Write(Write {
                     location: location.as_trace_location(),
                     root_value_after_write,
                 })]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::FreezeRef => {
                 let mut reference_ty = self.type_stack.pop()?;
@@ -1029,7 +1200,8 @@ impl<'a> VMTracer<'a> {
                 self.type_stack.push(reference_ty);
                 let reference_val = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(reference_val)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::MutBorrowField(fhidx) | B::ImmBorrowField(fhidx)) => {
                 let value_ty = self.type_stack.pop()?;
@@ -1042,18 +1214,23 @@ impl<'a> VMTracer<'a> {
                 let field_layout = slayout.fields.get(field_offset)?.layout.clone();
 
                 let location = value_ty.ref_type.as_ref()?.1.clone();
-                let field_location = RuntimeLocation::Indexed(Box::new(location.clone()), field_offset);
+                let field_location =
+                    RuntimeLocation::Indexed(Box::new(location.clone()), field_offset);
 
                 let ref_type = match i {
                     B::MutBorrowField(_) => RefType::Mut,
                     B::ImmBorrowField(_) => RefType::Imm,
                     _ => unreachable!(),
                 };
-                let a_layout = RootedType { layout: field_layout, ref_type: Some((ref_type, field_location)) };
+                let a_layout = RootedType {
+                    layout: field_layout,
+                    ref_type: Some((ref_type, field_location)),
+                };
                 self.type_stack.push(a_layout);
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::MutBorrowFieldGeneric(fhidx) | B::ImmBorrowFieldGeneric(fhidx)) => {
                 let value_ty = self.type_stack.pop()?;
@@ -1065,33 +1242,44 @@ impl<'a> VMTracer<'a> {
                 let field_offset = resolver.field_instantiation_offset(*fhidx);
                 let field_layout = slayout.fields.get(field_offset)?.layout.clone();
                 let location = value_ty.ref_type.as_ref()?.1.clone();
-                let field_location = RuntimeLocation::Indexed(Box::new(location.clone()), field_offset);
+                let field_location =
+                    RuntimeLocation::Indexed(Box::new(location.clone()), field_offset);
 
                 let ref_type = match i {
                     B::MutBorrowFieldGeneric(_) => RefType::Mut,
                     B::ImmBorrowFieldGeneric(_) => RefType::Imm,
                     _ => unreachable!(),
                 };
-                let a_layout = RootedType { layout: field_layout, ref_type: Some((ref_type, field_location)) };
+                let a_layout = RootedType {
+                    layout: field_layout,
+                    ref_type: Some((ref_type, field_location)),
+                };
                 self.type_stack.push(a_layout);
                 let value = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(value)]);
                 let ty_args = slayout.type_.type_params.clone();
-                self.trace.instruction(instruction, ty_args, effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, ty_args, effects, remaining_gas, pc);
             }
 
             B::VecPack(tok, n) => {
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
-                let ty = resolver.instantiate_single_type(*tok, &frame.ty_args).ok()?;
+                let ty = resolver
+                    .instantiate_single_type(*tok, &frame.ty_args)
+                    .ok()?;
                 let ty = loader.type_to_fully_annotated_layout(&ty).ok()?;
                 let ty = MoveTypeLayout::Vector(Box::new(ty));
                 let stack_len = self.type_stack.len();
                 let _ = self.type_stack.split_off(stack_len - *n as usize);
-                let a_layout = RootedType { layout: ty, ref_type: None };
+                let a_layout = RootedType {
+                    layout: ty,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let val = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(val)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::VecImmBorrow(_) | B::VecMutBorrow(_)) => {
                 let ref_type = match i {
@@ -1104,23 +1292,35 @@ impl<'a> VMTracer<'a> {
                 let MoveTypeLayout::Vector(ty) = ref_ty.layout else {
                     panic!("Expected vector, got {:?}", ref_ty.layout,);
                 };
-                let EF::Pop(TraceValue::RuntimeValue { value: MoveValue::U64(i) }) = &self.effects[0] else {
+                let EF::Pop(TraceValue::RuntimeValue {
+                    value: MoveValue::U64(i),
+                }) = &self.effects[0]
+                else {
                     unreachable!();
                 };
-                let location = RuntimeLocation::Indexed(Box::new(ref_ty.ref_type?.1.clone()), *i as usize);
-                let a_layout = RootedType { layout: (*ty).clone(), ref_type: Some((ref_type, location)) };
+                let location =
+                    RuntimeLocation::Indexed(Box::new(ref_ty.ref_type?.1.clone()), *i as usize);
+                let a_layout = RootedType {
+                    layout: (*ty).clone(),
+                    ref_type: Some((ref_type, location)),
+                };
                 self.type_stack.push(a_layout);
                 let val = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(val)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::VecLen(_) => {
                 self.type_stack.pop()?;
-                let a_layout = RootedType { layout: MoveTypeLayout::U64, ref_type: None };
+                let a_layout = RootedType {
+                    layout: MoveTypeLayout::U64,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let len = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(len)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::VecPushBack(_) => {
                 self.type_stack.pop()?;
@@ -1131,20 +1331,27 @@ impl<'a> VMTracer<'a> {
                 let location = reference_val.location()?.clone();
                 let runtime_location = RuntimeLocation::as_runtime_location(location.clone());
                 let snap = self.resolve_location(&runtime_location, Some(frame), interpreter)?;
-                let effects =
-                    self.register_post_effects(vec![EF::Write(Write { location, root_value_after_write: snap })]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                let effects = self.register_post_effects(vec![EF::Write(Write {
+                    location,
+                    root_value_after_write: snap,
+                })]);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::VecPopBack(_) => {
                 let reference_ty = self.type_stack.pop()?;
                 let MoveTypeLayout::Vector(ty) = reference_ty.layout else {
                     panic!("Expected vector, got {:?}", reference_ty.layout);
                 };
-                let a_layout = RootedType { layout: (*ty).clone(), ref_type: None };
+                let a_layout = RootedType {
+                    layout: (*ty).clone(),
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let v = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(v)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::VecUnpack(_, n) => {
                 let ty = self.type_stack.pop()?;
@@ -1152,7 +1359,10 @@ impl<'a> VMTracer<'a> {
                     panic!("Expected vector, got {:?}", ty.layout);
                 };
                 for _ in 0..*n {
-                    let a_layout = RootedType { layout: (*ty).clone(), ref_type: None };
+                    let a_layout = RootedType {
+                        layout: (*ty).clone(),
+                        ref_type: None,
+                    };
                     self.type_stack.push(a_layout);
                 }
                 let mut effects = vec![];
@@ -1161,7 +1371,8 @@ impl<'a> VMTracer<'a> {
                     effects.push(EF::Push(value));
                 }
                 let effects = self.register_post_effects(effects);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::VecSwap(_) => {
                 self.type_stack.pop()?;
@@ -1173,40 +1384,56 @@ impl<'a> VMTracer<'a> {
                     location: location.as_trace_location(),
                     root_value_after_write: snap,
                 })]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::PackVariant(vidx) => {
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
                 let (field_count, _variant_tag) = resolver.variant_field_count_and_tag(*vidx);
                 let stack_len = self.type_stack.len();
                 let _ = self.type_stack.split_off(stack_len - field_count as usize);
-                let ty = loader.type_to_fully_annotated_layout(&resolver.get_enum_type(*vidx)).ok()?;
-                let a_layout = RootedType { layout: ty, ref_type: None };
+                let ty = loader
+                    .type_to_fully_annotated_layout(&resolver.get_enum_type(*vidx))
+                    .ok()?;
+                let a_layout = RootedType {
+                    layout: ty,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let val = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(val)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::PackVariantGeneric(vidx) => {
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
-                let (field_count, _variant_tag) = resolver.variant_instantiantiation_field_count_and_tag(*vidx);
+                let (field_count, _variant_tag) =
+                    resolver.variant_instantiantiation_field_count_and_tag(*vidx);
                 let stack_len = self.type_stack.len();
                 let _ = self.type_stack.split_off(stack_len - field_count as usize);
                 let ty = loader
-                    .type_to_fully_annotated_layout(&resolver.instantiate_enum_type(*vidx, &frame.ty_args).ok()?)
+                    .type_to_fully_annotated_layout(
+                        &resolver.instantiate_enum_type(*vidx, &frame.ty_args).ok()?,
+                    )
                     .ok()?;
-                let a_layout = RootedType { layout: ty, ref_type: None };
+                let a_layout = RootedType {
+                    layout: ty,
+                    ref_type: None,
+                };
                 self.type_stack.push(a_layout);
                 let val = self.resolve_stack_value(Some(frame), interpreter, 0)?;
                 let effects = self.register_post_effects(vec![EF::Push(val)]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::UnpackVariant(_) | B::UnpackVariantGeneric(_)) => {
                 let ty = self.type_stack.pop()?;
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
                 let (field_count, tag) = match i {
                     B::UnpackVariant(vidx) => resolver.variant_field_count_and_tag(*vidx),
-                    B::UnpackVariantGeneric(vidx) => resolver.variant_instantiantiation_field_count_and_tag(*vidx),
+                    B::UnpackVariantGeneric(vidx) => {
+                        resolver.variant_instantiantiation_field_count_and_tag(*vidx)
+                    }
                     _ => unreachable!(),
                 };
                 let MoveTypeLayout::Enum(e) = ty.layout else {
@@ -1215,7 +1442,10 @@ impl<'a> VMTracer<'a> {
                 let variant_layout = e.variants.iter().find(|v| v.0 .1 == tag)?;
                 let mut effects = vec![];
                 for f_layout in variant_layout.1.iter() {
-                    let a_layout = RootedType { layout: f_layout.layout.clone(), ref_type: None };
+                    let a_layout = RootedType {
+                        layout: f_layout.layout.clone(),
+                        ref_type: None,
+                    };
                     self.type_stack.push(a_layout);
                 }
                 for i in 0..field_count {
@@ -1223,7 +1453,8 @@ impl<'a> VMTracer<'a> {
                     effects.push(EF::Push(value));
                 }
                 let effects = self.register_post_effects(effects);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             i @ (B::UnpackVariantImmRef(_)
             | B::UnpackVariantMutRef(_)
@@ -1232,14 +1463,20 @@ impl<'a> VMTracer<'a> {
                 let ty = self.type_stack.pop()?;
                 let resolver = frame.function.get_resolver(self.link_context(), loader);
                 let ((field_count, tag), ref_type) = match i {
-                    B::UnpackVariantImmRef(vidx) => (resolver.variant_field_count_and_tag(*vidx), RefType::Imm),
-                    B::UnpackVariantMutRef(vidx) => (resolver.variant_field_count_and_tag(*vidx), RefType::Mut),
-                    B::UnpackVariantGenericImmRef(vidx) => {
-                        (resolver.variant_instantiantiation_field_count_and_tag(*vidx), RefType::Imm)
+                    B::UnpackVariantImmRef(vidx) => {
+                        (resolver.variant_field_count_and_tag(*vidx), RefType::Imm)
                     }
-                    B::UnpackVariantGenericMutRef(vidx) => {
-                        (resolver.variant_instantiantiation_field_count_and_tag(*vidx), RefType::Mut)
+                    B::UnpackVariantMutRef(vidx) => {
+                        (resolver.variant_field_count_and_tag(*vidx), RefType::Mut)
                     }
+                    B::UnpackVariantGenericImmRef(vidx) => (
+                        resolver.variant_instantiantiation_field_count_and_tag(*vidx),
+                        RefType::Imm,
+                    ),
+                    B::UnpackVariantGenericMutRef(vidx) => (
+                        resolver.variant_instantiantiation_field_count_and_tag(*vidx),
+                        RefType::Mut,
+                    ),
                     _ => unreachable!(),
                 };
                 let MoveTypeLayout::Enum(e) = ty.layout else {
@@ -1251,8 +1488,10 @@ impl<'a> VMTracer<'a> {
                 let mut effects = vec![];
                 for (i, f_layout) in variant_layout.1.iter().enumerate() {
                     let location = RuntimeLocation::Indexed(Box::new(location.clone()), i);
-                    let a_layout =
-                        RootedType { layout: f_layout.layout.clone(), ref_type: Some((ref_type.clone(), location)) };
+                    let a_layout = RootedType {
+                        layout: f_layout.layout.clone(),
+                        ref_type: Some((ref_type.clone(), location)),
+                    };
                     self.type_stack.push(a_layout);
                 }
                 for i in 0..field_count {
@@ -1260,12 +1499,14 @@ impl<'a> VMTracer<'a> {
                     effects.push(EF::Push(value));
                 }
                 let effects = self.register_post_effects(effects);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::VariantSwitch(_) => {
                 self.type_stack.pop()?;
                 let effects = self.register_post_effects(vec![]);
-                self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+                self.trace
+                    .instruction(instruction, vec![], effects, remaining_gas, pc);
             }
             B::ExistsDeprecated(_)
             | B::ExistsGenericDeprecated(_)
@@ -1308,15 +1549,21 @@ impl<'a> VMTracer<'a> {
         remaining_gas: u64,
         link_context: AccountAddress,
     ) {
-        let opt = self.open_initial_frame_(args, ty_args, function, loader, remaining_gas, link_context);
+        let opt =
+            self.open_initial_frame_(args, ty_args, function, loader, remaining_gas, link_context);
         self.emit_trace_error_if_err(opt.is_none());
     }
 
-    pub(crate) fn close_initial_frame(&mut self, return_values: &VMResult<SmallVec<[Value; 1]>>, remaining_gas: u64) {
+    pub(crate) fn close_initial_frame(
+        &mut self,
+        return_values: &VMResult<SmallVec<[Value; 1]>>,
+        remaining_gas: u64,
+    ) {
         let return_values = match return_values {
             Ok(values) => values,
             Err(err) => {
-                self.trace.effect(EF::ExecutionError(format!("{:?}", err.major_status())));
+                self.trace
+                    .effect(EF::ExecutionError(format!("{:?}", err.major_status())));
                 return;
             }
         };
@@ -1334,7 +1581,15 @@ impl<'a> VMTracer<'a> {
         remaining_gas: u64,
         link_context: AccountAddress,
     ) {
-        let opt = self.open_frame_(ty_args, function, calling_frame, interpreter, loader, remaining_gas, link_context);
+        let opt = self.open_frame_(
+            ty_args,
+            function,
+            calling_frame,
+            interpreter,
+            loader,
+            remaining_gas,
+            link_context,
+        );
         self.emit_trace_error_if_err(opt.is_none())
     }
 
@@ -1349,10 +1604,18 @@ impl<'a> VMTracer<'a> {
         err: Option<&VMError>,
     ) {
         if let Some(err) = err {
-            self.trace.effect(EF::ExecutionError(format!("{:?}", err.major_status())));
+            self.trace
+                .effect(EF::ExecutionError(format!("{:?}", err.major_status())));
             return;
         }
-        let opt = self.close_frame_(frame, function, interpreter, loader, remaining_gas, link_context);
+        let opt = self.close_frame_(
+            frame,
+            function,
+            interpreter,
+            loader,
+            remaining_gas,
+            link_context,
+        );
         self.emit_trace_error_if_err(opt.is_none())
     }
 
@@ -1375,7 +1638,10 @@ impl<'a> VMTracer<'a> {
         remaining_gas: u64,
         err: Option<&PartialVMError>,
     ) {
-        if self.close_instruction_(frame, interpreter, loader, remaining_gas).is_none() {
+        if self
+            .close_instruction_(frame, interpreter, loader, remaining_gas)
+            .is_none()
+        {
             // If we fail to close the instruction, we need to emit an error event.
             // This can be the case where the instruction itself failed -- e.g. with a division by
             // zero, invalid cast, etc.
@@ -1383,13 +1649,17 @@ impl<'a> VMTracer<'a> {
                 Some(err) => format!("{:?}", err.major_status()),
                 None => "VM tracer failed to close instruction but interpreter was OK -- this is most likely a bug in the tracer".to_string(),
             };
-            let pc = self.pc.expect("PC always set by this point by `open_instruction`");
+            let pc = self
+                .pc
+                .expect("PC always set by this point by `open_instruction`");
             let instruction = &frame.function.code()[pc as usize];
             let effects = self.register_post_effects(vec![EF::ExecutionError(error_string)]);
             // TODO: type params here?
-            self.trace.instruction(instruction, vec![], effects, remaining_gas, pc);
+            self.trace
+                .instruction(instruction, vec![], effects, remaining_gas, pc);
         } else if let Some(err) = err {
-            self.trace.effect(EF::ExecutionError(format!("{:?}", err.major_status())));
+            self.trace
+                .effect(EF::ExecutionError(format!("{:?}", err.major_status())));
         }
     }
 }
@@ -1465,7 +1735,11 @@ impl FunctionTypeInfo {
             })
             .collect::<Option<_>>()?;
 
-        Some(FunctionTypeInfo { ty_args, local_types, return_types })
+        Some(FunctionTypeInfo {
+            ty_args,
+            local_types,
+            return_types,
+        })
     }
 }
 

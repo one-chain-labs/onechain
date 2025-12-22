@@ -1,10 +1,10 @@
 [package]
 name = "one-node"
+version.workspace = true
 authors.workspace = true
-edition.workspace = true
 license.workspace = true
 publish.workspace = true
-version.workspace = true
+edition.workspace = true
 
 [lints]
 workspace = true
@@ -25,6 +25,8 @@ tracing.workspace = true
 futures.workspace = true
 parking_lot.workspace = true
 tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
 reqwest.workspace = true
 tap.workspace = true
 serde.workspace = true
@@ -39,6 +41,7 @@ sui-config.workspace = true
 sui-core.workspace = true
 sui-rpc-api.workspace = true
 sui-storage.workspace = true
+sui-name-service.workspace = true
 sui-network.workspace = true
 sui-json-rpc.workspace = true
 sui-json-rpc-api.workspace = true
@@ -49,13 +52,13 @@ sui-types.workspace = true
 mysten-metrics.workspace = true
 mysten-service.workspace = true
 mysten-common.workspace = true
-narwhal-network.workspace = true
 typed-store.workspace = true
 mysten-network.workspace = true
 telemetry-subscribers.workspace = true
 fastcrypto.workspace = true
 fastcrypto-zkp.workspace = true
 move-vm-profiler.workspace = true
+sui-http.workspace = true
 
 [target.'cfg(msim)'.dependencies]
 sui-simulator.workspace = true

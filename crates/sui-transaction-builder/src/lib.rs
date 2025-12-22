@@ -95,7 +95,7 @@ impl TransactionBuilder {
                     return Ok(obj.object_ref());
                 }
             }
-            Err(anyhow!("Cannot find gas coin for signer address {signer} with amount sufficient for the required gas budget {gas_budget}. If you are using the pay or transfer commands, you can use pay-sui or transfer-sui commands instead, which will use the only object as gas payment."))
+            Err(anyhow!("Cannot find gas coin for signer address {signer} with amount sufficient for the required gas budget {gas_budget}. If you are using the pay or transfer commands, you can use pay-oct or transfer-oct commands instead, which will use the only object as gas payment."))
         }
     }
 
@@ -230,7 +230,7 @@ impl TransactionBuilder {
     ) -> anyhow::Result<TransactionData> {
         if let Some(gas) = gas {
             if input_coins.contains(&gas) {
-                return Err(anyhow!("Gas coin is in input coins of Pay transaction, use PaySui transaction instead!"));
+                return Err(anyhow!("Gas coin is in input coins of Pay transaction, use PayOct transaction instead!"));
             }
         }
 
@@ -248,7 +248,7 @@ impl TransactionBuilder {
         Ok(obj_refs)
     }
 
-    /// Construct a transaction kind for the PaySui transaction type
+    /// Construct a transaction kind for the PayOct transaction type
     ///
     /// Use this function together with tx_data_for_dry_run or tx_data
     /// for maximum reusability

@@ -49,7 +49,11 @@ pub fn verify_module_with_config_for_test(
 ) -> VMResult<()> {
     const MAX_MODULE_SIZE: usize = 65355;
     let mut bytes = vec![];
-    let version = if config.bytecode_version > VERSION_6 { module.version } else { VERSION_6 };
+    let version = if config.bytecode_version > VERSION_6 {
+        module.version
+    } else {
+        VERSION_6
+    };
     module.serialize_with_version(version, &mut bytes).unwrap();
     let now = Instant::now();
     let result = verify_module_with_config_metered(config, module, meter);
@@ -57,7 +61,11 @@ pub fn verify_module_with_config_for_test(
         "--> {}: verification time: {:.3}ms, result: {}, size: {}kb",
         name,
         (now.elapsed().as_micros() as f64) / 1000.0,
-        if let Err(e) = &result { format!("{:?}", e.major_status()) } else { "Ok".to_string() },
+        if let Err(e) = &result {
+            format!("{:?}", e.major_status())
+        } else {
+            "Ok".to_string()
+        },
         bytes.len() / 1000
     );
     // Also check whether the module actually fits into our payload size
@@ -95,6 +103,9 @@ pub fn verify_module_with_config_metered(
     script_signature::verify_module(module, no_additional_script_signature_checks)
 }
 
-pub fn verify_module_with_config_unmetered(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+pub fn verify_module_with_config_unmetered(
+    config: &VerifierConfig,
+    module: &CompiledModule,
+) -> VMResult<()> {
     verify_module_with_config_metered(config, module, &mut DummyMeter)
 }

@@ -3,10 +3,8 @@
 
 use anyhow::Result;
 use sui_data_ingestion_core::Worker;
+use sui_types::{base_types::ObjectID, full_checkpoint_content::CheckpointData, transaction::TransactionDataAPI};
 use tokio::sync::Mutex;
-
-use sui_rpc_api::CheckpointData;
-use sui_types::{base_types::ObjectID, transaction::TransactionDataAPI};
 
 use crate::{handlers::AnalyticsHandler, tables::MoveCallEntry, FileType};
 

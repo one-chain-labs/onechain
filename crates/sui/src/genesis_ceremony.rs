@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, str::FromStr};
+
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use fastcrypto::encoding::{Encoding, Hex};
-use std::{path::PathBuf, str::FromStr};
 use sui_config::{genesis::UnsignedGenesis, SUI_GENESIS_FILENAME};
 use sui_genesis_builder::Builder;
+use sui_keys::keypair_file::{read_authority_keypair_from_file, read_keypair_from_file, read_network_keypair_from_file};
 use sui_types::{
     base_types::SuiAddress,
     committee::ProtocolVersion,
@@ -15,8 +17,6 @@ use sui_types::{
     message_envelope::Message,
     multiaddr::Multiaddr,
 };
-
-use sui_keys::keypair_file::{read_authority_keypair_from_file, read_keypair_from_file, read_network_keypair_from_file};
 
 use crate::genesis_inspector::examine_genesis_checkpoint;
 
@@ -231,7 +231,7 @@ pub fn run(cmd: Ceremony) -> Result<()> {
 fn check_protocol_version(builder: &Builder, protocol_version: ProtocolVersion) -> Result<()> {
     // It is entirely possible for the user to sign a genesis blob with an unknown
     // protocol version, but if this happens there is almost certainly some confusion
-    // (e.g. using a `one_chain` binary built at the wrong commit).
+    // (e.g. using a `sui` binary built at the wrong commit).
     if builder.protocol_version() != protocol_version {
         return Err(anyhow::anyhow!(
             "Serialized protocol version does not match local --protocol-version argument. ({:?} vs {:?})",
@@ -244,7 +244,6 @@ fn check_protocol_version(builder: &Builder, protocol_version: ProtocolVersion) 
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use anyhow::Result;
     use sui_config::local_ip_utils;
     use sui_genesis_builder::validator_info::ValidatorInfo;
@@ -252,12 +251,14 @@ mod test {
     use sui_macros::nondeterministic;
     use sui_types::crypto::{get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair, SuiKeyPair};
 
+    use super::*;
+
     #[test]
     #[cfg_attr(msim, ignore)]
     fn ceremony() -> Result<()> {
         let dir = nondeterministic!(tempfile::TempDir::new().unwrap());
 
-        let validators = (0..10)
+        let validators = (0 .. 10)
             .map(|i| {
                 let keypair: AuthorityKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;
                 let worker_keypair: NetworkKeyPair = get_key_pair_from_rng(&mut rand::rngs::OsRng).1;

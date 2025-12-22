@@ -7,18 +7,21 @@ mod s3;
 
 use std::sync::Arc;
 
-use crate::object_store::http::{gcs::GoogleCloudStorage, local::LocalStorage, s3::AmazonS3};
-use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
-
-use crate::object_store::ObjectStoreGetExt;
 use anyhow::{anyhow, Context, Result};
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use futures::{StreamExt, TryStreamExt};
+use futures::{stream, StreamExt, TryStreamExt};
 use object_store::{path::Path, Error, GetResult, GetResultPayload, ObjectMeta};
 use reqwest::{
-    header::{HeaderMap, CONTENT_LENGTH, ETAG, LAST_MODIFIED},
+    header::{HeaderMap, CONTENT_LENGTH, DATE, ETAG, LAST_MODIFIED},
     Client,
     Method,
+};
+use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
+
+use crate::object_store::{
+    http::{gcs::GoogleCloudStorage, local::LocalStorage, s3::AmazonS3},
+    ObjectStoreGetExt,
 };
 
 // http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
@@ -66,47 +69,75 @@ impl HttpDownloaderBuilder for ObjectStoreConfig {
 async fn get(url: &str, store: &'static str, location: &Path, client: &Client) -> Result<GetResult> {
     let request = client.request(Method::GET, url);
     let response = request.send().await.context("failed to get")?;
-    let meta = header_meta(location, response.headers()).context("Failed to get header")?;
+    let headers = response.headers().clone();
+
+    if headers.get(CONTENT_LENGTH).is_none() {
+        let bytes = response.bytes().await.context("failed to buffer response without content length")?;
+        let size = bytes.len();
+        let meta = header_meta(location, &headers, Some(size)).context("Failed to get header")?;
+        let stream = stream::once(async move { Ok::<Bytes, Error>(bytes) }).boxed();
+        return Ok(GetResult {
+            range: 0 .. size,
+            payload: GetResultPayload::Stream(stream),
+            meta,
+            attributes: object_store::Attributes::new(),
+        });
+    }
+
+    let meta = header_meta(location, &headers, None).context("Failed to get header")?;
     let stream = response.bytes_stream().map_err(|source| Error::Generic { store, source: Box::new(source) }).boxed();
     Ok(GetResult {
-        range: 0..meta.size,
+        range: 0 .. meta.size,
         payload: GetResultPayload::Stream(stream),
         meta,
         attributes: object_store::Attributes::new(),
     })
 }
 
-fn header_meta(location: &Path, headers: &HeaderMap) -> Result<ObjectMeta> {
-    let last_modified = headers.get(LAST_MODIFIED).context("Missing last modified")?;
+fn header_meta(location: &Path, headers: &HeaderMap, size_override: Option<usize>) -> Result<ObjectMeta> {
+    let last_modified = parse_last_modified(headers)?;
+    let size = match size_override {
+        Some(size) => size,
+        None => parse_content_length(headers)?,
+    };
 
-    let content_length = headers.get(CONTENT_LENGTH).context("Missing content length")?;
-
-    let last_modified = last_modified.to_str().context("bad header")?;
-    let last_modified =
-        DateTime::parse_from_rfc2822(last_modified).context("invalid last modified")?.with_timezone(&Utc);
-
-    let content_length = content_length.to_str().context("bad header")?;
-    let content_length = content_length.parse().context("invalid content length")?;
-
-    let e_tag = headers.get(ETAG).context("missing etag")?;
-    let e_tag = e_tag.to_str().context("bad header")?;
+    let e_tag = headers.get(ETAG).map(|value| value.to_str().context("bad header")).transpose()?;
 
     Ok(ObjectMeta {
         location: location.clone(),
         last_modified,
-        size: content_length,
-        e_tag: Some(e_tag.to_string()),
+        size,
+        e_tag: e_tag.map(|value| value.to_string()),
         version: None,
     })
 }
 
+fn parse_last_modified(headers: &HeaderMap) -> Result<DateTime<Utc>> {
+    if let Some(value) = headers.get(LAST_MODIFIED).or_else(|| headers.get(DATE)) {
+        let value = value.to_str().context("bad header")?;
+        let parsed = DateTime::parse_from_rfc2822(value).context("invalid last modified")?.with_timezone(&Utc);
+        return Ok(parsed);
+    }
+
+    Ok(Utc::now())
+}
+
+fn parse_content_length(headers: &HeaderMap) -> Result<usize> {
+    let header = headers.get(CONTENT_LENGTH).context("Missing content length")?;
+    let header = header.to_str().context("bad header")?;
+    let parsed = header.parse().context("invalid content length")?;
+    Ok(parsed)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::object_store::http::HttpDownloaderBuilder;
-    use object_store::path::Path;
     use std::fs;
+
+    use object_store::path::Path;
     use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
     use tempfile::TempDir;
+
+    use crate::object_store::http::HttpDownloaderBuilder;
 
     #[tokio::test]
     pub async fn test_local_download() -> anyhow::Result<()> {

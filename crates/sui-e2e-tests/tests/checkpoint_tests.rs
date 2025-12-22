@@ -9,18 +9,19 @@ use std::{
     },
     time::Duration,
 };
+
 use sui_macros::{register_fail_point, register_fail_point_if, sim_test};
-use sui_test_transaction_builder::make_transfer_sui_transaction;
+use sui_test_transaction_builder::make_transfer_oct_transaction;
 use test_cluster::TestClusterBuilder;
 
 #[sim_test]
 async fn basic_checkpoints_integration_test() {
     let test_cluster = TestClusterBuilder::new().build().await;
-    let tx = make_transfer_sui_transaction(&test_cluster.wallet, None, None).await;
+    let tx = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
     let digest = *tx.digest();
     test_cluster.execute_transaction(tx).await;
 
-    for _ in 0..600 {
+    for _ in 0 .. 600 {
         let all_included = test_cluster.swarm.validator_node_handles().into_iter().all(|handle| {
             handle.with(|node| {
                 node.state().epoch_store_for_testing().is_transaction_executed_in_checkpoint(&digest).unwrap()
@@ -61,7 +62,7 @@ async fn test_checkpoint_split_brain() {
 
     let test_cluster = TestClusterBuilder::new().with_num_validators(committee_size).build().await;
 
-    let tx = make_transfer_sui_transaction(&test_cluster.wallet, None, None).await;
+    let tx = make_transfer_oct_transaction(&test_cluster.wallet, None, None).await;
     test_cluster.wallet.execute_transaction_may_fail(tx).await.ok();
 
     // provide enough time for validators to detect split brain

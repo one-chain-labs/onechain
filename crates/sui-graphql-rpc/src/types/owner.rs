@@ -1,6 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::{connection::Connection, *};
+use sui_name_service::NameServiceConfig;
+use sui_types::{dynamic_field::DynamicFieldType, gas_coin::GAS};
+
 use super::{
     address::Address,
     coin_metadata::CoinMetadata,
@@ -21,10 +25,6 @@ use crate::{
         type_filter::ExactTypeFilter,
     },
 };
-
-use async_graphql::{connection::Connection, *};
-use sui_json_rpc::name_service::NameServiceConfig;
-use sui_types::{dynamic_field::DynamicFieldType, gas_coin::GAS};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Owner {

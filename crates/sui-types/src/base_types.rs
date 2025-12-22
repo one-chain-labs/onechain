@@ -2,33 +2,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    coin::{Coin, CoinMetadata, TreasuryCap, COIN_MODULE_NAME, COIN_STRUCT_NAME},
-    crypto::{AuthorityPublicKeyBytes, DefaultHash, PublicKey, SignatureScheme, SuiPublicKey, SuiSignature},
-    dynamic_field::{DynamicFieldInfo, DynamicFieldType},
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    epoch_data::EpochData,
-    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiResult},
-    gas_coin::{GasCoin, GAS},
-    governance::{StakedOct, STAKED_OCT_STRUCT_NAME, STAKING_POOL_MODULE_NAME},
-    id::RESOLVED_SUI_ID,
-    messages_checkpoint::CheckpointTimestamp,
-    multisig::MultiSigPublicKey,
-    object::{Object, Owner},
-    parse_sui_struct_tag,
-    signature::GenericSignature,
-    sui_serde::{to_sui_struct_tag_string, HexAccountAddress, Readable},
-    transaction::{Transaction, VerifiedTransaction},
-    zk_login_authenticator::ZkLoginAuthenticator,
-    MOVE_STDLIB_ADDRESS,
-    SUI_CLOCK_OBJECT_ID,
-    SUI_FRAMEWORK_ADDRESS,
-    SUI_SYSTEM_ADDRESS,
+use std::{
+    cmp::max,
+    convert::{TryFrom, TryInto},
+    fmt,
+    str::FromStr,
 };
-pub use crate::{
-    committee::EpochId,
-    digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest},
-};
+
 use anyhow::anyhow;
 use fastcrypto::{
     encoding::{decode_bytes_hex, Encoding, Hex},
@@ -55,11 +35,33 @@ use serde::{
 };
 use serde_with::serde_as;
 use shared_crypto::intent::HashingIntentScope;
-use std::{
-    cmp::max,
-    convert::{TryFrom, TryInto},
-    fmt,
-    str::FromStr,
+
+use crate::{
+    coin::{Coin, CoinMetadata, TreasuryCap, COIN_MODULE_NAME, COIN_STRUCT_NAME},
+    crypto::{AuthorityPublicKeyBytes, DefaultHash, PublicKey, SignatureScheme, SuiPublicKey, SuiSignature},
+    dynamic_field::{DynamicFieldInfo, DynamicFieldType},
+    effects::{TransactionEffects, TransactionEffectsAPI},
+    epoch_data::EpochData,
+    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiResult},
+    gas_coin::{GasCoin, GAS},
+    governance::{StakedOct, STAKED_OCT_STRUCT_NAME, STAKING_POOL_MODULE_NAME},
+    id::RESOLVED_SUI_ID,
+    messages_checkpoint::CheckpointTimestamp,
+    multisig::MultiSigPublicKey,
+    object::{Object, Owner},
+    parse_sui_struct_tag,
+    signature::GenericSignature,
+    sui_serde::{to_sui_struct_tag_string, HexAccountAddress, Readable},
+    transaction::{Transaction, VerifiedTransaction},
+    zk_login_authenticator::ZkLoginAuthenticator,
+    MOVE_STDLIB_ADDRESS,
+    SUI_CLOCK_OBJECT_ID,
+    SUI_FRAMEWORK_ADDRESS,
+    SUI_SYSTEM_ADDRESS,
+};
+pub use crate::{
+    committee::EpochId,
+    digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest},
 };
 
 #[cfg(test)]
@@ -115,6 +117,30 @@ pub struct ObjectID(
     AccountAddress,
 );
 
+#[serde_as]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum FullObjectID {
+    Fastpath(ObjectID),
+    Consensus(ConsensusObjectSequenceKey),
+}
+
+impl FullObjectID {
+    pub fn new(object_id: ObjectID, start_version: Option<SequenceNumber>) -> Self {
+        if let Some(start_version) = start_version {
+            Self::Consensus((object_id, start_version))
+        } else {
+            Self::Fastpath(object_id)
+        }
+    }
+
+    pub fn id(&self) -> ObjectID {
+        match &self {
+            FullObjectID::Fastpath(object_id) => *object_id,
+            FullObjectID::Consensus(consensus_object_sequence_key) => consensus_object_sequence_key.0,
+        }
+    }
+}
+
 pub type VersionDigest = (SequenceNumber, ObjectDigest);
 
 pub type ObjectRef = (ObjectID, SequenceNumber, ObjectDigest);
@@ -126,6 +152,12 @@ pub fn random_object_ref() -> ObjectRef {
 pub fn update_object_ref_for_testing(object_ref: ObjectRef) -> ObjectRef {
     (object_ref.0, object_ref.1.next(), ObjectDigest::new([0; 32]))
 }
+
+pub type FullObjectRef = (FullObjectID, SequenceNumber, ObjectDigest);
+
+/// Represents an distinct stream of object versions for a Shared or ConsensusV2 object,
+/// based on the object ID and start version.
+pub type ConsensusObjectSequenceKey = (ObjectID, SequenceNumber);
 
 /// Wrapper around StructTag with a space-efficient representation for common types like coins
 /// The StructTag for a gas coin is 84 bytes, so using 1 byte instead is a win.
@@ -154,6 +186,10 @@ pub enum MoveObjectType_ {
 impl MoveObjectType {
     pub fn gas_coin() -> Self {
         Self(MoveObjectType_::GasCoin)
+    }
+
+    pub fn coin(coin_type: TypeTag) -> Self {
+        Self(if GAS::is_gas_type(&coin_type) { MoveObjectType_::GasCoin } else { MoveObjectType_::Coin(coin_type) })
     }
 
     pub fn staked_oct() -> Self {
@@ -674,7 +710,7 @@ impl From<&MultiSigPublicKey> for SuiAddress {
     }
 }
 
-/// OneChain address for [struct ZkLoginAuthenticator] is defined as the black2b hash of
+/// Sui address for [struct ZkLoginAuthenticator] is defined as the black2b hash of
 /// [zklogin_flag || iss_bytes_length || iss_bytes || unpadded_address_seed_in_bytes].
 impl TryFrom<&ZkLoginAuthenticator> for SuiAddress {
     type Error = SuiError;
@@ -810,10 +846,10 @@ pub fn move_ascii_str_layout() -> A::MoveStructLayout {
             name: STD_ASCII_STRUCT_NAME.to_owned(),
             type_params: vec![],
         },
-        fields: Box::new(vec![A::MoveFieldLayout::new(
+        fields: vec![A::MoveFieldLayout::new(
             ident_str!("bytes").into(),
             A::MoveTypeLayout::Vector(Box::new(A::MoveTypeLayout::U8)),
-        )]),
+        )],
     }
 }
 
@@ -825,13 +861,50 @@ pub fn move_utf8_str_layout() -> A::MoveStructLayout {
             name: STD_UTF8_STRUCT_NAME.to_owned(),
             type_params: vec![],
         },
-        fields: Box::new(vec![A::MoveFieldLayout::new(
+        fields: vec![A::MoveFieldLayout::new(
             ident_str!("bytes").into(),
             A::MoveTypeLayout::Vector(Box::new(A::MoveTypeLayout::U8)),
-        )]),
+        )],
     }
 }
 
+// The Rust representation of the Move `TxContext`.
+// This struct must be kept in sync with the Move `TxContext` definition.
+// Moving forward we are going to zero all fields of the Move `TxContext`
+// and use native functions to retrieve info about the transaction.
+// However we cannot remove the Move type and so this struct is going to
+// be the Rust equivalent to the Move `TxContext` for legacy usages.
+//
+// `TxContext` in Rust (see below) is going to be purely used in Rust and can
+// evolve as needed without worrying any compatibility with Move.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct MoveLegacyTxContext {
+    // Signer/sender of the transaction
+    sender: AccountAddress,
+    // Digest of the current transaction
+    digest: Vec<u8>,
+    // The current epoch number
+    epoch: EpochId,
+    // Timestamp that the epoch started at
+    epoch_timestamp_ms: CheckpointTimestamp,
+    // Number of `ObjectID`'s generated during execution of the current transaction
+    ids_created: u64,
+}
+
+impl From<&TxContext> for MoveLegacyTxContext {
+    fn from(tx_context: &TxContext) -> Self {
+        Self {
+            sender: tx_context.sender,
+            digest: tx_context.digest.clone(),
+            epoch: tx_context.epoch,
+            epoch_timestamp_ms: tx_context.epoch_timestamp_ms,
+            ids_created: tx_context.ids_created,
+        }
+    }
+}
+
+// Information about the transaction context.
+// This struct is not related to Move and can evolve as needed/required.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct TxContext {
     /// Signer/sender of the transaction
@@ -844,6 +917,10 @@ pub struct TxContext {
     epoch_timestamp_ms: CheckpointTimestamp,
     /// Number of `ObjectID`'s generated during execution of the current transaction
     ids_created: u64,
+    // gas price passed to transaction as input
+    gas_price: u64,
+    // address of the sponsor if any
+    sponsor: Option<AccountAddress>,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -857,8 +934,21 @@ pub enum TxContextKind {
 }
 
 impl TxContext {
-    pub fn new(sender: &SuiAddress, digest: &TransactionDigest, epoch_data: &EpochData) -> Self {
-        Self::new_from_components(sender, digest, &epoch_data.epoch_id(), epoch_data.epoch_start_timestamp())
+    pub fn new(
+        sender: &SuiAddress,
+        digest: &TransactionDigest,
+        epoch_data: &EpochData,
+        gas_price: u64,
+        sponsor: Option<SuiAddress>,
+    ) -> Self {
+        Self::new_from_components(
+            sender,
+            digest,
+            &epoch_data.epoch_id(),
+            epoch_data.epoch_start_timestamp(),
+            gas_price,
+            sponsor,
+        )
     }
 
     pub fn new_from_components(
@@ -866,6 +956,8 @@ impl TxContext {
         digest: &TransactionDigest,
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
+        gas_price: u64,
+        sponsor: Option<SuiAddress>,
     ) -> Self {
         Self {
             sender: AccountAddress::new(sender.0),
@@ -873,6 +965,8 @@ impl TxContext {
             epoch: *epoch_id,
             epoch_timestamp_ms,
             ids_created: 0,
+            gas_price,
+            sponsor: sponsor.map(|s| s.into()),
         }
     }
 
@@ -922,6 +1016,11 @@ impl TxContext {
         SuiAddress::from(ObjectID(self.sender))
     }
 
+    pub fn to_bcs_legacy_context(&self) -> Vec<u8> {
+        let move_context: MoveLegacyTxContext = self.into();
+        bcs::to_bytes(&move_context).unwrap()
+    }
+
     pub fn to_vec(&self) -> Vec<u8> {
         bcs::to_bytes(&self).unwrap()
     }
@@ -930,7 +1029,7 @@ impl TxContext {
     /// when mutable context is passed over some boundary via
     /// serialize/deserialize and this is the reason why this method
     /// consumes the other context..
-    pub fn update_state(&mut self, other: TxContext) -> Result<(), ExecutionError> {
+    pub fn update_state(&mut self, other: MoveLegacyTxContext) -> Result<(), ExecutionError> {
         if self.sender != other.sender || self.digest != other.digest || other.ids_created < self.ids_created {
             return Err(ExecutionError::new_with_source(
                 ExecutionErrorKind::InvariantViolation,
@@ -939,16 +1038,6 @@ impl TxContext {
         }
         self.ids_created = other.ids_created;
         Ok(())
-    }
-
-    // Generate a random TxContext for testing.
-    pub fn random_for_testing_only() -> Self {
-        Self::new(&SuiAddress::random_for_testing_only(), &TransactionDigest::random(), &EpochData::new_test())
-    }
-
-    /// Generate a TxContext for testing with a specific sender.
-    pub fn with_sender_for_testing_only(sender: &SuiAddress) -> Self {
-        Self::new(sender, &TransactionDigest::random(), &EpochData::new_test())
     }
 }
 
@@ -959,6 +1048,9 @@ impl SequenceNumber {
     pub const MAX: SequenceNumber = SequenceNumber(0x7fff_ffff_ffff_ffff);
     pub const MIN: SequenceNumber = SequenceNumber(u64::MIN);
     pub const RANDOMNESS_UNAVAILABLE: SequenceNumber = SequenceNumber(SequenceNumber::MAX.value() + 3);
+    // Used to represent a sequence number whose value is unknown.
+    // For internal use only. This should never appear on chain.
+    pub const UNKNOWN: SequenceNumber = SequenceNumber(SequenceNumber::MAX.value() + 4);
 
     pub const fn new() -> Self {
         SequenceNumber(0)
@@ -1103,13 +1195,13 @@ impl ObjectID {
         // If the string is too short, pad it
         if hex_len < Self::LENGTH * 2 {
             let mut hex_str = String::with_capacity(Self::LENGTH * 2);
-            for _ in 0..Self::LENGTH * 2 - hex_len {
+            for _ in 0 .. Self::LENGTH * 2 - hex_len {
                 hex_str.push('0');
             }
-            hex_str.push_str(&literal[2..]);
+            hex_str.push_str(&literal[2 ..]);
             Self::from_str(&hex_str)
         } else {
-            Self::from_str(&literal[2..])
+            Self::from_str(&literal[2 ..])
         }
     }
 
@@ -1124,7 +1216,7 @@ impl ObjectID {
 
         // truncate into an ObjectID.
         // OK to access slice because digest should never be shorter than ObjectID::LENGTH.
-        ObjectID::try_from(&hash.as_ref()[0..ObjectID::LENGTH]).unwrap()
+        ObjectID::try_from(&hash.as_ref()[0 .. ObjectID::LENGTH]).unwrap()
     }
 
     /// Incremenent the ObjectID by usize IDs, assuming the ObjectID hex is a number represented as an array of bytes
@@ -1133,7 +1225,7 @@ impl ObjectID {
         let mut step_copy = step;
 
         let mut carry = 0;
-        for idx in (0..Self::LENGTH).rev() {
+        for idx in (0 .. Self::LENGTH).rev() {
             if step_copy == 0 {
                 // Nothing else to do
                 break;
@@ -1163,7 +1255,7 @@ impl ObjectID {
         }
 
         // This logic increments the integer representation of an ObjectID u8 array
-        for idx in (0..Self::LENGTH).rev() {
+        for idx in (0 .. Self::LENGTH).rev() {
             if prev_val[idx] == 0xFF {
                 prev_val[idx] = 0;
             } else {
@@ -1178,7 +1270,7 @@ impl ObjectID {
     pub fn in_range(offset: ObjectID, count: u64) -> Result<Vec<ObjectID>, anyhow::Error> {
         let mut ret = Vec::new();
         let mut prev = offset;
-        for o in 0..count {
+        for o in 0 .. count {
             if o != 0 {
                 prev = prev.next_increment()?;
             }

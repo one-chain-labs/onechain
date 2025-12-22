@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::time::Duration;
+
 use mysten_common::metrics::{push_metrics, MetricsPushClient};
+use mysten_metrics::RegistryService;
 use mysten_network::metrics::MetricsCallbackProvider;
 use prometheus::{
     register_histogram_vec_with_registry,
@@ -11,11 +14,7 @@ use prometheus::{
     IntGaugeVec,
     Registry,
 };
-
-use std::time::Duration;
 use sui_network::tonic::Code;
-
-use mysten_metrics::RegistryService;
 
 /// Starts a task to periodically push metrics to a configured endpoint if a metrics push endpoint
 /// is configured.
@@ -173,9 +172,10 @@ impl MetricsCallbackProvider for GrpcMetrics {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
     use mysten_metrics::start_prometheus_server;
     use prometheus::{IntCounter, Registry};
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[tokio::test]
     pub async fn test_metrics_endpoint_with_multiple_registries_add_remove() {

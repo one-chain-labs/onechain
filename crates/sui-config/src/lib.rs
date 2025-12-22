@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Context, Result};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+
+use anyhow::{Context, Result};
+use serde::{de::DeserializeOwned, Serialize};
 use tracing::trace;
 
 pub mod certificate_deny_config;

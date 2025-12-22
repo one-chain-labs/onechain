@@ -194,6 +194,53 @@ impl Deref for TrustedCommit {
     }
 }
 
+/// `CertifiedCommits` keeps the synchronized certified commits along with the corresponding votes received from the peer that provided these commits.
+/// The `votes` contain the blocks as those provided by the peer, and certify the tip of the synced commits.
+#[derive(Clone, Debug)]
+pub(crate) struct CertifiedCommits {
+    commits: Vec<CertifiedCommit>,
+    votes: Vec<VerifiedBlock>,
+}
+
+impl CertifiedCommits {
+    pub(crate) fn new(commits: Vec<CertifiedCommit>, votes: Vec<VerifiedBlock>) -> Self {
+        Self { commits, votes }
+    }
+
+    pub(crate) fn commits(&self) -> &[CertifiedCommit] {
+        &self.commits
+    }
+
+    pub(crate) fn votes(&self) -> &[VerifiedBlock] {
+        &self.votes
+    }
+}
+
+/// A commit that has been synced and certified by a quorum of authorities.
+#[derive(Clone, Debug)]
+pub(crate) struct CertifiedCommit {
+    commit: Arc<TrustedCommit>,
+    blocks: Vec<VerifiedBlock>,
+}
+
+impl CertifiedCommit {
+    pub(crate) fn new_certified(commit: TrustedCommit, blocks: Vec<VerifiedBlock>) -> Self {
+        Self { commit: Arc::new(commit), blocks }
+    }
+
+    pub fn blocks(&self) -> &[VerifiedBlock] {
+        &self.blocks
+    }
+}
+
+impl Deref for CertifiedCommit {
+    type Target = TrustedCommit;
+
+    fn deref(&self) -> &Self::Target {
+        &self.commit
+    }
+}
+
 /// Digest of a consensus commit.
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CommitDigest([u8; consensus_config::DIGEST_LENGTH]);
@@ -210,7 +257,7 @@ impl CommitDigest {
 
 impl Hash for CommitDigest {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.0[..8]);
+        state.write(&self.0[.. 8]);
     }
 }
 
@@ -225,7 +272,7 @@ impl fmt::Display for CommitDigest {
         write!(
             f,
             "{}",
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0).get(0..4).ok_or(fmt::Error)?
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.0).get(0 .. 4).ok_or(fmt::Error)?
         )
     }
 }
@@ -371,6 +418,7 @@ pub fn load_committed_subdag_from_store(
 pub(crate) enum Decision {
     Direct,
     Indirect,
+    Certified, // This is a commit certified leader so no commit decision was made locally.
 }
 
 /// The status of a leader slot from the direct and indirect commit rules.
@@ -490,7 +538,7 @@ impl CommitRange {
     pub(crate) fn new(range: RangeInclusive<CommitIndex>) -> Self {
         // When end is CommitIndex::MAX, the range can be considered as unbounded
         // so it is ok to saturate at the end.
-        Self(*range.start()..(*range.end()).saturating_add(1))
+        Self(*range.start() .. (*range.end()).saturating_add(1))
     }
 
     // Inclusive
@@ -506,7 +554,7 @@ impl CommitRange {
     pub(crate) fn extend_to(&mut self, other: CommitIndex) {
         let new_end = other.saturating_add(1);
         assert!(self.0.end <= new_end);
-        self.0 = self.0.start..new_end;
+        self.0 = self.0.start .. new_end;
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -587,9 +635,9 @@ mod tests {
 
         let mut ancestors = genesis_references;
         let mut leader = None;
-        for round in 1..=first_wave_rounds {
+        for round in 1 ..= first_wave_rounds {
             let mut new_ancestors = vec![];
-            for author in 0..num_authorities {
+            for author in 0 .. num_authorities {
                 let base_ts = round as BlockTimestampMs * 1000;
                 let block = VerifiedBlock::new_for_test(
                     TestBlock::new(round, author)
@@ -632,12 +680,12 @@ mod tests {
     #[tokio::test]
     async fn test_commit_range() {
         telemetry_subscribers::init_for_testing();
-        let mut range1 = CommitRange::new(1..=5);
-        let range2 = CommitRange::new(2..=6);
-        let range3 = CommitRange::new(5..=10);
-        let range4 = CommitRange::new(6..=10);
-        let range5 = CommitRange::new(6..=9);
-        let range6 = CommitRange::new(1..=1);
+        let mut range1 = CommitRange::new(1 ..= 5);
+        let range2 = CommitRange::new(2 ..= 6);
+        let range3 = CommitRange::new(5 ..= 10);
+        let range4 = CommitRange::new(6 ..= 10);
+        let range5 = CommitRange::new(6 ..= 9);
+        let range6 = CommitRange::new(1 ..= 1);
 
         assert_eq!(range1.start(), 1);
         assert_eq!(range1.end(), 5);

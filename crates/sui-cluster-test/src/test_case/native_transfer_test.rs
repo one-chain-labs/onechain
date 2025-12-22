@@ -3,14 +3,13 @@
 
 use async_trait::async_trait;
 use jsonrpsee::rpc_params;
-use tracing::info;
-
 use sui_json_rpc_types::SuiTransactionBlockResponse;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
     object::Owner,
 };
+use tracing::info;
 
 use crate::{
     helper::{BalanceChangeChecker, ObjectChecker},
@@ -49,7 +48,7 @@ impl TestCaseImpl for NativeTransferTest {
         // Test transfer sui
         let obj_to_transfer_2 = *sui_objs_2.swap_remove(0).id();
         let params = rpc_params![signer, obj_to_transfer_2, (2_000_000).to_string(), recipient_addr, None::<u64>];
-        let data = ctx.build_transaction_remotely("unsafe_transferSui", params).await?;
+        let data = ctx.build_transaction_remotely("unsafe_transferOct", params).await?;
         let mut response = ctx.sign_and_execute(data, "coin transfer").await;
 
         Self::examine_response(ctx, &mut response, signer, recipient_addr, obj_to_transfer).await;

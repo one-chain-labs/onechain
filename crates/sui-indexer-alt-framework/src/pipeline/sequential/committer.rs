@@ -4,6 +4,7 @@
 use std::{cmp::Ordering, collections::BTreeMap, sync::Arc};
 
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection};
+use sui_pg_db::Db;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -12,14 +13,12 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-use crate::{
-    db::Db,
-    metrics::IndexerMetrics,
-    pipeline::{Indexed, LOUD_WATERMARK_UPDATE_INTERVAL, WARN_PENDING_WATERMARKS},
-    watermarks::CommitterWatermark,
-};
-
 use super::{Handler, SequentialConfig};
+use crate::{
+    metrics::IndexerMetrics,
+    models::watermarks::CommitterWatermark,
+    pipeline::{logging::WatermarkLogger, IndexedCheckpoint, WARN_PENDING_WATERMARKS},
+};
 
 /// The committer task gathers rows into batches and writes them to the database.
 ///
@@ -32,7 +31,7 @@ use super::{Handler, SequentialConfig};
 /// single write), in a single transaction that includes all row updates and an update to the
 /// watermark table.
 ///
-/// The committer can be configured to lag behind the ingestion serice by a fixed number of
+/// The committer can be configured to lag behind the ingestion service by a fixed number of
 /// checkpoints (configured by `checkpoint_lag`). A value of `0` means no lag.
 ///
 /// Upon successful write, the task sends its new watermark back to the ingestion service, to
@@ -42,7 +41,7 @@ use super::{Handler, SequentialConfig};
 pub(super) fn committer<H: Handler + 'static>(
     config: SequentialConfig,
     watermark: Option<CommitterWatermark<'static>>,
-    mut rx: mpsc::Receiver<Indexed<H>>,
+    mut rx: mpsc::Receiver<IndexedCheckpoint<H>>,
     tx: mpsc::UnboundedSender<(&'static str, u64)>,
     db: Db,
     metrics: Arc<IndexerMetrics>,
@@ -80,11 +79,11 @@ pub(super) fn committer<H: Handler + 'static>(
 
         // The committer task will periodically output a log message at a higher log level to
         // demonstrate that the pipeline is making progress.
-        let mut next_loud_watermark_update = watermark.checkpoint_hi_inclusive + LOUD_WATERMARK_UPDATE_INTERVAL;
+        let mut logger = WatermarkLogger::new("sequential_committer", &watermark);
 
         // Data for checkpoint that haven't been written yet. Note that `pending_rows` includes
         // rows in `batch`.
-        let mut pending: BTreeMap<u64, Indexed<H>> = BTreeMap::new();
+        let mut pending: BTreeMap<u64, IndexedCheckpoint<H>> = BTreeMap::new();
         let mut pending_rows = 0;
 
         info!(pipeline = H::NAME, ?watermark, "Starting committer");
@@ -219,6 +218,10 @@ pub(super) fn committer<H: Handler + 'static>(
 
                     let Ok(mut conn) = db.connect().await else {
                         warn!(pipeline = H::NAME, "Failed to get connection for DB");
+                        metrics
+                            .total_committer_batches_failed
+                            .with_label_values(&[H::NAME])
+                            .inc();
                         continue;
                     };
 
@@ -251,6 +254,11 @@ pub(super) fn committer<H: Handler + 'static>(
                                 "Error writing batch: {e}",
                             );
 
+                            metrics
+                                .total_committer_batches_failed
+                                .with_label_values(&[H::NAME])
+                                .inc();
+
                             attempt += 1;
                             continue;
                         }
@@ -258,13 +266,14 @@ pub(super) fn committer<H: Handler + 'static>(
 
                     debug!(
                         pipeline = H::NAME,
-                        elapsed_ms = elapsed * 1000.0,
                         attempt,
                         affected,
                         committed = batch_rows,
                         pending = pending_rows,
                         "Wrote batch",
                     );
+
+                    logger.log::<H>(&watermark, elapsed);
 
                     metrics
                         .total_committer_batches_succeeded
@@ -305,28 +314,6 @@ pub(super) fn committer<H: Handler + 'static>(
                         .watermark_timestamp_in_db_ms
                         .with_label_values(&[H::NAME])
                         .set(watermark.timestamp_ms_hi_inclusive);
-
-                    if watermark.checkpoint_hi_inclusive > next_loud_watermark_update {
-                        next_loud_watermark_update = watermark.checkpoint_hi_inclusive + LOUD_WATERMARK_UPDATE_INTERVAL;
-
-                        info!(
-                            pipeline = H::NAME,
-                            epoch = watermark.epoch_hi_inclusive,
-                            checkpoint = watermark.checkpoint_hi_inclusive,
-                            transaction = watermark.tx_hi,
-                            timestamp = %watermark.timestamp(),
-                            "Watermark",
-                        );
-                    } else {
-                        debug!(
-                            pipeline = H::NAME,
-                            epoch = watermark.epoch_hi_inclusive,
-                            checkpoint = watermark.checkpoint_hi_inclusive,
-                            transaction = watermark.tx_hi,
-                            timestamp = %watermark.timestamp(),
-                            "Watermark",
-                        );
-                    }
 
                     // Ignore the result -- the ingestion service will close this channel
                     // once it is done, but there may still be checkpoints buffered that need

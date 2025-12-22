@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use fastcrypto::traits::ToFromBytes;
+use mysten_network::Multiaddr;
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     balance::Balance,
     base_types::SuiAddress,
@@ -16,10 +21,6 @@ use crate::{
         SuiSystemStateTrait,
     },
 };
-use fastcrypto::traits::ToFromBytes;
-use mysten_network::Multiaddr;
-use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SimTestSuiSystemStateInnerV1 {

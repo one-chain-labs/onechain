@@ -16,14 +16,8 @@ use std::collections::{BTreeSet, HashMap};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode,
-        CodeOffset,
-        CompiledModule,
-        FunctionDefinition,
-        FunctionDefinitionIndex,
-        FunctionHandle,
-        FunctionHandleIndex,
-        StructDefinitionIndex,
+        Bytecode, CodeOffset, CompiledModule, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, FunctionHandleIndex, StructDefinitionIndex,
     },
     safe_unwrap,
 };
@@ -45,7 +39,11 @@ impl<'a> AcquiresVerifier<'a> {
         function_definition: &'a FunctionDefinition,
         _meter: &mut (impl Meter + ?Sized), // currently unused
     ) -> PartialVMResult<()> {
-        let annotated_acquires: BTreeSet<_> = function_definition.acquires_global_resources.iter().cloned().collect();
+        let annotated_acquires: BTreeSet<_> = function_definition
+            .acquires_global_resources
+            .iter()
+            .cloned()
+            .collect();
         let mut handle_to_def = HashMap::new();
         for func_def in module.function_defs() {
             handle_to_def.insert(func_def.function, func_def);
@@ -58,13 +56,19 @@ impl<'a> AcquiresVerifier<'a> {
             handle_to_def,
         };
 
-        for (offset, instruction) in safe_unwrap!(function_definition.code.as_ref()).code.iter().enumerate() {
+        for (offset, instruction) in safe_unwrap!(function_definition.code.as_ref())
+            .code
+            .iter()
+            .enumerate()
+        {
             verifier.verify_instruction(instruction, offset as CodeOffset)?
         }
 
         for annotation in verifier.annotated_acquires {
             if !verifier.actual_acquires.contains(&annotation) {
-                return Err(PartialVMError::new(StatusCode::EXTRANEOUS_ACQUIRES_ANNOTATION));
+                return Err(PartialVMError::new(
+                    StatusCode::EXTRANEOUS_ACQUIRES_ANNOTATION,
+                ));
             }
 
             let struct_def = safe_unwrap!(module.struct_defs().get(annotation.0 as usize));
@@ -77,7 +81,11 @@ impl<'a> AcquiresVerifier<'a> {
         Ok(())
     }
 
-    fn verify_instruction(&mut self, instruction: &Bytecode, offset: CodeOffset) -> PartialVMResult<()> {
+    fn verify_instruction(
+        &mut self,
+        instruction: &Bytecode,
+        offset: CodeOffset,
+    ) -> PartialVMResult<()> {
         match instruction {
             Bytecode::Call(idx) => self.call_acquire(*idx, offset),
             Bytecode::CallGeneric(idx) => {
@@ -171,24 +179,36 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::UnpackVariantGenericImmRef(_)
             | Bytecode::UnpackVariantMutRef(_)
             | Bytecode::UnpackVariantGenericMutRef(_)
-            | Bytecode::VariantSwitch(_) => Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Unexpected variant opcode in version 2".to_string())),
+            | Bytecode::VariantSwitch(_) => Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            )
+            .with_message("Unexpected variant opcode in version 2".to_string())),
         }
     }
 
-    fn call_acquire(&mut self, fh_idx: FunctionHandleIndex, offset: CodeOffset) -> PartialVMResult<()> {
+    fn call_acquire(
+        &mut self,
+        fh_idx: FunctionHandleIndex,
+        offset: CodeOffset,
+    ) -> PartialVMResult<()> {
         let function_handle = self.module.function_handle_at(fh_idx);
-        let mut function_acquired_resources = self.function_acquired_resources(function_handle, fh_idx);
+        let mut function_acquired_resources =
+            self.function_acquired_resources(function_handle, fh_idx);
         for acquired_resource in &function_acquired_resources {
             if !self.annotated_acquires.contains(acquired_resource) {
                 return Err(self.error(StatusCode::MISSING_ACQUIRES_ANNOTATION, offset));
             }
         }
-        self.actual_acquires.append(&mut function_acquired_resources);
+        self.actual_acquires
+            .append(&mut function_acquired_resources);
         Ok(())
     }
 
-    fn struct_acquire(&mut self, sd_idx: StructDefinitionIndex, offset: CodeOffset) -> PartialVMResult<()> {
+    fn struct_acquire(
+        &mut self,
+        sd_idx: StructDefinitionIndex,
+        offset: CodeOffset,
+    ) -> PartialVMResult<()> {
         if self.annotated_acquires.contains(&sd_idx) {
             self.actual_acquires.insert(sd_idx);
             Ok(())

@@ -5,24 +5,28 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 use itertools::Itertools;
-use sui_types::dynamic_field::DynamicFieldInfo;
-use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
-
 use move_core_types::language_storage::{StructTag, TypeTag};
 use mysten_metrics::{get_metrics, spawn_monitored_task};
 use sui_data_ingestion_core::Worker;
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
 use sui_types::{
-    dynamic_field::DynamicFieldType,
+    dynamic_field::{DynamicFieldInfo, DynamicFieldType},
     effects::{ObjectChange, TransactionEffectsAPI},
     event::SystemEpochInfoEvent,
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
     messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber},
     object::{Object, Owner},
     sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
     transaction::TransactionDataAPI,
 };
+use tokio_util::sync::CancellationToken;
+use tracing::{info, warn};
 
+use super::{
+    tx_processor::{EpochEndIndexingObjectStore, TxChangesProcessor},
+    CheckpointDataToCommit,
+    EpochToCommit,
+    TransactionObjectChangesToCommit,
+};
 use crate::{
     errors::IndexerError,
     handlers::committer::start_tx_checkpoint_commit_task,
@@ -45,13 +49,6 @@ use crate::{
         TransactionKind,
         TxIndex,
     },
-};
-
-use super::{
-    tx_processor::{EpochEndIndexingObjectStore, TxChangesProcessor},
-    CheckpointDataToCommit,
-    EpochToCommit,
-    TransactionObjectChangesToCommit,
 };
 
 const CHECKPOINT_QUEUE_SIZE: usize = 100;

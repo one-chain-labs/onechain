@@ -57,13 +57,13 @@ impl AccountData {
     }
 
     pub fn new_with_account_and_balance(account: Arc<Account>, initial_balance: u64) -> Self {
-        let coins = (0..NUM_GAS_OBJECTS)
+        let coins = (0 .. NUM_GAS_OBJECTS)
             .map(|_| {
                 let gas_object_id = ObjectID::random();
                 Object::with_id_owner_gas_for_testing(gas_object_id, account.address, initial_balance)
             })
             .collect();
-        let initial_balances = (0..NUM_GAS_OBJECTS).map(|_| initial_balance).collect();
+        let initial_balances = (0 .. NUM_GAS_OBJECTS).map(|_| initial_balance).collect();
         Self { account, coins, initial_balances, balance_creation_amt: initial_balance }
     }
 }

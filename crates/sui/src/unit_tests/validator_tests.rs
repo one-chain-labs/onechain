@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::validator_commands::{get_validator_summary, SuiValidatorCommand, SuiValidatorCommandResponse};
 use anyhow::Ok;
 use fastcrypto::encoding::{Base64, Encoding};
 use shared_crypto::intent::{Intent, IntentMessage};
@@ -11,6 +10,8 @@ use sui_types::{
     transaction::{Transaction, TransactionData},
 };
 use test_cluster::TestClusterBuilder;
+
+use crate::validator_commands::{get_validator_summary, SuiValidatorCommand, SuiValidatorCommandResponse};
 
 #[tokio::test]
 async fn test_print_raw_rgp_txn() -> Result<(), anyhow::Error> {

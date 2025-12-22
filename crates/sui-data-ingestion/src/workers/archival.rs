@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::io::Cursor;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use object_store::{path::Path, ObjectStore};
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
 use sui_archival::{
     create_file_metadata_from_bytes,
     finalize_manifest,
@@ -75,9 +76,9 @@ impl ArchivalReducer {
             self.upload_file(Path::from(summary_file_path.clone()), SUMMARY_FILE_MAGIC, &summary_buffer).await?;
         let mut manifest = Self::read_manifest(&self.remote_store).await?;
         let checkpoint_file_metadata =
-            create_file_metadata_from_bytes(chk_bytes, FileType::CheckpointContent, epoch, start..end)?;
+            create_file_metadata_from_bytes(chk_bytes, FileType::CheckpointContent, epoch, start .. end)?;
         let summary_file_metadata =
-            create_file_metadata_from_bytes(sum_bytes, FileType::CheckpointSummary, epoch, start..end)?;
+            create_file_metadata_from_bytes(sum_bytes, FileType::CheckpointSummary, epoch, start .. end)?;
         manifest.update(epoch, end, checkpoint_file_metadata, summary_file_metadata);
 
         let bytes = finalize_manifest(manifest)?;

@@ -3,11 +3,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::{errors::IndexerError, indexer_reader::IndexerReader};
 use async_trait::async_trait;
-use jsonrpsee::{core::RpcResult, RpcModule};
-
 use cached::{proc_macro::cached, SizedCache};
+use jsonrpsee::{core::RpcResult, RpcModule};
 use sui_json_rpc::{governance_api::ValidatorExchangeRates, SuiRpcModule};
 use sui_json_rpc_api::GovernanceReadApiServer;
 use sui_json_rpc_types::{DelegatedStake, EpochInfo, StakeStatus, SuiCommittee, SuiObjectDataFilter, ValidatorApys};
@@ -19,6 +17,8 @@ use sui_types::{
     sui_serde::BigInt,
     sui_system_state::{sui_system_state_summary::SuiSystemStateSummary, PoolTokenExchangeRate},
 };
+
+use crate::{errors::IndexerError, indexer_reader::IndexerReader};
 
 #[derive(Clone)]
 pub struct GovernanceReadApi {

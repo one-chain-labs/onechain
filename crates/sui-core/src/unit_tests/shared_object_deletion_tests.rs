@@ -4,14 +4,29 @@
 
 use std::sync::Arc;
 
+use move_core_types::ident_str;
+use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
+    base_types::{FullObjectID, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
+    committee::EpochId,
     crypto::{get_key_pair, AccountKeyPair},
-    effects::TransactionEffects,
-    execution_status::{CommandArgumentError, ExecutionFailureStatus},
+    effects::{TransactionEffects, TransactionEffectsAPI},
+    error::{ExecutionError, SuiError},
+    execution_status::{
+        CommandArgumentError,
+        ExecutionFailureStatus,
+        ExecutionFailureStatus::{InputObjectDeleted, SharedObjectOperationNotAllowed},
+    },
     object::Object,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{ProgrammableTransaction, Transaction, TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
+    storage::FullObjectKey,
+    transaction::{
+        ObjectArg,
+        ProgrammableTransaction,
+        Transaction,
+        VerifiedCertificate,
+        TEST_ONLY_GAS_UNIT_FOR_PUBLISH,
+    },
 };
 
 use crate::{
@@ -28,16 +43,6 @@ use crate::{
         AuthorityState,
     },
     move_call,
-};
-use move_core_types::ident_str;
-use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
-use sui_types::{
-    base_types::TransactionDigest,
-    committee::EpochId,
-    effects::TransactionEffectsAPI,
-    error::{ExecutionError, SuiError},
-    execution_status::ExecutionFailureStatus::{InputObjectDeleted, SharedObjectOperationNotAllowed},
-    transaction::{ObjectArg, VerifiedCertificate},
 };
 
 pub struct TestRunner {
@@ -58,7 +63,7 @@ impl TestRunner {
         let authority_state = TestAuthorityBuilder::new().with_protocol_config(protocol_config).build().await;
 
         let mut gas_object_ids = vec![];
-        for _ in 0..20 {
+        for _ in 0 .. 20 {
             let gas_object_id = ObjectID::random();
             let gas_object = Object::with_id_owner_for_testing(gas_object_id, sender);
             authority_state.insert_genesis_object(gas_object).await;
@@ -449,13 +454,12 @@ impl TestRunner {
 
     pub fn object_exists_in_marker_table(
         &mut self,
-        object_id: &ObjectID,
-        version: &SequenceNumber,
+        object_key: FullObjectKey,
         epoch: EpochId,
     ) -> Option<TransactionDigest> {
         self.authority_state
             .get_object_cache_reader()
-            .get_deleted_shared_object_previous_tx_digest(object_id, *version, epoch)
+            .get_deleted_shared_object_previous_tx_digest(object_key, epoch, true)
     }
 }
 
@@ -495,7 +499,12 @@ async fn test_delete_shared_object() {
     assert!(effects.wrapped().is_empty());
 
     assert_eq!(
-        user1.object_exists_in_marker_table(&deleted_obj_id, &deleted_obj_ver, 0).unwrap(),
+        user1
+            .object_exists_in_marker_table(
+                FullObjectKey::new(FullObjectID::new(deleted_obj_id, Some(initial_shared_version)), deleted_obj_ver),
+                0
+            )
+            .unwrap(),
         *effects.transaction_digest(),
     );
 }
@@ -578,7 +587,12 @@ async fn test_delete_shared_object_immut_mut_mut_interleave() {
     assert!(effects.wrapped().is_empty());
 
     assert_eq!(
-        user1.object_exists_in_marker_table(&deleted_obj_id, &deleted_obj_ver, 0).unwrap(),
+        user1
+            .object_exists_in_marker_table(
+                FullObjectKey::new(FullObjectID::new(deleted_obj_id, Some(initial_shared_version)), deleted_obj_ver),
+                0
+            )
+            .unwrap(),
         *effects.transaction_digest(),
     );
 
@@ -643,7 +657,12 @@ async fn test_delete_shared_object_immut_mut_immut_interleave() {
     assert!(effects.wrapped().is_empty());
 
     assert_eq!(
-        user1.object_exists_in_marker_table(&deleted_obj_id, &deleted_obj_ver, 0).unwrap(),
+        user1
+            .object_exists_in_marker_table(
+                FullObjectKey::new(FullObjectID::new(deleted_obj_id, Some(initial_shared_version)), deleted_obj_ver),
+                0
+            )
+            .unwrap(),
         *effects.transaction_digest(),
     );
 
@@ -1139,7 +1158,12 @@ async fn test_delete_with_shared_after_mutate_enqueued() {
     assert!(delete_effects.status().is_ok());
     let deleted_obj_ver = delete_effects.deleted()[0].1;
 
-    assert!(user_1.object_exists_in_marker_table(&shared_obj_id, &deleted_obj_ver, 0).is_some());
+    assert!(user_1
+        .object_exists_in_marker_table(
+            FullObjectKey::new(FullObjectID::new(shared_obj_id, Some(initial_shared_version)), deleted_obj_ver),
+            0
+        )
+        .is_some());
 
     let mutate_effects = res.get(1).unwrap();
     assert!(mutate_effects.status().is_ok());

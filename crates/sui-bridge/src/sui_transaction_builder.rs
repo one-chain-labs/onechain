@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashMap, str::FromStr};
+
 use fastcrypto::traits::ToFromBytes;
 use move_core_types::ident_str;
-use std::{collections::HashMap, str::FromStr};
 use sui_types::{
     base_types::{ObjectRef, SuiAddress},
     bridge::{
@@ -498,6 +499,14 @@ pub fn build_committee_update_url_transaction(
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashMap, sync::Arc};
+
+    use ethers::types::Address as EthAddress;
+    use sui_types::{
+        bridge::{BridgeChainId, TOKEN_ID_BTC, TOKEN_ID_USDC},
+        crypto::{get_key_pair, ToFromBytes},
+    };
+
     use crate::{
         crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes},
         e2e_tests::test_utils::TestClusterWrapperBuilder,
@@ -511,18 +520,12 @@ mod tests {
         },
         types::{BridgeAction, EmergencyAction, EmergencyActionType, *},
     };
-    use ethers::types::Address as EthAddress;
-    use std::{collections::HashMap, sync::Arc};
-    use sui_types::{
-        bridge::{BridgeChainId, TOKEN_ID_BTC, TOKEN_ID_USDC},
-        crypto::{get_key_pair, ToFromBytes},
-    };
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
     async fn test_build_sui_transaction_for_token_transfer() {
         telemetry_subscribers::init_for_testing();
         let mut bridge_keys = vec![];
-        for _ in 0..=3 {
+        for _ in 0 ..= 3 {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp);
         }
@@ -595,7 +598,7 @@ mod tests {
         telemetry_subscribers::init_for_testing();
         let num_valdiator = 2;
         let mut bridge_keys = vec![];
-        for _ in 0..num_valdiator {
+        for _ in 0 .. num_valdiator {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp);
         }
@@ -660,7 +663,7 @@ mod tests {
     async fn test_build_sui_transaction_for_committee_blocklist() {
         telemetry_subscribers::init_for_testing();
         let mut bridge_keys = vec![];
-        for _ in 0..=3 {
+        for _ in 0 ..= 3 {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp);
         }
@@ -738,7 +741,7 @@ mod tests {
     async fn test_build_sui_transaction_for_limit_update() {
         telemetry_subscribers::init_for_testing();
         let mut bridge_keys = vec![];
-        for _ in 0..=3 {
+        for _ in 0 ..= 3 {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp);
         }
@@ -798,7 +801,7 @@ mod tests {
     async fn test_build_sui_transaction_for_price_update() {
         telemetry_subscribers::init_for_testing();
         let mut bridge_keys = vec![];
-        for _ in 0..=3 {
+        for _ in 0 ..= 3 {
             let (_, kp): (_, BridgeAuthorityKeyPair) = get_key_pair();
             bridge_keys.push(kp);
         }

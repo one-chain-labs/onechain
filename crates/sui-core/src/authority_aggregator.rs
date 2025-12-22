@@ -2,42 +2,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority_client::{
-        make_authority_clients_with_timeout_config,
-        make_network_authority_clients_with_network_config,
-        AuthorityAPI,
-        NetworkAuthorityClient,
-    },
-    safe_client::{SafeClient, SafeClientMetrics, SafeClientMetricsBase},
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    convert::AsRef,
+    net::SocketAddr,
+    string::ToString,
+    sync::Arc,
+    time::Duration,
 };
+
 use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
 use mysten_metrics::{monitored_future, spawn_monitored_task, GaugeGuard, MonitorCancellation};
 use mysten_network::config::Config;
-use std::{convert::AsRef, net::SocketAddr};
-use sui_authority_aggregation::{quorum_map_then_reduce_with_timeout, AsyncResult, ReduceOutput};
-use sui_config::genesis::Genesis;
-use sui_network::{default_mysten_network_config, DEFAULT_CONNECT_TIMEOUT_SEC, DEFAULT_REQUEST_TIMEOUT_SEC};
-use sui_swarm_config::network_config::NetworkConfig;
-use sui_types::{
-    base_types::*,
-    committee::Committee,
-    crypto::{AuthorityPublicKeyBytes, AuthoritySignInfo},
-    error::{SuiError, SuiResult, UserInputError},
-    fp_ensure,
-    message_envelope::Message,
-    object::Object,
-    quorum_driver_types::{GroupedErrors, QuorumDriverResponse},
-    sui_system_state::{epoch_start_sui_system_state::EpochStartSystemStateTrait, SuiSystemState, SuiSystemStateTrait},
-    transaction::*,
-};
-use thiserror::Error;
-use tracing::{debug, error, info, instrument, trace, trace_span, warn, Instrument};
-
-use crate::{
-    epoch::committee_store::CommitteeStore,
-    stake_aggregator::{InsertResult, MultiStakeAggregator, StakeAggregator},
-};
 use prometheus::{
     register_histogram_with_registry,
     register_int_counter_vec_with_registry,
@@ -49,14 +25,14 @@ use prometheus::{
     IntGauge,
     Registry,
 };
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    string::ToString,
-    sync::Arc,
-    time::Duration,
-};
+use sui_authority_aggregation::{quorum_map_then_reduce_with_timeout, AsyncResult, ReduceOutput};
+use sui_config::genesis::Genesis;
+use sui_network::{default_mysten_network_config, DEFAULT_CONNECT_TIMEOUT_SEC, DEFAULT_REQUEST_TIMEOUT_SEC};
+use sui_swarm_config::network_config::NetworkConfig;
 use sui_types::{
-    committee::{CommitteeTrait, CommitteeWithNetworkMetadata, StakeUnit},
+    base_types::*,
+    committee::{Committee, CommitteeTrait, CommitteeWithNetworkMetadata, StakeUnit},
+    crypto::{AuthorityPublicKeyBytes, AuthoritySignInfo},
     effects::{
         CertifiedTransactionEffects,
         SignedTransactionEffects,
@@ -64,6 +40,9 @@ use sui_types::{
         TransactionEvents,
         VerifiedCertifiedTransactionEffects,
     },
+    error::{SuiError, SuiResult, UserInputError},
+    fp_ensure,
+    message_envelope::Message,
     messages_grpc::{
         HandleCertificateRequestV3,
         HandleCertificateResponseV3,
@@ -72,9 +51,30 @@ use sui_types::{
         TransactionInfoRequest,
     },
     messages_safe_client::PlainTransactionInfoResponse,
-    sui_system_state::epoch_start_sui_system_state::EpochStartSystemState,
+    object::Object,
+    quorum_driver_types::{GroupedErrors, QuorumDriverResponse},
+    sui_system_state::{
+        epoch_start_sui_system_state::{EpochStartSystemState, EpochStartSystemStateTrait},
+        SuiSystemState,
+        SuiSystemStateTrait,
+    },
+    transaction::*,
 };
+use thiserror::Error;
 use tokio::time::{sleep, timeout};
+use tracing::{debug, error, info, instrument, trace, trace_span, warn, Instrument};
+
+use crate::{
+    authority_client::{
+        make_authority_clients_with_timeout_config,
+        make_network_authority_clients_with_network_config,
+        AuthorityAPI,
+        NetworkAuthorityClient,
+    },
+    epoch::committee_store::CommitteeStore,
+    safe_client::{SafeClient, SafeClientMetrics, SafeClientMetricsBase},
+    stake_aggregator::{InsertResult, MultiStakeAggregator, StakeAggregator},
+};
 
 pub const DEFAULT_RETRIES: usize = 4;
 
@@ -246,17 +246,6 @@ pub enum AggregatorProcessTransactionError {
     },
 
     #[error(
-        "Validators returned conflicting transactions but it is potentially recoverable. Locked objects: {:?}. Validator errors: {:?}",
-        conflicting_tx_digests,
-        errors,
-    )]
-    RetryableConflictingTransaction {
-        conflicting_tx_digest_to_retry: Option<TransactionDigest>,
-        errors: GroupedErrors,
-        conflicting_tx_digests: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)>,
-    },
-
-    #[error(
         "{} of the validators by stake are overloaded with transactions pending execution. Validator errors: {:?}",
         overloaded_stake,
         errors
@@ -348,50 +337,28 @@ struct ProcessTransactionState {
     overloaded_stake: StakeUnit,
     // Validators that are overloaded and request client to retry.
     retryable_overload_info: RetryableOverloadInfo,
-    // If there are conflicting transactions, we note them down and may attempt to retry
+    // If there are conflicting transactions, we note them down to report to user.
     conflicting_tx_digests: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)>,
     // As long as none of the exit criteria are met we consider the state retryable
     // 1) >= 2f+1 signatures
     // 2) >= f+1 non-retryable errors
     // 3) >= 2f+1 object not found errors
-    // Note: For conflicting transactions we collect as many responses as possible
-    // before we know for sure no tx can reach quorum. Namely, stake of the most
-    // promising tx + retryable stake < 2f+1.
     retryable: bool,
     tx_finalized_with_different_user_sig: bool,
-
-    conflicting_tx_total_stake: StakeUnit,
-    most_staked_conflicting_tx_stake: StakeUnit,
 }
 
 impl ProcessTransactionState {
-    #[allow(clippy::type_complexity)]
-    pub fn conflicting_tx_digest_with_most_stake(
-        &self,
-    ) -> Option<(TransactionDigest, &Vec<(AuthorityName, ObjectRef)>, StakeUnit)> {
-        self.conflicting_tx_digests
-            .iter()
-            .max_by_key(|(_, (_, stake))| *stake)
-            .map(|(digest, (validators, stake))| (*digest, validators, *stake))
-    }
-
     pub fn record_conflicting_transaction_if_any(
         &mut self,
         validator_name: AuthorityName,
         weight: StakeUnit,
         err: &SuiError,
-    ) -> bool {
+    ) {
         if let SuiError::ObjectLockConflict { obj_ref, pending_transaction: transaction } = err {
             let (lock_records, total_stake) = self.conflicting_tx_digests.entry(*transaction).or_insert((Vec::new(), 0));
             lock_records.push((validator_name, *obj_ref));
             *total_stake += weight;
-            self.conflicting_tx_total_stake += weight;
-            if *total_stake > self.most_staked_conflicting_tx_stake {
-                self.most_staked_conflicting_tx_stake = *total_stake;
-            }
-            return true;
         }
-        false
     }
 
     pub fn check_if_error_indicates_tx_finalized_with_different_user_sig(&self, validity_threshold: StakeUnit) -> bool {
@@ -873,7 +840,7 @@ where
                             if state
                                 .latest_object_version
                                 .as_ref()
-                                .map_or(true, |latest| object_info.object.version() > latest.version())
+                                .is_none_or(|latest| object_info.object.version() > latest.version())
                             {
                                 state.latest_object_version = Some(object_info.object);
                             }
@@ -928,7 +895,7 @@ where
                             if state
                                 .latest_system_state
                                 .as_ref()
-                                .map_or(true, |latest| system_state.epoch() > latest.epoch())
+                                .is_none_or(|latest| system_state.epoch() > latest.epoch())
                             {
                                 state.latest_system_state = Some(system_state);
                             }
@@ -980,9 +947,7 @@ where
             retryable_overload_info: Default::default(),
             retryable: true,
             conflicting_tx_digests: Default::default(),
-            conflicting_tx_total_stake: 0,
             tx_finalized_with_different_user_sig: false,
-            most_staked_conflicting_tx_stake: 0,
         };
 
         let transaction_ref = &transaction;
@@ -1024,6 +989,8 @@ where
                                     .with_label_values(&[&display_name, err.as_ref()])
                                     .inc();
                                 Self::record_rpc_error_maybe(self.metrics.clone(), &display_name, &err);
+                                // Record conflicting transactions if any to report to user.
+                                state.record_conflicting_transaction_if_any(name, weight, &err);
                                 let (retryable, categorized) = err.is_retryable();
                                 if !categorized {
                                     // TODO: Should minimize possible uncategorized errors here
@@ -1056,9 +1023,7 @@ where
                                     // code path to handle both overload scenarios.
                                     state.retryable_overload_info.add_stake_retryable_overload(weight, Duration::from_secs(err.retry_after_secs()));
                                 }
-                                else if !retryable && !state.record_conflicting_transaction_if_any(name, weight, &err) {
-                                    // We don't count conflicting transactions as non-retryable errors here
-                                    // because its handling is a bit different.
+                                else if !retryable {
                                     state.non_retryable_stake += weight;
                                 }
                                 state.errors.push((err, vec![name], weight));
@@ -1068,12 +1033,10 @@ where
 
                         let retryable_stake = self.get_retryable_stake(&state);
                         let good_stake = std::cmp::max(state.tx_signatures.total_votes(), state.effects_map.total_votes());
-                        let stake_of_most_promising_tx = std::cmp::max(good_stake, state.most_staked_conflicting_tx_stake);
-                        if stake_of_most_promising_tx + retryable_stake < quorum_threshold {
+                        if good_stake + retryable_stake < quorum_threshold {
                             debug!(
                                 tx_digest = ?tx_digest,
                                 good_stake,
-                                most_staked_conflicting_tx_stake =? state.most_staked_conflicting_tx_stake,
                                 retryable_stake,
                                 "No chance for any tx to get quorum, exiting. Conflicting_txes: {:?}",
                                 state.conflicting_tx_digests
@@ -1106,22 +1069,18 @@ where
             Err(state) => {
                 self.record_process_transaction_metrics(tx_digest, &state);
                 let state = self.record_non_quorum_effects_maybe(tx_digest, state);
-                Err(self.handle_process_transaction_error(tx_digest, state))
+                Err(self.handle_process_transaction_error(state))
             }
         }
     }
 
-    fn record_rpc_error_maybe(metrics: Arc<AuthAggMetrics>, display_name: &String, error: &SuiError) {
+    fn record_rpc_error_maybe(metrics: Arc<AuthAggMetrics>, display_name: &str, error: &SuiError) {
         if let SuiError::RpcError(_message, code) = error {
             metrics.total_rpc_err.with_label_values(&[display_name, code.as_str()]).inc();
         }
     }
 
-    fn handle_process_transaction_error(
-        &self,
-        original_tx_digest: &TransactionDigest,
-        state: ProcessTransactionState,
-    ) -> AggregatorProcessTransactionError {
+    fn handle_process_transaction_error(&self, state: ProcessTransactionState) -> AggregatorProcessTransactionError {
         let quorum_threshold = self.committee.quorum_threshold();
 
         // Return system overload error if we see >= 2f + 1 overloaded stake.
@@ -1132,47 +1091,6 @@ where
             };
         }
 
-        // Handle possible conflicts first as `FatalConflictingTransaction` is
-        // more meaningful than `FatalTransaction`.
-        if let Some((most_staked_conflicting_tx, validators, most_staked_conflicting_tx_stake)) =
-            state.conflicting_tx_digest_with_most_stake()
-        {
-            let good_stake = state.tx_signatures.total_votes();
-            let retryable_stake = self.get_retryable_stake(&state);
-
-            if good_stake + retryable_stake >= quorum_threshold {
-                return AggregatorProcessTransactionError::RetryableConflictingTransaction {
-                    errors: group_errors(state.errors),
-                    conflicting_tx_digest_to_retry: None,
-                    conflicting_tx_digests: state.conflicting_tx_digests,
-                };
-            }
-
-            if most_staked_conflicting_tx_stake + retryable_stake >= quorum_threshold {
-                return AggregatorProcessTransactionError::RetryableConflictingTransaction {
-                    errors: group_errors(state.errors),
-                    conflicting_tx_digest_to_retry: Some(most_staked_conflicting_tx),
-                    conflicting_tx_digests: state.conflicting_tx_digests,
-                };
-            }
-
-            warn!(
-                ?state.conflicting_tx_digests,
-                ?most_staked_conflicting_tx,
-                ?original_tx_digest,
-                original_tx_stake = good_stake,
-                most_staked_conflicting_tx_stake = most_staked_conflicting_tx_stake,
-                "Client double spend attempt detected: {:?}",
-                validators
-            );
-            self.metrics.total_client_double_spend_attempts_detected.inc();
-
-            return AggregatorProcessTransactionError::FatalConflictingTransaction {
-                errors: group_errors(state.errors),
-                conflicting_tx_digests: state.conflicting_tx_digests,
-            };
-        }
-
         if !state.retryable {
             if state.tx_finalized_with_different_user_sig
                 || state
@@ -1180,6 +1098,23 @@ where
             {
                 return AggregatorProcessTransactionError::TxAlreadyFinalizedWithDifferentUserSignatures;
             }
+
+            // Handle conflicts first as `FatalConflictingTransaction` which is
+            // more meaningful than `FatalTransaction`
+            if !state.conflicting_tx_digests.is_empty() {
+                let good_stake = state.tx_signatures.total_votes();
+                warn!(
+                    ?state.conflicting_tx_digests,
+                    original_tx_stake = good_stake,
+                    "Client double spend attempt detected!",
+                );
+                self.metrics.total_client_double_spend_attempts_detected.inc();
+                return AggregatorProcessTransactionError::FatalConflictingTransaction {
+                    errors: group_errors(state.errors),
+                    conflicting_tx_digests: state.conflicting_tx_digests,
+                };
+            }
+
             return AggregatorProcessTransactionError::FatalTransaction { errors: group_errors(state.errors) };
         }
 
@@ -1199,7 +1134,7 @@ where
             };
         }
 
-        // No conflicting transaction, the system is not overloaded and transaction state is still retryable.
+        // The system is not overloaded and transaction state is still retryable.
         AggregatorProcessTransactionError::RetryableTransaction { errors: group_errors(state.errors) }
     }
 
@@ -1365,7 +1300,6 @@ where
 
     fn get_retryable_stake(&self, state: &ProcessTransactionState) -> StakeUnit {
         self.committee.total_votes()
-            - state.conflicting_tx_total_stake
             - state.non_retryable_stake
             - state.effects_map.total_votes()
             - state.tx_signatures.total_votes()

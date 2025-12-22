@@ -72,9 +72,8 @@ mod test {
 
     use tokio::time::sleep;
 
-    use crate::display::status;
-
     use super::{action, config, done, error, header, newline, warn};
+    use crate::display::status;
 
     #[tokio::test]
     #[ignore = "only used to manually check if prints work correctly"]
@@ -82,7 +81,7 @@ mod test {
         header("This is a header");
         config("This is a config", 2);
         action("Running a long function");
-        for i in 0..5 {
+        for i in 0 .. 5 {
             sleep(Duration::from_secs(1)).await;
             if i == 2 {
                 warn("This is a warning!");

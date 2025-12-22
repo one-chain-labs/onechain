@@ -90,7 +90,7 @@ async fn multiple_direct_commit() {
 
     let mut last_decided = Slot::new_for_test(0, 0);
     let mut ancestors = None;
-    for n in 1..=10 {
+    for n in 1 ..= 10 {
         // Build the dag up to the decision round for each pipeline's wave starting
         // with wave 1.
         // note: pipelines, waves & rounds are zero-indexed.
@@ -162,7 +162,7 @@ async fn no_genesis_commit() {
     let decision_round_pipeline_0_wave_0 = committer.committers[0].decision_round(0);
 
     let mut ancestors = None;
-    for r in 0..decision_round_pipeline_0_wave_0 {
+    for r in 0 .. decision_round_pipeline_0_wave_0 {
         ancestors = Some(build_dag(context.clone(), dag_state.clone(), ancestors, r));
 
         let last_decided = Slot::new_for_test(0, 0);
@@ -419,7 +419,7 @@ async fn indirect_skip() {
     assert_eq!(sequence.len(), 7);
 
     // Ensure we commit the first 3 leaders.
-    for i in 0..=2 {
+    for i in 0 ..= 2 {
         // First sequenced leader should be in round 1.
         let leader_round = i + 1;
         let leader = committer.get_leaders(leader_round)[0];
@@ -439,7 +439,7 @@ async fn indirect_skip() {
     }
 
     // Ensure we commit the last 3 leaders.
-    for i in 4..=6 {
+    for i in 4 ..= 6 {
         let leader_round = i + 1;
         let leader = committer.get_leaders(leader_round)[0];
         if let DecidedLeader::Commit(ref block) = sequence[i as usize] {

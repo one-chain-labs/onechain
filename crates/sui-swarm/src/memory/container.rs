@@ -1,13 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::node::RuntimeType;
-use futures::FutureExt;
-use one_node::{SuiNode, SuiNodeHandle};
 use std::{
     sync::{Arc, Weak},
     thread,
 };
+
+use futures::FutureExt;
+use one_node::{SuiNode, SuiNodeHandle};
 use sui_config::NodeConfig;
 use sui_types::{
     base_types::ConciseableName,
@@ -15,6 +15,8 @@ use sui_types::{
 };
 use telemetry_subscribers::get_global_telemetry_config;
 use tracing::{info, trace};
+
+use super::node::RuntimeType;
 
 #[derive(Debug)]
 pub(crate) struct Container {

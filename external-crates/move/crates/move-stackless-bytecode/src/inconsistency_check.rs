@@ -26,7 +26,9 @@ use move_model::model::FunctionEnv;
 use crate::{
     function_data_builder::FunctionDataBuilder,
     function_target::FunctionData,
-    function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor},
+    function_target_pipeline::{
+        FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
+    },
 };
 
 pub struct InconsistencyCheckInstrumenter {}
@@ -50,7 +52,8 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
             return data;
         }
         let flavor = match &data.variant {
-            FunctionVariant::Baseline | FunctionVariant::Verification(VerificationFlavor::Inconsistency(..)) => {
+            FunctionVariant::Baseline
+            | FunctionVariant::Verification(VerificationFlavor::Inconsistency(..)) => {
                 // instrumentation only applies to non-inconsistency verification variants
                 return data;
             }
@@ -58,7 +61,9 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
         };
 
         // create a clone of the data for inconsistency check
-        let new_data = data.fork(FunctionVariant::Verification(VerificationFlavor::Inconsistency(Box::new(flavor))));
+        let new_data = data.fork(FunctionVariant::Verification(
+            VerificationFlavor::Inconsistency(Box::new(flavor)),
+        ));
 
         // instrumentation
         let mut builder = FunctionDataBuilder::new(fun_env, new_data);
@@ -69,7 +74,11 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
 
         // add the new variant to targets
         let new_data = builder.data;
-        targets.insert_target_data(&fun_env.get_qualified_id(), new_data.variant.clone(), new_data);
+        targets.insert_target_data(
+            &fun_env.get_qualified_id(),
+            new_data.variant.clone(),
+            new_data,
+        );
 
         // the original function data is unchanged
         data

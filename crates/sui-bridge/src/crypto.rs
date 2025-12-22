@@ -1,10 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::{BridgeError, BridgeResult},
-    types::{BridgeAction, BridgeCommittee, SignedBridgeAction, VerifiedSignedBridgeAction},
-};
+use std::fmt::{Debug, Display, Formatter};
+
 use ethers::{
     core::k256::{ecdsa::VerifyingKey, elliptic_curve::sec1::ToEncodedPoint},
     types::Address as EthAddress,
@@ -22,9 +20,13 @@ use fastcrypto::{
     traits::{KeyPair, RecoverableSigner, ToFromBytes, VerifyRecoverable},
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter};
 use sui_types::{base_types::ConciseableName, message_envelope::VerifiedEnvelope};
 use tap::TapFallible;
+
+use crate::{
+    error::{BridgeError, BridgeResult},
+    types::{BridgeAction, BridgeCommittee, SignedBridgeAction, VerifiedSignedBridgeAction},
+};
 pub type BridgeAuthorityKeyPair = Secp256k1KeyPair;
 pub type BridgeAuthorityPublicKey = Secp256k1PublicKey;
 pub type BridgeAuthorityRecoverableSignature = Secp256k1RecoverableSignature;
@@ -38,10 +40,10 @@ impl BridgeAuthorityPublicKeyBytes {
         let pubkey = VerifyingKey::from_sec1_bytes(self.as_bytes()).unwrap();
         let affine: &ethers::core::k256::AffinePoint = pubkey.as_ref();
         let encoded = affine.to_encoded_point(false);
-        let pubkey = &encoded.as_bytes()[1..];
+        let pubkey = &encoded.as_bytes()[1 ..];
         assert_eq!(pubkey.len(), 64, "raw public key must be 64 bytes");
         let hash = Keccak256::digest(pubkey).digest;
-        EthAddress::from_slice(&hash[12..])
+        EthAddress::from_slice(&hash[12 ..])
     }
 }
 
@@ -80,7 +82,7 @@ pub struct ConciseBridgeAuthorityPublicKeyBytesRef<'a>(&'a BridgeAuthorityPublic
 
 impl Debug for ConciseBridgeAuthorityPublicKeyBytesRef<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let s = Hex::encode(self.0 .0 .0.get(0..4).ok_or(std::fmt::Error)?);
+        let s = Hex::encode(self.0 .0 .0.get(0 .. 4).ok_or(std::fmt::Error)?);
         write!(f, "k#{}..", s)
     }
 }
@@ -168,15 +170,11 @@ pub fn verify_signed_bridge_action(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        events::EmittedSuiToEthTokenBridgeV1,
-        test_utils::{get_test_authority_and_key, get_test_sui_to_eth_bridge_action},
-        types::{BridgeAction, BridgeAuthority, SignedBridgeAction, SuiToEthBridgeAction},
-    };
+    use std::{str::FromStr, sync::Arc};
+
     use ethers::types::Address as EthAddress;
     use fastcrypto::traits::{KeyPair, ToFromBytes};
     use prometheus::Registry;
-    use std::{str::FromStr, sync::Arc};
     use sui_types::{
         base_types::SuiAddress,
         bridge::{BridgeChainId, TOKEN_ID_ETH},
@@ -185,6 +183,11 @@ mod tests {
     };
 
     use super::*;
+    use crate::{
+        events::EmittedSuiToEthTokenBridgeV1,
+        test_utils::{get_test_authority_and_key, get_test_sui_to_eth_bridge_action},
+        types::{BridgeAction, BridgeAuthority, SignedBridgeAction, SuiToEthBridgeAction},
+    };
 
     #[test]
     fn test_sign_and_verify_bridge_event_basic() -> anyhow::Result<()> {

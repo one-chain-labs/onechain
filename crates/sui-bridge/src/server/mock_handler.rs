@@ -12,6 +12,12 @@ use std::{
     time::Duration,
 };
 
+use arc_swap::ArcSwap;
+use async_trait::async_trait;
+use axum::Json;
+use sui_types::digests::TransactionDigest;
+
+use super::{handler::BridgeRequestHandlerTrait, make_router};
 use crate::{
     crypto::{BridgeAuthorityKeyPair, BridgeAuthoritySignInfo},
     error::{BridgeError, BridgeResult},
@@ -19,12 +25,6 @@ use crate::{
     server::BridgeNodePublicMetadata,
     types::SignedBridgeAction,
 };
-use arc_swap::ArcSwap;
-use async_trait::async_trait;
-use axum::Json;
-use sui_types::digests::TransactionDigest;
-
-use super::{handler::BridgeRequestHandlerTrait, make_router};
 
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]

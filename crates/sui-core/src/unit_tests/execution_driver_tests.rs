@@ -1,6 +1,36 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::BTreeSet,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
+
+use itertools::Itertools;
+use sui_config::node::AuthorityOverloadConfig;
+use sui_protocol_config::ProtocolConfig;
+use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::{
+    base_types::TransactionDigest,
+    committee::Committee,
+    crypto::{get_key_pair, AccountKeyPair},
+    effects::{TransactionEffects, TransactionEffectsAPI},
+    error::{SuiError, SuiResult},
+    object::{Object, Owner},
+    transaction::{
+        CertifiedTransaction,
+        Transaction,
+        VerifiedCertificate,
+        TEST_ONLY_GAS_UNIT_FOR_HEAVY_COMPUTATION_STORAGE,
+    },
+};
+use tokio::{
+    sync::mpsc::UnboundedReceiver,
+    time::{sleep, timeout},
+};
+
 use crate::{
     authority::{
         authority_tests::{send_consensus, send_consensus_no_execution},
@@ -15,6 +45,7 @@ use crate::{
         get_latest_ref,
     },
     authority_server::{ValidatorService, ValidatorServiceMetrics},
+    checkpoints::CheckpointStore,
     consensus_adapter::{
         ConnectionMonitorStatusForTests,
         ConsensusAdapter,
@@ -23,43 +54,8 @@ use crate::{
     },
     safe_client::SafeClient,
     test_authority_clients::LocalAuthorityClient,
-    test_utils::{
-        init_local_authorities,
-        init_local_authorities_with_overload_thresholds,
-        make_transfer_object_move_transaction,
-        make_transfer_object_transaction,
-    },
-};
-use sui_protocol_config::ProtocolConfig;
-use sui_types::error::SuiError;
-
-use std::{
-    collections::BTreeSet,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-
-use itertools::Itertools;
-use sui_config::node::AuthorityOverloadConfig;
-use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::TransactionDigest,
-    committee::Committee,
-    crypto::{get_key_pair, AccountKeyPair},
-    effects::{TransactionEffects, TransactionEffectsAPI},
-    error::SuiResult,
-    object::{Object, Owner},
-    transaction::{
-        CertifiedTransaction,
-        Transaction,
-        VerifiedCertificate,
-        TEST_ONLY_GAS_UNIT_FOR_HEAVY_COMPUTATION_STORAGE,
-    },
-};
-use tokio::{
-    sync::mpsc::UnboundedReceiver,
-    time::{sleep, timeout},
+    test_utils::{make_transfer_object_move_transaction, make_transfer_object_transaction},
+    unit_test_utils::{init_local_authorities, init_local_authorities_with_overload_thresholds},
 };
 
 #[allow(dead_code)]
@@ -305,11 +301,11 @@ async fn test_execution_with_dependencies() {
     // ---- Initialize a network with three accounts, each with 10 gas objects.
 
     const NUM_ACCOUNTS: usize = 3;
-    let accounts: Vec<(_, AccountKeyPair)> = (0..NUM_ACCOUNTS).map(|_| get_key_pair()).collect_vec();
+    let accounts: Vec<(_, AccountKeyPair)> = (0 .. NUM_ACCOUNTS).map(|_| get_key_pair()).collect_vec();
 
     const NUM_GAS_OBJECTS_PER_ACCOUNT: usize = 10;
-    let gas_objects = (0..NUM_ACCOUNTS)
-        .map(|i| (0..NUM_GAS_OBJECTS_PER_ACCOUNT).map(|_| Object::with_owner_for_testing(accounts[i].0)).collect_vec())
+    let gas_objects = (0 .. NUM_ACCOUNTS)
+        .map(|i| (0 .. NUM_GAS_OBJECTS_PER_ACCOUNT).map(|_| Object::with_owner_for_testing(accounts[i].0)).collect_vec())
         .collect_vec();
     let all_gas_objects = gas_objects.clone().into_iter().flatten().collect_vec();
 
@@ -351,7 +347,7 @@ async fn test_execution_with_dependencies() {
 
     // In each iteration, creates an owned and a shared transaction that depends on previous input
     // and gas objects.
-    for i in 0..100 {
+    for i in 0 .. 100 {
         let source_index = i % NUM_ACCOUNTS;
         let (source_addr, source_key) = &accounts[source_index];
 
@@ -441,7 +437,7 @@ async fn test_per_object_overload() {
     // Initialize a network with 1 account and 2000 gas objects.
     let (addr, key): (_, AccountKeyPair) = get_key_pair();
     const NUM_GAS_OBJECTS_PER_ACCOUNT: usize = 2000;
-    let gas_objects = (0..NUM_GAS_OBJECTS_PER_ACCOUNT).map(|_| Object::with_owner_for_testing(addr)).collect_vec();
+    let gas_objects = (0 .. NUM_GAS_OBJECTS_PER_ACCOUNT).map(|_| Object::with_owner_for_testing(addr)).collect_vec();
     let (aggregator, authorities, _genesis, package) = init_local_authorities(4, gas_objects.clone()).await;
     let rgp = authorities.first().unwrap().reference_gas_price_for_testing().unwrap();
     let authority_clients: Vec<_> = authorities.iter().map(|a| aggregator.authority_clients[&a.name].clone()).collect();
@@ -526,7 +522,7 @@ async fn test_txn_age_overload() {
 
     // Initialize a network with 1 account and 3 gas objects.
     let (addr, key): (_, AccountKeyPair) = get_key_pair();
-    let gas_objects = (0..3).map(|_| Object::with_owner_for_testing(addr)).collect_vec();
+    let gas_objects = (0 .. 3).map(|_| Object::with_owner_for_testing(addr)).collect_vec();
     let (aggregator, authorities, _genesis, package) =
         init_local_authorities_with_overload_thresholds(4, gas_objects.clone(), AuthorityOverloadConfig {
             max_txn_age_in_queue: Duration::from_secs(5),
@@ -632,6 +628,7 @@ async fn test_authority_txn_signing_pushback() {
     let epoch_store = authority_state.epoch_store_for_testing();
     let consensus_adapter = Arc::new(ConsensusAdapter::new(
         Arc::new(MockConsensusClient::new()),
+        CheckpointStore::new_for_tests(),
         authority_state.name,
         Arc::new(ConnectionMonitorStatusForTests {}),
         100_000,
@@ -732,6 +729,7 @@ async fn test_authority_txn_execution_pushback() {
     let epoch_store = authority_state.epoch_store_for_testing();
     let consensus_adapter = Arc::new(ConsensusAdapter::new(
         Arc::new(MockConsensusClient::new()),
+        CheckpointStore::new_for_tests(),
         authority_state.name,
         Arc::new(ConnectionMonitorStatusForTests {}),
         100_000,

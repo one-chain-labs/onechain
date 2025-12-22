@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::{connection::Connection, *};
+use sui_name_service::NameServiceConfig;
+use sui_types::{
+    object::{Data, MoveObject as NativeMoveObject},
+    TypeTag,
+};
+
 use super::{
     balance::{self, Balance},
     base64::Base64,
@@ -22,12 +29,6 @@ use super::{
     uint53::UInt53,
 };
 use crate::{connection::ScanConnection, data::Db, error::Error, types::stake::StakedOct};
-use async_graphql::{connection::Connection, *};
-use sui_json_rpc::name_service::NameServiceConfig;
-use sui_types::{
-    object::{Data, MoveObject as NativeMoveObject},
-    TypeTag,
-};
 
 #[derive(Clone)]
 pub(crate) struct MoveObject {
@@ -64,7 +65,7 @@ pub(crate) enum MoveObjectDowncastError {
         name = "has_public_transfer",
         ty = "bool",
         desc = "Determines whether a transaction can transfer this object, using the \
-                TransferObjects transaction command or `sui::transfer::public_transfer`, both of \
+                TransferObjects transaction command or `one::transfer::public_transfer`, both of \
                 which require the object to have the `key` and `store` abilities."
     ),
     field(
@@ -286,7 +287,7 @@ impl MoveObject {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(self).has_public_transfer(ctx).await

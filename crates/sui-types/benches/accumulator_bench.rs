@@ -1,14 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use criterion::*;
 use fastcrypto::hash::MultisetHash;
 use sui_types::{accumulator::Accumulator, base_types::ObjectDigest};
 
-use criterion::*;
-
 fn accumulator_benchmark(c: &mut Criterion) {
     {
-        let digests: Vec<_> = (0..1_000).map(|_| ObjectDigest::random()).collect();
+        let digests: Vec<_> = (0 .. 1_000).map(|_| ObjectDigest::random()).collect();
         let mut accumulator = Accumulator::default();
 
         let mut group = c.benchmark_group("accumulator");

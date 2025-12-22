@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::future::{join_all, Either};
-use parking_lot::{Mutex, MutexGuard};
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     future::Future,
@@ -12,6 +10,9 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
+
+use futures::future::{join_all, Either};
+use parking_lot::{Mutex, MutexGuard};
 use tokio::sync::oneshot;
 
 type Registrations<V> = Vec<oneshot::Sender<V>>;
@@ -23,7 +24,7 @@ pub struct NotifyRead<K, V> {
 
 impl<K: Eq + Hash + Clone, V: Clone> NotifyRead<K, V> {
     pub fn new() -> Self {
-        let pending = (0..255).map(|_| Default::default()).collect();
+        let pending = (0 .. 255).map(|_| Default::default()).collect();
         let count_pending = Default::default();
         Self { pending, count_pending }
     }
@@ -120,7 +121,7 @@ pub struct Registration<'a, K: Eq + Hash + Clone, V: Clone> {
     registration: Option<(K, oneshot::Receiver<V>)>,
 }
 
-impl<'a, K: Eq + Hash + Clone + Unpin, V: Clone + Unpin> Future for Registration<'a, K, V> {
+impl<K: Eq + Hash + Clone + Unpin, V: Clone + Unpin> Future for Registration<'_, K, V> {
     type Output = V;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -135,7 +136,7 @@ impl<'a, K: Eq + Hash + Clone + Unpin, V: Clone + Unpin> Future for Registration
     }
 }
 
-impl<'a, K: Eq + Hash + Clone, V: Clone> Drop for Registration<'a, K, V> {
+impl<K: Eq + Hash + Clone, V: Clone> Drop for Registration<'_, K, V> {
     fn drop(&mut self) {
         if let Some((key, receiver)) = self.registration.take() {
             mem::drop(receiver);
@@ -152,8 +153,9 @@ impl<K: Eq + Hash + Clone, V: Clone> Default for NotifyRead<K, V> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::future::join_all;
+
+    use super::*;
 
     #[tokio::test]
     pub async fn test_notify_read() {

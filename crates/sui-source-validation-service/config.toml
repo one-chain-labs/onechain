@@ -1,7 +1,7 @@
 [[packages]]
 source = "Repository"
 [packages.values]
-repository = "https://github.com/one-chain-labs/onechain"
+repository = "https://github.com/mystenlabs/sui"
 network = "mainnet"
 [[packages.values.branches]]
 branch = "framework/mainnet"
@@ -15,7 +15,7 @@ paths = [
 [[packages]]
 source = "Repository"
 [packages.values]
-repository = "https://github.com/one-chain-labs/onechain"
+repository = "https://github.com/mystenlabs/sui"
 network = "testnet"
 [[packages.values.branches]]
 branch = "framework/testnet"
@@ -29,7 +29,7 @@ paths = [
 [[packages]]
 source = "Repository"
 [packages.values]
-repository = "https://github.com/one-chain-labs/onechain"
+repository = "https://github.com/mystenlabs/sui"
 network = "devnet"
 [[packages.values.branches]]
 branch = "framework/devnet"

@@ -23,7 +23,6 @@ use serde::{
     Serialize,
 };
 use serde_with::{serde_as, Bytes, DeserializeAs, DisplayFromStr, SerializeAs};
-
 use sui_protocol_config::ProtocolVersion;
 
 use crate::{

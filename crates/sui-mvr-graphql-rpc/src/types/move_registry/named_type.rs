@@ -8,13 +8,12 @@ use futures::future;
 use regex::{Captures, Regex};
 use sui_types::{base_types::ObjectID, TypeTag};
 
-use crate::{data::package_resolver::PackageResolver, error::Error};
-
 use super::{
     error::MoveRegistryError,
     named_move_package::NamedMovePackage,
     on_chain::{VersionedName, VERSIONED_NAME_UNBOUND_REG},
 };
+use crate::{data::package_resolver::PackageResolver, error::Error};
 
 pub(crate) struct NamedType;
 
@@ -113,11 +112,11 @@ fn replace_all_result(
     for caps in re.captures_iter(haystack) {
         // SAFETY: we know that the regex will have a match on position 0.
         let m = caps.get(0).unwrap();
-        new.push_str(&haystack[last_match..m.start()]);
+        new.push_str(&haystack[last_match .. m.start()]);
         new.push_str(&replacement(&caps)?);
         last_match = m.end();
     }
-    new.push_str(&haystack[last_match..]);
+    new.push_str(&haystack[last_match ..]);
     Ok(new)
 }
 

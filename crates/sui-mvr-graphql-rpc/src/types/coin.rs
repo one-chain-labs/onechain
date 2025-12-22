@@ -1,14 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    connection::ScanConnection,
-    consistency::{build_objects_query, View},
-    data::{Db, QueryExecutor},
-    error::Error,
-    filter,
-    raw_query::RawQuery,
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    *,
 };
+use diesel_async::scoped_futures::ScopedFutureExt;
+use sui_indexer::{models::objects::StoredHistoryObject, types::OwnerType};
+use sui_types::{coin::Coin as NativeCoin, TypeTag};
 
 use super::{
     available_range::AvailableRange,
@@ -29,12 +28,14 @@ use super::{
     type_filter::ExactTypeFilter,
     uint53::UInt53,
 };
-use async_graphql::*;
-
-use async_graphql::connection::{Connection, CursorType, Edge};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use sui_indexer::{models::objects::StoredHistoryObject, types::OwnerType};
-use sui_types::{coin::Coin as NativeCoin, TypeTag};
+use crate::{
+    connection::ScanConnection,
+    consistency::{build_objects_query, View},
+    data::{Db, QueryExecutor},
+    error::Error,
+    filter,
+    raw_query::RawQuery,
+};
 
 #[derive(Clone)]
 pub(crate) struct Coin {
@@ -221,7 +222,7 @@ impl Coin {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(&self.super_).has_public_transfer(ctx).await

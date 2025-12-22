@@ -1,7 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::traffic_controller::nodefw_client::{BlockAddress, BlockAddresses};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+
 use axum::{
     extract::State,
     http::StatusCode,
@@ -10,16 +16,12 @@ use axum::{
     Json,
     Router,
 };
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
 use tokio::{
     sync::{Mutex, Notify},
     task::JoinHandle,
 };
+
+use crate::traffic_controller::nodefw_client::{BlockAddress, BlockAddresses};
 
 #[derive(Clone)]
 struct AppState {

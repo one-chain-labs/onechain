@@ -8,6 +8,7 @@ mod simtests {
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
+
     use sui_macros::{register_fail_point, sim_test};
     use test_cluster::TestClusterBuilder;
 

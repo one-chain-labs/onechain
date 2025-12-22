@@ -68,9 +68,12 @@ impl SourcePackageLayout {
     pub fn is_optional(&self) -> bool {
         match self {
             Self::Sources | Self::Manifest => false,
-            Self::Tests | Self::Scripts | Self::Examples | Self::Specifications | Self::DocTemplates | Self::Lock => {
-                true
-            }
+            Self::Tests
+            | Self::Scripts
+            | Self::Examples
+            | Self::Specifications
+            | Self::DocTemplates
+            | Self::Lock => true,
         }
     }
 }

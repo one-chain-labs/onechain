@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{sync::Arc, time::Duration};
+
 use fastcrypto::encoding::{Base64, Encoding};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use simulacrum::Simulacrum;
-use std::{sync::Arc, time::Duration};
 use sui_graphql_rpc::{
     client::{simple_client::GraphqlQueryVariable, ClientError},
     config::{Limits, ServiceConfig},
@@ -270,6 +271,7 @@ async fn test_zklogin_sig_verify() {
     let cluster = start_cluster(ServiceConfig::test_defaults()).await;
 
     let test_cluster = &cluster.network.validator_fullnode_handle;
+    test_cluster.trigger_reconfiguration().await;
     test_cluster.wait_for_epoch_all_nodes(1).await;
     test_cluster.wait_for_authenticator_state_update().await;
 
@@ -307,7 +309,6 @@ async fn test_zklogin_sig_verify() {
 
     // a valid signature with tx bytes returns success as true.
     let binding = res.response_body().data.clone().into_json().unwrap();
-    tracing::info!("tktkbinding: {:?}", binding);
     let res = binding.get("verifyZkloginSignature").unwrap();
     assert_eq!(res.get("success").unwrap(), true);
 

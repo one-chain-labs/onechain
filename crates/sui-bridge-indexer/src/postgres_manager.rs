@@ -1,18 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    models::SuiProgressStore,
-    schema,
-    schema::{
-        governance_actions,
-        sui_error_transactions,
-        sui_progress_store::txn_digest,
-        token_transfer,
-        token_transfer_data,
-    },
-    ProcessedTxnData,
-};
 use diesel::{
     query_dsl::methods::FilterDsl,
     upsert::excluded,
@@ -29,6 +17,19 @@ use diesel_async::{
     RunQueryDsl,
 };
 use sui_types::digests::TransactionDigest;
+
+use crate::{
+    models::SuiProgressStore,
+    schema,
+    schema::{
+        governance_actions,
+        sui_error_transactions,
+        sui_progress_store::txn_digest,
+        token_transfer,
+        token_transfer_data,
+    },
+    ProcessedTxnData,
+};
 
 pub(crate) type PgPool = diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
 

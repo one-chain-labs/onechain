@@ -1,6 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    env,
+    io::{stderr, Write},
+    path::PathBuf,
+    str::FromStr,
+    sync::{atomic::Ordering, Arc, Mutex},
+    time::Duration,
+};
+
 use atomic_float::AtomicF64;
 use crossterm::tty::IsTty;
 use once_cell::sync::Lazy;
@@ -17,14 +26,6 @@ use opentelemetry_sdk::{
     Resource,
 };
 use span_latency_prom::PrometheusSpanLatencyLayer;
-use std::{
-    env,
-    io::{stderr, Write},
-    path::PathBuf,
-    str::FromStr,
-    sync::{atomic::Ordering, Arc, Mutex},
-    time::Duration,
-};
 use tracing::{error, info, metadata::LevelFilter, Level};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_subscriber::{filter, fmt, layer::SubscriberExt, reload, EnvFilter, Layer, Registry};
@@ -345,7 +346,6 @@ impl TelemetryConfig {
         // tokio-console layer
         // Please see https://docs.rs/console-subscriber/latest/console_subscriber/struct.Builder.html#configuration
         // for environment vars/config options
-        #[cfg(feature = "tokio-console")]
         if config.tokio_console {
             layers.push(console_subscriber::spawn().boxed());
         }
@@ -364,10 +364,8 @@ impl TelemetryConfig {
 
         if config.enable_otlp_tracing {
             let trace_file = env::var("TRACE_FILE").ok();
-
-            let config = opentelemetry_sdk::trace::Config::default()
-                .with_resource(Resource::new(vec![opentelemetry::KeyValue::new("service.name", service_name.clone())]))
-                .with_sampler(Sampler::ParentBased(Box::new(sampler.clone())));
+            let resource = Resource::new(vec![opentelemetry::KeyValue::new("service.name", service_name.clone())]);
+            let sampler = Sampler::ParentBased(Box::new(sampler.clone()));
 
             // We can either do file output or OTLP, but not both. tracing-opentelemetry
             // only supports a single tracer at a time.
@@ -376,7 +374,11 @@ impl TelemetryConfig {
                 file_output = exporter.cached_open_file.clone();
                 let processor = BatchSpanProcessor::builder(exporter, runtime::Tokio).build();
 
-                let p = TracerProvider::builder().with_config(config).with_span_processor(processor).build();
+                let p = TracerProvider::builder()
+                    .with_resource(resource)
+                    .with_sampler(sampler)
+                    .with_span_processor(processor)
+                    .build();
 
                 let tracer = p.tracer(service_name);
                 provider = Some(p);
@@ -384,16 +386,14 @@ impl TelemetryConfig {
                 tracing_opentelemetry::layer().with_tracer(tracer)
             } else {
                 let endpoint = env::var("OTLP_ENDPOINT").unwrap_or_else(|_| "http://localhost:4317".to_string());
-
-                let p = opentelemetry_otlp::new_pipeline()
-                    .tracing()
-                    .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_endpoint(endpoint))
-                    .with_trace_config(config)
-                    .install_batch(runtime::Tokio)
-                    .expect("Could not create async Tracer");
-
-                let tracer = p.tracer(service_name);
-
+                let otlp_exporter =
+                    opentelemetry_otlp::SpanExporter::builder().with_tonic().with_endpoint(endpoint).build().unwrap();
+                let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
+                    .with_resource(resource)
+                    .with_sampler(sampler)
+                    .with_batch_exporter(otlp_exporter, runtime::Tokio)
+                    .build();
+                let tracer = tracer_provider.tracer(service_name);
                 tracing_opentelemetry::layer().with_tracer(tracer)
             };
 
@@ -501,10 +501,12 @@ pub fn init_for_testing() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use prometheus::proto::MetricType;
     use std::time::Duration;
+
+    use prometheus::proto::MetricType;
     use tracing::{debug, debug_span, info, trace_span, warn};
+
+    use super::*;
 
     #[test]
     #[should_panic]

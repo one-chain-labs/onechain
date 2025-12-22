@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diesel::{data_types::PgTimestamp, Identifiable, Insertable, Queryable, QueryableByName, Selectable};
-
 use serde::Serialize;
 use sui_indexer_builder::{Task, LIVE_TASK_TARGET_CHECKPOINT};
 

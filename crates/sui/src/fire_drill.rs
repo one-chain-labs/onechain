@@ -6,10 +6,12 @@
 //! 2. restart the node in a new epoch when config file will be reloaded and take effects
 //!
 //! Example usage:
-//! one_chain fire-drill metadata-rotation \
+//! one fire-drill metadata-rotation \
 //! --one-node-config-path validator.yaml \
 //! --account-key-path account.key \
 //! --fullnode-rpc-url http://fullnode-my-local-net:9000
+
+use std::path::{Path, PathBuf};
 
 use anyhow::bail;
 use clap::*;
@@ -18,7 +20,6 @@ use fastcrypto::{
     traits::{KeyPair, ToFromBytes},
 };
 use move_core_types::ident_str;
-use std::path::{Path, PathBuf};
 use sui_config::{
     local_ip_utils,
     node::{AuthorityKeyPairWithPath, KeyPairWithPath},
@@ -47,7 +48,7 @@ pub enum FireDrill {
 
 #[derive(Parser)]
 pub struct MetadataRotation {
-    /// Path to one node config.
+    /// Path to sui node config.
     #[clap(long = "one-node-config-path")]
     sui_node_config_path: PathBuf,
     /// Path to account key file.

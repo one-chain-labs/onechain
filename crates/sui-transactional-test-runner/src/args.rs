@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_adapter::{FakeID, SuiTestAdapter};
+use std::path::PathBuf;
+
 use anyhow::{bail, ensure};
 use clap::{self, Args, Parser};
 use move_compiler::editions::Flavor;
@@ -23,6 +24,8 @@ use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ObjectArg},
 };
+
+use crate::test_adapter::{FakeID, SuiTestAdapter};
 
 pub const SUI_ARGS_LONG: &str = "sui-args";
 
@@ -74,6 +77,13 @@ pub struct SuiInitArgs {
     /// the indexer.
     #[clap(long = "epochs-to-keep")]
     pub epochs_to_keep: Option<u64>,
+    /// Dir for simulacrum to write checkpoint files to. To be passed to the offchain indexer and
+    /// reader.
+    #[clap(long)]
+    pub data_ingestion_path: Option<PathBuf>,
+    /// URL for the Sui REST API. To be passed to the offchain indexer and reader.
+    #[clap(long)]
+    pub rest_api_url: Option<String>,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -116,6 +126,8 @@ pub struct ProgrammableTransactionCommand {
     pub gas_payment: Option<FakeID>,
     #[clap(long = "dev-inspect")]
     pub dev_inspect: bool,
+    #[clap(long = "dry-run")]
+    pub dry_run: bool,
     #[clap(
         long = "inputs",
         value_parser = ParsedValue::<SuiExtraValueArgs>::parse,
@@ -181,6 +193,14 @@ pub struct RunGraphqlCommand {
 }
 
 #[derive(Debug, clap::Parser)]
+pub struct RunJsonRpcCommand {
+    #[clap(long = "show-headers")]
+    pub show_headers: bool,
+    #[clap(long, num_args(1..))]
+    pub cursors: Vec<String>,
+}
+
+#[derive(Debug, clap::Parser)]
 pub struct CreateCheckpointCommand {
     pub count: Option<u64>,
 }
@@ -217,6 +237,7 @@ pub enum SuiSubcommand<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> {
     SetRandomState(SetRandomStateCommand),
     ViewCheckpoint,
     RunGraphql(RunGraphqlCommand),
+    RunJsonRpc(RunJsonRpcCommand),
     Bench(RunCommand<ExtraValueArgs>, ExtraRunArgs),
 }
 
@@ -256,6 +277,7 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::FromArgMatches
             }
             Some(("view-checkpoint", _)) => SuiSubcommand::ViewCheckpoint,
             Some(("run-graphql", matches)) => SuiSubcommand::RunGraphql(RunGraphqlCommand::from_arg_matches(matches)?),
+            Some(("run-jsonrpc", matches)) => SuiSubcommand::RunJsonRpc(RunJsonRpcCommand::from_arg_matches(matches)?),
             Some(("bench", matches)) => {
                 SuiSubcommand::Bench(RunCommand::from_arg_matches(matches)?, ExtraRunArgs::from_arg_matches(matches)?)
             }
@@ -289,6 +311,7 @@ impl<ExtraValueArgs: ParsableValue, ExtraRunArgs: Parser> clap::CommandFactory
             .subcommand(SetRandomStateCommand::command().name("set-random-state"))
             .subcommand(clap::Command::new("view-checkpoint"))
             .subcommand(RunGraphqlCommand::command().name("run-graphql"))
+            .subcommand(RunJsonRpcCommand::command().name("run-jsonrpc"))
             .subcommand(RunCommand::<ExtraValueArgs>::augment_args(ExtraRunArgs::command()).name("bench"))
     }
 

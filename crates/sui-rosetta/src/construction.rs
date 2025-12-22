@@ -10,7 +10,6 @@ use fastcrypto::{
     hash::HashFunction,
 };
 use futures::StreamExt;
-
 use shared_crypto::intent::{Intent, IntentMessage};
 use sui_json_rpc_types::{
     StakeStatus,
@@ -58,7 +57,7 @@ use crate::{
     SuiEnv,
 };
 
-/// This module implements the [Rosetta Construction API](https://www.rosetta-api.org/docs/ConstructionApi.html)
+// This module implements the [Rosetta Construction API](https://www.rosetta-api.org/docs/ConstructionApi.html)
 
 /// Derive returns the AccountIdentifier associated with a public key.
 ///
@@ -244,7 +243,7 @@ pub async fn metadata(
 
     // Get amount, objects, for the operation
     let (total_required_amount, objects) = match &option.internal_operation {
-        InternalOperation::PaySui { amounts, .. } => {
+        InternalOperation::PayOct { amounts, .. } => {
             let amount = amounts.iter().sum::<u64>();
             (Some(amount), vec![])
         }

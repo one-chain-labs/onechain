@@ -31,7 +31,7 @@ module 0x0.m {
 
 // //# upgrade --package test  --sender A --upgrade-capability 1,1
 // module v2::m {
-//     use sui::tx_context::TxContext;
+//     use one::tx_context::TxContext;
 //     fun init(_: &mut TxContext) {
 //     }
 

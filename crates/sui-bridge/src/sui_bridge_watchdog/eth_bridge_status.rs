@@ -3,13 +3,15 @@
 
 //! The EthBridgeStatus observable monitors whether the Eth Bridge is paused.
 
-use crate::{abi::EthSuiBridge, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use ethers::{providers::Provider, types::Address as EthAddress};
 use prometheus::IntGauge;
-use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info};
+
+use crate::{abi::EthSuiBridge, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
 
 pub struct EthBridgeStatus {
     bridge_contract: EthSuiBridge<Provider<MeteredEthHttpProvier>>,

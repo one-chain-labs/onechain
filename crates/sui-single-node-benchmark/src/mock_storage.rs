@@ -1,14 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
+
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::language_storage::ModuleId;
 use once_cell::unsync::OnceCell;
 use prometheus::core::{Atomic, AtomicU64};
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
+use sui_core::authority::{
+    authority_per_epoch_store::AuthorityPerEpochStore,
+    epoch_start_configuration::EpochStartConfigTrait,
 };
 use sui_storage::package_object_cache::PackageObjectCache;
 use sui_types::{
@@ -16,15 +21,7 @@ use sui_types::{
     error::{SuiError, SuiResult},
     inner_temporary_store::InnerTemporaryStore,
     object::{Object, Owner},
-    storage::{
-        get_module_by_id,
-        BackingPackageStore,
-        ChildObjectResolver,
-        GetSharedLocks,
-        ObjectStore,
-        PackageObject,
-        ParentSync,
-    },
+    storage::{get_module_by_id, BackingPackageStore, ChildObjectResolver, ObjectStore, PackageObject, ParentSync},
     transaction::{InputObjectKind, InputObjects, ObjectReadResult, TransactionKey},
 };
 
@@ -53,31 +50,35 @@ impl InMemoryObjectStore {
     // We will need a trait to unify the these functions. (similarly the one in simulacrum)
     pub(crate) fn read_objects_for_execution(
         &self,
-        shared_locks: &dyn GetSharedLocks,
+        epoch_store: &Arc<AuthorityPerEpochStore>,
         tx_key: &TransactionKey,
         input_object_kinds: &[InputObjectKind],
     ) -> SuiResult<InputObjects> {
-        let shared_locks_cell: OnceCell<Option<HashMap<_, _>>> = OnceCell::new();
+        let shared_version_assignments_cell: OnceCell<Option<HashMap<_, _>>> = OnceCell::new();
         let mut input_objects = Vec::new();
         for kind in input_object_kinds {
             let obj: Option<Object> = match kind {
                 InputObjectKind::MovePackage(id) => self.get_package_object(id)?.map(|o| o.into()),
                 InputObjectKind::ImmOrOwnedMoveObject(objref) => self.get_object_by_key(&objref.0, objref.1),
 
-                InputObjectKind::SharedMoveObject { id, .. } => {
-                    let shared_locks = shared_locks_cell
+                InputObjectKind::SharedMoveObject { id, initial_shared_version, .. } => {
+                    let shared_version_assignments = shared_version_assignments_cell
                         .get_or_init(|| {
-                            shared_locks
-                                .get_shared_locks(tx_key)
-                                .expect("get_shared_locks should not fail")
-                                .map(|l| l.into_iter().collect())
+                            epoch_store.get_assigned_shared_object_versions(tx_key).map(|l| l.into_iter().collect())
                         })
                         .as_ref()
                         .ok_or_else(|| SuiError::GenericAuthorityError {
-                            error: "Shared object locks should have been set.".to_string(),
+                            error: "Shared object versions should have been assigned.".to_string(),
                         })?;
-                    let version = shared_locks.get(id).unwrap_or_else(|| {
-                        panic!("Shared object locks should have been set. key: {tx_key:?}, obj id: {id:?}")
+                    let initial_shared_version = if epoch_store.epoch_start_config().use_version_assignment_tables_v3() {
+                        *initial_shared_version
+                    } else {
+                        // (before ConsensusV2 objects, we didn't track initial shared
+                        // version for shared object locks)
+                        SequenceNumber::UNKNOWN
+                    };
+                    let version = shared_version_assignments.get(&(*id, initial_shared_version)).unwrap_or_else(|| {
+                        panic!("Shared object version should have been assigned. key: {tx_key:?}, obj id: {id:?}")
                     });
 
                     self.get_object_by_key(id, *version)
@@ -142,6 +143,8 @@ impl ChildObjectResolver for InMemoryObjectStore {
         _receiving_object_id: &ObjectID,
         _receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        _use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         unimplemented!()
     }
@@ -158,12 +161,6 @@ impl GetModule for InMemoryObjectStore {
 
 impl ParentSync for InMemoryObjectStore {
     fn get_latest_parent_entry_ref_deprecated(&self, _object_id: ObjectID) -> Option<ObjectRef> {
-        unreachable!()
-    }
-}
-
-impl GetSharedLocks for InMemoryObjectStore {
-    fn get_shared_locks(&self, _key: &TransactionKey) -> SuiResult<Option<Vec<(ObjectID, SequenceNumber)>>> {
         unreachable!()
     }
 }

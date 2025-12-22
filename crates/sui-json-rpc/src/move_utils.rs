@@ -1,12 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority_state::StateRead,
-    error::{Error, SuiRpcInputError},
-    with_tracing,
-    SuiRpcModule,
-};
+use std::{collections::BTreeMap, sync::Arc};
+
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
 #[cfg(test)]
@@ -16,7 +12,6 @@ use move_binary_format::{
     normalized::{Module as NormalizedModule, Type},
 };
 use move_core_types::identifier::Identifier;
-use std::{collections::BTreeMap, sync::Arc};
 use sui_core::authority::AuthorityState;
 use sui_json_rpc_api::{MoveUtilsOpenRpc, MoveUtilsServer};
 use sui_json_rpc_types::{
@@ -34,6 +29,13 @@ use sui_types::{
 };
 use tap::TapFallible;
 use tracing::{error, instrument, warn};
+
+use crate::{
+    authority_state::StateRead,
+    error::{Error, SuiRpcInputError},
+    with_tracing,
+    SuiRpcModule,
+};
 
 #[cfg_attr(test, automock)]
 #[async_trait]
@@ -246,9 +248,9 @@ impl MoveUtilsServer for MoveUtils {
 mod tests {
 
     mod get_normalized_move_module_tests {
-        use super::super::*;
-        use jsonrpsee::types::ErrorObjectOwned;
         use move_binary_format::file_format::basic_test_module;
+
+        use super::super::*;
 
         fn setup() -> (ObjectID, String) {
             (ObjectID::random(), String::from("test_module"))
@@ -284,8 +286,7 @@ mod tests {
             let move_utils = MoveUtils { internal: Arc::new(mock_internal) };
 
             let response = move_utils.get_normalized_move_module(package, module_name).await;
-            let error_result = response.unwrap_err();
-            let error_object: ErrorObjectOwned = error_result.into();
+            let error_object = response.unwrap_err();
 
             assert_eq!(error_object.code(), -32602);
             assert_eq!(error_object.message(), &error_string);

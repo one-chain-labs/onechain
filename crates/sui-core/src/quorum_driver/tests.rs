@@ -1,18 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    quorum_driver::{
-        reconfig_observer::DummyReconfigObserver,
-        AuthorityAggregator,
-        AuthorityAggregatorUpdatable as _,
-        QuorumDriverHandlerBuilder,
-        QuorumDriverMetrics,
-    },
-    test_authority_clients::{LocalAuthorityClient, LocalAuthorityClientFaultConfig},
-    test_utils::{init_local_authorities, make_transfer_sui_transaction},
-};
-use mysten_common::sync::notify_read::{NotifyRead, Registration};
 use std::{
     net::SocketAddr,
     sync::{
@@ -21,6 +9,8 @@ use std::{
     },
     time::Duration,
 };
+
+use mysten_common::sync::notify_read::{NotifyRead, Registration};
 use sui_macros::{register_fail_point, sim_test};
 use sui_types::{
     base_types::{SuiAddress, TransactionDigest},
@@ -31,6 +21,19 @@ use sui_types::{
     transaction::Transaction,
 };
 use tokio::time::timeout;
+
+use crate::{
+    quorum_driver::{
+        reconfig_observer::DummyReconfigObserver,
+        AuthorityAggregator,
+        AuthorityAggregatorUpdatable as _,
+        QuorumDriverHandlerBuilder,
+        QuorumDriverMetrics,
+    },
+    test_authority_clients::{LocalAuthorityClient, LocalAuthorityClientFaultConfig},
+    test_utils::make_transfer_oct_transaction,
+    unit_test_utils::init_local_authorities,
+};
 
 async fn setup() -> (AuthorityAggregator<LocalAuthorityClient>, Transaction) {
     let (sender, keypair): (_, AccountKeyPair) = get_key_pair();
@@ -44,7 +47,7 @@ async fn setup() -> (AuthorityAggregator<LocalAuthorityClient>, Transaction) {
 }
 
 fn make_tx(gas: &Object, sender: SuiAddress, keypair: &AccountKeyPair, gas_price: u64) -> Transaction {
-    make_transfer_sui_transaction(
+    make_transfer_oct_transaction(
         gas.compute_object_reference(),
         SuiAddress::random_for_testing_only(),
         None,
@@ -105,8 +108,8 @@ async fn test_quorum_driver_submit_transaction_no_ticket() {
     handle.await.unwrap();
 }
 
-async fn verify_ticket_response<'a>(
-    ticket: Registration<'a, TransactionDigest, QuorumDriverResult>,
+async fn verify_ticket_response(
+    ticket: Registration<'_, TransactionDigest, QuorumDriverResult>,
     tx_digest: &TransactionDigest,
 ) {
     let QuorumDriverResponse { effects_cert, .. } = ticket.await.unwrap();
@@ -225,8 +228,7 @@ async fn test_quorum_driver_object_locked() -> Result<(), anyhow::Error> {
     // there are not enough retryable errors to push the original tx or the most staked
     // conflicting tx >= 2f+1 stake. Neither transaction can be retried due to client
     // double spend and this is a fatal error.
-    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes, retried_tx_status }) = res {
-        assert_eq!(retried_tx_status, None);
+    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes }) = res {
         assert_eq!(conflicting_txes.len(), 1);
         assert_eq!(conflicting_txes.iter().next().unwrap().0, tx.digest());
     } else {
@@ -245,8 +247,7 @@ async fn test_quorum_driver_object_locked() -> Result<(), anyhow::Error> {
 
     let res = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx2)).await.unwrap().await;
     // Aggregator gets three bad responses, and tries tx, which should succeed.
-    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes, retried_tx_status }) = res {
-        assert_eq!(retried_tx_status, Some((*tx.digest(), true)));
+    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes }) = res {
         assert_eq!(conflicting_txes.len(), 1);
         assert_eq!(conflicting_txes.iter().next().unwrap().0, tx.digest());
     } else {
@@ -282,8 +283,7 @@ async fn test_quorum_driver_object_locked() -> Result<(), anyhow::Error> {
 
     let res = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx3)).await.unwrap().await;
 
-    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes, retried_tx_status }) = res {
-        assert_eq!(retried_tx_status, None);
+    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes }) = res {
         assert_eq!(conflicting_txes.len(), 2);
         let tx_stake = conflicting_txes.get(tx.digest()).unwrap().1;
         assert!(tx_stake == 2500 || tx_stake == 5000);
@@ -301,8 +301,7 @@ async fn test_quorum_driver_object_locked() -> Result<(), anyhow::Error> {
     assert!(client2.handle_transaction(tx2.clone(), Some(client_ip)).await.is_ok());
     let res = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx2)).await.unwrap().await;
 
-    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes, retried_tx_status }) = res {
-        assert_eq!(retried_tx_status, None);
+    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes }) = res {
         assert_eq!(conflicting_txes.len(), 1);
         assert_eq!(conflicting_txes.get(tx.digest()).unwrap().1, 5000);
     } else {
@@ -336,8 +335,7 @@ async fn test_quorum_driver_object_locked() -> Result<(), anyhow::Error> {
     let tx4 = make_tx(&gas, sender, &keypair, rgp);
     let res = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx4.clone())).await.unwrap().await;
 
-    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes, retried_tx_status }) = res {
-        assert_eq!(retried_tx_status, None);
+    if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes }) = res {
         assert!(conflicting_txes.len() == 3 || conflicting_txes.len() == 2);
         assert!(conflicting_txes.iter().all(|(digest, (_objs, stake))| (*stake == 2500)
             && (digest == tx.digest() || digest == tx2.digest() || digest == tx3.digest())));

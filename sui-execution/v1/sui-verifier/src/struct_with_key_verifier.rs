@@ -6,7 +6,6 @@
 //! - The first field is named "id"
 //! - The first field has type `one::object::UID`
 
-use crate::verification_failure;
 use move_binary_format::file_format::{CompiledModule, SignatureToken};
 use sui_types::{
     error::ExecutionError,
@@ -14,6 +13,8 @@ use sui_types::{
     id::{OBJECT_MODULE_NAME, UID_STRUCT_NAME},
     SUI_FRAMEWORK_ADDRESS,
 };
+
+use crate::verification_failure;
 
 pub fn verify_module(module: &CompiledModule) -> Result<(), ExecutionError> {
     verify_key_structs(module)

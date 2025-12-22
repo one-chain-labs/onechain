@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{base_types::ObjectID, id::UID};
 
-/// Rust version of the Move sui::vec_map::VecMap type
+/// Rust version of the Move one::vec_map::VecMap type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct VecMap<K, V> {
     pub contents: Vec<Entry<K, V>>,
@@ -17,20 +17,20 @@ impl<K: PartialEq, V> VecMap<K, V> {
     }
 }
 
-/// Rust version of the Move sui::vec_map::Entry type
+/// Rust version of the Move one::vec_map::Entry type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Entry<K, V> {
     pub key: K,
     pub value: V,
 }
 
-/// Rust version of the Move sui::vec_set::VecSet type
+/// Rust version of the Move one::vec_set::VecSet type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct VecSet<T> {
     pub contents: Vec<T>,
 }
 
-/// Rust version of the Move sui::table::Table type.
+/// Rust version of the Move one::table::Table type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct TableVec {
     pub contents: Table,
@@ -42,7 +42,7 @@ impl Default for TableVec {
     }
 }
 
-/// Rust version of the Move sui::table::Table type.
+/// Rust version of the Move one::table::Table type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Table {
     pub id: ObjectID,
@@ -55,7 +55,7 @@ impl Default for Table {
     }
 }
 
-/// Rust version of the Move sui::linked_table::LinkedTable type.
+/// Rust version of the Move one::linked_table::LinkedTable type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct LinkedTable<K> {
     pub id: ObjectID,
@@ -70,7 +70,7 @@ impl<K> Default for LinkedTable<K> {
     }
 }
 
-/// Rust version of the Move sui::linked_table::Node type.
+/// Rust version of the Move one::linked_table::Node type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct LinkedTableNode<K, V> {
     pub prev: Option<K>,
@@ -78,7 +78,7 @@ pub struct LinkedTableNode<K, V> {
     pub value: V,
 }
 
-/// Rust version of the Move sui::bag::Bag type.
+/// Rust version of the Move one::bag::Bag type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Bag {
     pub id: UID,

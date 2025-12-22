@@ -1,21 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
-use crate::authority::authority_tests::init_state_with_ids_and_object_basics;
+use authority_tests::send_and_confirm_transaction;
 use bcs;
+use move_core_types::{account_address::AccountAddress, ident_str};
 use sui_types::{
+    crypto::{get_key_pair, AccountKeyPair},
     execution_status::ExecutionStatus,
+    object::Owner,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     utils::to_sender_signed_transaction,
 };
 
-use authority_tests::send_and_confirm_transaction;
-use move_core_types::{account_address::AccountAddress, ident_str};
-use sui_types::{
-    crypto::{get_key_pair, AccountKeyPair},
-    object::Owner,
-};
+use super::*;
+use crate::authority::authority_tests::init_state_with_ids_and_object_basics;
 
 #[tokio::test]
 async fn test_batch_transaction_ok() -> anyhow::Result<()> {
@@ -25,7 +23,7 @@ async fn test_batch_transaction_ok() -> anyhow::Result<()> {
     let (recipient, _): (_, AccountKeyPair) = get_key_pair();
     const N: usize = 5;
     const TOTAL: usize = N + 1;
-    let all_ids = (0..TOTAL).map(|_| ObjectID::random()).collect::<Vec<_>>();
+    let all_ids = (0 .. TOTAL).map(|_| ObjectID::random()).collect::<Vec<_>>();
     let (authority_state, package) =
         init_state_with_ids_and_object_basics([sender; TOTAL].into_iter().zip(all_ids.clone().into_iter())).await;
     let rgp = authority_state.reference_gas_price_for_testing()?;
@@ -35,7 +33,7 @@ async fn test_batch_transaction_ok() -> anyhow::Result<()> {
             .transfer_object(recipient, authority_state.get_object(obj_id).await.unwrap().compute_object_reference())
             .unwrap()
     }
-    for _ in 0..N {
+    for _ in 0 .. N {
         builder
             .move_call(package.0, ident_str!("object_basics").to_owned(), ident_str!("create").to_owned(), vec![], vec![
                 CallArg::Pure(16u64.to_le_bytes().to_vec()),
@@ -71,7 +69,7 @@ async fn test_batch_transaction_last_one_fail() -> anyhow::Result<()> {
     let (recipient, _): (_, AccountKeyPair) = get_key_pair();
     const N: usize = 5;
     const TOTAL: usize = N + 1;
-    let all_ids = (0..TOTAL).map(|_| ObjectID::random()).collect::<Vec<_>>();
+    let all_ids = (0 .. TOTAL).map(|_| ObjectID::random()).collect::<Vec<_>>();
     let (authority_state, package) =
         init_state_with_ids_and_object_basics([sender; TOTAL].into_iter().zip(all_ids.clone().into_iter())).await;
     let rgp = authority_state.reference_gas_price_for_testing()?;
@@ -119,7 +117,7 @@ async fn test_batch_insufficient_gas_balance() -> anyhow::Result<()> {
 
     const N: usize = 10;
     let mut builder = ProgrammableTransactionBuilder::new();
-    for _ in 0..N {
+    for _ in 0 .. N {
         builder
             .move_call(package.0, ident_str!("object_basics").to_owned(), ident_str!("create").to_owned(), vec![], vec![
                 CallArg::Pure(16u64.to_le_bytes().to_vec()),

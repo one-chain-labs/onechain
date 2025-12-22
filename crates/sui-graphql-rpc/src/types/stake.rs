@@ -1,7 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{connection::ScanConnection, context_data::db_data_provider::PgManager, data::Db, error::Error};
+use async_graphql::{connection::Connection, *};
+use move_core_types::language_storage::StructTag;
+use sui_json_rpc_types::{Stake as RpcStakedOct, StakeStatus as RpcStakeStatus};
+use sui_types::{base_types::MoveObjectType, governance::StakedOct as NativeStakedOct};
 
 use super::{
     balance::{self, Balance},
@@ -23,10 +26,7 @@ use super::{
     type_filter::ExactTypeFilter,
     uint53::UInt53,
 };
-use async_graphql::{connection::Connection, *};
-use move_core_types::language_storage::StructTag;
-use sui_json_rpc_types::{Stake as RpcStakedOct, StakeStatus as RpcStakeStatus};
-use sui_types::{base_types::MoveObjectType, governance::StakedOct as NativeStakedOct};
+use crate::{connection::ScanConnection, context_data::db_data_provider::PgManager, data::Db, error::Error};
 
 #[derive(Copy, Clone, Enum, PartialEq, Eq)]
 /// The stake's possible status: active, pending, or unstaked.
@@ -225,7 +225,7 @@ impl StakedOct {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(&self.super_).has_public_transfer(ctx).await

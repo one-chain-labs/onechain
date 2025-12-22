@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::Error,
-    types::{address::Address, sui_address::SuiAddress, validator::Validator},
-};
 use std::{collections::BTreeMap, time::Duration};
+
 use sui_indexer::{apis::GovernanceReadApi, db::ConnectionPoolConfig, indexer_reader::IndexerReader};
 use sui_json_rpc_types::Stake as RpcStakedOct;
 use sui_types::{
     governance::StakedOct as NativeStakedOct,
     sui_system_state::sui_system_state_summary::SuiSystemStateSummary as NativeSuiSystemStateSummary,
+};
+
+use crate::{
+    error::Error,
+    types::{address::Address, sui_address::SuiAddress, validator::Validator},
 };
 
 pub(crate) struct PgManager {

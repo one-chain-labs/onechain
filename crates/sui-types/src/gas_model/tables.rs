@@ -4,13 +4,11 @@
 use std::collections::BTreeMap;
 
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-
 use move_core_types::{
     gas_algebra::{AbstractMemorySize, InternalGas, NumArgs, NumBytes},
     language_storage::ModuleId,
+    vm_status::StatusCode,
 };
-
-use move_core_types::vm_status::StatusCode;
 use move_vm_profiler::GasProfiler;
 use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
@@ -19,12 +17,11 @@ use move_vm_types::{
 };
 use once_cell::sync::Lazy;
 
+use super::gas_predicates::{charge_input_as_memory, use_legacy_abstract_size};
 use crate::gas_model::{
     gas_predicates::native_function_threshold_exceeded,
     units_types::{CostTable, Gas, GasCost},
 };
-
-use super::gas_predicates::{charge_input_as_memory, use_legacy_abstract_size};
 
 /// VM flat fee
 pub const VM_FLAT_FEE: Gas = Gas::new(8_000);
@@ -92,7 +89,6 @@ impl GasStatus {
     ///
     /// Charge for every operation and fail when there is no more gas to pay for operations.
     /// This is the instantiation that must be used when executing a user script.
-
     pub fn new(cost_table: CostTable, budget: u64, gas_price: u64, gas_model_version: u64) -> Self {
         assert!(gas_price > 0, "gas price cannot be 0");
         let budget_in_unit = budget / gas_price;

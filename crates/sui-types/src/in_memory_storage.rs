@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeMap;
+
+use better_any::{Tid, TidAble};
+use move_binary_format::CompiledModule;
+use move_bytecode_utils::module_cache::GetModule;
+use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
+
 use crate::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, VersionNumber},
     committee::EpochId,
@@ -19,11 +26,6 @@ use crate::{
     },
     transaction::{InputObjectKind, InputObjects, ObjectReadResult, Transaction, TransactionDataAPI},
 };
-use better_any::{Tid, TidAble};
-use move_binary_format::CompiledModule;
-use move_bytecode_utils::module_cache::GetModule;
-use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
-use std::collections::BTreeMap;
 
 // TODO: We should use AuthorityTemporaryStore instead.
 // Keeping this functionally identical to AuthorityTemporaryStore is a pain.
@@ -71,6 +73,8 @@ impl ChildObjectResolver for InMemoryStorage {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        _use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         let recv_object = match self.persistent.get(receiving_object_id).cloned() {
             None => return Ok(None),

@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::{Display, Formatter},
+};
+
 use move_core_types::{
     annotated_value::MoveStructLayout,
     ident_str,
@@ -8,17 +13,12 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt::{Display, Formatter},
-};
 
 use crate::{
     balance::Balance,
     base_types::{ObjectID, SequenceNumber},
     coin::Coin,
     error::{ExecutionError, ExecutionErrorKind},
-    id::UID,
     object::{Data, MoveObject, Object},
     SUI_FRAMEWORK_ADDRESS,
 };
@@ -69,13 +69,13 @@ mod checked {
         }
     }
 
-    /// Rust version of the Move sui::coin::Coin<Sui::oct::OCT> type
+    /// Rust version of the Move one::coin::Coin<Sui::oct::OCT> type
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct GasCoin(pub Coin);
 
     impl GasCoin {
         pub fn new(id: ObjectID, value: u64) -> Self {
-            Self(Coin::new(UID::new(id), value))
+            Self(Coin::new(id, value))
         }
 
         pub fn value(&self) -> u64 {

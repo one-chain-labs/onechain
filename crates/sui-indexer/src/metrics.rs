@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::net::SocketAddr;
+
 use axum::{extract::Extension, http::StatusCode, routing::get, Router};
 use mysten_metrics::RegistryService;
 use prometheus::{
@@ -13,7 +15,6 @@ use prometheus::{
     Registry,
     TextEncoder,
 };
-use std::net::SocketAddr;
 use tracing::info;
 
 const METRICS_ROUTE: &str = "/metrics";

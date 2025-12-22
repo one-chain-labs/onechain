@@ -266,7 +266,7 @@ impl IndexedObject {
             checkpoint_sequence_number: rng.r#gen(),
             object: Object::with_owner_for_testing(random_address),
             df_kind: {
-                let random_value = rng.gen_range(0..3);
+                let random_value = rng.gen_range(0 .. 3);
                 match random_value {
                     0 => Some(DynamicFieldType::DynamicField),
                     1 => Some(DynamicFieldType::DynamicObject),
@@ -360,13 +360,13 @@ impl TxIndex {
             },
             transaction_digest: TransactionDigest::random(),
             checkpoint_sequence_number: rng.r#gen(),
-            input_objects: (0..1000).map(|_| ObjectID::random()).collect(),
-            changed_objects: (0..1000).map(|_| ObjectID::random()).collect(),
-            affected_objects: (0..1000).map(|_| ObjectID::random()).collect(),
-            payers: (0..rng.gen_range(0..100)).map(|_| SuiAddress::random_for_testing_only()).collect(),
+            input_objects: (0 .. 1000).map(|_| ObjectID::random()).collect(),
+            changed_objects: (0 .. 1000).map(|_| ObjectID::random()).collect(),
+            affected_objects: (0 .. 1000).map(|_| ObjectID::random()).collect(),
+            payers: (0 .. rng.gen_range(0 .. 100)).map(|_| SuiAddress::random_for_testing_only()).collect(),
             sender: SuiAddress::random_for_testing_only(),
-            recipients: (0..rng.gen_range(0..1000)).map(|_| SuiAddress::random_for_testing_only()).collect(),
-            move_calls: (0..rng.gen_range(0..1000))
+            recipients: (0 .. rng.gen_range(0 .. 1000)).map(|_| SuiAddress::random_for_testing_only()).collect(),
+            move_calls: (0 .. rng.gen_range(0 .. 1000))
                 .map(|_| (ObjectID::random(), rng.r#gen::<u64>().to_string(), rng.r#gen::<u64>().to_string()))
                 .collect(),
         }

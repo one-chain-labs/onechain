@@ -16,10 +16,11 @@
 // 1. Run `cargo insta test --review` under `./sui-config`.
 // 2. Review, accept or reject changes.
 
+use std::num::NonZeroUsize;
+
 use fastcrypto::traits::KeyPair;
 use insta::assert_yaml_snapshot;
 use rand::{rngs::StdRng, SeedableRng};
-use std::num::NonZeroUsize;
 use sui_config::{
     genesis::{GenesisCeremonyParameters, TokenDistributionScheduleBuilder},
     node::{DEFAULT_COMMISSION_RATE, DEFAULT_VALIDATOR_GAS_PRICE},
@@ -62,13 +63,12 @@ fn populated_genesis_snapshot_matches() {
     let worker_key: NetworkKeyPair = get_key_pair_from_rng(&mut rng).1;
     let network_key: NetworkKeyPair = get_key_pair_from_rng(&mut rng).1;
     let account_key: AccountKeyPair = get_key_pair_from_rng(&mut rng).1;
-    let addr = SuiAddress::from(account_key.public());
     let validator = ValidatorInfo {
         name: "0".into(),
         protocol_key: key.public().into(),
         worker_key: worker_key.public().clone(),
-        account_address: addr,
-        revenue_receiving_address: addr,
+        account_address: SuiAddress::from(account_key.public()),
+        revenue_receiving_address: SuiAddress::from(account_key.public()),
         network_key: network_key.public().clone(),
         gas_price: DEFAULT_VALIDATOR_GAS_PRICE,
         commission_rate: DEFAULT_COMMISSION_RATE,
@@ -110,6 +110,7 @@ fn network_config_snapshot_matches() {
         net::{IpAddr, Ipv4Addr, SocketAddr},
         path::PathBuf,
     };
+
     use sui_swarm_config::network_config_builder::ConfigBuilder;
 
     let temp_dir = tempfile::tempdir().unwrap();
@@ -127,17 +128,8 @@ fn network_config_snapshot_matches() {
         validator_config.p2p_config.listen_address = fake_socket;
         validator_config.p2p_config.external_address = None;
         validator_config.admin_interface_port = 8888;
-        let metrics_addr: Multiaddr = "/ip4/127.0.0.1/tcp/1234".parse().unwrap();
-        let primary_network_admin_server_port = 5678;
-        let worker_network_admin_server_base_port = 8765;
         if let Some(consensus_config) = validator_config.consensus_config.as_mut() {
-            consensus_config.address = Multiaddr::empty();
             consensus_config.db_path = PathBuf::from("/tmp/foo/");
-            consensus_config.narwhal_config.prometheus_metrics.socket_addr = metrics_addr;
-            consensus_config.narwhal_config.network_admin_server.primary_network_admin_server_port =
-                primary_network_admin_server_port;
-            consensus_config.narwhal_config.network_admin_server.worker_network_admin_server_base_port =
-                worker_network_admin_server_base_port;
         }
     }
     assert_yaml_snapshot!(network_config, {

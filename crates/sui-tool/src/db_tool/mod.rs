@@ -1,14 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use self::{
-    db_dump::{dump_table, duplicate_objects_summary, list_tables, table_summary, StoreName},
-    index_search::{search_index, SearchRange},
-};
-use crate::db_tool::db_dump::{compact, print_table_metadata, prune_checkpoints, prune_objects};
+use std::path::{Path, PathBuf};
+
 use anyhow::{anyhow, bail};
 use clap::Parser;
-use std::path::{Path, PathBuf};
 use sui_core::{
     authority::{authority_per_epoch_store::AuthorityEpochTables, authority_store_tables::AuthorityPerpetualTables},
     checkpoints::CheckpointStore,
@@ -20,6 +16,12 @@ use sui_types::{
     messages_checkpoint::{CheckpointDigest, CheckpointSequenceNumber},
 };
 use typed_store::rocks::MetricConf;
+
+use self::{
+    db_dump::{dump_table, duplicate_objects_summary, list_tables, table_summary, StoreName},
+    index_search::{search_index, SearchRange},
+};
+use crate::db_tool::db_dump::{compact, print_table_metadata, prune_checkpoints, prune_objects};
 pub mod db_dump;
 mod index_search;
 
@@ -301,8 +303,8 @@ pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
     // Download the snapshot for the epoch you want to restore to the local disk. You will find one snapshot per epoch in the S3 bucket. We need to place the snapshot in the dir where config is pointing to. If db-config in fullnode.yaml is /opt/sui/db/authorities_db and we want to restore from epoch 10, we want to copy the snapshot to /opt/sui/db/authorities_dblike this:
     // aws s3 cp s3://myBucket/dir /opt/sui/db/authorities_db/ --recursive —exclude “*” —include “epoch_10*”
     // Mark downloaded snapshot as live: mv  /opt/sui/db/authorities_db/epoch_10  /opt/sui/db/authorities_db/live
-    // Reset the downloaded db to execute from genesis with: cargo run --package one-tool -- db-tool --db-path /opt/sui/db/authorities_db/live reset-db
-    // Start the sui full node: cargo run --release --bin one-node -- --config-path ~/db_checkpoints/fullnode.yaml
+    // Reset the downloaded db to execute from genesis with: cargo run --package sui-tool -- db-tool --db-path /opt/sui/db/authorities_db/live reset-db
+    // Start the sui full node: cargo run --release --bin sui-node -- --config-path ~/db_checkpoints/fullnode.yaml
     // A sample fullnode.yaml config would be:
     // ---
     // db-path:  /opt/sui/db/authorities_db
@@ -332,8 +334,7 @@ pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
     );
     perpetual_db.reset_db_for_execution_since_genesis()?;
 
-    let checkpoint_db =
-        CheckpointStore::open_tables_read_write(path.join("checkpoints"), MetricConf::default(), None, None);
+    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
     checkpoint_db.reset_db_for_execution_since_genesis()?;
 
     let epoch_db = AuthorityEpochTables::open_tables_read_write(path.join("store"), MetricConf::default(), None, None);
@@ -346,14 +347,14 @@ pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
 /// NOTE: Does not force re-execution of transactions.
 /// Run with: cargo run --package sui-tool -- db-tool --db-path /opt/sui/db/authorities_db/live rewind-checkpoint-execution --epoch 3 --checkpoint-sequence-number 300000
 pub fn rewind_checkpoint_execution(path: &Path, epoch: EpochId, checkpoint_sequence_number: u64) -> anyhow::Result<()> {
-    let checkpoint_db =
-        CheckpointStore::open_tables_read_write(path.join("checkpoints"), MetricConf::default(), None, None);
+    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
     let Some(checkpoint) = checkpoint_db.get_checkpoint_by_sequence_number(checkpoint_sequence_number)? else {
         bail!("Checkpoint {checkpoint_sequence_number} not found!");
     };
     if epoch != checkpoint.epoch() {
         bail!("Checkpoint {checkpoint_sequence_number} is in epoch {} not {epoch}!", checkpoint.epoch());
     }
+
     let highest_executed_sequence_number =
         checkpoint_db.get_highest_executed_checkpoint_seq_number()?.unwrap_or_default();
     if checkpoint_sequence_number > highest_executed_sequence_number {
@@ -406,10 +407,9 @@ pub fn print_all_entries(
 
 /// Force sets state sync checkpoint watermarks.
 /// Run with (for example):
-/// cargo run --package one-tool -- db-tool --db-path /opt/sui/db/authorities_db/live set_checkpoint_watermark --highest-synced 300000
+/// cargo run --package sui-tool -- db-tool --db-path /opt/sui/db/authorities_db/live set_checkpoint_watermark --highest-synced 300000
 pub fn set_checkpoint_watermark(path: &Path, options: SetCheckpointWatermarkOptions) -> anyhow::Result<()> {
-    let checkpoint_db =
-        CheckpointStore::open_tables_read_write(path.join("checkpoints"), MetricConf::default(), None, None);
+    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
 
     if let Some(highest_verified) = options.highest_verified {
         let Some(checkpoint) = checkpoint_db.get_checkpoint_by_sequence_number(highest_verified)? else {

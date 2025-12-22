@@ -8,13 +8,12 @@ use std::{
 };
 
 use futures::Future;
-use http::StatusCode;
+use http::{Request, StatusCode};
 use prometheus::{HistogramTimer, Registry};
 use tower::{load_shed::error::Overloaded, BoxError, Layer, Service, ServiceExt};
 use tracing::{error, info, warn};
 
 use crate::metrics::{is_path_tracked, normalize_path, RequestMetrics};
-use http::Request;
 
 /// Tower Layer for tracking metrics in Prometheus related to number, success-rate and latency of
 /// requests running through service.
@@ -141,7 +140,10 @@ impl MetricsGuard {
             if let Some(err) = error {
                 error!("Request failed for path {} in {:.2}s, error {:?}", self.path, elapsed, err);
             } else if let Some(status) = status {
-                error!("Request failed for path {} in {:.2}s with status: {}", self.path, elapsed, status);
+                // don't log too many requests as an error, as we're flooding the logs
+                if status != StatusCode::TOO_MANY_REQUESTS {
+                    error!("Request failed for path {} in {:.2}s with status: {}", self.path, elapsed, status);
+                }
             } else {
                 warn!("Request failed for path {} in {:.2}s", self.path, elapsed);
             }

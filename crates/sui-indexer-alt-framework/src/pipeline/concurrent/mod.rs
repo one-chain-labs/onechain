@@ -5,17 +5,11 @@ use std::{sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use sui_field_count::FieldCount;
+use sui_pg_db::{self as db, Db};
 use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
-
-use crate::{
-    db::{self, Db},
-    metrics::IndexerMetrics,
-    watermarks::CommitterWatermark,
-};
-
-use super::{processor::processor, CommitterConfig, Processor, WatermarkPart, PIPELINE_BUFFER};
+use tracing::info;
 
 use self::{
     collector::collector,
@@ -24,6 +18,8 @@ use self::{
     pruner::pruner,
     reader_watermark::reader_watermark,
 };
+use super::{processor::processor, CommitterConfig, Processor, WatermarkPart, PIPELINE_BUFFER};
+use crate::{metrics::IndexerMetrics, models::watermarks::CommitterWatermark};
 
 mod collector;
 mod commit_watermark;
@@ -63,13 +59,25 @@ pub trait Handler: Processor<Value: FieldCount> {
     /// If there are more than this many rows pending, the committer applies backpressure.
     const MAX_PENDING_ROWS: usize = 5000;
 
+    /// Whether the pruner requires processed values in order to prune.
+    /// This will determine the first checkpoint to process when we start the pipeline.
+    /// If this is true, when the pipeline starts, it will process all checkpoints from the
+    /// pruner watermark, so that the pruner have access to the processed values for any unpruned
+    /// checkpoints.
+    /// If this is false, when the pipeline starts, it will process all checkpoints from the
+    /// committer watermark.
+    // TODO: There are two issues with this:
+    // 1. There is no static guarantee that this flag is set correctly when the pruner needs processed values.
+    // 2. The name is a bit abstract.
+    const PRUNING_REQUIRES_PROCESSED_VALUES: bool = false;
+
     /// Take a chunk of values and commit them to the database, returning the number of rows
     /// affected.
     async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> anyhow::Result<usize>;
 
-    /// Clean up data between checkpoints `_from` and `_to` (inclusive) in the database, returning
+    /// Clean up data between checkpoints `_from` and `_to_exclusive` (exclusive) in the database, returning
     /// the number of rows affected. This function is optional, and defaults to not pruning at all.
-    async fn prune(_from: u64, _to: u64, _conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
+    async fn prune(&self, _from: u64, _to_exclusive: u64, _conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
         Ok(0)
     }
 }
@@ -82,12 +90,6 @@ pub struct ConcurrentConfig {
 
     /// Configuration for the pruner, that deletes old data.
     pub pruner: Option<PrunerConfig>,
-
-    /// How many checkpoints lagged behind latest seen checkpoint to hold back writes for.
-    /// This is useful if pruning is implemented as a concurrent pipeline, and it must be behind
-    /// the pipeline it tries to prune from by a certain number of checkpoints, to ensure
-    /// consistency reads remain valid for a certain amount of time.
-    pub checkpoint_lag: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -104,11 +106,17 @@ pub struct PrunerConfig {
 
     /// The maximum range to try and prune in one request, measured in checkpoints.
     pub max_chunk_size: u64,
+
+    /// The max number of tasks to run in parallel for pruning.
+    pub prune_concurrency: u64,
 }
 
 /// Values ready to be written to the database. This is an internal type used to communicate
 /// between the collector and the committer parts of the pipeline.
-struct Batched<H: Handler> {
+///
+/// Values inside each batch may or may not be from the same checkpoint. Values in the same
+/// checkpoint can also be split across multiple batches.
+struct BatchedRows<H: Handler> {
     /// The rows to write
     values: Vec<H::Value>,
     /// Proportions of all the watermarks that are represented in this chunk
@@ -125,7 +133,7 @@ impl PrunerConfig {
     }
 }
 
-impl<H: Handler> Batched<H> {
+impl<H: Handler> BatchedRows<H> {
     fn new() -> Self {
         Self { values: vec![], watermark: vec![] }
     }
@@ -144,7 +152,13 @@ impl<H: Handler> Batched<H> {
 
 impl Default for PrunerConfig {
     fn default() -> Self {
-        Self { interval_ms: 300_000, delay_ms: 120_000, retention: 4_000_000, max_chunk_size: 2_000 }
+        Self {
+            interval_ms: 300_000,
+            delay_ms: 120_000,
+            retention: 4_000_000,
+            max_chunk_size: 2_000,
+            prune_concurrency: 1,
+        }
     }
 }
 
@@ -178,7 +192,8 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {
-    let ConcurrentConfig { committer: committer_config, pruner: pruner_config, checkpoint_lag } = config;
+    info!(pipeline = H::NAME, "Starting pipeline with config: {:?}", config);
+    let ConcurrentConfig { committer: committer_config, pruner: pruner_config } = config;
 
     let (processor_tx, collector_rx) = mpsc::channel(H::FANOUT + PIPELINE_BUFFER);
     let (collector_tx, committer_rx) = mpsc::channel(committer_config.write_concurrency + PIPELINE_BUFFER);
@@ -189,17 +204,12 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     // the global cancel signal. We achieve this by creating a child cancel token that we call
     // cancel on once the committer tasks have shutdown.
     let pruner_cancel = cancel.child_token();
+    let handler = Arc::new(handler);
 
-    let processor = processor(handler, checkpoint_rx, processor_tx, metrics.clone(), cancel.clone());
+    let processor = processor(handler.clone(), checkpoint_rx, processor_tx, metrics.clone(), cancel.clone());
 
-    let collector = collector::<H>(
-        committer_config.clone(),
-        checkpoint_lag,
-        collector_rx,
-        collector_tx,
-        metrics.clone(),
-        cancel.clone(),
-    );
+    let collector =
+        collector::<H>(committer_config.clone(), collector_rx, collector_tx, metrics.clone(), cancel.clone());
 
     let committer = committer::<H>(
         committer_config.clone(),
@@ -224,7 +234,7 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     let reader_watermark =
         reader_watermark::<H>(pruner_config.clone(), db.clone(), metrics.clone(), pruner_cancel.clone());
 
-    let pruner = pruner::<H>(pruner_config, db, metrics, pruner_cancel.clone());
+    let pruner = pruner(handler, pruner_config, db, metrics, pruner_cancel.clone());
 
     tokio::spawn(async move {
         let (_, _, _, _) = futures::join!(processor, collector, committer, commit_watermark);
@@ -235,5 +245,9 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
 }
 
 const fn max_chunk_rows<H: Handler>() -> usize {
-    i16::MAX as usize / H::Value::FIELD_COUNT
+    if H::Value::FIELD_COUNT == 0 {
+        i16::MAX as usize
+    } else {
+        i16::MAX as usize / H::Value::FIELD_COUNT
+    }
 }

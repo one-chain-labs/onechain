@@ -3,6 +3,14 @@
 
 use std::str::FromStr;
 
+use async_graphql::{connection::Connection, *};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::{Deserialize, Serialize};
+use sui_indexer::models::objects::StoredHistoryObject;
+use sui_name_service::{Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError};
+use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
+
 use super::{
     available_range::AvailableRange,
     balance::{self, Balance},
@@ -30,16 +38,9 @@ use crate::{
     data::{Db, DbConnection, QueryExecutor},
     error::Error,
 };
-use async_graphql::{connection::Connection, *};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
-use serde::{Deserialize, Serialize};
-use sui_indexer::models::objects::StoredHistoryObject;
-use sui_json_rpc::name_service::{Domain as NativeDomain, NameRecord, NameServiceConfig, NameServiceError};
-use sui_types::{base_types::SuiAddress as NativeSuiAddress, dynamic_field::Field, id::UID};
 
-const MOD_REGISTRATION: &IdentStr = ident_str!("onens_registration");
-const TYP_REGISTRATION: &IdentStr = ident_str!("OnensRegistration");
+const MOD_REGISTRATION: &IdentStr = ident_str!("suins_registration");
+const TYP_REGISTRATION: &IdentStr = ident_str!("SuinsRegistration");
 
 /// Represents the "core" of the name service (e.g. the on-chain registry and reverse registry). It
 /// doesn't contain any fields because we look them up based on the `NameServiceConfig`.
@@ -50,7 +51,7 @@ pub(crate) struct NameService;
 pub(crate) struct Domain(NativeDomain);
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "sui_json_rpc::name_service::DomainFormat")]
+#[graphql(remote = "sui_name_service::DomainFormat")]
 pub enum DomainFormat {
     At,
     Dot,
@@ -262,7 +263,7 @@ impl SuinsRegistration {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(&self.super_).has_public_transfer(ctx).await

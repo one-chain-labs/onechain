@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     balance::Balance,
@@ -13,7 +14,6 @@ use crate::{
     object::{Data, Object},
     SUI_SYSTEM_ADDRESS,
 };
-use serde::{Deserialize, Serialize};
 
 /// Maximum number of active validators at any moment.
 /// We do not allow the number of validators in any epoch to go above this.

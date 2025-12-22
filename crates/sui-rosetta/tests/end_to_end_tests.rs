@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use serde_json::json;
 use std::{num::NonZeroUsize, time::Duration};
 
 use rosetta_client::start_rosetta_test_server;
+use serde_json::json;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_keys::keystore::AccountKeystore;
 use sui_rosetta::{
@@ -288,7 +288,7 @@ async fn test_withdraw_stake() {
 }
 
 #[tokio::test]
-async fn test_pay_sui() {
+async fn test_pay_oct() {
     let test_cluster = TestClusterBuilder::new().build().await;
     let sender = test_cluster.get_address_0();
     let recipient = test_cluster.get_address_1();
@@ -300,12 +300,12 @@ async fn test_pay_sui() {
     let ops = serde_json::from_value(json!(
         [{
             "operation_identifier":{"index":0},
-            "type":"PaySui",
+            "type":"PayOct",
             "account": { "address" : recipient.to_string() },
             "amount" : { "value": "1000000000" }
         },{
             "operation_identifier":{"index":1},
-            "type":"PaySui",
+            "type":"PayOct",
             "account": { "address" : sender.to_string() },
             "amount" : { "value": "-1000000000" }
         }]
@@ -336,7 +336,7 @@ async fn test_pay_sui() {
 }
 
 #[tokio::test]
-async fn test_pay_sui_multiple_times() {
+async fn test_pay_oct_multiple_times() {
     let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(36000000).build().await;
     let sender = test_cluster.get_address_0();
     let recipient = test_cluster.get_address_1();
@@ -346,17 +346,17 @@ async fn test_pay_sui_multiple_times() {
     let (rosetta_client, _handle) = start_rosetta_test_server(client.clone()).await;
     let coin_cache = CoinMetadataCache::new(client.clone(), NonZeroUsize::new(2).unwrap());
 
-    for i in 1..20 {
+    for i in 1 .. 20 {
         println!("Iteration: {}", i);
         let ops = serde_json::from_value(json!(
             [{
                 "operation_identifier":{"index":0},
-                "type":"PaySui",
+                "type":"PayOct",
                 "account": { "address" : recipient.to_string() },
                 "amount" : { "value": "1000000000" }
             },{
                 "operation_identifier":{"index":1},
-                "type":"PaySui",
+                "type":"PayOct",
                 "account": { "address" : sender.to_string() },
                 "amount" : { "value": "-1000000000" }
             }]

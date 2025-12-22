@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::*;
+use sui_types::transaction::TransactionKind as NativeTransactionKind;
+
 use self::{
     consensus_commit_prologue::ConsensusCommitPrologueTransaction,
     end_of_epoch::ChangeEpochTransaction,
@@ -12,8 +15,6 @@ use crate::types::transaction_block_kind::{
     end_of_epoch::EndOfEpochTransaction,
     programmable::ProgrammableTransactionBlock,
 };
-use async_graphql::*;
-use sui_types::transaction::TransactionKind as NativeTransactionKind;
 
 pub(crate) mod authenticator_state_update;
 pub(crate) mod consensus_commit_prologue;
@@ -53,6 +54,9 @@ impl TransactionBlockKind {
             }
             K::ConsensusCommitPrologueV3(ccp) => {
                 T::ConsensusCommitPrologue(ConsensusCommitPrologueTransaction::from_v3(ccp, checkpoint_viewed_at))
+            }
+            K::ConsensusCommitPrologueV4(ccp) => {
+                T::ConsensusCommitPrologue(ConsensusCommitPrologueTransaction::from_v4(ccp, checkpoint_viewed_at))
             }
             K::AuthenticatorStateUpdate(asu) => {
                 T::AuthenticatorState(AuthenticatorStateUpdateTransaction { native: asu, checkpoint_viewed_at })

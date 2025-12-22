@@ -1,24 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    authority::authority_per_epoch_store::AuthorityPerEpochStore,
-    consensus_adapter::{BlockStatusReceiver, ConsensusClient},
-    consensus_handler::ConsensusHandlerInitializer,
-    consensus_manager::mysticeti_manager::MysticetiManager,
-    consensus_validator::SuiTxValidator,
-    mysticeti_adapter::LazyMysticetiClient,
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
 };
+
 use arc_swap::ArcSwapOption;
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use fastcrypto::traits::KeyPair as _;
 use mysten_metrics::RegistryService;
 use prometheus::{register_int_gauge_with_registry, IntGauge, Registry};
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant},
-};
 use sui_config::{ConsensusConfig, NodeConfig};
 use sui_protocol_config::ProtocolVersion;
 use sui_types::{committee::EpochId, error::SuiResult, messages_consensus::ConsensusTransaction};
@@ -27,6 +20,15 @@ use tokio::{
     time::{sleep, timeout},
 };
 use tracing::info;
+
+use crate::{
+    authority::authority_per_epoch_store::AuthorityPerEpochStore,
+    consensus_adapter::{BlockStatusReceiver, ConsensusClient},
+    consensus_handler::ConsensusHandlerInitializer,
+    consensus_manager::mysticeti_manager::MysticetiManager,
+    consensus_validator::SuiTxValidator,
+    mysticeti_adapter::LazyMysticetiClient,
+};
 
 pub mod mysticeti_manager;
 

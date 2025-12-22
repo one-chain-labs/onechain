@@ -30,17 +30,18 @@ pub(crate) async fn set_version_middleware(
 mod tests {
     use std::net::SocketAddr;
 
+    use axum::{body::Body, middleware, routing::get, Router};
+    use http::StatusCode;
+    use mysten_metrics;
+    use tokio_util::sync::CancellationToken;
+    use tower::ServiceExt;
+
     use super::*;
     use crate::{
         config::{ConnectionConfig, ServiceConfig, Version},
         metrics::Metrics,
         server::builder::AppState,
     };
-    use axum::{body::Body, middleware, routing::get, Router};
-    use http::StatusCode;
-    use mysten_metrics;
-    use tokio_util::sync::CancellationToken;
-    use tower::ServiceExt;
 
     fn metrics() -> Metrics {
         let binding_address: SocketAddr = "0.0.0.0:9185".parse().unwrap();

@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[tokio::test]
-async fn test_operation_data_parsing_pay_sui() -> Result<(), anyhow::Error> {
+async fn test_operation_data_parsing_pay_oct() -> Result<(), anyhow::Error> {
     let gas = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());
 
     let sender = SuiAddress::random_for_testing_only();
@@ -31,7 +31,7 @@ async fn test_operation_data_parsing_pay_sui() -> Result<(), anyhow::Error> {
         TransactionData::new_programmable(sender, vec![gas], pt, TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price, gas_price);
 
     let ops: Operations = data.clone().try_into()?;
-    ops.0.iter().for_each(|op| assert_eq!(op.type_, OperationType::PaySui));
+    ops.0.iter().for_each(|op| assert_eq!(op.type_, OperationType::PayOct));
     let metadata = ConstructionMetadata {
         sender,
         coins: vec![gas],

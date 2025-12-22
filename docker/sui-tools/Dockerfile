@@ -25,7 +25,7 @@ RUN cargo build --profile ${PROFILE} \
     --bin sui-bridge-cli \
     --bin sui-analytics-indexer \
     --bin sui-edge-proxy \
-    --bin one_chain \
+    --bin one \
     --bin sui-faucet \
     --bin sui-cluster-test \
     --bin one-tool
@@ -45,7 +45,7 @@ COPY --from=builder /sui/target/release/deepbook-indexer /usr/local/bin
 COPY --from=builder /sui/target/release/sui-bridge-cli /usr/local/bin
 COPY --from=builder /sui/target/release/sui-analytics-indexer /usr/local/bin
 COPY --from=builder /sui/target/release/sui-edge-proxy /usr/local/bin
-COPY --from=builder /sui/target/release/one_chain /usr/local/bin
+COPY --from=builder /sui/target/release/one /usr/local/bin
 COPY --from=builder /sui/target/release/sui-faucet /usr/local/bin
 COPY --from=builder /sui/target/release/sui-cluster-test /usr/local/bin
 COPY --from=builder /sui/target/release/one-tool /usr/local/bin

@@ -4,8 +4,6 @@
 pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    #[cfg(feature = "tracing")]
-    use move_vm_config::runtime::VMProfilerConfig;
     use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
     use anyhow::Result;
@@ -13,6 +11,8 @@ mod checked {
     use move_bytecode_verifier::verify_module_with_config_metered;
     use move_bytecode_verifier_meter::Meter;
     use move_core_types::account_address::AccountAddress;
+    #[cfg(feature = "tracing")]
+    use move_vm_config::runtime::VMProfilerConfig;
     use move_vm_config::{
         runtime::{VMConfig, VMRuntimeLimitsConfig},
         verifier::VerifierConfig,
@@ -22,21 +22,17 @@ mod checked {
         native_extensions::NativeContextExtensions,
         native_functions::NativeFunctionTable,
     };
-    use sui_move_natives::object_runtime;
-    use sui_types::metrics::BytecodeVerifierMetrics;
-    use sui_verifier::check_for_verifier_timeout;
-    use tracing::instrument;
-
-    use sui_move_natives::{object_runtime::ObjectRuntime, NativesCostTable};
+    use sui_move_natives::{object_runtime, object_runtime::ObjectRuntime, NativesCostTable};
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::*,
         error::{ExecutionError, ExecutionErrorKind, SuiError},
         execution_config_utils::to_binary_config,
-        metrics::LimitsMetrics,
+        metrics::{BytecodeVerifierMetrics, LimitsMetrics},
         storage::ChildObjectResolver,
     };
-    use sui_verifier::verifier::sui_verify_module_metered_check_timeout_only;
+    use sui_verifier::{check_for_verifier_timeout, verifier::sui_verify_module_metered_check_timeout_only};
+    use tracing::instrument;
 
     pub fn new_move_vm(
         natives: NativeFunctionTable,
@@ -68,6 +64,7 @@ mod checked {
             binary_config: to_binary_config(protocol_config),
             rethrow_serialization_type_layout_errors: protocol_config.rethrow_serialization_type_layout_errors(),
             max_type_to_layout_nodes: protocol_config.max_type_to_layout_nodes_as_option(),
+            variant_nodes: protocol_config.variant_nodes(),
         })
         .map_err(|_| SuiError::ExecutionInvariantViolation)
     }

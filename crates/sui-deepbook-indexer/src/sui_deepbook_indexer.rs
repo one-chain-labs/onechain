@@ -5,26 +5,23 @@ use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use diesel::{dsl::now, ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper, TextExpressionMethods};
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
-use sui_indexer_builder::progress::ProgressSavingPolicy;
-use sui_types::{
-    base_types::ObjectID,
-    transaction::{Command, TransactionDataAPI},
-};
-use tracing::info;
-
 use sui_indexer_builder::{
     indexer_builder::{DataMapper, IndexerProgressStore, Persistent},
+    progress::ProgressSavingPolicy,
     sui_datasource::CheckpointTxnData,
     Task,
     Tasks,
     LIVE_TASK_TARGET_CHECKPOINT,
 };
 use sui_types::{
+    base_types::ObjectID,
     effects::TransactionEffectsAPI,
     event::Event,
     execution_status::ExecutionStatus,
     full_checkpoint_content::CheckpointTransaction,
+    transaction::{Command, TransactionDataAPI},
 };
+use tracing::info;
 
 use crate::{
     events::{
@@ -853,7 +850,7 @@ fn process_sui_event(
                 txn_data
             }
             _ => {
-                // todo: metrics.total_sui_bridge_txn_other.inc();
+                // todo: metrics.total_oct_bridge_txn_other.inc();
                 None
             }
         }

@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_graphql::{connection::Connection, *};
+use sui_types::{
+    coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap},
+    gas_coin::{GAS, TOTAL_SUPPLY_OCT},
+    TypeTag,
+};
+
 use super::{
     balance::{self, Balance},
     base64::Base64,
@@ -20,12 +27,6 @@ use super::{
     uint53::UInt53,
 };
 use crate::{connection::ScanConnection, data::Db, error::Error};
-use async_graphql::{connection::Connection, *};
-use sui_types::{
-    coin::{CoinMetadata as NativeCoinMetadata, TreasuryCap},
-    gas_coin::{GAS, TOTAL_SUPPLY_OCT},
-    TypeTag,
-};
 
 pub(crate) struct CoinMetadata {
     pub super_: MoveObject,
@@ -208,7 +209,7 @@ impl CoinMetadata {
     }
 
     /// Determines whether a transaction can transfer this object, using the TransferObjects
-    /// transaction command or `sui::transfer::public_transfer`, both of which require the object to
+    /// transaction command or `one::transfer::public_transfer`, both of which require the object to
     /// have the `key` and `store` abilities.
     pub(crate) async fn has_public_transfer(&self, ctx: &Context<'_>) -> Result<bool> {
         MoveObjectImpl(&self.super_).has_public_transfer(ctx).await

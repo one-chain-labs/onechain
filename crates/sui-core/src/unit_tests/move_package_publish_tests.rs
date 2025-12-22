@@ -1,35 +1,34 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::{
-    authority_tests::{call_move, init_state_with_ids, send_and_confirm_transaction},
-    move_integration_tests::{build_and_publish_test_package, build_test_package},
-};
+use std::{collections::HashSet, env, fs::File, io::Read, path::PathBuf};
 
+use expect_test::expect;
 use move_binary_format::CompiledModule;
+use move_package::source_package::manifest_parser;
+use sui_framework::BuiltInFramework;
+use sui_move_build::{check_unpublished_dependencies, gather_published_ids, BuildConfig};
 use sui_types::{
     base_types::ObjectID,
-    error::UserInputError,
+    crypto::{get_key_pair, AccountKeyPair},
+    effects::TransactionEffectsAPI,
+    error::{SuiError, UserInputError},
+    execution_status::{ExecutionFailureStatus, ExecutionStatus},
     object::{Data, ObjectRead, Owner},
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{TransactionData, TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
     utils::to_sender_signed_transaction,
 };
 
-use move_package::source_package::manifest_parser;
-use sui_move_build::{check_unpublished_dependencies, gather_published_ids, BuildConfig};
-use sui_types::{
-    crypto::{get_key_pair, AccountKeyPair},
-    error::SuiError,
-};
-
-use crate::authority::move_integration_tests::{build_multi_publish_txns, build_package, run_multi_txns};
-use expect_test::expect;
-use std::{collections::HashSet, env, fs::File, io::Read, path::PathBuf};
-use sui_framework::BuiltInFramework;
-use sui_types::{
-    effects::TransactionEffectsAPI,
-    execution_status::{ExecutionFailureStatus, ExecutionStatus},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
+use crate::authority::{
+    authority_tests::{call_move, init_state_with_ids, send_and_confirm_transaction},
+    move_integration_tests::{
+        build_and_publish_test_package,
+        build_multi_publish_txns,
+        build_package,
+        build_test_package,
+        run_multi_txns,
+    },
 };
 
 #[tokio::test]

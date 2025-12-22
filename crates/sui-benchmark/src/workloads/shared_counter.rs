@@ -1,6 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use futures::future::join_all;
+use rand::{seq::SliceRandom, Rng};
+use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::{
+    base_types::{ObjectDigest, ObjectID, SequenceNumber},
+    crypto::get_key_pair,
+    transaction::Transaction,
+};
+use tracing::{debug, error, info};
+
 use crate::{
     drivers::Interval,
     system_state_observer::SystemStateObserver,
@@ -23,17 +36,6 @@ use crate::{
     ExecutionEffects,
     ValidatorProxy,
 };
-use async_trait::async_trait;
-use futures::future::join_all;
-use rand::{seq::SliceRandom, Rng};
-use std::sync::Arc;
-use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectDigest, ObjectID, SequenceNumber},
-    crypto::get_key_pair,
-    transaction::Transaction,
-};
-use tracing::{debug, error, info};
 
 /// The max amount of gas units needed for a payload.
 pub const MAX_GAS_IN_UNIT: u64 = 1_000_000_000;
@@ -66,7 +68,7 @@ impl Payload for SharedCounterTestPayload {
     fn make_transaction(&mut self) -> Transaction {
         let rgp = self.system_state_observer.state.borrow().reference_gas_price;
         let gas_price_increment =
-            if self.max_tip_amount == 0 { 0 } else { rand::thread_rng().gen_range(0..self.max_tip_amount) };
+            if self.max_tip_amount == 0 { 0 } else { rand::thread_rng().gen_range(0 .. self.max_tip_amount) };
         let gas_price = rgp + gas_price_increment;
         TestTransactionBuilder::new(self.gas.1, self.gas.0, gas_price)
             .call_counter_increment(self.package_id, self.counter_id, self.counter_initial_shared_version)
@@ -99,7 +101,7 @@ impl SharedCounterWorkloadBuilder {
         duration: Interval,
         group: u32,
     ) -> Option<WorkloadBuilderInfo> {
-        let target_qps = (workload_weight * target_qps as f32) as u64;
+        let target_qps = (workload_weight * target_qps as f32).ceil() as u64;
         let num_workers = (workload_weight * num_workers as f32).ceil() as u64;
         let max_ops = target_qps * in_flight_ratio;
         let shared_counter_ratio = 1.0 - (std::cmp::min(shared_counter_hotness_factor, 100) as f32 / 100.0);
@@ -132,7 +134,7 @@ impl WorkloadBuilder<dyn Payload> for SharedCounterWorkloadBuilder {
         configs.push(GasCoinConfig { amount: MAX_GAS_FOR_TESTING, address, keypair: Arc::new(keypair) });
 
         // Gas coins for creating counters
-        for _i in 0..self.num_counters {
+        for _i in 0 .. self.num_counters {
             let (address, keypair) = get_key_pair();
             configs.push(GasCoinConfig { amount: MAX_GAS_FOR_TESTING, address, keypair: Arc::new(keypair) });
         }
@@ -145,7 +147,7 @@ impl WorkloadBuilder<dyn Payload> for SharedCounterWorkloadBuilder {
             + ESTIMATED_COMPUTATION_COST
             + STORAGE_COST_PER_COUNTER * self.num_counters;
         // Gas coins for running workload
-        for _i in 0..self.num_payloads {
+        for _i in 0 .. self.num_payloads {
             let (address, keypair) = get_key_pair();
             configs.push(GasCoinConfig { amount, address, keypair: Arc::new(keypair) });
         }

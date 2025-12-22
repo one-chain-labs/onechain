@@ -1,11 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeSet;
+
+use async_graphql::InputObject;
+use sui_types::base_types::SuiAddress as NativeSuiAddress;
+
 use super::TransactionBlockKindInput;
 use crate::types::{digest::Digest, intersect, sui_address::SuiAddress, type_filter::FqNameFilter, uint53::UInt53};
-use async_graphql::InputObject;
-use std::collections::BTreeSet;
-use sui_types::base_types::SuiAddress as NativeSuiAddress;
 
 #[derive(InputObject, Debug, Default, Clone)]
 pub(crate) struct TransactionBlockFilter {

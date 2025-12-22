@@ -1,7 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitored_scope;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
+    hash::{Hash, Hasher},
+    sync::Arc,
+    time::Duration,
+};
+
 use futures::FutureExt;
 use parking_lot::Mutex;
 use prometheus::{
@@ -11,18 +17,14 @@ use prometheus::{
     IntGaugeVec,
     Registry,
 };
-use std::{
-    collections::{hash_map::DefaultHasher, HashMap, HashSet},
-    hash::{Hash, Hasher},
-    sync::Arc,
-    time::Duration,
-};
 use tokio::{
     runtime::Handle,
     sync::{mpsc, mpsc::error::TrySendError},
     time::Instant,
 };
 use tracing::{debug, error};
+
+use crate::monitored_scope;
 
 type Point = u64;
 type HistogramMessage = (HistogramLabels, Point);
@@ -281,7 +283,7 @@ impl HistogramReporter {
     }
 }
 
-impl<'a> Drop for HistogramTimerGuard<'a> {
+impl Drop for HistogramTimerGuard<'_> {
     fn drop(&mut self) {
         self.histogram.report(self.start.elapsed().as_millis() as u64);
     }
@@ -289,8 +291,9 @@ impl<'a> Drop for HistogramTimerGuard<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use prometheus::proto::MetricFamily;
+
+    use super::*;
 
     #[test]
     fn pct_index_test() {

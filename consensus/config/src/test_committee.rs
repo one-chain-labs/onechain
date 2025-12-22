@@ -48,7 +48,7 @@ fn get_available_local_address() -> Multiaddr {
 fn get_available_port(host: &str) -> u16 {
     const MAX_PORT_RETRIES: u32 = 1000;
 
-    for _ in 0..MAX_PORT_RETRIES {
+    for _ in 0 .. MAX_PORT_RETRIES {
         if let Ok(port) = get_ephemeral_port(host) {
             return port;
         }

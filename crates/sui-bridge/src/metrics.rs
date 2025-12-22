@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::MetricsConfig;
+use std::time::Duration;
+
 use mysten_common::metrics::{push_metrics, MetricsPushClient};
 use mysten_metrics::RegistryService;
 use prometheus::{
@@ -17,8 +18,9 @@ use prometheus::{
     IntGaugeVec,
     Registry,
 };
-use std::time::Duration;
 use sui_types::crypto::NetworkKeyPair;
+
+use crate::config::MetricsConfig;
 
 const FINE_GRAINED_LATENCY_SEC_BUCKETS: &[f64] = &[
     0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6,
@@ -120,6 +122,11 @@ pub struct BridgeMetrics {
 
     pub(crate) auth_agg_ok_responses: IntCounterVec,
     pub(crate) auth_agg_bad_responses: IntCounterVec,
+
+    pub(crate) sui_eth_token_transfer_approved: IntCounter,
+    pub(crate) sui_eth_token_transfer_claimed: IntCounter,
+    pub(crate) eth_sui_token_transfer_approved: IntCounter,
+    pub(crate) eth_sui_token_transfer_claimed: IntCounter,
 }
 
 impl BridgeMetrics {
@@ -349,6 +356,34 @@ impl BridgeMetrics {
                 "bridge_auth_agg_bad_responses",
                 "Total number of bad respones from auth agg",
                 &["authority"],
+                registry,
+            )
+            .unwrap(),
+            sui_eth_token_transfer_approved: register_int_counter_with_registry!(
+                "bridge_sui_eth_token_transfer_approved",
+                "Total number of approved sui to eth token transfers (since metric introduced). \
+                Should be used to track rates rather than absolute values.",
+                registry,
+            )
+            .unwrap(),
+            sui_eth_token_transfer_claimed: register_int_counter_with_registry!(
+                "bridge_sui_eth_token_transfer_claimed",
+                "Total number of claimed sui to eth token transfers (since metric introduced). \
+                Should be used to track rates rather than absolute values.",
+                registry,
+            )
+            .unwrap(),
+            eth_sui_token_transfer_approved: register_int_counter_with_registry!(
+                "bridge_eth_sui_token_transfer_approved",
+                "Total number of approved eth to sui token transfers (since metric introduced). \
+                Should be used to track rates rather than absolute values.",
+                registry,
+            )
+            .unwrap(),
+            eth_sui_token_transfer_claimed: register_int_counter_with_registry!(
+                "bridge_eth_sui_token_transfer_claimed",
+                "Total number of claimed eth to sui token transfers (since metric introduced). \
+                Should be used to track rates rather than absolute values.",
                 registry,
             )
             .unwrap(),

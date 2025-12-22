@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
 use std::env;
+
+use serde::{Deserialize, Serialize};
 
 /// config as loaded from `config.yaml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]

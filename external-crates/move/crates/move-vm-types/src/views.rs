@@ -1,7 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag};
+use move_core_types::{
+    account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
+};
 
 /// Trait that provides an abstract view into a Move type.
 ///

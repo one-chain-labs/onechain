@@ -2,7 +2,7 @@
 # Copyright (c) Mysten Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
 #
-# assumes One chain cli installed (cargo build --bin one_chain)
+# assumes One chain cli installed (cargo build --bin one)
 
 cd genesis || exit
 python3 -m venv .venv

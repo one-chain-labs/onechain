@@ -46,7 +46,11 @@ impl FunctionTargetProcessor for CleanAndOptimizeProcessor {
         // Run optimizer
         let options = ProverOptions::get(func_env.module_env.env);
         let instrs = std::mem::take(&mut data.code);
-        let new_instrs = Optimizer { options: &options, target: &FunctionTarget::new(func_env, &data) }.run(instrs);
+        let new_instrs = Optimizer {
+            options: &options,
+            target: &FunctionTarget::new(func_env, &data),
+        }
+        .run(instrs);
         data.code = new_instrs;
         data
     }
@@ -83,9 +87,8 @@ struct Optimizer<'a> {
     target: &'a FunctionTarget<'a>,
 }
 
-impl<'a> TransferFunctions for Optimizer<'a> {
+impl TransferFunctions for Optimizer<'_> {
     type State = AnalysisState;
-
     const BACKWARD: bool = false;
 
     fn execute(&self, state: &mut AnalysisState, instr: &Bytecode, _offset: CodeOffset) {
@@ -103,7 +106,10 @@ impl<'a> TransferFunctions for Optimizer<'a> {
                     }
                 }
                 Function(mid, fid, _) => {
-                    let callee_env = &self.target.global_env().get_function_qid(mid.qualified(*fid));
+                    let callee_env = &self
+                        .target
+                        .global_env()
+                        .get_function_qid(mid.qualified(*fid));
                     let has_effect = if !self.options.for_interpretation && callee_env.is_native() {
                         // Exploit knowledge about builtin functions
                         !(callee_env.is_well_known(VECTOR_BORROW_MUT)
@@ -138,12 +144,12 @@ fn is_custom_borrow(fun_env: &FunctionEnv, borrow_natives: &Vec<String>) -> bool
     false
 }
 
-impl<'a> DataflowAnalysis for Optimizer<'a> {}
+impl DataflowAnalysis for Optimizer<'_> {}
 
 // Transformation
 // ==============
 
-impl<'a> Optimizer<'a> {
+impl Optimizer<'_> {
     fn run(&mut self, instrs: Vec<Bytecode>) -> Vec<Bytecode> {
         // Rum Analysis
         let cfg = StacklessControlFlowGraph::new_forward(&instrs);
@@ -170,13 +176,16 @@ impl<'a> Optimizer<'a> {
             // Perform peephole optimization
             match (new_instrs.last(), instr) {
                 (None, _) => {}
-                (Some(Call(_, _, UnpackRef, srcs1, _)), Call(_, _, PackRef, srcs2, _)) if srcs1[0] == srcs2[0] => {
+                (Some(Call(_, _, UnpackRef, srcs1, _)), Call(_, _, PackRef, srcs2, _))
+                    if srcs1[0] == srcs2[0] =>
+                {
                     // skip this redundant unpack/pack pair.
                     new_instrs.pop();
                     continue;
                 }
                 (Some(Call(_, dests, IsParent(..), srcs, _)), Branch(_, _, _, tmp))
-                    if dests[0] == *tmp && !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) =>
+                    if dests[0] == *tmp
+                        && !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) =>
                 {
                     assert!(matches!(instrs[code_offset + 1], Label(..)));
                     // skip this obsolete IsParent check when all WriteBacks in this block are redundant
@@ -220,7 +229,9 @@ impl<'a> Optimizer<'a> {
             // Other cases for skipping the instruction
             match instr {
                 // Remove unnecessary WriteBack
-                Call(_, _, WriteBack(..), srcs, _) if !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) => {
+                Call(_, _, WriteBack(..), srcs, _)
+                    if !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) =>
+                {
                     continue;
                 }
                 _ => {}

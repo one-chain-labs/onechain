@@ -1,5 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, RwLock},
+    time::Duration,
+};
+
 use anyhow::{bail, Context, Result};
 use fastcrypto::{
     ed25519::Ed25519PublicKey,
@@ -10,11 +16,6 @@ use futures::stream::{self, StreamExt};
 use once_cell::sync::Lazy;
 use prometheus::{register_counter_vec, register_histogram_vec, CounterVec, HistogramVec};
 use serde::Deserialize;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::{Arc, RwLock},
-    time::Duration,
-};
 use sui_tls::Allower;
 use sui_types::{
     base_types::SuiAddress,
@@ -428,14 +429,15 @@ fn append_path_segment(mut url: Url, segment: &str) -> Option<Url> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::admin::{generate_self_cert, CertKeyPair};
     use serde::Serialize;
     use sui_types::{
         base_types::SuiAddress,
         bridge::{BridgeCommitteeSummary, BridgeSummary, MoveTypeCommitteeMember},
         sui_system_state::sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
     };
+
+    use super::*;
+    use crate::admin::{generate_self_cert, CertKeyPair};
 
     /// creates a test that binds our proxy use case to the structure in sui_getLatestSuiSystemState
     /// most of the fields are garbage, but we will send the results of the serde process to a private decode

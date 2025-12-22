@@ -1,6 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+
 use crate::backfill::{
     backfill_instances::ingestion_backfills::{
         digest_task::DigestBackfill,
@@ -12,8 +16,6 @@ use crate::backfill::{
     BackfillTaskKind,
     IngestionBackfillKind,
 };
-use std::sync::Arc;
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 
 mod ingestion_backfills;
 mod sql_backfill;

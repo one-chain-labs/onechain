@@ -1,17 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_store::{
-    http::{get, DEFAULT_USER_AGENT, STRICT_PATH_ENCODE_SET},
-    ObjectStoreGetExt,
-};
+use std::{fmt, sync::Arc};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 use object_store::{path::Path, GetResult};
 use percent_encoding::{utf8_percent_encode, PercentEncode};
 use reqwest::{Client, ClientBuilder};
-use std::{fmt, sync::Arc};
+
+use crate::object_store::{
+    http::{get, DEFAULT_USER_AGENT, STRICT_PATH_ENCODE_SET},
+    ObjectStoreGetExt,
+};
 
 #[derive(Debug)]
 pub(crate) struct S3Client {

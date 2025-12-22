@@ -1,6 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, str::FromStr, sync::Arc};
+
+use anyhow::anyhow;
+use async_trait::async_trait;
+use move_core_types::identifier::Identifier;
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+};
+use regex::Regex;
+use strum::{EnumCount, IntoEnumIterator};
+use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
+use sui_protocol_config::ProtocolConfig;
+use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::{
+    base_types::{random_object_ref, ObjectID, ObjectRef, SuiAddress},
+    crypto::get_key_pair,
+    effects::TransactionEffectsAPI,
+    object::Owner,
+    transaction::{CallArg, Command, ObjectArg, Transaction, TransactionData},
+    utils::to_sender_signed_transaction,
+};
+use tracing::debug;
+
 use super::{
     workload::{Workload, WorkloadBuilder, MAX_GAS_FOR_TESTING},
     WorkloadBuilderInfo,
@@ -17,28 +41,6 @@ use crate::{
     ProgrammableTransactionBuilder,
     ValidatorProxy,
 };
-use anyhow::anyhow;
-use async_trait::async_trait;
-use move_core_types::identifier::Identifier;
-use rand::{
-    distributions::{Distribution, Standard},
-    Rng,
-};
-use regex::Regex;
-use std::{path::PathBuf, str::FromStr, sync::Arc};
-use strum::{EnumCount, IntoEnumIterator};
-use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
-use sui_protocol_config::ProtocolConfig;
-use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{random_object_ref, ObjectID, ObjectRef, SuiAddress},
-    crypto::get_key_pair,
-    effects::TransactionEffectsAPI,
-    object::Owner,
-    transaction::{CallArg, Command, ObjectArg, Transaction, TransactionData},
-    utils::to_sender_signed_transaction,
-};
-use tracing::debug;
 
 /// Number of vectors to create in LargeTransientRuntimeVectors workload
 const NUM_VECTORS: u64 = 1_000;
@@ -54,7 +56,7 @@ pub enum AdversarialPayloadType {
     LargePureFunctionArgs,
     // Creates a bunch of shared objects in the module init for adversarial, then taking them all as input)
     MaxReads,
-    // Creates a the largest package publish possible
+    // Creates the largest package publish possible
     MaxPackagePublish,
     // TODO:
     // - MaxReads (by creating a bunch of shared objects in the module init for adversarial, then taking them all as input)
@@ -99,7 +101,7 @@ impl FromStr for AdversarialPayloadType {
 impl Distribution<AdversarialPayloadType> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> AdversarialPayloadType {
         // Exclude the "Random" variant
-        let n = rng.gen_range(1..AdversarialPayloadType::COUNT);
+        let n = rng.gen_range(1 .. AdversarialPayloadType::COUNT);
         AdversarialPayloadType::iter().nth(n).unwrap()
     }
 }
@@ -144,7 +146,7 @@ impl FromStr for AdversarialPayloadCfg {
         let payload_type = AdversarialPayloadType::from_str(toks[0])?;
         let load_factor = toks[1].parse::<f32>().unwrap();
 
-        if !(0.0..=1.0).contains(&load_factor) {
+        if !(0.0 ..= 1.0).contains(&load_factor) {
             return Err(anyhow!("invalid load factor. Valid range is [0.0, 1.0]"));
         };
 
@@ -210,7 +212,7 @@ impl AdversarialTestPayload {
                 let num_objs_to_read =
                     // We subtract one here because gas counts as one input object
                     self.get_pct_of(self.shared_objs.len() as u64) as usize;
-                convert_move_call_args(&self.shared_objs[..num_objs_to_read], &mut builder);
+                convert_move_call_args(&self.shared_objs[.. num_objs_to_read], &mut builder);
 
                 builder.command(Command::move_call(
                     self.package_id,
@@ -293,7 +295,7 @@ impl AdversarialTestPayload {
                 let max_fn_params = protocol_config.max_function_parameters();
                 let max_pure_arg_size = self.get_pct_of(protocol_config.max_pure_argument_size().into());
                 let mut args: Vec<BenchMoveCallArg> = vec![];
-                (0..max_fn_params).for_each(|_| {
+                (0 .. max_fn_params).for_each(|_| {
                     let mut v = vec![0u8; max_pure_arg_size as usize];
                     while bcs::to_bytes(&v).unwrap().len() >= max_pure_arg_size as usize {
                         v.pop();
@@ -332,7 +334,7 @@ impl WorkloadBuilder<dyn Payload> for AdversarialWorkloadBuilder {
     async fn generate_coin_config_for_payloads(&self) -> Vec<GasCoinConfig> {
         let mut configs = vec![];
         // Gas coins for running workload
-        for _i in 0..self.num_payloads {
+        for _i in 0 .. self.num_payloads {
             let (address, keypair) = get_key_pair();
             configs.push(GasCoinConfig { amount: MAX_GAS_FOR_TESTING, address, keypair: Arc::new(keypair) });
         }
@@ -371,7 +373,7 @@ impl AdversarialWorkloadBuilder {
         duration: Interval,
         group: u32,
     ) -> Option<WorkloadBuilderInfo> {
-        let target_qps = (workload_weight * target_qps as f32) as u64;
+        let target_qps = (workload_weight * target_qps as f32).ceil() as u64;
         let num_workers = (workload_weight * num_workers as f32).ceil() as u64;
         let max_ops = target_qps * in_flight_ratio;
         if max_ops == 0 || num_workers == 0 {

@@ -5,11 +5,8 @@ use super::reroot_path;
 use clap::*;
 use move_compiler::compiled_unit::NamedCompiledModule;
 use move_coverage::{
-    coverage_map::CoverageMap,
-    format_csv_summary,
-    format_human_summary,
-    source_coverage::SourceCoverageBuilder,
-    summary::summarize_inst_cov,
+    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
+    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_package::BuildConfig;
@@ -60,19 +57,36 @@ impl Coverage {
             CoverageSummaryOptions::Source { module_name } => {
                 let unit = package.get_module_by_name_from_root(&module_name)?;
                 let source_path = &unit.source_path;
-                let NamedCompiledModule { module, source_map, .. } = &unit.unit;
+                let NamedCompiledModule {
+                    module, source_map, ..
+                } = &unit.unit;
                 let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
                 source_coverage
                     .compute_source_coverage(source_path)
                     .output_source_coverage(&mut std::io::stdout())
                     .unwrap();
             }
-            CoverageSummaryOptions::Summary { functions, output_csv, .. } => {
+            CoverageSummaryOptions::Summary {
+                functions,
+                output_csv,
+                ..
+            } => {
                 let coverage_map = coverage_map.to_unified_exec_map();
                 if output_csv {
-                    format_csv_summary(modules, &coverage_map, summarize_inst_cov, &mut std::io::stdout())
+                    format_csv_summary(
+                        modules,
+                        &coverage_map,
+                        summarize_inst_cov,
+                        &mut std::io::stdout(),
+                    )
                 } else {
-                    format_human_summary(modules, &coverage_map, summarize_inst_cov, &mut std::io::stdout(), functions)
+                    format_human_summary(
+                        modules,
+                        &coverage_map,
+                        summarize_inst_cov,
+                        &mut std::io::stdout(),
+                        functions,
+                    )
                 }
             }
             CoverageSummaryOptions::Bytecode { module_name } => {

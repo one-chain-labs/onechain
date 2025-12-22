@@ -7,7 +7,6 @@ use std::{
     str::FromStr,
 };
 
-use crate::execution_value::SuiResolver;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -20,6 +19,8 @@ use sui_types::{
     move_package::{MovePackage, TypeOrigin, UpgradeInfo},
     storage::{get_module, BackingPackageStore, PackageObject},
 };
+
+use crate::execution_value::SuiResolver;
 
 /// Exposes module and linkage resolution to the Move runtime.  The first by delegating to
 /// `resolver` and the second via linkage information that is loaded from a move package.
@@ -222,7 +223,7 @@ impl From<&MovePackage> for PackageLinkage {
     }
 }
 
-impl<'state> LinkageResolver for LinkageView<'state> {
+impl LinkageResolver for LinkageView<'_> {
     type Error = SuiError;
 
     fn link_context(&self) -> AccountAddress {
@@ -295,9 +296,9 @@ impl<'state> LinkageResolver for LinkageView<'state> {
     }
 }
 
-/** Remaining implementations delegated to state_view *************************/
+// Remaining implementations delegated to state_view
 
-impl<'state> ResourceResolver for LinkageView<'state> {
+impl ResourceResolver for LinkageView<'_> {
     type Error = SuiError;
 
     fn get_resource(&self, address: &AccountAddress, typ: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
@@ -305,7 +306,7 @@ impl<'state> ResourceResolver for LinkageView<'state> {
     }
 }
 
-impl<'state> ModuleResolver for LinkageView<'state> {
+impl ModuleResolver for LinkageView<'_> {
     type Error = SuiError;
 
     fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
@@ -313,7 +314,7 @@ impl<'state> ModuleResolver for LinkageView<'state> {
     }
 }
 
-impl<'state> BackingPackageStore for LinkageView<'state> {
+impl BackingPackageStore for LinkageView<'_> {
     fn get_package_object(&self, package_id: &ObjectID) -> SuiResult<Option<PackageObject>> {
         self.resolver.get_package_object(package_id)
     }

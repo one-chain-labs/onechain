@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::Error,
-    types::{address::Address, sui_address::SuiAddress, validator::Validator},
-};
 use std::{collections::BTreeMap, time::Duration};
+
 use sui_indexer::{apis::GovernanceReadApi, db::ConnectionPoolConfig, indexer_reader::IndexerReader};
 use sui_json_rpc_types::Stake as RpcStakedOct;
 use sui_types::{
     governance::StakedOct as NativeStakedOct,
     sui_system_state::sui_system_state_summary::SuiSystemStateSummary as NativeSuiSystemStateSummary,
+};
+
+use crate::{
+    error::Error,
+    types::{address::Address, sui_address::SuiAddress, validator::Validator},
 };
 
 pub(crate) struct PgManager {
@@ -58,7 +60,7 @@ impl PgManager {
         }
     }
 
-    /// Make a request to the RPC for its representations of the staked oct we parsed out of the
+    /// Make a request to the RPC for its representations of the staked sui we parsed out of the
     /// object.  Used to implement fields that are implemented in JSON-RPC but not GraphQL (yet).
     pub(crate) async fn fetch_rpc_staked_oct(&self, stake: NativeStakedOct) -> Result<RpcStakedOct, Error> {
         let governance_api = GovernanceReadApi::new(self.inner.clone());

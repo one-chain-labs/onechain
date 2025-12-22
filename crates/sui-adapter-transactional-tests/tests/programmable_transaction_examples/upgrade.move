@@ -36,7 +36,7 @@ module q_2::m {
 //# programmable --sender A --inputs 10 @A object(2,1) 0u8 digest(q_2)
 //> 0: one::package::authorize_upgrade(Input(2), Input(3), Input(4));
 //> 1: SplitCoins(Gas, [Input(0)]);
-//> 2: Upgrade(q_2, [one,std,r], q, Result(0));
+//> 2: Upgrade(q_2, [sui,std,r], q, Result(0));
 //> TransferObjects([Result(1)], Input(1));
 //> one::package::commit_upgrade(Input(2), Result(2))
 

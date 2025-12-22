@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_bytecode_verifier_meter::Scope;
-use prometheus::Registry;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
 };
+
+use move_bytecode_verifier_meter::Scope;
+use prometheus::Registry;
 use sui_adapter::adapter::run_metered_move_bytecode_verifier;
 use sui_config::verifier_signing_config::VerifierSigningConfig;
 use sui_framework::BuiltInFramework;
@@ -183,7 +184,7 @@ fn test_meter_system_packages() {
             &bytecode_verifier_metrics,
         )
         .unwrap_or_else(|_| {
-            panic!("Verification of all system packages should succeed, but failed on {}", system_package.id(),)
+            panic!("Verification of all system packages should succeed, but failed on {}", system_package.id,)
         });
     }
 

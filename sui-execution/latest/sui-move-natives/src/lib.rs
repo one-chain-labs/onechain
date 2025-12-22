@@ -1,6 +1,33 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use better_any::{Tid, TidAble};
+use crypto::{
+    nitro_attestation::{self, NitroAttestationCostParams},
+    vdf::{self, VDFCostParams},
+};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{
+    annotated_value as A,
+    gas_algebra::InternalGas,
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    runtime_value as R,
+    vm_status::StatusCode,
+};
+use move_stdlib_natives::{self as MSN, GasParameters};
+use move_vm_runtime::native_functions::{NativeContext, NativeFunction, NativeFunctionTable};
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    values::{Struct, Value},
+};
+use sui_protocol_config::ProtocolConfig;
+use sui_types::{MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS};
+use transfer::TransferReceiveObjectInternalCostParams;
+
 use self::{
     address::{AddressFromBytesCostParams, AddressFromU256CostParams, AddressToU256CostParams},
     config::ConfigReadSettingImplCostParams,
@@ -45,28 +72,6 @@ use crate::crypto::{
     zklogin,
     zklogin::{CheckZkloginIdCostParams, CheckZkloginIssuerCostParams},
 };
-use better_any::{Tid, TidAble};
-use crypto::vdf::{self, VDFCostParams};
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{
-    annotated_value as A,
-    gas_algebra::InternalGas,
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
-    runtime_value as R,
-    vm_status::StatusCode,
-};
-use move_stdlib_natives::{self as MSN, GasParameters};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction, NativeFunctionTable};
-use move_vm_types::{
-    loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    values::{Struct, Value},
-};
-use std::sync::Arc;
-use sui_protocol_config::ProtocolConfig;
-use sui_types::{MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS};
-use transfer::TransferReceiveObjectInternalCostParams;
 
 mod address;
 mod config;
@@ -170,6 +175,9 @@ pub struct NativesCostTable {
 
     // Receive object
     pub transfer_receive_object_internal_cost_params: TransferReceiveObjectInternalCostParams,
+
+    // nitro attestation
+    pub nitro_attestation_cost_params: NitroAttestationCostParams,
 }
 
 impl NativesCostTable {
@@ -537,7 +545,7 @@ impl NativesCostTable {
                 bls12381_g2_msm_base_cost_per_input: protocol_config
                     .group_ops_bls12381_g2_msm_base_cost_per_input_as_option()
                     .map(Into::into),
-                bls12381_msm_max_len: protocol_config.group_ops_bls12381_msm_max_len_as_option().map(Into::into),
+                bls12381_msm_max_len: protocol_config.group_ops_bls12381_msm_max_len_as_option(),
                 bls12381_pairing_cost: protocol_config.group_ops_bls12381_pairing_cost_as_option().map(Into::into),
                 bls12381_g1_to_uncompressed_g1_cost: protocol_config
                     .group_ops_bls12381_g1_to_uncompressed_g1_cost_as_option()
@@ -552,12 +560,17 @@ impl NativesCostTable {
                     .group_ops_bls12381_uncompressed_g1_sum_cost_per_term_as_option()
                     .map(Into::into),
                 bls12381_uncompressed_g1_sum_max_terms: protocol_config
-                    .group_ops_bls12381_uncompressed_g1_sum_max_terms_as_option()
-                    .map(Into::into),
+                    .group_ops_bls12381_uncompressed_g1_sum_max_terms_as_option(),
             },
             vdf_cost_params: VDFCostParams {
                 vdf_verify_cost: protocol_config.vdf_verify_vdf_cost_as_option().map(Into::into),
                 hash_to_input_cost: protocol_config.vdf_hash_to_input_cost_as_option().map(Into::into),
+            },
+            nitro_attestation_cost_params: NitroAttestationCostParams {
+                parse_base_cost: protocol_config.nitro_attestation_parse_base_cost_as_option().map(Into::into),
+                parse_cost_per_byte: protocol_config.nitro_attestation_parse_cost_per_byte_as_option().map(Into::into),
+                verify_base_cost: protocol_config.nitro_attestation_verify_base_cost_as_option().map(Into::into),
+                verify_cost_per_cert: protocol_config.nitro_attestation_verify_cost_per_cert_as_option().map(Into::into),
             },
         }
     }
@@ -731,6 +744,11 @@ pub fn all_natives(silent: bool, protocol_config: &ProtocolConfig) -> NativeFunc
         ("vdf", "hash_to_input_internal", make_native!(vdf::hash_to_input_internal)),
         ("ecdsa_k1", "secp256k1_sign", make_native!(ecdsa_k1::secp256k1_sign)),
         ("ecdsa_k1", "secp256k1_keypair_from_seed", make_native!(ecdsa_k1::secp256k1_keypair_from_seed)),
+        (
+            "nitro_attestation",
+            "load_nitro_attestation_internal",
+            make_native!(nitro_attestation::load_nitro_attestation_internal),
+        ),
     ];
     let sui_framework_natives_iter = sui_framework_natives.iter().cloned().map(|(module_name, func_name, func)| {
         (SUI_FRAMEWORK_ADDRESS, Identifier::new(module_name).unwrap(), Identifier::new(func_name).unwrap(), func)

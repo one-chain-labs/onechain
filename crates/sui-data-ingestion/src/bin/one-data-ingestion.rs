@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{env, path::PathBuf, time::Duration};
+
 use anyhow::Result;
 use prometheus::Registry;
 use serde::{Deserialize, Serialize};
-use std::{env, path::PathBuf, time::Duration};
 use sui_data_ingestion::{
     ArchivalConfig,
     ArchivalReducer,
@@ -12,11 +13,9 @@ use sui_data_ingestion::{
     BlobTaskConfig,
     BlobWorker,
     DynamoDBProgressStore,
-    KVStoreTaskConfig,
-    KVStoreWorker,
 };
 use sui_data_ingestion_core::{DataIngestionMetrics, IndexerExecutor, ReaderOptions, WorkerPool};
-use sui_kvstore::{BigTableClient, KvWorker};
+use sui_kvstore::{BigTableClient, BigTableProgressStore, KvWorker};
 use tokio::{signal, sync::oneshot};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -24,7 +23,6 @@ use tokio::{signal, sync::oneshot};
 enum Task {
     Archival(ArchivalConfig),
     Blob(BlobTaskConfig),
-    KV(KVStoreTaskConfig),
     BigTableKV(BigTableTaskConfig),
 }
 
@@ -114,12 +112,27 @@ async fn main() -> Result<()> {
     mysten_metrics::init_metrics(&registry);
     let metrics = DataIngestionMetrics::new(&registry);
 
+    let mut bigtable_store = None;
+    for task in &config.tasks {
+        if let Task::BigTableKV(kv_config) = &task.task {
+            std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", kv_config.credentials.clone());
+            let bigtable_client = BigTableClient::new_remote(
+                kv_config.instance_id.clone(),
+                false,
+                Some(Duration::from_secs(kv_config.timeout_secs as u64)),
+            )
+            .await?;
+            bigtable_store = Some(BigTableProgressStore::new(bigtable_client));
+        }
+    }
+
     let progress_store = DynamoDBProgressStore::new(
         &config.progress_store.aws_access_key_id,
         &config.progress_store.aws_secret_access_key,
         config.progress_store.aws_region,
         config.progress_store.table_name,
         config.is_backfill,
+        bigtable_store,
     )
     .await;
     let mut executor = IndexerExecutor::new(progress_store, config.tasks.len(), metrics);
@@ -141,13 +154,7 @@ async fn main() -> Result<()> {
                     WorkerPool::new(BlobWorker::new(blob_config), task_config.name, task_config.concurrency);
                 executor.register(worker_pool).await?;
             }
-            Task::KV(kv_config) => {
-                let worker_pool =
-                    WorkerPool::new(KVStoreWorker::new(kv_config).await, task_config.name, task_config.concurrency);
-                executor.register(worker_pool).await?;
-            }
             Task::BigTableKV(kv_config) => {
-                std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", kv_config.credentials);
                 let client = BigTableClient::new_remote(
                     kv_config.instance_id,
                     false,

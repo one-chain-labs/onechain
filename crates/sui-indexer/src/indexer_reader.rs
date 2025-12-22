@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 use diesel::{
     dsl::sql,
@@ -13,13 +15,8 @@ use diesel::{
     SelectableHelper,
     TextExpressionMethods,
 };
-use itertools::Itertools;
-use std::sync::Arc;
-use sui_types::{dynamic_field::visitor as DFV, object::bounded_visitor::BoundedVisitor};
-use tap::{Pipe, TapFallible};
-use tracing::{debug, error, warn};
-
 use fastcrypto::encoding::{Encoding, Hex};
+use itertools::Itertools;
 use move_core_types::{
     annotated_value::MoveStructLayout,
     language_storage::{StructTag, TypeTag},
@@ -45,12 +42,14 @@ use sui_types::{
     coin::{CoinMetadata, TreasuryCap},
     committee::EpochId,
     digests::TransactionDigest,
-    dynamic_field::{DynamicFieldInfo, DynamicFieldName},
+    dynamic_field::{visitor as DFV, DynamicFieldInfo, DynamicFieldName},
     effects::TransactionEvents,
     event::EventID,
-    object::{Object, ObjectRead},
+    object::{bounded_visitor::BoundedVisitor, Object, ObjectRead},
     sui_system_state::{sui_system_state_summary::SuiSystemStateSummary, SuiSystemStateTrait},
 };
+use tap::{Pipe, TapFallible};
+use tracing::{debug, error, warn};
 
 use crate::{
     database::ConnectionPool,
@@ -270,7 +269,6 @@ impl IndexerReader {
             .into_iter()
             .map(EpochInfo::try_from)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(Into::into)
     }
 
     pub async fn get_latest_sui_system_state(&self) -> Result<SuiSystemStateSummary, IndexerError> {
@@ -306,7 +304,7 @@ impl IndexerReader {
 
     /// Retrieve the system state data for the given epoch. If no epoch is given,
     /// it will retrieve the latest epoch's data and return the system state.
-    /// System state of the an epoch is written at the end of the epoch, so system state
+    /// System state of the epoch is written at the end of the epoch, so system state
     /// of the current epoch is empty until the epoch ends. You can call
     /// `get_latest_sui_system_state` for current epoch instead.
     pub async fn get_epoch_sui_system_state(
@@ -1343,12 +1341,7 @@ impl ConnectionAsObjectStore {
             snapshot_query = snapshot_query.filter(objects_snapshot::dsl::object_version.eq(version.value() as i64));
         }
 
-        snapshot_query
-            .first::<StoredObjectSnapshot>(connection)
-            .optional()?
-            .map(|o| o.try_into())
-            .transpose()
-            .map_err(Into::into)
+        snapshot_query.first::<StoredObjectSnapshot>(connection).optional()?.map(|o| o.try_into()).transpose()
     }
 
     fn get_object(&self, object_id: &ObjectID, version: Option<VersionNumber>) -> Result<Option<Object>, IndexerError> {
@@ -1359,7 +1352,7 @@ impl ConnectionAsObjectStore {
             result = self.get_object_from_history(object_id, version)?;
         }
 
-        result.map(|o| o.try_into()).transpose().map_err(Into::into)
+        result.map(|o| o.try_into()).transpose()
     }
 }
 

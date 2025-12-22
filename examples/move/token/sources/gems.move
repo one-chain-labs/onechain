@@ -25,7 +25,7 @@ module examples::sword {
 }
 
 /// Module that defines the in-game currency: GEMs which can be purchased with
-/// SUI and used to buy swords (in the `sword` module).
+/// OCT and used to buy swords (in the `sword` module).
 module examples::gem {
     use std::{option::none, string::{Self, String}};
     use one::{

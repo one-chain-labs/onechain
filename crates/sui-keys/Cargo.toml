@@ -1,10 +1,10 @@
 [package]
-name = "sui-keys"
 version.workspace = true
 authors.workspace = true
+edition.workspace = true
 license.workspace = true
 publish.workspace = true
-edition.workspace = true
+name = "sui-keys"
 
 [dependencies]
 anyhow.workspace = true

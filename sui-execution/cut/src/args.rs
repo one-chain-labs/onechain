@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{env, path::PathBuf, str::FromStr};
+
 use anyhow::{self, bail, Result};
 use clap::{ArgAction, Parser};
-use std::{env, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 /// Tool for cutting duplicate versions of a subset of crates in a git repository.

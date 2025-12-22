@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Error;
-use tracing::{info, warn};
-
 use sui_bridge::events::{
     EmergencyOpEvent,
     MoveBlocklistValidatorEvent,
@@ -24,6 +22,7 @@ use sui_types::{
     BRIDGE_ADDRESS,
     SUI_BRIDGE_OBJECT_ID,
 };
+use tracing::{info, warn};
 
 use crate::{
     metrics::BridgeIndexerMetrics,
@@ -45,7 +44,7 @@ pub struct SuiBridgeDataMapper {
 
 impl DataMapper<CheckpointTxnData, ProcessedTxnData> for SuiBridgeDataMapper {
     fn map(&self, (data, checkpoint_num, timestamp_ms): CheckpointTxnData) -> Result<Vec<ProcessedTxnData>, Error> {
-        self.metrics.total_sui_bridge_transactions.inc();
+        self.metrics.total_oct_bridge_transactions.inc();
         if !data.input_objects.iter().any(|obj| obj.id() == SUI_BRIDGE_OBJECT_ID) {
             return Ok(vec![]);
         }
@@ -95,7 +94,7 @@ fn process_sui_event(
         match ev.type_.name.as_str() {
             "TokenDepositedEvent" => {
                 info!("Observed Sui Deposit {:?}", ev);
-                // todo: metrics.total_sui_token_deposited.inc();
+                // todo: metrics.total_oct_token_deposited.inc();
                 let move_event: MoveTokenDepositedEvent = bcs::from_bytes(&ev.contents)?;
                 Some(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: move_event.source_chain,
@@ -120,7 +119,7 @@ fn process_sui_event(
             }
             "TokenTransferApproved" => {
                 info!("Observed Sui Approval {:?}", ev);
-                // todo: metrics.total_sui_token_transfer_approved.inc();
+                // todo: metrics.total_oct_token_transfer_approved.inc();
                 let event: MoveTokenTransferApproved = bcs::from_bytes(&ev.contents)?;
                 Some(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -138,7 +137,7 @@ fn process_sui_event(
             }
             "TokenTransferClaimed" => {
                 info!("Observed Sui Claim {:?}", ev);
-                // todo: metrics.total_sui_token_transfer_claimed.inc();
+                // todo: metrics.total_oct_token_transfer_claimed.inc();
                 let event: MoveTokenTransferClaimed = bcs::from_bytes(&ev.contents)?;
                 Some(ProcessedTxnData::TokenTransfer(TokenTransfer {
                     chain_id: event.message_key.source_chain,
@@ -239,7 +238,7 @@ fn process_sui_event(
                 }))
             }
             _ => {
-                // todo: metrics.total_sui_bridge_txn_other.inc();
+                // todo: metrics.total_oct_bridge_txn_other.inc();
                 warn!("Unexpected event {ev:?}.");
                 None
             }

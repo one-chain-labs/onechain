@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![warn(future_incompatible, nonstandard_style, rust_2018_idioms, rust_2021_compatibility)]
 
-use base_types::{SequenceNumber, SuiAddress};
+use base_types::{ObjectID, SequenceNumber, SuiAddress};
 use move_binary_format::{
     file_format::{AbilitySet, SignatureToken},
     CompiledModule,
@@ -13,11 +13,8 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
 };
 pub use move_core_types::{identifier::Identifier, language_storage::TypeTag};
-use object::OBJECT_START_VERSION;
-
-use base_types::ObjectID;
-
 pub use mysten_network::multiaddr;
+use object::OBJECT_START_VERSION;
 
 use crate::{
     base_types::{RESOLVED_ASCII_STR, RESOLVED_STD_OPTION, RESOLVED_UTF8_STR},
@@ -69,6 +66,7 @@ pub mod mock_checkpoint_builder;
 pub mod move_package;
 pub mod multisig;
 pub mod multisig_legacy;
+pub mod nitro_attestation;
 pub mod object;
 pub mod passkey_authenticator;
 pub mod programmable_transaction_builder;
@@ -81,6 +79,7 @@ pub mod sui_sdk_types_conversions;
 pub mod sui_serde;
 pub mod sui_system_state;
 pub mod supported_protocol_versions;
+pub mod test_checkpoint_data_builder;
 pub mod traffic_control;
 pub mod transaction;
 pub mod transaction_executor;
@@ -304,8 +303,9 @@ fn is_object_struct(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_parse_sui_numeric_address() {

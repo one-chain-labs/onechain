@@ -1,13 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Context, Result};
+use std::{env, fs, path::PathBuf, sync::Arc};
 
+use anyhow::{anyhow, Context, Result};
 use clap::*;
 use object_store::{aws::AmazonS3Builder, ClientOptions, DynObjectStore};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::{env, fs, path::PathBuf, sync::Arc};
 use tracing::info;
 
 /// Object-store type.

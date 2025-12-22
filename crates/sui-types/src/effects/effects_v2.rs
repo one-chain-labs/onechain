@@ -1,6 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(debug_assertions)]
+use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+use serde::{Deserialize, Serialize};
+
 use super::{
     object_change::{ObjectIn, ObjectOut},
     EffectsObjectChange,
@@ -27,10 +33,6 @@ use crate::{
     gas::GasCostSummary,
     object::{Owner, OBJECT_START_VERSION},
 };
-use serde::{Deserialize, Serialize};
-#[cfg(debug_assertions)]
-use std::collections::HashSet;
-use std::collections::{BTreeMap, BTreeSet};
 
 /// The response from processing a transaction or a certified transaction
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]

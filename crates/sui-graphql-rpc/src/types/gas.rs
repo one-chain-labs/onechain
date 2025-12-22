@@ -1,8 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_graphql::{connection::Connection, *};
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    *,
+};
 use sui_types::{
+    base_types::SuiAddress as NativeSuiAddress,
     effects::{TransactionEffects as NativeTransactionEffects, TransactionEffectsAPI},
     gas::GasCostSummary as NativeGasCostSummary,
     transaction::GasData,
@@ -12,9 +16,12 @@ use super::{
     address::Address,
     big_int::BigInt,
     cursor::Page,
-    object::{self, Object, ObjectFilter, ObjectKey},
+    object::{Object, ObjectKey},
     sui_address::SuiAddress,
 };
+use crate::{consistency::ConsistentIndexCursor, error::Error, types::cursor::JsonCursor};
+
+type CGasPayment = JsonCursor<ConsistentIndexCursor>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct GasInput {
@@ -56,9 +63,9 @@ impl GasInput {
         &self,
         ctx: &Context<'_>,
         first: Option<u64>,
-        after: Option<object::Cursor>,
+        after: Option<CGasPayment>,
         last: Option<u64>,
-        before: Option<object::Cursor>,
+        before: Option<CGasPayment>,
     ) -> Result<Connection<String, Object>> {
         // A possible user error during dry run or execution would be to supply a gas payment that
         // is not a Move object (i.e a package). Even though the transaction would fail to run, this
@@ -68,9 +75,38 @@ impl GasInput {
         // still be viewable.
         let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
 
-        let filter = ObjectFilter { object_keys: Some(self.payment_obj_keys.clone()), ..Default::default() };
+        let mut connection = Connection::new(false, false);
+        // Return empty connection if no payment objects
+        if self.payment_obj_keys.is_empty() {
+            return Ok(connection);
+        }
 
-        Object::paginate(ctx.data_unchecked(), page, filter, self.checkpoint_viewed_at).await.extend()
+        let Some((prev, next, checkpoint_viewed_at, cs)) =
+            page.paginate_consistent_indices(self.payment_obj_keys.len(), self.checkpoint_viewed_at)?
+        else {
+            return Ok(connection);
+        };
+
+        connection.has_previous_page = prev;
+        connection.has_next_page = next;
+
+        // Collect cursors since we need them twice
+        let cursors: Vec<_> = cs.collect();
+        let objects = Object::query_many(
+            ctx,
+            cursors.iter().map(|c| self.payment_obj_keys[c.ix].clone()).collect(),
+            checkpoint_viewed_at,
+        )
+        .await?
+        .into_iter()
+        .map(|obj| obj.ok_or_else(|| Error::Internal("Gas object not found".to_string())))
+        .collect::<Result<Vec<_>, _>>()?;
+
+        for (c, obj) in cursors.into_iter().zip(objects) {
+            connection.edges.push(Edge::new(c.encode_cursor(), obj));
+        }
+
+        Ok(connection)
     }
 
     /// An unsigned integer specifying the number of native tokens per gas unit this transaction
@@ -146,17 +182,12 @@ impl GasInput {
     /// was queried for. This is stored on `GasInput` so that when viewing that entity's state, it
     /// will be as if it was read at the same checkpoint.
     pub(crate) fn from(s: &GasData, checkpoint_viewed_at: u64) -> Self {
-        Self {
-            owner: s.owner.into(),
-            price: s.price,
-            budget: s.budget,
-            payment_obj_keys: s
-                .payment
-                .iter()
-                .map(|o| ObjectKey { object_id: o.0.into(), version: o.1.value().into() })
-                .collect(),
-            checkpoint_viewed_at,
-        }
+        let payment_obj_keys = match s.owner {
+            NativeSuiAddress::ZERO => vec![], // system transactions do not have payment objects
+            _ => s.payment.iter().map(|o| ObjectKey { object_id: o.0.into(), version: o.1.value().into() }).collect(),
+        };
+
+        Self { owner: s.owner.into(), price: s.price, budget: s.budget, payment_obj_keys, checkpoint_viewed_at }
     }
 }
 

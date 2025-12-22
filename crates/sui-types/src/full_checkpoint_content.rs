@@ -3,6 +3,10 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+use itertools::Either;
+use serde::{Deserialize, Serialize};
+use tap::Pipe;
+
 use crate::{
     base_types::{ObjectID, ObjectRef},
     effects::{IDOperation, ObjectIn, ObjectOut, TransactionEffects, TransactionEffectsAPI, TransactionEvents},
@@ -11,9 +15,6 @@ use crate::{
     storage::BackingPackageStore,
     transaction::Transaction,
 };
-use itertools::Either;
-use serde::{Deserialize, Serialize};
-use tap::Pipe;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CheckpointData {

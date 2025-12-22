@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{io, sync::Arc};
+
 use axum::{middleware::AddExtension, Extension};
 use axum_server::{
     accept::Accept,
@@ -8,7 +10,6 @@ use axum_server::{
 };
 use fastcrypto::ed25519::Ed25519PublicKey;
 use rustls::pki_types::CertificateDer;
-use std::{io, sync::Arc};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::server::TlsStream;
 use tower_layer::Layer;

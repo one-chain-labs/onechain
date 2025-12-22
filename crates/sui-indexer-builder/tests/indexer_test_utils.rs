@@ -9,11 +9,8 @@ use std::{
 
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
-use prometheus::{IntCounterVec, IntGaugeVec};
-use tokio::{sync::Mutex, task::JoinHandle};
-
 use mysten_metrics::spawn_monitored_task;
-
+use prometheus::{IntCounterVec, IntGaugeVec};
 use sui_indexer_builder::{
     indexer_builder::{DataMapper, DataSender, Datasource, IndexerProgressStore, Persistent},
     metrics::IndexerMetricProvider,
@@ -21,6 +18,7 @@ use sui_indexer_builder::{
     Tasks,
     LIVE_TASK_TARGET_CHECKPOINT,
 };
+use tokio::{sync::Mutex, task::JoinHandle};
 
 pub struct TestDatasource<T> {
     pub data: Vec<T>,

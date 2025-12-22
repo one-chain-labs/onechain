@@ -1,12 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data::{Db, DbConnection, QueryExecutor},
-    error::Error,
-    metrics::Metrics,
-    types::chain_identifier::ChainIdentifier,
-};
+use std::{mem, sync::Arc, time::Duration};
+
 use async_graphql::ServerError;
 use diesel::{
     query_dsl::positional_order_dsl::PositionalOrderDsl,
@@ -16,7 +12,6 @@ use diesel::{
     QueryDsl,
 };
 use diesel_async::scoped_futures::ScopedFutureExt;
-use std::{mem, sync::Arc, time::Duration};
 use sui_indexer::schema::checkpoints;
 use tokio::{
     sync::{watch, RwLock},
@@ -24,6 +19,13 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+
+use crate::{
+    data::{Db, DbConnection, QueryExecutor},
+    error::Error,
+    metrics::Metrics,
+    types::chain_identifier::ChainIdentifier,
+};
 
 /// Watermark task that periodically updates the current checkpoint, checkpoint timestamp, and
 /// epoch values.

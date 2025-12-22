@@ -6,6 +6,36 @@ use std::{
     fmt::Write,
 };
 
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    dataloader::Loader,
+    *,
+};
+use diesel::{BoolExpressionMethods, ExpressionMethods, QueryDsl, SelectableHelper};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use move_core_types::{
+    annotated_value::{MoveStruct, MoveTypeLayout},
+    language_storage::StructTag,
+};
+use serde::{Deserialize, Serialize};
+use sui_indexer::{
+    models::{
+        obj_indices::StoredObjectVersion,
+        objects::{StoredFullHistoryObject, StoredHistoryObject},
+    },
+    schema::{full_objects_history, objects_version},
+    types::{ObjectStatus as NativeObjectStatus, OwnerType},
+};
+use sui_types::{
+    object::{
+        bounded_visitor::BoundedVisitor,
+        MoveObject as NativeMoveObject,
+        Object as NativeObject,
+        Owner as NativeOwner,
+    },
+    TypeTag,
+};
+
 use super::{
     available_range::AvailableRange,
     balance::{self, Balance},
@@ -36,35 +66,6 @@ use crate::{
     or_filter,
     raw_query::RawQuery,
     types::{base64::Base64, intersect},
-};
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    dataloader::Loader,
-    *,
-};
-use diesel::{BoolExpressionMethods, ExpressionMethods, QueryDsl, SelectableHelper};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveTypeLayout},
-    language_storage::StructTag,
-};
-use serde::{Deserialize, Serialize};
-use sui_indexer::{
-    models::{
-        obj_indices::StoredObjectVersion,
-        objects::{StoredFullHistoryObject, StoredHistoryObject},
-    },
-    schema::{full_objects_history, objects_version},
-    types::{ObjectStatus as NativeObjectStatus, OwnerType},
-};
-use sui_types::{
-    object::{
-        bounded_visitor::BoundedVisitor,
-        MoveObject as NativeMoveObject,
-        Object as NativeObject,
-        Owner as NativeOwner,
-    },
-    TypeTag,
 };
 
 #[derive(Clone, Debug)]
@@ -144,7 +145,9 @@ pub(crate) struct ObjectFilter {
     /// Filter for live objects by their IDs.
     pub object_ids: Option<Vec<SuiAddress>>,
 
-    /// Filter for live or potentially historical objects by their ID and version.
+    /// Filter for live objects by their ID and version. NOTE:  this input filter has been
+    /// deprecated in favor of `multiGetObjects` query as it does not make sense to query for live
+    /// objects by their versions. This filter will be removed with v1.42.0 release.
     pub object_keys: Option<Vec<ObjectKey>>,
 }
 
@@ -731,6 +734,29 @@ impl Object {
     /// Check [`Object::root_version`] for details.
     pub(crate) fn root_version(&self) -> u64 {
         self.root_version
+    }
+
+    /// Fetch objects by their id and version. If you need to query for live objects, use the
+    /// `objects` field.
+    pub(crate) async fn query_many(
+        ctx: &Context<'_>,
+        keys: Vec<ObjectKey>,
+        checkpoint_viewed_at: u64,
+    ) -> Result<Vec<Self>, Error> {
+        let DataLoader(loader) = &ctx.data_unchecked();
+
+        let keys: Vec<PointLookupKey> =
+            keys.into_iter().map(|key| PointLookupKey { id: key.object_id, version: key.version.into() }).collect();
+
+        let data = loader.load_many(keys).await?;
+        let objects: Vec<_> = data
+            .into_iter()
+            .filter_map(|(lookup_key, bcs)| {
+                Object::new_serialized(lookup_key.id, lookup_key.version, bcs, checkpoint_viewed_at, lookup_key.version)
+            })
+            .collect();
+
+        Ok(objects)
     }
 
     /// Query the database for a `page` of objects, optionally `filter`-ed.
@@ -1482,8 +1508,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn test_owner_filter_intersection() {
@@ -1533,7 +1560,7 @@ mod tests {
                 object_ids: Some(vec![i1]),
                 object_keys: Some(vec![ObjectKey { object_id: i2, version: 1.into() }, ObjectKey {
                     object_id: i4,
-                    version: 2.into()
+                    version: 2.into(),
                 },]),
                 ..Default::default()
             })
@@ -1549,7 +1576,7 @@ mod tests {
             Some(ObjectFilter {
                 object_keys: Some(vec![ObjectKey { object_id: i2, version: 2.into() }, ObjectKey {
                     object_id: i4,
-                    version: 2.into()
+                    version: 2.into(),
                 },]),
                 ..Default::default()
             })

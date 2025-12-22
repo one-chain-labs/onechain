@@ -12,11 +12,17 @@ use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
 #[test]
-fn test_additonal_addresses() {
-    let path: PathBuf =
-        ["tests", "test_sources", "basic_no_deps_address_not_assigned_with_dev_assignment"].into_iter().collect();
+fn test_additional_addresses() {
+    let path: PathBuf = [
+        "tests",
+        "test_sources",
+        "basic_no_deps_address_not_assigned_with_dev_assignment",
+    ]
+    .into_iter()
+    .collect();
 
-    let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path())).unwrap();
+    let manifest_string =
+        std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path())).unwrap();
 
     let mut dep_graph_builder = DG::DependencyGraphBuilder::new(
         /* skip_fetch_latest_git_deps */ true,
@@ -24,10 +30,19 @@ fn test_additonal_addresses() {
         tempdir().unwrap().path().to_path_buf(),
     );
     let (dg, _) = dep_graph_builder
-        .get_graph(&PM::DependencyKind::default(), path, manifest_string, /* lock_string_opt */ None)
+        .get_graph(
+            &PM::DependencyKind::default(),
+            path,
+            manifest_string,
+            /* lock_string_opt */ None,
+        )
         .unwrap();
 
-    let DG::DependencyGraphBuilder { mut dependency_cache, mut progress_output, .. } = dep_graph_builder;
+    let DG::DependencyGraphBuilder {
+        mut dependency_cache,
+        mut progress_output,
+        ..
+    } = dep_graph_builder;
 
     assert!(RG::ResolvedGraph::resolve(
         dg.clone(),
@@ -47,7 +62,10 @@ fn test_additonal_addresses() {
 
     assert!(RG::ResolvedGraph::resolve(
         dg,
-        BuildConfig { install_dir: Some(tempdir().unwrap().path().to_path_buf()), ..Default::default() },
+        BuildConfig {
+            install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+            ..Default::default()
+        },
         &mut dependency_cache,
         None,
         &mut progress_output,
@@ -56,10 +74,13 @@ fn test_additonal_addresses() {
 }
 
 #[test]
-fn test_additonal_addresses_already_assigned_same_value() {
-    let path: PathBuf = ["tests", "test_sources", "basic_no_deps_address_assigned"].into_iter().collect();
+fn test_additional_addresses_already_assigned_same_value() {
+    let path: PathBuf = ["tests", "test_sources", "basic_no_deps_address_assigned"]
+        .into_iter()
+        .collect();
 
-    let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path())).unwrap();
+    let manifest_string =
+        std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path())).unwrap();
 
     let mut dep_graph_builder = DG::DependencyGraphBuilder::new(
         /* skip_fetch_latest_git_deps */ true,
@@ -67,10 +88,19 @@ fn test_additonal_addresses_already_assigned_same_value() {
         tempdir().unwrap().path().to_path_buf(),
     );
     let (dg, _) = dep_graph_builder
-        .get_graph(&PM::DependencyKind::default(), path, manifest_string, /* lock_string_opt */ None)
+        .get_graph(
+            &PM::DependencyKind::default(),
+            path,
+            manifest_string,
+            /* lock_string_opt */ None,
+        )
         .unwrap();
 
-    let DG::DependencyGraphBuilder { mut dependency_cache, mut progress_output, .. } = dep_graph_builder;
+    let DG::DependencyGraphBuilder {
+        mut dependency_cache,
+        mut progress_output,
+        ..
+    } = dep_graph_builder;
 
     assert!(RG::ResolvedGraph::resolve(
         dg,
@@ -90,10 +120,13 @@ fn test_additonal_addresses_already_assigned_same_value() {
 }
 
 #[test]
-fn test_additonal_addresses_already_assigned_different_value() {
-    let path: PathBuf = ["tests", "test_sources", "basic_no_deps_address_assigned"].into_iter().collect();
+fn test_additional_addresses_already_assigned_different_value() {
+    let path: PathBuf = ["tests", "test_sources", "basic_no_deps_address_assigned"]
+        .into_iter()
+        .collect();
 
-    let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path())).unwrap();
+    let manifest_string =
+        std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path())).unwrap();
 
     let mut dep_graph_builder = DG::DependencyGraphBuilder::new(
         /* skip_fetch_latest_git_deps */ true,
@@ -101,10 +134,19 @@ fn test_additonal_addresses_already_assigned_different_value() {
         tempdir().unwrap().path().to_path_buf(),
     );
     let (dg, _) = dep_graph_builder
-        .get_graph(&PM::DependencyKind::default(), path, manifest_string, /* lock_string_opt */ None)
+        .get_graph(
+            &PM::DependencyKind::default(),
+            path,
+            manifest_string,
+            /* lock_string_opt */ None,
+        )
         .unwrap();
 
-    let DG::DependencyGraphBuilder { mut dependency_cache, mut progress_output, .. } = dep_graph_builder;
+    let DG::DependencyGraphBuilder {
+        mut dependency_cache,
+        mut progress_output,
+        ..
+    } = dep_graph_builder;
 
     assert!(RG::ResolvedGraph::resolve(
         dg,

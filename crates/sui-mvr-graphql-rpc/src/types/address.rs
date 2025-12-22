@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::connection::ScanConnection;
+use async_graphql::{connection::Connection, *};
 
 use super::{
     balance::{self, Balance},
@@ -16,7 +16,7 @@ use super::{
     transaction_block::{self, TransactionBlock, TransactionBlockFilter},
     type_filter::ExactTypeFilter,
 };
-use async_graphql::{connection::Connection, *};
+use crate::connection::ScanConnection;
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub(crate) struct Address {

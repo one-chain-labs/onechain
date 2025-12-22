@@ -100,8 +100,11 @@ impl Pool {
 
         // The string doesn't exist in the pool yet; insert it at the head of
         // the linked list of entries.
-        let mut entry =
-            Box::new(Entry { string: string.into_owned().into_boxed_str(), hash, next: self.0[bucket_index].take() });
+        let mut entry = Box::new(Entry {
+            string: string.into_owned().into_boxed_str(),
+            hash,
+            next: self.0[bucket_index].take(),
+        });
         let ptr = NonNull::from(&mut *entry);
 
         // The bucket in the top-level contiguous array now points to the new

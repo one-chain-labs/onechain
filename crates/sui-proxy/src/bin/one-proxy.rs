@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::env;
+
 use anyhow::Result;
 use clap::Parser;
-use std::env;
 use sui_proxy::{
     admin::{
         app,

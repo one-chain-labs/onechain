@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-
 use sui_json_rpc_types::{CheckpointedObjectID, EpochInfo, EpochPage, QueryObjectsPage, SuiObjectResponseQuery};
 use sui_open_rpc_macros::open_rpc;
 use sui_types::sui_serde::BigInt;

@@ -2,6 +2,49 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
+use std::{
+    collections::{hash_map::Entry::Vacant, HashMap},
+    fs,
+    fs::{File, OpenOptions},
+    io::{BufWriter, Seek, SeekFrom, Write},
+    num::NonZeroUsize,
+    path::PathBuf,
+    sync::Arc,
+};
+
+use anyhow::{Context, Result};
+use byteorder::{BigEndian, ByteOrder};
+use fastcrypto::hash::MultisetHash;
+use futures::StreamExt;
+use integer_encoding::VarInt;
+use object_store::{path::Path, DynObjectStore};
+use sui_config::object_storage_config::ObjectStoreConfig;
+use sui_core::{
+    authority::authority_store_tables::{AuthorityPerpetualTables, LiveObject},
+    state_accumulator::StateAccumulator,
+};
+use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
+use sui_storage::{
+    blob::{Blob, BlobEncoding, BLOB_ENCODING_BYTES},
+    object_store::util::{copy_file, delete_recursively, path_to_filesystem},
+};
+use sui_types::{
+    accumulator::Accumulator,
+    base_types::{ObjectID, ObjectRef},
+    digests::ChainIdentifier,
+    messages_checkpoint::ECMHLiveObjectSetDigest,
+    sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
+};
+use tokio::{
+    sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    },
+    task::JoinHandle,
+};
+use tokio_stream::wrappers::ReceiverStream;
+use tracing::debug;
+
 use crate::{
     compute_sha3_checksum,
     create_file_metadata,
@@ -18,49 +61,6 @@ use crate::{
     REFERENCE_FILE_MAGIC,
     SEQUENCE_NUM_BYTES,
 };
-use anyhow::{anyhow, Context, Result};
-use byteorder::{BigEndian, ByteOrder};
-use fastcrypto::hash::MultisetHash;
-use futures::StreamExt;
-use integer_encoding::VarInt;
-use object_store::{path::Path, DynObjectStore};
-use std::{
-    collections::{hash_map::Entry::Vacant, HashMap},
-    fs,
-    fs::{File, OpenOptions},
-    io::{BufWriter, Seek, SeekFrom, Write},
-    num::NonZeroUsize,
-    path::PathBuf,
-    sync::Arc,
-};
-use sui_config::object_storage_config::ObjectStoreConfig;
-use sui_core::{
-    authority::{
-        authority_store_tables::{AuthorityPerpetualTables, LiveObject},
-        CHAIN_IDENTIFIER,
-    },
-    state_accumulator::StateAccumulator,
-};
-use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
-use sui_storage::{
-    blob::{Blob, BlobEncoding, BLOB_ENCODING_BYTES},
-    object_store::util::{copy_file, delete_recursively, path_to_filesystem},
-};
-use sui_types::{
-    accumulator::Accumulator,
-    base_types::{ObjectID, ObjectRef},
-    messages_checkpoint::ECMHLiveObjectSetDigest,
-    sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
-};
-use tokio::{
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-    },
-    task::JoinHandle,
-};
-use tokio_stream::wrappers::ReceiverStream;
-use tracing::debug;
 
 /// LiveObjectSetWriterV1 writes live object set. It creates multiple *.obj files and *.ref file
 struct LiveObjectSetWriterV1 {
@@ -214,9 +214,9 @@ impl LiveObjectSetWriterV1 {
 
     fn write_object_ref(&mut self, object_ref: &ObjectRef) -> Result<()> {
         let mut buf = [0u8; OBJECT_REF_BYTES];
-        buf[0..ObjectID::LENGTH].copy_from_slice(object_ref.0.as_ref());
-        BigEndian::write_u64(&mut buf[ObjectID::LENGTH..OBJECT_REF_BYTES], object_ref.1.value());
-        buf[ObjectID::LENGTH + SEQUENCE_NUM_BYTES..OBJECT_REF_BYTES].copy_from_slice(object_ref.2.as_ref());
+        buf[0 .. ObjectID::LENGTH].copy_from_slice(object_ref.0.as_ref());
+        BigEndian::write_u64(&mut buf[ObjectID::LENGTH .. OBJECT_REF_BYTES], object_ref.1.value());
+        buf[ObjectID::LENGTH + SEQUENCE_NUM_BYTES .. OBJECT_REF_BYTES].copy_from_slice(object_ref.2.as_ref());
         self.ref_wbuf.write_all(&buf)?;
         Ok(())
     }
@@ -272,11 +272,11 @@ impl StateSnapshotWriterV1 {
         epoch: u64,
         perpetual_db: Arc<AuthorityPerpetualTables>,
         root_state_hash: ECMHLiveObjectSetDigest,
+        chain_identifier: ChainIdentifier,
     ) -> Result<()> {
         let system_state_object = get_sui_system_state(&perpetual_db)?;
 
         let protocol_version = system_state_object.protocol_version();
-        let chain_identifier = CHAIN_IDENTIFIER.get().ok_or(anyhow!("No chain identifier found"))?;
         let protocol_config =
             ProtocolConfig::get_for_version(ProtocolVersion::new(protocol_version), chain_identifier.chain());
         let include_wrapped_tombstone = !protocol_config.simplified_unwrap_then_delete();

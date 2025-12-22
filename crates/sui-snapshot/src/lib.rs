@@ -9,12 +9,6 @@ pub mod reader;
 pub mod uploader;
 mod writer;
 
-use anyhow::Result;
-use fastcrypto::hash::MultisetHash;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use object_store::path::Path;
-use serde::{Deserialize, Serialize};
 use std::{
     path::PathBuf,
     sync::{
@@ -23,6 +17,13 @@ use std::{
     },
     time::Duration,
 };
+
+use anyhow::Result;
+use fastcrypto::hash::MultisetHash;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use object_store::path::Path;
+use serde::{Deserialize, Serialize};
 use sui_core::{
     authority::{
         authority_store_tables::{AuthorityPerpetualTables, LiveObject},

@@ -1,9 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{workloads::ExpectedFailureType, ExecutionEffects};
 use std::fmt::Display;
+
 use sui_types::transaction::Transaction;
+
+use crate::{workloads::ExpectedFailureType, ExecutionEffects};
 
 /// A Payload is a transaction wrapper of a particular type (transfer object, shared counter, etc).
 /// Calling `make_transaction()` on a payload produces the transaction it is wrapping. Once that

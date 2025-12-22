@@ -6,6 +6,8 @@
 // Predicates and utility functions based on gas versions.
 //
 
+use sui_protocol_config::ProtocolConfig;
+
 use crate::gas_model::{
     tables::{
         initial_cost_schedule_v1,
@@ -16,7 +18,6 @@ use crate::gas_model::{
     },
     units_types::CostTable,
 };
-use sui_protocol_config::ProtocolConfig;
 
 // Threshold after which native functions contribute to virtual instruction count.
 const V2_NATIVE_FUNCTION_CALL_THRESHOLD: u64 = 700;

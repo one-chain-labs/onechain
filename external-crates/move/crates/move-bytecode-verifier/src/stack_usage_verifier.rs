@@ -76,20 +76,26 @@ impl<'a> StackUsageVerifier<'a> {
             // Check that the stack height is sufficient to accommodate the number
             // of pops this instruction does
             if stack_size_increment < num_pops {
-                return Err(PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
-                    .at_code_offset(self.current_function(), block_start));
+                return Err(
+                    PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
+                        .at_code_offset(self.current_function(), block_start),
+                );
             }
             if let Some(new_incr) = u64::checked_sub(stack_size_increment, num_pops) {
                 stack_size_increment = new_incr
             } else {
-                return Err(PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
-                    .at_code_offset(self.current_function(), block_start));
+                return Err(
+                    PartialVMError::new(StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK)
+                        .at_code_offset(self.current_function(), block_start),
+                );
             };
             if let Some(new_incr) = u64::checked_add(stack_size_increment, num_pushes) {
                 stack_size_increment = new_incr
             } else {
-                return Err(PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
-                    .at_code_offset(self.current_function(), block_start));
+                return Err(
+                    PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
+                        .at_code_offset(self.current_function(), block_start),
+                );
             };
 
             if stack_size_increment > config.max_value_stack_size as u64 {
@@ -101,8 +107,10 @@ impl<'a> StackUsageVerifier<'a> {
         if stack_size_increment == 0 {
             Ok(())
         } else {
-            Err(PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
-                .at_code_offset(self.current_function(), block_start))
+            Err(
+                PartialVMError::new(StatusCode::POSITIVE_STACK_SIZE_AT_BLOCK_END)
+                    .at_code_offset(self.current_function(), block_start),
+            )
         }
     }
 
@@ -264,14 +272,17 @@ impl<'a> StackUsageVerifier<'a> {
             // Pack performs `num_fields` pops and one push
             Bytecode::PackVariant(vidx) => {
                 let handle = self.module.variant_handle_at(*vidx);
-                let variant_definition = self.module.variant_def_at(handle.enum_def, handle.variant);
+                let variant_definition =
+                    self.module.variant_def_at(handle.enum_def, handle.variant);
                 let field_count = variant_definition.fields.len();
                 (field_count as u64, 1)
             }
             Bytecode::PackVariantGeneric(vidx) => {
                 let handle = self.module.variant_instantiation_handle_at(*vidx);
                 let enum_def_instantiation = self.module.enum_instantiation_at(handle.enum_def);
-                let variant_definition = self.module.variant_def_at(enum_def_instantiation.def, handle.variant);
+                let variant_definition = self
+                    .module
+                    .variant_def_at(enum_def_instantiation.def, handle.variant);
                 let field_count = variant_definition.fields.len();
                 (field_count as u64, 1)
             }
@@ -281,7 +292,8 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::UnpackVariantImmRef(vidx)
             | Bytecode::UnpackVariantMutRef(vidx) => {
                 let handle = self.module.variant_handle_at(*vidx);
-                let variant_definition = self.module.variant_def_at(handle.enum_def, handle.variant);
+                let variant_definition =
+                    self.module.variant_def_at(handle.enum_def, handle.variant);
                 let field_count = variant_definition.fields.len();
                 (1, field_count as u64)
             }
@@ -290,7 +302,9 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::UnpackVariantGenericMutRef(vidx) => {
                 let handle = self.module.variant_instantiation_handle_at(*vidx);
                 let enum_def_instantiation = self.module.enum_instantiation_at(handle.enum_def);
-                let variant_definition = self.module.variant_def_at(enum_def_instantiation.def, handle.variant);
+                let variant_definition = self
+                    .module
+                    .variant_def_at(enum_def_instantiation.def, handle.variant);
                 let field_count = variant_definition.fields.len();
                 (1, field_count as u64)
             }

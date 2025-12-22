@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    fs::OpenOptions,
+    io::Write,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
+
 use futures::{future::BoxFuture, FutureExt};
 use opentelemetry::trace::TraceError;
 use opentelemetry_proto::{
@@ -9,12 +16,6 @@ use opentelemetry_proto::{
 };
 use opentelemetry_sdk::export::trace::{ExportResult, SpanData, SpanExporter};
 use prost::Message;
-use std::{
-    fs::OpenOptions,
-    io::Write,
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-};
 
 #[derive(Clone)]
 pub(crate) struct CachedOpenFile {

@@ -1,51 +1,52 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_trait::async_trait;
-use lru::LruCache;
-use move_binary_format::file_format::{
-    AbilitySet,
-    DatatypeTyParameter,
-    EnumDefinitionIndex,
-    FunctionDefinitionIndex,
-    Signature as MoveSignature,
-    SignatureIndex,
-    Visibility,
-};
-use move_command_line_common::{
-    display::{try_render_constant, RenderResult},
-    error_bitset::ErrorBitset,
-};
-use move_core_types::{annotated_value::MoveEnumLayout, language_storage::ModuleId};
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     num::NonZeroUsize,
     sync::{Arc, Mutex},
 };
-use sui_types::{
-    base_types::is_primitive_type_tag,
-    transaction::{Argument, CallArg, Command, ProgrammableTransaction},
-    type_input::{StructInput, TypeInput},
-};
 
-use crate::error::Error;
+use async_trait::async_trait;
+use lru::LruCache;
 use move_binary_format::{
     errors::Location,
-    file_format::{DatatypeHandleIndex, SignatureToken, StructDefinitionIndex, StructFieldInformation, TableIndex},
+    file_format::{
+        AbilitySet,
+        DatatypeHandleIndex,
+        DatatypeTyParameter,
+        EnumDefinitionIndex,
+        FunctionDefinitionIndex,
+        Signature as MoveSignature,
+        SignatureIndex,
+        SignatureToken,
+        StructDefinitionIndex,
+        StructFieldInformation,
+        TableIndex,
+        Visibility,
+    },
     CompiledModule,
+};
+use move_command_line_common::{
+    display::{try_render_constant, RenderResult},
+    error_bitset::ErrorBitset,
 };
 use move_core_types::{
     account_address::AccountAddress,
-    annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
-    language_storage::{StructTag, TypeTag},
+    annotated_value::{MoveEnumLayout, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    language_storage::{ModuleId, StructTag, TypeTag},
 };
 use sui_types::{
-    base_types::SequenceNumber,
+    base_types::{is_primitive_type_tag, SequenceNumber},
     move_package::{MovePackage, TypeOrigin},
     object::Object,
+    transaction::{Argument, CallArg, Command, ProgrammableTransaction},
+    type_input::{StructInput, TypeInput},
     Identifier,
 };
+
+use crate::error::Error;
 
 pub mod error;
 
@@ -65,7 +66,7 @@ pub struct Resolver<S> {
 
 /// Optional configuration that imposes limits on the work that the resolver can do for each
 /// request.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Limits {
     /// Maximum recursion depth through type parameters.
     pub max_type_argument_depth: usize,
@@ -408,35 +409,28 @@ impl<S: PackageStore> Resolver<S> {
 
     /// Returns the signatures of parameters to function `pkg::module::function` in the package
     /// store, assuming the function exists.
-    pub async fn function_parameters(
-        &self,
-        pkg: AccountAddress,
-        module: &str,
-        function: &str,
-    ) -> Result<Vec<OpenSignature>> {
+    pub async fn function_signature(&self, pkg: AccountAddress, module: &str, function: &str) -> Result<FunctionDef> {
         let mut context = ResolutionContext::new(self.limits.as_ref());
 
         let package = self.package_store.fetch(pkg).await?;
-        let Some(def) = package.module(module)?.function_def(function)? else {
+        let Some(mut def) = package.module(module)?.function_def(function)? else {
             return Err(Error::FunctionNotFound(pkg, module.to_string(), function.to_string()));
         };
 
-        let mut sigs = def.parameters.clone();
-
         // (1). Fetch all the information from this store that is necessary to resolve types
         // referenced by this tag.
-        for sig in &sigs {
+        for sig in def.parameters.iter().chain(def.return_.iter()) {
             context
                 .add_signature(sig.body.clone(), &self.package_store, package.as_ref(), /* visit_fields */ false)
                 .await?;
         }
 
         // (2). Use that information to relocate package IDs in the signature.
-        for sig in &mut sigs {
+        for sig in def.parameters.iter_mut().chain(def.return_.iter_mut()) {
             context.relocate_signature(&mut sig.body)?;
         }
 
-        Ok(sigs)
+        Ok(def)
     }
 
     /// Attempts to infer the type layouts for pure inputs to the programmable transaction.
@@ -480,8 +474,9 @@ impl<S: PackageStore> Resolver<S> {
             match cmd {
                 Command::MoveCall(call) => {
                     let params = self
-                        .function_parameters(call.package.into(), call.module.as_str(), call.function.as_str())
-                        .await?;
+                        .function_signature(call.package.into(), call.module.as_str(), call.function.as_str())
+                        .await?
+                        .parameters;
 
                     for (open_sig, arg) in params.iter().zip(call.arguments.iter()) {
                         let sig = open_sig.instantiate(&call.type_arguments)?;
@@ -982,7 +977,7 @@ impl OpenSignatureBody {
     }
 }
 
-impl<'m, 'n> DatatypeRef<'m, 'n> {
+impl DatatypeRef<'_, '_> {
     pub fn as_key(&self) -> DatatypeKey {
         DatatypeKey { package: self.package, module: self.module.to_string().into(), name: self.name.to_string().into() }
     }
@@ -1303,10 +1298,7 @@ impl<'l> ResolutionContext<'l> {
                     resolved_fields.push(MoveFieldLayout { name: ident(name.as_str())?, layout })
                 }
 
-                (
-                    MoveTypeLayout::Struct(Box::new(MoveStructLayout { type_, fields: Box::new(resolved_fields) })),
-                    field_depth + 1,
-                )
+                (MoveTypeLayout::Struct(Box::new(MoveStructLayout { type_, fields: resolved_fields })), field_depth + 1)
             }
             MoveData::Enum(variants) => {
                 let mut field_depth = 0;
@@ -1520,18 +1512,18 @@ fn read_signature(idx: SignatureIndex, bytecode: &CompiledModule) -> Result<Vec<
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
-    use move_binary_format::file_format::Ability;
-    use move_core_types::ident_str;
     use std::{
         path::PathBuf,
         str::FromStr,
         sync::{Arc, RwLock},
     };
-    use sui_types::{base_types::random_object_ref, transaction::ObjectArg};
 
+    use async_trait::async_trait;
+    use move_binary_format::file_format::Ability;
     use move_compiler::compiled_unit::NamedCompiledModule;
+    use move_core_types::ident_str;
     use sui_move_build::{BuildConfig, CompiledPackage};
+    use sui_types::{base_types::random_object_ref, transaction::ObjectArg};
 
     use super::*;
 
@@ -2005,9 +1997,9 @@ mod tests {
         let resolver = Resolver::new(cache);
         let c0 = addr("0xc0");
 
-        let foo = resolver.function_parameters(c0, "m", "foo").await.unwrap();
-        let bar = resolver.function_parameters(c0, "m", "bar").await.unwrap();
-        let baz = resolver.function_parameters(c0, "m", "baz").await.unwrap();
+        let foo = resolver.function_signature(c0, "m", "foo").await.unwrap();
+        let bar = resolver.function_signature(c0, "m", "bar").await.unwrap();
+        let baz = resolver.function_signature(c0, "m", "baz").await.unwrap();
 
         insta::assert_snapshot!(format!(
             "c0::m::foo: {foo:#?}\n\
@@ -2039,7 +2031,7 @@ mod tests {
             O::Vector(Box::new(O::Datatype(key("0x1::option::Option"), vec![O::TypeParameter(99)]))),
         ]);
 
-        insta::assert_display_snapshot!(
+        insta::assert_snapshot!(
             sig.instantiate(&[T::U64, T::Bool]).unwrap_err(),
             @"Type Parameter 99 out of bounds (2)"
         );
@@ -2255,7 +2247,7 @@ mod tests {
                     ident_str!("m").to_owned(),
                     ident_str!("foo").to_owned(),
                     vec![t],
-                    (0..=6).map(Argument::Input).collect(),
+                    (0 ..= 6).map(Argument::Input).collect(),
                 )],
             }
         }
@@ -2335,14 +2327,14 @@ mod tests {
                     ident_str!("m").to_owned(),
                     ident_str!("foo").to_owned(),
                     vec![T::U64],
-                    (0..=6).map(Argument::Input).collect(),
+                    (0 ..= 6).map(Argument::Input).collect(),
                 ),
                 Command::move_call(
                     addr("0xe0").into(),
                     ident_str!("m").to_owned(),
                     ident_str!("foo").to_owned(),
                     vec![T::U64],
-                    (0..=6).map(Argument::Input).collect(),
+                    (0 ..= 6).map(Argument::Input).collect(),
                 ),
             ],
         };
@@ -2392,7 +2384,7 @@ mod tests {
                     ident_str!("m").to_owned(),
                     ident_str!("foo").to_owned(),
                     vec![T::U64],
-                    (0..=6).map(Argument::Input).collect(),
+                    (0 ..= 6).map(Argument::Input).collect(),
                 ),
                 // This command is using the input that was previously used as a U64, but now as a
                 // U32, which will cause an error.
@@ -2400,7 +2392,7 @@ mod tests {
             ],
         };
 
-        insta::assert_display_snapshot!(
+        insta::assert_snapshot!(
             resolver.pure_input_layouts(&ptb).await.unwrap_err(),
             @"Conflicting types for input 3: u64 and u32"
         );

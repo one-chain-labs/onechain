@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use futures::future::try_join_all;
-use std::sync::Arc;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use sui_sdk::{rpc_types::Checkpoint, SuiClient};
 use sui_types::messages_checkpoint::CheckpointSequenceNumber;

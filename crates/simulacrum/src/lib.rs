@@ -12,7 +12,7 @@
 
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use fastcrypto::traits::Signer;
 use rand::rngs::OsRng;
 use sui_config::{
@@ -28,31 +28,34 @@ use sui_swarm_config::{
     network_config_builder::ConfigBuilder,
 };
 use sui_types::{
-    base_types::{AuthorityName, ObjectID, SuiAddress, VersionNumber},
+    base_types::{AuthorityName, ObjectID, ObjectRef, SuiAddress, VersionNumber},
     committee::Committee,
-    crypto::AuthoritySignature,
+    crypto::{get_account_key_pair, AccountKeyPair, AuthoritySignature},
     digests::ConsensusCommitDigest,
-    effects::TransactionEffects,
+    effects::{TransactionEffects, TransactionEffectsAPI},
     error::ExecutionError,
-    gas_coin::MIST_PER_OCT,
+    gas_coin::{GasCoin, MIST_PER_OCT},
     inner_temporary_store::InnerTemporaryStore,
-    messages_checkpoint::{EndOfEpochData, VerifiedCheckpoint},
-    object::Object,
+    messages_checkpoint::{CheckpointContents, CheckpointSequenceNumber, EndOfEpochData, VerifiedCheckpoint},
+    messages_consensus::ConsensusDeterminedVersionAssignments,
+    mock_checkpoint_builder::{MockCheckpointBuilder, ValidatorKeypairProvider},
+    object::{Object, Owner},
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
     signature::VerifyParams,
     storage::{ObjectStore, ReadStore, RpcStateReader},
     sui_system_state::epoch_start_sui_system_state::EpochStartSystemState,
-    transaction::{EndOfEpochTransactionKind, Transaction, VerifiedTransaction},
+    transaction::{
+        EndOfEpochTransactionKind,
+        GasData,
+        Transaction,
+        TransactionData,
+        TransactionKind,
+        VerifiedTransaction,
+    },
 };
 
 pub use self::store::{in_mem_store::InMemoryStore, SimulatorStore};
 use self::{epoch_state::EpochState, store::in_mem_store::KeyStore};
-use sui_types::{
-    gas_coin::GasCoin,
-    messages_checkpoint::{CheckpointContents, CheckpointSequenceNumber},
-    mock_checkpoint_builder::{MockCheckpointBuilder, ValidatorKeypairProvider},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{GasData, TransactionData, TransactionKind},
-};
 
 mod epoch_state;
 pub mod store;
@@ -220,7 +223,7 @@ impl<R, S: store::SimulatorStore> Simulacrum<R, S> {
             round,
             timestamp_ms,
             ConsensusCommitDigest::default(),
-            Vec::new(),
+            ConsensusDeterminedVersionAssignments::empty_for_testing(),
         );
 
         self.execute_transaction(consensus_commit_prologue_transaction.into())
@@ -311,6 +314,37 @@ impl<R, S: store::SimulatorStore> Simulacrum<R, S> {
     /// Return the reference gas price for the current epoch
     pub fn reference_gas_price(&self) -> u64 {
         self.epoch_state.reference_gas_price()
+    }
+
+    /// Create a new account and credit it with `amount` gas units from a faucet account. Returns
+    /// the account, its keypair, and a reference to the gas object it was funded with.
+    ///
+    /// ```
+    /// use simulacrum::Simulacrum;
+    /// use sui_types::base_types::SuiAddress;
+    /// use sui_types::gas_coin::MIST_PER_OCT;
+    ///
+    /// # fn main() {
+    /// let mut simulacrum = Simulacrum::new();
+    /// let (account, kp, gas) = simulacrum.funded_account(MIST_PER_OCT).unwrap();
+    ///
+    /// // `account` is a fresh SuiAddress that owns a Coin<OCT> object with single SUI in it,
+    /// // referred to by `gas`.
+    /// // ...
+    /// # }
+    /// ```
+    pub fn funded_account(&mut self, amount: u64) -> Result<(SuiAddress, AccountKeyPair, ObjectRef)> {
+        let (address, key) = get_account_key_pair();
+        let fx = self.request_gas(address, amount)?;
+        ensure!(fx.status().is_ok(), "Failed to request gas for account");
+
+        let gas = fx
+            .created()
+            .into_iter()
+            .find_map(|(oref, owner)| matches!(owner, Owner::AddressOwner(owner) if owner == address).then_some(oref))
+            .context("Could not find created object")?;
+
+        Ok((address, key, gas))
     }
 
     /// Request that `amount` Mist be sent to `address` from a faucet account.
@@ -592,7 +626,7 @@ mod tests {
         let clock = chain.store().get_clock();
         let start_time_ms = clock.timestamp_ms();
         println!("clock: {:#?}", clock);
-        for _ in 0..steps {
+        for _ in 0 .. steps {
             chain.advance_clock(Duration::from_millis(1));
             chain.create_checkpoint();
             let clock = chain.store().get_clock();
@@ -609,7 +643,7 @@ mod tests {
         let mut chain = Simulacrum::new();
 
         let start_epoch = chain.store.get_highest_checkpint().unwrap().epoch;
-        for i in 0..steps {
+        for i in 0 .. steps {
             chain.advance_epoch(/* create_random_state */ false);
             chain.advance_clock(Duration::from_millis(1));
             chain.create_checkpoint();

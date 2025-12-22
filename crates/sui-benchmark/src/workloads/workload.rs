@@ -1,21 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    system_state_observer::SystemStateObserver,
-    workloads::{payload::Payload, Gas, GasCoinConfig},
-    ValidatorProxy,
-};
+use std::{str::FromStr, sync::Arc};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
-use std::{str::FromStr, sync::Arc};
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 use sui_types::gas_coin::MIST_PER_OCT;
+
+use crate::{
+    system_state_observer::SystemStateObserver,
+    workloads::{payload::Payload, Gas, GasCoinConfig},
+    ValidatorProxy,
+};
 
 // This is the maximum gas we will transfer from primary coin into any gas coin
 // for running the benchmark
@@ -31,11 +33,15 @@ pub const STORAGE_COST_PER_COUNTER: u64 = 341 * 76 * 100;
 /// Used to estimate the budget required for each transaction.
 pub const ESTIMATED_COMPUTATION_COST: u64 = 1_000_000;
 
-#[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy)]
+#[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, PartialEq)]
 pub enum ExpectedFailureType {
     Random = 0,
     InvalidSignature,
     // TODO: Add other failure types
+
+    // This is not a failure type, but a placeholder for no failure. Marking no failure asserts that
+    // the transaction must succeed.
+    NoFailure,
 }
 
 impl TryFrom<u32> for ExpectedFailureType {
@@ -43,7 +49,11 @@ impl TryFrom<u32> for ExpectedFailureType {
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(rand::random()),
+            0 => {
+                let mut rng = rand::thread_rng();
+                let n = rng.gen_range(1 .. ExpectedFailureType::COUNT - 1);
+                Ok(ExpectedFailureType::iter().nth(n).unwrap())
+            }
             _ => ExpectedFailureType::iter().nth(value as usize).ok_or_else(|| {
                 anyhow!("Invalid failure type specifier. Valid options are {} to {}", 0, ExpectedFailureType::COUNT)
             }),
@@ -68,7 +78,7 @@ impl FromStr for ExpectedFailureType {
 impl Distribution<ExpectedFailureType> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> ExpectedFailureType {
         // Exclude the "Random" variant
-        let n = rng.gen_range(1..ExpectedFailureType::COUNT);
+        let n = rng.gen_range(1 .. ExpectedFailureType::COUNT);
         ExpectedFailureType::iter().nth(n).unwrap()
     }
 }

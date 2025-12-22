@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use expect_test::expect;
-use move_core_types::account_address::AccountAddress;
 use std::{
     collections::HashMap,
     fs,
@@ -10,6 +8,9 @@ use std::{
     path::{Path, PathBuf},
     str,
 };
+
+use expect_test::expect;
+use move_core_types::account_address::AccountAddress;
 use sui_json_rpc_types::{get_new_package_obj_from_response, get_new_package_upgrade_cap_from_response};
 use sui_move_build::{BuildConfig, CompiledPackage, SuiPackageHooks};
 use sui_sdk::wallet_context::WalletContext;
@@ -690,15 +691,11 @@ async fn publish_package_and_deps(context: &WalletContext, package: PathBuf) -> 
 
 /// Copy `package` from fixtures into `directory`, setting its named address in the copied package's
 /// `Move.toml` to `address`. (A fixture's self-address is assumed to match its package name).
-async fn copy_published_package<'s>(
-    directory: impl AsRef<Path>,
-    package: &str,
-    address: SuiAddress,
-) -> io::Result<PathBuf> {
+async fn copy_published_package(directory: impl AsRef<Path>, package: &str, address: SuiAddress) -> io::Result<PathBuf> {
     copy_upgraded_package(directory, package, address, address).await
 }
 
-async fn copy_upgraded_package<'s>(
+async fn copy_upgraded_package(
     directory: impl AsRef<Path>,
     package: &str,
     storage_id: SuiAddress,

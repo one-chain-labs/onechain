@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::{future::join_all, StreamExt};
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use one_node::SuiNodeHandle;
-use rand::{distributions::*, rngs::OsRng, seq::SliceRandom};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -13,6 +9,12 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+
+use futures::{future::join_all, StreamExt};
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use mysten_common::fatal;
+use one_node::SuiNodeHandle;
+use rand::{distributions::*, rngs::OsRng, seq::SliceRandom};
 use sui_config::{
     genesis::Genesis,
     node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
@@ -258,7 +260,7 @@ impl TestCluster {
                         Ok(Some(run_with_range)) => Some(run_with_range),
                         Ok(None) => None,
                         Err(e) => {
-                            error!("failed recv from sui-node shutdown channel: {}", e);
+                            error!("failed recv from one-node shutdown channel: {}", e);
                             None
                         },
                     }
@@ -266,7 +268,7 @@ impl TestCluster {
             }
         })
         .await
-        .expect("Timed out waiting for cluster to hit target epoch and recv shutdown signal from sui-node")
+        .expect("Timed out waiting for cluster to hit target epoch and recv shutdown signal from one-node")
     }
 
     pub async fn wait_for_protocol_version(&self, target_protocol_version: ProtocolVersion) -> SuiSystemState {
@@ -303,7 +305,9 @@ impl TestCluster {
             node.get_node_handle()
                 .unwrap()
                 .with_async(|node| async {
-                    node.close_epoch_for_testing().await.unwrap();
+                    node.close_epoch_for_testing().await.unwrap_or_else(|_| {
+                        fatal!("Failed to close epoch for validator {:?}", node.state().name);
+                    });
                     cur_stake += cur_committee.weight(&node.state().name);
                 })
                 .await;
@@ -611,7 +615,7 @@ impl TestCluster {
         context.get_one_gas_object_owned_by_address(funding_address).await.unwrap().unwrap()
     }
 
-    pub async fn transfer_sui_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
+    pub async fn transfer_oct_must_exceed(&self, sender: SuiAddress, receiver: SuiAddress, amount: u64) -> ObjectID {
         let tx = self.test_transaction_builder_with_sender(sender).await.transfer_oct(Some(amount), receiver).build();
         let effects = self.sign_and_execute_transaction(&tx).await.effects.unwrap();
         assert_eq!(&SuiExecutionStatus::Success, effects.status());
@@ -941,13 +945,13 @@ impl TestClusterBuilder {
         // valid JWKs as well.
         #[cfg(msim)]
         if !self.default_jwks {
-            sui_node::set_jwk_injector(Arc::new(|_authority, provider| {
+            one_node::set_jwk_injector(Arc::new(|_authority, provider| {
                 use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
                 use rand::Rng;
 
                 // generate random (and possibly conflicting) id/key pairings.
-                let id_num = rand::thread_rng().gen_range(1..=4);
-                let key_num = rand::thread_rng().gen_range(1..=4);
+                let id_num = rand::thread_rng().gen_range(1 ..= 4);
+                let key_num = rand::thread_rng().gen_range(1 ..= 4);
 
                 let id = JwkId { iss: provider.get_config().iss, kid: format!("kid{}", id_num) };
 

@@ -1,6 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Result;
+use fastcrypto::traits::ToFromBytes;
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
+
+use super::{
+    epoch_start_sui_system_state::EpochStartValidatorInfoV1,
+    get_validators_from_table_vec,
+    sui_system_state_summary::{SuiSupperCommitteeSummary, SuiSystemStateSummary, SuiValidatorSummary},
+    AdvanceEpochParams,
+    SuiSystemStateTrait,
+};
 use crate::{
     balance::Balance,
     base_types::{ObjectID, SuiAddress},
@@ -18,18 +30,6 @@ use crate::{
     multiaddr::Multiaddr,
     storage::ObjectStore,
     sui_system_state::epoch_start_sui_system_state::EpochStartSystemState,
-};
-use anyhow::Result;
-use fastcrypto::traits::ToFromBytes;
-use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize};
-
-use super::{
-    epoch_start_sui_system_state::EpochStartValidatorInfoV1,
-    get_validators_from_table_vec,
-    sui_system_state_summary::{SuiSupperCommitteeSummary, SuiSystemStateSummary, SuiValidatorSummary},
-    AdvanceEpochParams,
-    SuiSystemStateTrait,
 };
 
 const E_METADATA_INVALID_POP: u64 = 0;
@@ -269,7 +269,7 @@ impl ValidatorMetadataV1 {
 /// Rust version of the Move sui::validator::Validator type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ValidatorV1 {
-    metadata: ValidatorMetadataV1,
+    pub metadata: ValidatorMetadataV1,
     #[serde(skip)]
     verified_metadata: OnceCell<VerifiedValidatorMetadataV1>,
     pub revenue_receiving_address: SuiAddress,

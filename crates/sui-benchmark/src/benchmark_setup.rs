@@ -1,18 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    bank::BenchmarkBank,
-    options::Opts,
-    util::get_ed25519_keypair_from_keystore,
-    FullNodeProxy,
-    LocalValidatorAggregatorProxy,
-    ValidatorProxy,
-};
+use std::{path::PathBuf, sync::Arc, thread::JoinHandle, time::Duration};
+
 use anyhow::{anyhow, bail, Context, Result};
 use prometheus::Registry;
 use rand::seq::SliceRandom;
-use std::{path::PathBuf, sync::Arc, thread::JoinHandle, time::Duration};
 use sui_swarm_config::genesis_config::AccountConfig;
 use sui_types::{
     base_types::{ConciseableName, ObjectID, SuiAddress},
@@ -28,10 +21,19 @@ use tokio::{
 };
 use tracing::info;
 
+use crate::{
+    bank::BenchmarkBank,
+    options::Opts,
+    util::get_ed25519_keypair_from_keystore,
+    FullNodeProxy,
+    LocalValidatorAggregatorProxy,
+    ValidatorProxy,
+};
+
 pub enum Env {
     // Mode where benchmark in run on a validator cluster that gets spun up locally
     Local,
-    // Mode where benchmark is run on a already running remote cluster
+    // Mode where benchmark is run on an already running remote cluster
     Remote,
 }
 

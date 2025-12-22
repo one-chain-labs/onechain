@@ -3,6 +3,14 @@
 
 use std::{collections::HashSet, sync::Arc};
 
+use ethers::{
+    providers::{JsonRpcClient, Middleware, Provider},
+    types::{Address as EthAddress, Block, Filter, TxHash},
+};
+use tap::TapFallible;
+
+#[cfg(test)]
+use crate::eth_mock_provider::EthMockProvider;
 use crate::{
     abi::EthBridgeEvent,
     error::{BridgeError, BridgeResult},
@@ -10,15 +18,6 @@ use crate::{
     metrics::BridgeMetrics,
     types::{BridgeAction, EthLog, RawEthLog},
 };
-use ethers::{
-    providers::{JsonRpcClient, Middleware, Provider},
-    types::{Block, Filter, TxHash},
-};
-use tap::TapFallible;
-
-#[cfg(test)]
-use crate::eth_mock_provider::EthMockProvider;
-use ethers::types::Address as EthAddress;
 pub struct EthClient<P> {
     provider: Provider<P>,
     contract_addresses: HashSet<EthAddress>,

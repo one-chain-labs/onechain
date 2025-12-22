@@ -37,7 +37,8 @@ fn serialize_nested_types_too_deep() {
         serialize_signature_token(&mut binary, &ty).expect_err("serialization should fail");
 
         let mut binary = BinaryData::new();
-        serialize_signature_token_unchecked(&mut binary, &ty).expect("serialization (unchecked) should succeed");
+        serialize_signature_token_unchecked(&mut binary, &ty)
+            .expect("serialization (unchecked) should succeed");
 
         let cursor = Cursor::new(binary.as_inner());
         load_signature_token_test_entry(cursor).expect_err("deserialization should fail");

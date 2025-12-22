@@ -9,7 +9,6 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use sui_data_ingestion_core::Worker;
-
 use sui_package_resolver::{PackageStore, Resolver};
 use sui_types::{
     base_types::ObjectID,
@@ -223,15 +222,17 @@ fn parse_struct_field(
 
 #[cfg(test)]
 mod tests {
-    use crate::handlers::parse_struct;
+    use std::{collections::BTreeMap, str::FromStr};
+
     use move_core_types::{
         account_address::AccountAddress,
         annotated_value::{MoveStruct, MoveValue, MoveVariant},
         identifier::Identifier,
         language_storage::StructTag,
     };
-    use std::{collections::BTreeMap, str::FromStr};
     use sui_types::base_types::ObjectID;
+
+    use crate::handlers::parse_struct;
 
     #[tokio::test]
     async fn test_wrapped_object_parsing() -> anyhow::Result<()> {

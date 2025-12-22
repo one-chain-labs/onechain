@@ -313,7 +313,7 @@ impl GenesisConfig {
 
     pub fn custom_genesis(num_accounts: usize, num_objects_per_account: usize) -> Self {
         let mut accounts = Vec::new();
-        for _ in 0..num_accounts {
+        for _ in 0 .. num_accounts {
             accounts
                 .push(AccountConfig { address: None, gas_amounts: vec![DEFAULT_GAS_AMOUNT; num_objects_per_account] })
         }
@@ -389,7 +389,7 @@ impl GenesisConfig {
     /// get the same keypair used for genesis (hence the importance of the seedable rng).
     pub fn benchmark_gas_keys(n: usize) -> Vec<SuiKeyPair> {
         let mut rng = StdRng::seed_from_u64(Self::BENCHMARKS_RNG_SEED);
-        (0..n).map(|_| SuiKeyPair::Ed25519(NetworkKeyPair::generate(&mut rng))).collect()
+        (0 .. n).map(|_| SuiKeyPair::Ed25519(NetworkKeyPair::generate(&mut rng))).collect()
     }
 
     pub fn add_faucet_account(mut self) -> Self {

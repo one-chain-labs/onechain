@@ -5,10 +5,9 @@
 
 use std::{path::PathBuf, sync::Arc};
 
+pub use executor::Executor;
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{error::SuiResult, metrics::BytecodeVerifierMetrics};
-
-pub use executor::Executor;
 pub use verifier::Verifier;
 
 pub mod executor;

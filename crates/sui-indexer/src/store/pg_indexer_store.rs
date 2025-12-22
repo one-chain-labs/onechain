@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use core::result::Result::Ok;
 use std::{
     collections::{BTreeMap, HashMap},
     io::Cursor,
@@ -8,10 +9,10 @@ use std::{
 };
 
 use async_trait::async_trait;
-use core::result::Result::Ok;
 use csv::{ReaderBuilder, Writer};
 use diesel::{
     dsl::{max, min},
+    upsert::excluded,
     ExpressionMethods,
     OptionalExtension,
     QueryDsl,
@@ -21,14 +22,20 @@ use futures::future::Either;
 use itertools::Itertools;
 use object_store::path::Path;
 use strum::IntoEnumIterator;
-use sui_types::base_types::ObjectID;
-use tap::TapFallible;
-use tracing::{info, warn};
-
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 use sui_protocol_config::ProtocolConfig;
 use sui_storage::object_store::util::put;
+use sui_types::{
+    base_types::ObjectID,
+    digests::{ChainIdentifier, CheckpointDigest},
+};
+use tap::TapFallible;
+use tracing::{info, warn};
 
+use super::{
+    pg_partition_manager::{EpochPartitionData, PgPartitionManager},
+    IndexerStore,
+};
 use crate::{
     config::UploadOptions,
     database::ConnectionPool,
@@ -49,6 +56,7 @@ use crate::{
             StoredObjectSnapshot,
         },
         packages::StoredPackage,
+        raw_checkpoints::StoredRawCheckpoint,
         transactions::StoredTransaction,
         watermarks::StoredWatermark,
     },
@@ -99,15 +107,6 @@ use crate::{
         TxIndex,
     },
 };
-
-use super::{
-    pg_partition_manager::{EpochPartitionData, PgPartitionManager},
-    IndexerStore,
-};
-
-use crate::models::raw_checkpoints::StoredRawCheckpoint;
-use diesel::upsert::excluded;
-use sui_types::digests::{ChainIdentifier, CheckpointDigest};
 
 #[macro_export]
 macro_rules! chunk {
@@ -1742,7 +1741,7 @@ impl IndexerStore for PgIndexerStore {
         // the first cp of the current epoch.
         let min_prunable_cp = self.get_min_prunable_checkpoint().await?;
         min_cp = std::cmp::max(min_cp, min_prunable_cp);
-        for cp in min_cp..=max_cp {
+        for cp in min_cp ..= max_cp {
             // NOTE: the order of pruning tables is crucial:
             // 1. prune tx_* tables;
             // 2. prune event_* tables;
@@ -1851,7 +1850,7 @@ impl IndexerStore for PgIndexerStore {
         info!("Persisting protocol configs with start_version: {}, end_version: {}", start_version, end_version);
 
         // Gather all protocol configs and feature flags for all versions between start and end.
-        for version in start_version..=end_version {
+        for version in start_version ..= end_version {
             let protocol_configs =
                 ProtocolConfig::get_for_version_if_supported((version as u64).into(), chain_id.chain()).ok_or(
                     IndexerError::GenericError(format!(

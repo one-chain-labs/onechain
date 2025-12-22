@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::*;
+use std::str::FromStr;
 
+use clap::*;
 use strum_macros::EnumString;
 
 use crate::drivers::Interval;
-use std::str::FromStr;
 
 #[derive(Parser)]
 #[clap(name = "Stress Testing Framework")]
@@ -184,6 +184,9 @@ pub enum RunSpec {
         // relative weight of expected failure transactions in the benchmark workload
         #[clap(long, num_args(1..), value_delimiter = ',', default_values_t = [0])]
         expected_failure: Vec<u32>,
+        // relative weight of randomized transaction in the benchmark workload
+        #[clap(long, num_args(1..), value_delimiter = ',', default_values_t = [0])]
+        randomized_transaction: Vec<u32>,
 
         // --- workload-specific options --- (TODO: use subcommands or similar)
         // 100 for max hotness i.e all requests target

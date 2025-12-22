@@ -5,9 +5,8 @@ use std::{
     error::Error,
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::Sender;
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, mpsc::Sender};
 use tracing::error;
 
 use crate::payload::{Command, Payload, Processor, SignerInfo};

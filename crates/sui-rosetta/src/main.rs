@@ -118,7 +118,7 @@ impl RosettaServerCommand {
                 server.serve(addr).await;
             }
             RosettaServerCommand::StartOnlineRemoteServer { env, addr, full_node_url, data_path } => {
-                info!("Starting Rosetta Online Server with remove Sui full node [{full_node_url}].");
+                info!("Starting Rosetta Online Server with remove OneChain full node [{full_node_url}].");
                 let sui_client = wait_for_sui_client(full_node_url).await;
                 let rosetta_path = data_path.join("rosetta_db");
                 info!("Rosetta db path : {rosetta_path:?}");
@@ -127,7 +127,7 @@ impl RosettaServerCommand {
             }
 
             RosettaServerCommand::StartOnlineServer { env, addr, node_config, data_path } => {
-                info!("Starting Rosetta Online Server with embedded Sui full node.");
+                info!("Starting Rosetta Online Server with embedded OneChain full node.");
                 info!("Data directory path: {data_path:?}");
 
                 let node_config = node_config.unwrap_or_else(|| {
@@ -138,7 +138,7 @@ impl RosettaServerCommand {
 
                 let mut config = NodeConfig::load(&node_config)?;
                 config.db_path = data_path.join("sui_db");
-                info!("Overriding Sui db path to : {:?}", config.db_path);
+                info!("Overriding OneChain db path to : {:?}", config.db_path);
 
                 let registry_service = mysten_metrics::start_prometheus_server(config.metrics_address);
                 // Staring a full node for the rosetta server.
@@ -159,17 +159,17 @@ impl RosettaServerCommand {
 
 async fn wait_for_sui_client(rpc_address: String) -> SuiClient {
     loop {
-        match SuiClientBuilder::default().max_concurrent_requests(usize::MAX).build(&rpc_address).await {
+        match SuiClientBuilder::default().build(&rpc_address).await {
             Ok(client) => return client,
             Err(e) => {
-                warn!("Error connecting to Sui RPC server [{rpc_address}]: {e}, retrying in 5 seconds.");
+                warn!("Error connecting to OneChain RPC server [{rpc_address}]: {e}, retrying in 5 seconds.");
                 tokio::time::sleep(Duration::from_millis(5000)).await;
             }
         }
     }
 }
 
-/// This method reads the keypairs from the Sui keystore to create the PrefundedAccount objects,
+/// This method reads the keypairs from the OneChain keystore to create the PrefundedAccount objects,
 /// PrefundedAccount will be written to the rosetta-cli config file for testing.
 ///
 fn read_prefunded_account(path: &Path) -> Result<Vec<PrefundedAccount>, anyhow::Error> {

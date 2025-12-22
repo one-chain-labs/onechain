@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use diesel::{associations::HasTable, QueryDsl};
 use diesel_async::RunQueryDsl;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use prometheus::Registry;
-use std::time::Duration;
 use sui_bridge::e2e_tests::test_utils::{initiate_bridge_eth_to_sui, BridgeTestCluster, BridgeTestClusterBuilder};
 use sui_bridge_indexer::{
     config::IndexerConfig,
@@ -19,7 +20,7 @@ use sui_bridge_indexer::{
 use sui_data_ingestion_core::DataIngestionMetrics;
 use sui_indexer::database::Connection;
 use sui_indexer_builder::indexer_builder::IndexerProgressStore;
-use sui_pg_temp_db::TempDb;
+use sui_pg_db::temp::TempDb;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/migrations");
 

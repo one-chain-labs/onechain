@@ -8,17 +8,13 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    crypto::BridgeAuthorityPublicKey,
-    error::{BridgeError, BridgeResult},
-    types::{BridgeAction, SuiToEthBridgeAction},
-};
+use std::str::FromStr;
+
 use ethers::types::Address as EthAddress;
 use fastcrypto::encoding::{Encoding, Hex};
 use move_core_types::language_storage::StructTag;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use sui_json_rpc_types::SuiEvent;
 use sui_types::{
     base_types::SuiAddress,
@@ -29,6 +25,12 @@ use sui_types::{
     parse_sui_type_tag,
     TypeTag,
     BRIDGE_PACKAGE_ID,
+};
+
+use crate::{
+    crypto::BridgeAuthorityPublicKey,
+    error::{BridgeError, BridgeResult},
+    types::{BridgeAction, SuiToEthBridgeAction},
 };
 
 // `TokendDepositedEvent` emitted in bridge.move
@@ -407,12 +409,6 @@ impl SuiBridgeEvent {
 pub mod tests {
     use std::collections::HashSet;
 
-    use super::*;
-    use crate::{
-        crypto::BridgeAuthorityKeyPair,
-        e2e_tests::test_utils::BridgeTestClusterBuilder,
-        types::{BridgeAction, SuiToEthBridgeAction},
-    };
     use ethers::types::Address as EthAddress;
     use sui_json_rpc_types::{BcsEvent, SuiEvent};
     use sui_types::{
@@ -422,6 +418,13 @@ pub mod tests {
         digests::TransactionDigest,
         event::EventID,
         Identifier,
+    };
+
+    use super::*;
+    use crate::{
+        crypto::BridgeAuthorityKeyPair,
+        e2e_tests::test_utils::BridgeTestClusterBuilder,
+        types::{BridgeAction, SuiToEthBridgeAction},
     };
 
     /// Returns a test SuiEvent and corresponding BridgeAction

@@ -16,7 +16,6 @@ use move_core_types::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_json::json;
-
 use sui_json::SuiJsonValue;
 use sui_json_rpc::error::Error;
 use sui_json_rpc_types::{
@@ -318,7 +317,7 @@ impl RpcExampleProvider {
     }
 
     fn get_object_responses(&mut self, object_count: usize) -> Vec<SuiObjectResponse> {
-        (0..object_count)
+        (0 .. object_count)
             .map(|_| {
                 let object_id = ObjectID::new(self.rng.gen());
                 let coin = GasCoin::new(object_id, 100000000);
@@ -411,7 +410,7 @@ impl RpcExampleProvider {
         let limit = 4;
         let descending_order = false;
         let seq = 1004;
-        let page = (0..4)
+        let page = (0 .. 4)
             .map(|idx| Checkpoint {
                 epoch: 5000,
                 sequence_number: seq + 1 + idx,
@@ -451,7 +450,7 @@ impl RpcExampleProvider {
 
     fn get_owned_objects(&mut self) -> Examples {
         let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
-        let result = (0..4)
+        let result = (0 .. 4)
             .map(|_| SuiObjectData {
                 object_id: ObjectID::new(self.rng.gen()),
                 version: Default::default(),
@@ -508,7 +507,7 @@ impl RpcExampleProvider {
     }
 
     fn query_transaction_blocks(&mut self) -> Examples {
-        let mut data = self.get_transaction_digests(5..9);
+        let mut data = self.get_transaction_digests(5 .. 9);
         let has_next_page = data.len() > (9 - 5);
         data.truncate(9 - 5);
         let next_cursor = data.last().cloned();
@@ -534,7 +533,7 @@ impl RpcExampleProvider {
     }
 
     fn multi_get_transaction_blocks(&mut self) -> Examples {
-        let data = (0..3).map(|_| self.get_transfer_data_response().4).collect::<Vec<_>>();
+        let data = (0 .. 3).map(|_| self.get_transfer_data_response().4).collect::<Vec<_>>();
         let digests = data.iter().map(|x| x.digest).collect::<Vec<_>>();
         Examples::new("sui_multiGetTransactionBlocks", vec![ExamplePairing::new(
             "Returns the transaction data for specified digest.",
@@ -728,8 +727,7 @@ impl RpcExampleProvider {
         let limit = 3;
         let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
         let cursor = ObjectID::new(self.rng.gen());
-        let next = ObjectID::new(self.rng.gen());
-        let coins = (0..3)
+        let coins = (0 .. 3)
             .map(|_| Coin {
                 coin_type: "0x2::oct::OCT".to_string(),
                 coin_object_id: ObjectID::new(self.rng.gen()),
@@ -740,7 +738,7 @@ impl RpcExampleProvider {
                 previous_transaction: TransactionDigest::new(self.rng.gen()),
             })
             .collect::<Vec<_>>();
-        let page = CoinPage { data: coins, next_cursor: Some(next), has_next_page: true };
+        let page = CoinPage { data: coins, next_cursor: Some("abcd".to_string()), has_next_page: true };
 
         Examples::new(
             "suix_getAllCoins",
@@ -802,7 +800,7 @@ impl RpcExampleProvider {
     fn suix_get_coins(&mut self) -> Examples {
         let coin_type = "0x2::oct::OCT".to_string();
         let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
-        let coins = (0..3)
+        let coins = (0 .. 3)
             .map(|_| Coin {
                 coin_type: coin_type.clone(),
                 coin_object_id: ObjectID::new(self.rng.gen()),
@@ -814,9 +812,7 @@ impl RpcExampleProvider {
             })
             .collect::<Vec<_>>();
 
-        let next_cursor = coins.last().unwrap().coin_object_id;
-
-        let page = CoinPage { data: coins, next_cursor: Some(next_cursor), has_next_page: true };
+        let page = CoinPage { data: coins, next_cursor: Some("abcd".to_string()), has_next_page: true };
 
         Examples::new(
             "suix_getCoins",
@@ -959,7 +955,7 @@ impl RpcExampleProvider {
 
     fn suix_get_dynamic_fields(&mut self) -> Examples {
         let object_id = ObjectID::new(self.rng.gen());
-        let dynamic_fields = (0..3)
+        let dynamic_fields = (0 .. 3)
             .map(|_| DynamicFieldInfo {
                 name: DynamicFieldName {
                     type_: TypeTag::from_str("0x9::test::TestField").unwrap(),
@@ -1012,7 +1008,7 @@ impl RpcExampleProvider {
                         )
                         .unwrap()
                     },
-                    MoveStructLayout { type_: struct_tag, fields: Box::new(Vec::new()) },
+                    MoveStructLayout { type_: struct_tag, fields: Vec::new() },
                 )
                 .unwrap(),
             ),
@@ -1045,7 +1041,7 @@ impl RpcExampleProvider {
         let query = json!(SuiObjectResponseQuery { filter, options });
         let object_id = ObjectID::new(self.rng.gen());
 
-        let items = (0..3)
+        let items = (0 .. 3)
             .map(|_| {
                 SuiObjectResponse::new_with_data(SuiObjectData {
                     content: None,
@@ -1083,7 +1079,7 @@ impl RpcExampleProvider {
     fn suix_query_events(&mut self) -> Examples {
         let package_id = ObjectID::new(self.rng.gen());
         let identifier = Identifier::from_str("test").unwrap();
-        let mut event_ids = self.get_event_ids(5..9);
+        let mut event_ids = self.get_event_ids(5 .. 9);
         let has_next_page = event_ids.len() > (9 - 5);
         event_ids.truncate(9 - 5);
         let next_cursor = event_ids.last().cloned();

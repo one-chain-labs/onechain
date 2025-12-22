@@ -9,9 +9,7 @@ OneChain provides a command line interface (CLI) tool to interact with the OneCh
 To get the latest version of the CLI, you can run the following command from a terminal or console.
 
 ```sh
-cargo install --locked --git https://github.com/one-chain-labs/onechain.git one_chain  --features tracing
-
-mv ~/.cargo/bin/one_chain ~/.cargo/bin/one
+cargo install --locked --git https://github.com/one-chain-labs/onechain.git one --features tracing
 ```
 
 :::info
@@ -544,7 +542,7 @@ this command records all the Move function invocations and the gas cost breakdow
 To enable the profiler, you must either install or build the OneChain Client binary locally with the `--features tracing` flag if it has not already been built with that feature enabled.
 
 ```sh
-$ cargo install --locked --git https://github.com/one-chain-labs/onechain.git --branch <BRANCH-NAME> --features tracing one_chain
+$ cargo install --locked --git https://github.com/one-chain-labs/onechain.git --branch <BRANCH-NAME> --features tracing one
 ```
 
 The command outputs a profile to the current working directory in the format `gas_profile_{tx_digest}_{unix_timestamp}.json`.

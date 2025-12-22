@@ -1,20 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    config::{DynamicPeerValidationConfig, RemoteWriteConfig, StaticPeerValidationConfig},
-    handlers::publish_metrics,
-    histogram_relay::HistogramRelay,
-    middleware::{expect_content_length, expect_mysten_proxy_header, expect_valid_public_key},
-    peers::{AllowedPeer, SuiNodeProvider},
-    var,
-};
+use std::{fs, io::BufReader, net::SocketAddr, sync::Arc, time::Duration};
+
 use anyhow::{Error, Result};
 use axum::{extract::DefaultBodyLimit, middleware, routing::post, Extension, Router};
 use fastcrypto::{
     ed25519::{Ed25519KeyPair, Ed25519PublicKey},
     traits::{KeyPair, ToFromBytes},
 };
-use std::{fs, io::BufReader, net::SocketAddr, sync::Arc, time::Duration};
 use sui_tls::{
     rustls::ServerConfig,
     AllowAll,
@@ -31,6 +24,15 @@ use tower_http::{
     LatencyUnit,
 };
 use tracing::{info, Level};
+
+use crate::{
+    config::{DynamicPeerValidationConfig, RemoteWriteConfig, StaticPeerValidationConfig},
+    handlers::publish_metrics,
+    histogram_relay::HistogramRelay,
+    middleware::{expect_content_length, expect_mysten_proxy_header, expect_valid_public_key},
+    peers::{AllowedPeer, SuiNodeProvider},
+    var,
+};
 
 /// Configure our graceful shutdown scenarios
 pub async fn shutdown_signal(h: axum_server::Handle) {

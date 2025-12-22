@@ -244,12 +244,11 @@ pub mod test {
 
     use serde::{Deserialize, Serialize};
 
+    use super::{BenchmarkParametersGenerator, BenchmarkType, LoadType};
     use crate::{
         measurement::{Measurement, MeasurementsCollection},
         settings::Settings,
     };
-
-    use super::{BenchmarkParametersGenerator, BenchmarkType, LoadType};
 
     /// Mock benchmark type for unit tests.
     #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]

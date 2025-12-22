@@ -51,7 +51,6 @@ use crate::{
 /// dag_builder.print(); // print the parsed DAG
 /// dag_builder.persist_all_blocks(dag_state.clone()); // persist all blocks to DagState
 /// ```
-
 pub(crate) fn parse_dag(dag_string: &str) -> IResult<&str, DagBuilder> {
     let (input, _) = tuple((tag("DAG"), multispace0, char('{')))(dag_string)?;
 
@@ -218,7 +217,7 @@ fn parse_slot(input: &str) -> IResult<&str, Slot> {
 // Helper function to convert a string representation (e.g., 'A' or '[26]') to an AuthorityIndex
 fn str_to_authority_index(input: &str) -> Option<AuthorityIndex> {
     if input.starts_with('[') && input.ends_with(']') && input.len() > 2 {
-        input[1..input.len() - 1].parse::<u32>().ok().map(AuthorityIndex::new_for_test)
+        input[1 .. input.len() - 1].parse::<u32>().ok().map(AuthorityIndex::new_for_test)
     } else if input.len() == 1 && input.chars().next()?.is_ascii_uppercase() {
         // Handle single uppercase ASCII alphabetic character
         let alpha_char = input.chars().next().unwrap();

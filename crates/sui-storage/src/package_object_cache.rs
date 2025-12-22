@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{num::NonZeroUsize, sync::Arc};
+
 use lru::LruCache;
 use parking_lot::RwLock;
-use std::{num::NonZeroUsize, sync::Arc};
 use sui_types::{
     base_types::ObjectID,
     error::{SuiError, SuiResult, UserInputError},

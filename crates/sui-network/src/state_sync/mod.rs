@@ -47,9 +47,6 @@
 //! channel will always be made in order. StateSync will also send out a notification to its peers
 //! of the newly synchronized checkpoint so that it can help other peers synchronize.
 
-use anemo::{types::PeerEvent, PeerId, Request, Response, Result};
-use futures::{stream::FuturesOrdered, FutureExt, StreamExt};
-use rand::Rng;
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
@@ -59,6 +56,10 @@ use std::{
     },
     time::Duration,
 };
+
+use anemo::{types::PeerEvent, PeerId, Request, Response, Result};
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt};
+use rand::Rng;
 use sui_config::p2p::StateSyncConfig;
 use sui_types::{
     committee::Committee,
@@ -310,7 +311,7 @@ impl Iterator for PeerBalancer {
     fn next(&mut self) -> Option<Self::Item> {
         while !self.peers.is_empty() {
             const SELECTION_WINDOW: usize = 2;
-            let idx = rand::thread_rng().gen_range(0..std::cmp::min(SELECTION_WINDOW, self.peers.len()));
+            let idx = rand::thread_rng().gen_range(0 .. std::cmp::min(SELECTION_WINDOW, self.peers.len()));
             let (peer, info) = self.peers.remove(idx).unwrap();
             let requested_checkpoint = self.requested_checkpoint.unwrap_or(0);
             match &self.request_type {
@@ -533,7 +534,7 @@ where
         // we must have all of the checkpoints before n from either state sync or consensus.
         #[cfg(debug_assertions)]
         {
-            let _ = (next_sequence_number..=*checkpoint.sequence_number())
+            let _ = (next_sequence_number ..= *checkpoint.sequence_number())
                 .map(|n| {
                     let checkpoint = self
                         .store
@@ -1038,7 +1039,7 @@ async fn sync_checkpoint_contents_from_archive<S>(
         debug!("Syncing checkpoint contents from archive: {sync_from_archive},  highest_synced: {highest_synced},  lowest_checkpoint_on_peers: {}", lowest_checkpoint_on_peers.map_or_else(|| "None".to_string(), |l| l.to_string()));
         if sync_from_archive {
             let start = highest_synced.checked_add(1).expect("Checkpoint seq num overflow");
-            let checkpoint_range = start..lowest_checkpoint_on_peers.unwrap();
+            let checkpoint_range = start .. lowest_checkpoint_on_peers.unwrap();
             if let Some(archive_reader) = archive_readers.pick_one_random(checkpoint_range.clone()).await {
                 let txn_counter = Arc::new(AtomicU64::new(0));
                 let checkpoint_counter = Arc::new(AtomicU64::new(0));

@@ -99,6 +99,10 @@ impl Default for MeterConfig {
 
 impl MeterConfig {
     pub fn unbounded() -> Self {
-        Self { max_per_fun_meter_units: None, max_per_mod_meter_units: None, max_per_pkg_meter_units: None }
+        Self {
+            max_per_fun_meter_units: None,
+            max_per_mod_meter_units: None,
+            max_per_pkg_meter_units: None,
+        }
     }
 }

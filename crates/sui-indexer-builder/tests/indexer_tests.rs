@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::indexer_test_utils::{InMemoryPersistent, NoopDataMapper, TestDatasource};
 use prometheus::{
     register_int_counter_vec_with_registry,
     register_int_gauge_vec_with_registry,
@@ -15,6 +14,8 @@ use sui_indexer_builder::{
     LIVE_TASK_TARGET_CHECKPOINT,
 };
 
+use crate::indexer_test_utils::{InMemoryPersistent, NoopDataMapper, TestDatasource};
+
 mod indexer_test_utils;
 
 #[tokio::test]
@@ -23,7 +24,7 @@ async fn indexer_simple_backfill_task_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=10u64).collect::<Vec<_>>();
+    let data = (0 ..= 10u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 5,
@@ -55,7 +56,7 @@ async fn indexer_partitioned_backfill_task_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -88,7 +89,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test1() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 31,
@@ -98,7 +99,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test1() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.data.lock().await.append(&mut (0..=30).collect());
+    persistent.data.lock().await.append(&mut (0 ..= 30).collect());
     persistent.progress_store.lock().await.insert("test_indexer - backfill - 1".to_string(), Task {
         task_name: "test_indexer - backfill - 1".to_string(),
         start_checkpoint: 30,
@@ -129,7 +130,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test2() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -139,7 +140,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test2() {
         inflight_live_tasks: new_gauge_vec(&registry, "bar"),
     };
     let persistent = InMemoryPersistent::new();
-    persistent.data.lock().await.append(&mut (0..=30).collect());
+    persistent.data.lock().await.append(&mut (0 ..= 30).collect());
     persistent.progress_store.lock().await.insert("test_indexer - backfill - 1".to_string(), Task {
         task_name: "test_indexer - backfill - 1".to_string(),
         start_checkpoint: 30,
@@ -172,7 +173,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test3() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 28,
@@ -216,7 +217,7 @@ async fn indexer_partitioned_task_with_data_already_in_db_test4() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -258,7 +259,7 @@ async fn indexer_with_existing_live_task1() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 35,
@@ -293,7 +294,7 @@ async fn indexer_with_existing_live_task2() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 25,
@@ -339,7 +340,7 @@ async fn resume_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=50u64).collect::<Vec<_>>();
+    let data = (0 ..= 50u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 31,
@@ -370,7 +371,7 @@ async fn resume_test() {
     // the data recorded in storage should be the same as the datasource
     let mut recorded_data = persistent.data.lock().await.clone();
     recorded_data.sort();
-    assert_eq!((10..=50u64).collect::<Vec<_>>(), recorded_data);
+    assert_eq!((10 ..= 50u64).collect::<Vec<_>>(), recorded_data);
 }
 
 #[tokio::test]
@@ -379,7 +380,7 @@ async fn resume_with_live_test() {
     let registry = Registry::new();
     mysten_metrics::init_metrics(&registry);
 
-    let data = (0..=70u64).collect::<Vec<_>>();
+    let data = (0 ..= 70u64).collect::<Vec<_>>();
     let datasource = TestDatasource {
         data: data.clone(),
         live_task_starting_checkpoint: 60,
@@ -404,7 +405,7 @@ async fn resume_with_live_test() {
         is_live_task: true,
     });
     // the live task have indexed cp 31 to 50 before shutdown
-    persistent.data.lock().await.append(&mut (31..=50).collect());
+    persistent.data.lock().await.append(&mut (31 ..= 50).collect());
     let mut indexer = IndexerBuilder::new("test_indexer", datasource, NoopDataMapper, persistent.clone())
         .with_backfill_strategy(BackfillStrategy::Simple)
         .build();
@@ -419,7 +420,7 @@ async fn resume_with_live_test() {
     // the data recorded in storage should be the same as the datasource
     let mut recorded_data = persistent.data.lock().await.clone();
     recorded_data.sort();
-    assert_eq!((10..=70u64).collect::<Vec<_>>(), recorded_data);
+    assert_eq!((10 ..= 70u64).collect::<Vec<_>>(), recorded_data);
 }
 
 fn new_gauge_vec(registry: &Registry, name: &str) -> IntGaugeVec {

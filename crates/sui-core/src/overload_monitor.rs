@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::authority::AuthorityState;
-use mysten_metrics::monitored_scope;
 use std::{
     cmp::{max, min},
     hash::Hasher,
@@ -12,6 +10,8 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+use mysten_metrics::monitored_scope;
 use sui_config::node::AuthorityOverloadConfig;
 use sui_types::{
     digests::TransactionDigest,
@@ -21,6 +21,8 @@ use sui_types::{
 use tokio::time::sleep;
 use tracing::{debug, info};
 use twox_hash::XxHash64;
+
+use crate::authority::AuthorityState;
 
 #[derive(Default)]
 pub struct AuthorityOverloadInfo {
@@ -216,15 +218,13 @@ pub fn overload_monitor_accept_tx(load_shedding_percentage: u32, tx_digest: Tran
 #[cfg(test)]
 #[allow(clippy::disallowed_methods)] // allow unbounded_channel() since tests are simulating txn manager execution driver interaction.
 mod tests {
-    use super::*;
+    use std::sync::Arc;
 
-    use crate::authority::test_authority_builder::TestAuthorityBuilder;
     use rand::{
         rngs::{OsRng, StdRng},
         Rng,
         SeedableRng,
     };
-    use std::sync::Arc;
     use sui_macros::sim_test;
     use tokio::{
         sync::{
@@ -234,6 +234,9 @@ mod tests {
         task::JoinHandle,
         time::{interval, Instant, MissedTickBehavior},
     };
+
+    use super::*;
+    use crate::authority::test_authority_builder::TestAuthorityBuilder;
 
     #[test]
     pub fn test_authority_overload_info() {
@@ -327,7 +330,7 @@ mod tests {
         let state = TestAuthorityBuilder::new().with_authority_overload_config(config.clone()).build().await;
 
         // Initialize latency reporter.
-        for _ in 0..1000 {
+        for _ in 0 .. 1000 {
             state.metrics.execution_queueing_latency.report(Duration::from_secs(20));
         }
 
@@ -381,7 +384,7 @@ mod tests {
             let mut do_send = |enable_load_shedding: bool, authority: Arc<AuthorityState>| -> bool {
                 if enable_load_shedding {
                     let shedding_percentage = authority.overload_info.load_shedding_percentage.load(Ordering::Relaxed);
-                    !(shedding_percentage > 0 && rng.gen_range(0..100) < shedding_percentage)
+                    !(shedding_percentage > 0 && rng.gen_range(0 .. 100) < shedding_percentage)
                 } else {
                     true
                 }
@@ -454,7 +457,7 @@ mod tests {
 
     // Helper fundtion to periodically print the current overload info.
     async fn sleep_and_print_stats(state: Arc<AuthorityState>, seconds: u32) {
-        for _ in 0..seconds {
+        for _ in 0 .. seconds {
             info!(
                 "Overload: {:?}. Shedding percentage: {:?}. Queue: {:?}, Ready rate: {:?}. Exec rate: {:?}.",
                 state.overload_info.is_overload.load(Ordering::Relaxed),
@@ -596,7 +599,7 @@ mod tests {
         let executor = start_executor(1000.0, rx, stop_rx, state.clone());
 
         sleep_and_print_stats(state.clone(), 15).await;
-        for _ in 0..16 {
+        for _ in 0 .. 16 {
             // Regularly send out a burst of request.
             burst_tx.send(10000).unwrap();
             sleep_and_print_stats(state.clone(), 5).await;
@@ -620,9 +623,9 @@ mod tests {
     // the overload monitor.
     #[test]
     fn test_txn_rejection_rate() {
-        for rejection_percentage in 0..=100 {
+        for rejection_percentage in 0 ..= 100 {
             let mut reject_count = 0;
-            for _ in 0..10000 {
+            for _ in 0 .. 10000 {
                 let digest = TransactionDigest::random();
                 if should_reject_tx(rejection_percentage, digest, 28455473) {
                     reject_count += 1;
@@ -652,7 +655,7 @@ mod tests {
         }
 
         // It should always be rejected using the current temporal_seed.
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             assert!(should_reject_tx(load_shedding_percentage, digest, temporal_seed));
         }
 

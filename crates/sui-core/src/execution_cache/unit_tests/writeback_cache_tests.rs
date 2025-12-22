@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use prometheus::default_registry;
-use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     collections::BTreeMap,
     future::Future,
@@ -13,8 +11,10 @@ use std::{
     },
     time::{Duration, Instant},
 };
+
+use prometheus::default_registry;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use sui_framework::BuiltInFramework;
-use sui_macros::{register_fail_point_async, sim_test};
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
     base_types::{random_object_ref, SuiAddress},
@@ -24,6 +24,7 @@ use sui_types::{
     object::{MoveObject, Owner, OBJECT_START_VERSION},
     storage::ChildObjectResolver,
 };
+use tokio::sync::RwLock;
 
 use super::*;
 use crate::{
@@ -74,7 +75,12 @@ impl Scenario {
         static METRICS: once_cell::sync::Lazy<Arc<ExecutionCacheMetrics>> =
             once_cell::sync::Lazy::new(|| Arc::new(ExecutionCacheMetrics::new(default_registry())));
 
-        let cache = Arc::new(WritebackCache::new(&Default::default(), store.clone(), (*METRICS).clone()));
+        let cache = Arc::new(WritebackCache::new(
+            &Default::default(),
+            store.clone(),
+            (*METRICS).clone(),
+            BackpressureManager::new_for_tests(),
+        ));
         Self {
             authority,
             store,
@@ -120,7 +126,7 @@ impl Scenario {
             count.load(Ordering::Relaxed)
         };
 
-        for i in 0..num_steps {
+        for i in 0 .. num_steps {
             println!("running with cache eviction after step {}", i);
             let count = Arc::new(AtomicU32::new(0));
             let action = Box::new(|s: &mut Scenario| {
@@ -298,7 +304,7 @@ impl Scenario {
                 .iter()
                 .find(|o| **o == object.compute_object_reference())
                 .expect("received object must have new lock");
-            self.outputs.markers.push((object.compute_object_reference().into(), MarkerValue::Received));
+            self.outputs.markers.push((object.compute_full_object_reference().into(), MarkerValue::Received));
         }
     }
 
@@ -318,7 +324,7 @@ impl Scenario {
         let tx = *outputs.transaction.digest();
         assert!(self.transactions.insert(tx), "transaction is not unique");
 
-        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone()).await;
+        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone(), true);
 
         self.count_action();
         tx
@@ -326,14 +332,14 @@ impl Scenario {
 
     // commit a transaction to the database
     pub async fn commit(&mut self, tx: TransactionDigest) -> SuiResult {
-        let res = self.cache().commit_transaction_outputs(1, &[tx]).await;
+        self.cache().commit_transaction_outputs(1, &[tx], true);
         self.count_action();
-        Ok(res)
+        Ok(())
     }
 
-    pub async fn clear_state_end_of_epoch(&self) {
-        let execution_guard = tokio::sync::RwLock::new(1u64);
-        let lock = execution_guard.write().await;
+    pub fn clear_state_end_of_epoch(&self) {
+        let execution_guard = RwLock::new(1u64);
+        let lock = execution_guard.try_write().unwrap();
         self.cache().clear_state_end_of_epoch(&lock);
     }
 
@@ -342,7 +348,12 @@ impl Scenario {
     }
 
     pub fn reset_cache(&mut self) {
-        self.cache = Arc::new(WritebackCache::new(&Default::default(), self.store.clone(), self.cache.metrics.clone()));
+        self.cache = Arc::new(WritebackCache::new(
+            &Default::default(),
+            self.store.clone(),
+            self.cache.metrics.clone(),
+            BackpressureManager::new_for_tests(),
+        ));
 
         // reset the scenario state to match the db
         let reverse_id_map: BTreeMap<_, _> = self.id_map.iter().map(|(k, v)| (*v, *k)).collect();
@@ -428,7 +439,11 @@ impl Scenario {
             let id = self.id_map.get(short_id).expect("no such object");
             let object = self.objects.get(id).expect("no such object");
             assert_eq!(self.cache().get_object_by_key(id, object.version()).unwrap(), *object);
-            assert!(self.cache().have_received_object_at_version(id, object.version(), 1));
+            assert!(self.cache().have_received_object_at_version(
+                FullObjectKey::new(object.full_id(), object.version()),
+                1,
+                true
+            ));
         }
     }
 
@@ -485,7 +500,7 @@ async fn test_committed() {
 
         s.assert_live(&[1, 2]);
         s.assert_dirty(&[1, 2]);
-        s.cache().commit_transaction_outputs(1, &[tx]).await;
+        s.cache().commit_transaction_outputs(1, &[tx], true);
         s.assert_not_dirty(&[1, 2]);
         s.assert_cached(&[1, 2]);
 
@@ -626,7 +641,7 @@ async fn test_lt_or_eq() {
     telemetry_subscribers::init_for_testing();
     Scenario::iterate(|mut s| async move {
         let check_all_versions = |s: &Scenario| {
-            for i in 1u64..=3 {
+            for i in 1u64 ..= 3 {
                 let v = SequenceNumber::from_u64(i);
                 assert_eq!(s.cache().find_object_lt_or_eq_version(s.obj_id(1), v).unwrap().version(), v);
             }
@@ -746,7 +761,7 @@ async fn test_write_transaction_outputs_is_sync() {
         let outputs = s.take_outputs();
         // assert that write_transaction_outputs is sync in non-simtest, which causes the
         // fail_point_async! macros above to be elided
-        s.cache.write_transaction_outputs(1, outputs).now_or_never().unwrap();
+        s.cache.write_transaction_outputs(1, outputs);
     })
     .await;
 }
@@ -758,7 +773,7 @@ async fn test_missing_reverts_panic() {
     Scenario::iterate(|mut s| async move {
         s.with_created(&[1]);
         s.do_tx().await;
-        s.clear_state_end_of_epoch().await;
+        s.clear_state_end_of_epoch();
     })
     .await;
 }
@@ -801,7 +816,7 @@ async fn test_revert_state_update_created() {
         s.assert_live(&[1]);
 
         s.cache().revert_state_update(&tx1);
-        s.clear_state_end_of_epoch().await;
+        s.clear_state_end_of_epoch();
 
         s.assert_not_exists(&[1]);
     })
@@ -823,7 +838,7 @@ async fn test_revert_state_update_mutated() {
         let tx = s.do_tx().await;
 
         s.cache().revert_state_update(&tx);
-        s.clear_state_end_of_epoch().await;
+        s.clear_state_end_of_epoch();
 
         let version_after_revert = s.cache().get_object(&s.obj_id(1)).unwrap().version();
         assert_eq!(v1, version_after_revert);
@@ -843,29 +858,22 @@ async fn test_invalidate_package_cache_on_revert() {
         s.assert_packages(&[2]);
 
         s.cache().revert_state_update(&tx1);
-        s.clear_state_end_of_epoch().await;
+        s.clear_state_end_of_epoch();
 
         assert!(s.cache().get_package_object(&s.obj_id(2)).unwrap().is_none());
     })
     .await;
 }
 
-#[sim_test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn test_concurrent_readers() {
     telemetry_subscribers::init_for_testing();
-
-    register_fail_point_async("write_object_entry", || async {
-        tokio::task::yield_now().await;
-    });
-    register_fail_point_async("write_marker_entry", || async {
-        tokio::task::yield_now().await;
-    });
 
     let mut s = Scenario::new(None, Arc::new(AtomicU32::new(0))).await;
     let cache = s.cache.clone();
     let mut txns = Vec::new();
 
-    for i in 0..100 {
+    for i in 0 .. 100 {
         let parent_id = i * 2;
         let child_id = i * 2 + 1;
         s.with_created(&[parent_id]);
@@ -889,11 +897,11 @@ async fn test_concurrent_readers() {
         tokio::task::spawn(async move {
             for (tx1, tx2, _, _) in txns {
                 println!("writing tx1");
-                cache.write_transaction_outputs(1, tx1).await;
+                cache.write_transaction_outputs(1, tx1);
 
                 barrier.wait().await;
                 println!("writing tx2");
-                cache.write_transaction_outputs(1, tx2).await;
+                cache.write_transaction_outputs(1, tx2);
             }
         })
     };
@@ -934,7 +942,7 @@ async fn test_concurrent_lockers() {
     let cache = s.cache.clone();
     let mut txns = Vec::new();
 
-    for i in 0..1000 {
+    for i in 0 .. 1000 {
         let a = i * 4;
         let b = i * 4 + 1;
         let c = i * 4 + 2;
@@ -969,11 +977,12 @@ async fn test_concurrent_lockers() {
         tokio::task::spawn(async move {
             let mut results = Vec::new();
             for (tx1, _, a_ref, b_ref) in txns {
-                results.push(
-                    cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx1.digest(), Some(tx1.clone()))
-                        .await,
-                );
+                results.push(cache.acquire_transaction_locks(
+                    &epoch_store,
+                    &[a_ref, b_ref],
+                    *tx1.digest(),
+                    Some(tx1.clone()),
+                ));
                 barrier.wait().await;
             }
             results
@@ -988,11 +997,12 @@ async fn test_concurrent_lockers() {
         tokio::task::spawn(async move {
             let mut results = Vec::new();
             for (_, tx2, a_ref, b_ref) in txns {
-                results.push(
-                    cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx2.digest(), Some(tx2.clone()))
-                        .await,
-                );
+                results.push(cache.acquire_transaction_locks(
+                    &epoch_store,
+                    &[a_ref, b_ref],
+                    *tx2.digest(),
+                    Some(tx2.clone()),
+                ));
                 barrier.wait().await;
             }
             results
@@ -1016,7 +1026,7 @@ async fn test_concurrent_lockers_same_tx() {
     let cache = s.cache.clone();
     let mut txns = Vec::new();
 
-    for i in 0..1000 {
+    for i in 0 .. 1000 {
         let a = i * 4;
         let b = i * 4 + 1;
         s.with_created(&[a, b]);
@@ -1042,11 +1052,12 @@ async fn test_concurrent_lockers_same_tx() {
         tokio::task::spawn(async move {
             let mut results = Vec::new();
             for (tx1, a_ref, b_ref) in txns {
-                results.push(
-                    cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx1.digest(), Some(tx1.clone()))
-                        .await,
-                );
+                results.push(cache.acquire_transaction_locks(
+                    &epoch_store,
+                    &[a_ref, b_ref],
+                    *tx1.digest(),
+                    Some(tx1.clone()),
+                ));
                 barrier.wait().await;
             }
             results
@@ -1061,11 +1072,12 @@ async fn test_concurrent_lockers_same_tx() {
         tokio::task::spawn(async move {
             let mut results = Vec::new();
             for (tx1, a_ref, b_ref) in txns {
-                results.push(
-                    cache
-                        .acquire_transaction_locks(&epoch_store, &[a_ref, b_ref], *tx1.digest(), Some(tx1.clone()))
-                        .await,
-                );
+                results.push(cache.acquire_transaction_locks(
+                    &epoch_store,
+                    &[a_ref, b_ref],
+                    *tx1.digest(),
+                    Some(tx1.clone()),
+                ));
                 barrier.wait().await;
             }
             results
@@ -1091,7 +1103,12 @@ async fn latest_object_cache_race_test() {
     static METRICS: once_cell::sync::Lazy<Arc<ExecutionCacheMetrics>> =
         once_cell::sync::Lazy::new(|| Arc::new(ExecutionCacheMetrics::new(default_registry())));
 
-    let cache = Arc::new(WritebackCache::new(&Default::default(), store.clone(), (*METRICS).clone()));
+    let cache = Arc::new(WritebackCache::new(
+        &Default::default(),
+        store.clone(),
+        (*METRICS).clone(),
+        BackpressureManager::new_for_tests(),
+    ));
 
     let object_id = ObjectID::random();
     let owner = SuiAddress::random_for_testing_only();
@@ -1103,9 +1120,9 @@ async fn latest_object_cache_race_test() {
         std::thread::spawn(move || {
             let mut version = OBJECT_START_VERSION;
             while start.elapsed() < Duration::from_secs(2) {
-                let object = Object::with_id_owner_version_for_testing(object_id, version, owner);
+                let object = Object::with_id_owner_version_for_testing(object_id, version, Owner::AddressOwner(owner));
 
-                cache.write_object_entry(&object_id, version, object.into()).now_or_never().unwrap();
+                cache.write_object_entry(&object_id, version, object.into());
 
                 version = version.next();
             }
@@ -1134,7 +1151,8 @@ async fn latest_object_cache_race_test() {
                     std::thread::sleep(Duration::from_micros(1));
                 }
 
-                let object = Object::with_id_owner_version_for_testing(object_id, latest_version, owner);
+                let object =
+                    Object::with_id_owner_version_for_testing(object_id, latest_version, Owner::AddressOwner(owner));
 
                 // because we obtained the ticket before reading the object, we will not write a stale
                 // version to the cache.
@@ -1155,7 +1173,7 @@ async fn latest_object_cache_race_test() {
             while start.elapsed() < Duration::from_secs(2) {
                 cache.cached.object_by_id_cache.invalidate(&object_id);
                 // sleep for 1 to 10µs
-                std::thread::sleep(Duration::from_micros(rand::thread_rng().gen_range(1..10)));
+                std::thread::sleep(Duration::from_micros(rand::thread_rng().gen_range(1 .. 10)));
             }
         })
     };
@@ -1182,4 +1200,59 @@ async fn latest_object_cache_race_test() {
     reader.join().unwrap();
     checker.join().unwrap();
     invalidator.join().unwrap();
+}
+
+#[tokio::test]
+async fn test_transaction_cache_race() {
+    telemetry_subscribers::init_for_testing();
+
+    let mut s = Scenario::new(None, Arc::new(AtomicU32::new(0))).await;
+    let cache = s.cache.clone();
+    let mut txns = Vec::new();
+
+    for i in 0 .. 1000 {
+        let a = i * 4;
+        s.with_created(&[a]);
+        s.do_tx().await;
+
+        let outputs = s.take_outputs();
+        let tx = (*outputs.transaction).clone();
+        let effects = outputs.effects.clone();
+
+        txns.push((tx, effects));
+    }
+
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+
+    let t1 = {
+        let txns = txns.clone();
+        let cache = cache.clone();
+        let barrier = barrier.clone();
+        std::thread::spawn(move || {
+            for (i, (tx, effects)) in txns.into_iter().enumerate() {
+                barrier.wait();
+                // test both single and multi insert
+                if i % 2 == 0 {
+                    cache.insert_transaction_and_effects(&tx, &effects);
+                } else {
+                    cache.multi_insert_transaction_and_effects(&[VerifiedExecutionData::new(tx, effects)]);
+                }
+            }
+        })
+    };
+
+    let t2 = {
+        let txns = txns.clone();
+        let cache = cache.clone();
+        let barrier = barrier.clone();
+        std::thread::spawn(move || {
+            for (tx, _) in txns {
+                barrier.wait();
+                cache.get_transaction_block(tx.digest());
+            }
+        })
+    };
+
+    t1.join().unwrap();
+    t2.join().unwrap();
 }

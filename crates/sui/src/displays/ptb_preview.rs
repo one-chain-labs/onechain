@@ -1,6 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt::{Display, Formatter};
+
+use tabled::{
+    builder::Builder as TableBuilder,
+    settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
+};
+
 use crate::{
     client_ptb::{
         ast::{GAS_BUDGET, GAS_COIN, JSON, SUMMARY, WARN_SHADOWS},
@@ -8,13 +15,8 @@ use crate::{
     },
     sp,
 };
-use std::fmt::{Display, Formatter};
-use tabled::{
-    builder::Builder as TableBuilder,
-    settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
-};
 
-impl<'a> Display for PTBPreview<'a> {
+impl Display for PTBPreview<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut builder = TableBuilder::default();
         let columns = vec!["command", "values"];

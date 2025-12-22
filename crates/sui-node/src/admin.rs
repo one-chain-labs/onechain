@@ -1,7 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::SuiNode;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
+
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -11,11 +16,6 @@ use axum::{
 use base64::Engine;
 use humantime::parse_duration;
 use serde::Deserialize;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    str::FromStr,
-    sync::Arc,
-};
 use sui_types::{
     base_types::AuthorityName,
     crypto::{RandomnessPartialSignature, RandomnessRound, RandomnessSignature},
@@ -24,6 +24,8 @@ use sui_types::{
 use telemetry_subscribers::TracingHandle;
 use tokio::sync::oneshot;
 use tracing::info;
+
+use crate::SuiNode;
 
 // Example commands:
 //

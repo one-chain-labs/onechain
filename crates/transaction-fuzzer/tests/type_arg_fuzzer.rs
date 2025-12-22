@@ -1,9 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::{collection::vec, prelude::*};
-
-use proptest::strategy::ValueTree;
+use proptest::{collection::vec, prelude::*, strategy::ValueTree};
+use sui_types::{base_types::ObjectRef, effects::TransactionEffectsAPI, object::Owner};
 use transaction_fuzzer::{
     account_universe::{AccountCurrent, AccountData},
     executor::Executor,
@@ -17,8 +16,6 @@ use transaction_fuzzer::{
     },
 };
 
-use sui_types::{base_types::ObjectRef, effects::TransactionEffectsAPI, object::Owner};
-
 fn publish_type_factory(exec: &mut Executor, account: &mut AccountCurrent) -> ObjectRef {
     let effects = exec.publish("type_factory", vec![], account);
     let package = effects.created().into_iter().find(|(_, owner)| matches!(owner, Owner::Immutable)).unwrap();
@@ -30,8 +27,8 @@ fn _all_valid_type_tag_fuzzing(add_sub: isize) {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let mut account = AccountCurrent::new(AccountData::new_random());
     let package_id = publish_type_factory(&mut exec, &mut account);
-    let strategy = vec(generate_valid_type_factory_tags(package_id.0), 1..10);
-    for _ in 0..500 {
+    let strategy = vec(generate_valid_type_factory_tags(package_id.0), 1 .. 10);
+    for _ in 0 .. 500 {
         let tys = strategy.new_tree(&mut runner).unwrap().current();
         let len = tys.len();
         let pt = type_factory_pt_for_tags(package_id.0, tys, (len as isize + add_sub) as usize);
@@ -43,10 +40,10 @@ fn _all_valid_type_tag_fuzzing(add_sub: isize) {
 #[cfg_attr(msim, ignore)]
 fn all_random_single_type_tag_fuzzing() {
     let mut exec = Executor::new();
-    let strategy = vec(gen_type_tag(), 1..10);
+    let strategy = vec(gen_type_tag(), 1 .. 10);
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let mut account = AccountCurrent::new(AccountData::new_random());
-    for _ in 0..1000 {
+    for _ in 0 .. 1000 {
         let tys = strategy.new_tree(&mut runner).unwrap().current();
         run_pt(&mut account, &mut exec, pt_for_tags(tys))
     }
@@ -72,8 +69,8 @@ fn interesting_invalid_type_tags_fuzzing() {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let mut account = AccountCurrent::new(AccountData::new_random());
     let package_id = publish_type_factory(&mut exec, &mut account);
-    let strategy = vec(generate_valid_and_invalid_type_factory_tags(package_id.0), 1..10);
-    for _ in 0..500 {
+    let strategy = vec(generate_valid_and_invalid_type_factory_tags(package_id.0), 1 .. 10);
+    for _ in 0 .. 500 {
         let tys = strategy.new_tree(&mut runner).unwrap().current();
         let len = tys.len();
         let pt = type_factory_pt_for_tags(package_id.0, tys, len);

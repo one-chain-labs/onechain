@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::faucet::{FaucetClient, FaucetClientFactory};
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use cluster::{Cluster, ClusterFactory};
 use config::ClusterTestOpt;
@@ -10,7 +11,6 @@ use jsonrpsee::{
     core::{client::ClientT, params::ArrayParams},
     http_client::HttpClientBuilder,
 };
-use std::sync::Arc;
 use sui_faucet::CoinInfo;
 use sui_json_rpc_types::{
     SuiExecutionStatus,
@@ -19,19 +19,14 @@ use sui_json_rpc_types::{
     SuiTransactionBlockResponseOptions,
     TransactionBlockBytes,
 };
-use sui_sdk::wallet_context::WalletContext;
+use sui_sdk::{wallet_context::WalletContext, SuiClient};
 use sui_test_transaction_builder::batch_make_transfer_transactions;
 use sui_types::{
-    base_types::TransactionDigest,
+    base_types::{SuiAddress, TransactionDigest},
+    gas_coin::GasCoin,
     object::Owner,
     quorum_driver_types::ExecuteTransactionRequestType,
     sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
-};
-
-use sui_sdk::SuiClient;
-use sui_types::{
-    base_types::SuiAddress,
-    gas_coin::GasCoin,
     transaction::{Transaction, TransactionData},
 };
 use test_case::{
@@ -46,6 +41,8 @@ use test_case::{
 use tokio::time::{self, Duration};
 use tracing::{error, info};
 use wallet_client::WalletClient;
+
+use crate::faucet::{FaucetClient, FaucetClientFactory};
 
 pub mod cluster;
 pub mod config;

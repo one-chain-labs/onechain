@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{client_ptb::ptb::Summary, displays::Pretty};
 use std::fmt::{Display, Formatter};
 
 use tabled::{
     builder::Builder as TableBuilder,
     settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
 };
-impl<'a> Display for Pretty<'a, Summary> {
+
+use crate::{client_ptb::ptb::Summary, displays::Pretty};
+impl Display for Pretty<'_, Summary> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut builder = TableBuilder::default();
         let Pretty(summary) = self;

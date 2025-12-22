@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::types::{AccountBalanceRequest, Amount, ConstructionMetadata, Currency, CurrencyMetadata};
 use quick_js::Context;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sui_types::base_types::{ObjectRef, SuiAddress};
+
+use crate::types::{AccountBalanceRequest, Amount, ConstructionMetadata, Currency, CurrencyMetadata};
 
 #[tokio::test]
 async fn test_currency_defaults() {

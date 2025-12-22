@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_macros::sim_test;
-use sui_rpc_api::{types::ExecuteTransactionOptions, Client};
-use sui_sdk_types::types::BalanceChange;
-use sui_test_transaction_builder::make_transfer_sui_transaction;
+use sui_rpc_api::Client;
+use sui_sdk_types::BalanceChange;
+use sui_test_transaction_builder::make_transfer_oct_transaction;
 use sui_types::{base_types::SuiAddress, effects::TransactionEffectsAPI, transaction::TransactionDataAPI};
 use test_cluster::TestClusterBuilder;
 
@@ -16,12 +16,10 @@ async fn execute_transaction_transfer() {
     let address = SuiAddress::random_for_testing_only();
     let amount = 9;
 
-    let txn = make_transfer_sui_transaction(&test_cluster.wallet, Some(address), Some(amount)).await;
+    let txn = make_transfer_oct_transaction(&test_cluster.wallet, Some(address), Some(amount)).await;
     let sender = txn.transaction_data().sender();
 
-    let options = ExecuteTransactionOptions { balance_changes: Some(true), ..Default::default() };
-
-    let response = client.execute_transaction(&options, &txn).await.unwrap();
+    let response = client.execute_transaction(&txn).await.unwrap();
 
     let gas = response.effects.gas_cost_summary().net_gas_usage();
 
@@ -33,7 +31,7 @@ async fn execute_transaction_transfer() {
     ];
     expected.sort_by_key(|e| e.address);
 
-    let mut actual = response.balance_changes.unwrap();
+    let mut actual = response.balance_changes;
     actual.sort_by_key(|e| e.address);
 
     assert_eq!(actual, expected);

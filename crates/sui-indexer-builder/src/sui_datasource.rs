@@ -1,16 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    indexer_builder::{DataSender, Datasource},
-    metrics::IndexerMetricProvider,
-    Task,
-};
+use std::{path::PathBuf, sync::Arc};
+
 use anyhow::Error;
 use async_trait::async_trait;
 use mysten_metrics::{metered_channel, spawn_monitored_task};
 use prometheus::IntGauge;
-use std::{path::PathBuf, sync::Arc};
 use sui_data_ingestion_core::{DataIngestionMetrics, IndexerExecutor, ProgressStore, ReaderOptions, Worker, WorkerPool};
 use sui_sdk::SuiClient;
 use sui_types::{
@@ -20,6 +16,12 @@ use sui_types::{
 use tokio::{
     sync::{oneshot, oneshot::Sender},
     task::JoinHandle,
+};
+
+use crate::{
+    indexer_builder::{DataSender, Datasource},
+    metrics::IndexerMetricProvider,
+    Task,
 };
 
 const BACKFILL_TASK_INGESTION_READER_BATCH_SIZE: usize = 300;

@@ -9,7 +9,7 @@ expression: "results.join(\"\\n\")"
 │ command       │ values                            │
 ├───────────────┼───────────────────────────────────┤
 │ assign        │ s @0x1                            │
-│ move-call     │ sui::coin::value<sui::oct::OCT> s │
+│ move-call     │ one::coin::value<one::oct::OCT> s │
 │ make-move-vec │ <address> [s]                     │
 ╰───────────────┴───────────────────────────────────╯
  === BUILT PTB === 

@@ -1,15 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{ops::RangeInclusive, sync::Arc};
+
+use dashmap::DashMap;
+use sui_data_ingestion_core::{setup_single_workflow, ReaderOptions, Worker};
+use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
+use tokio::sync::Notify;
+
 use crate::{
     backfill::{backfill_instances::ingestion_backfills::IngestionBackfillTrait, backfill_task::BackfillTask},
     database::ConnectionPool,
 };
-use dashmap::DashMap;
-use std::{ops::RangeInclusive, sync::Arc};
-use sui_data_ingestion_core::{setup_single_workflow, ReaderOptions, Worker};
-use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
-use tokio::sync::Notify;
 
 pub struct IngestionBackfillTask<T: IngestionBackfillTrait> {
     ready_checkpoints: Arc<DashMap<CheckpointSequenceNumber, Vec<T::ProcessedType>>>,

@@ -1,20 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AnalyticsWriter, FileFormat, FileType, ParquetSchema, ParquetValue};
-use anyhow::{anyhow, Result};
-use arrow_array::{ArrayRef, BooleanArray, Int64Array, RecordBatch, StringArray, UInt64Array};
-use serde::Serialize;
 use std::{
     fs::{create_dir_all, remove_file, File},
     ops::Range,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use anyhow::{anyhow, Result};
+use arrow_array::{ArrayRef, BooleanArray, Int64Array, RecordBatch, StringArray, UInt64Array};
+use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
+use serde::Serialize;
+use sui_storage::object_store::util::path_to_filesystem;
 use sui_types::base_types::EpochId;
 
-use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
-use sui_storage::object_store::util::path_to_filesystem;
+use crate::{AnalyticsWriter, FileFormat, FileType, ParquetSchema, ParquetValue};
 
 // Save table entries to parquet files.
 pub(crate) struct ParquetWriter {
@@ -27,7 +28,7 @@ pub(crate) struct ParquetWriter {
 
 impl ParquetWriter {
     pub(crate) fn new(root_dir_path: &Path, file_type: FileType, start_checkpoint_seq_num: u64) -> Result<Self> {
-        let checkpoint_range = start_checkpoint_seq_num..u64::MAX;
+        let checkpoint_range = start_checkpoint_seq_num .. u64::MAX;
         Ok(Self { root_dir_path: root_dir_path.to_path_buf(), file_type, epoch: 0, checkpoint_range, data: vec![] })
     }
 
@@ -72,7 +73,7 @@ impl<S: Serialize + ParquetSchema> AnalyticsWriter<S> for ParquetWriter {
 
     fn write(&mut self, rows: &[S]) -> Result<()> {
         for row in rows {
-            for col_idx in 0..S::schema().len() {
+            for col_idx in 0 .. S::schema().len() {
                 if col_idx == self.data.len() {
                     self.data.push(vec![]);
                 }

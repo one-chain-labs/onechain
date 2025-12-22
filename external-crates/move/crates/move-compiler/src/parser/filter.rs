@@ -17,7 +17,10 @@ pub trait FilterContext {
     /// Attribute-based node removal
     fn should_remove_by_attributes(&mut self, _attrs: &[P::Attributes]) -> bool;
 
-    fn filter_map_address(&mut self, address_def: P::AddressDefinition) -> Option<P::AddressDefinition> {
+    fn filter_map_address(
+        &mut self,
+        address_def: P::AddressDefinition,
+    ) -> Option<P::AddressDefinition> {
         if self.should_remove_by_attributes(&address_def.attributes) {
             None
         } else {
@@ -25,7 +28,10 @@ pub trait FilterContext {
         }
     }
 
-    fn filter_map_module(&mut self, module_def: P::ModuleDefinition) -> Option<P::ModuleDefinition> {
+    fn filter_map_module(
+        &mut self,
+        module_def: P::ModuleDefinition,
+    ) -> Option<P::ModuleDefinition> {
         if self.should_remove_by_attributes(&module_def.attributes) {
             None
         } else {
@@ -41,7 +47,10 @@ pub trait FilterContext {
         }
     }
 
-    fn filter_map_struct(&mut self, struct_def: P::StructDefinition) -> Option<P::StructDefinition> {
+    fn filter_map_struct(
+        &mut self,
+        struct_def: P::StructDefinition,
+    ) -> Option<P::StructDefinition> {
         if self.should_remove_by_attributes(&struct_def.attributes) {
             None
         } else {
@@ -84,57 +93,135 @@ pub trait FilterContext {
 
 /// This filters out module member from `prog` based on supplied `FilterContext` implementation
 pub fn filter_program<T: FilterContext>(context: &mut T, prog: P::Program) -> P::Program {
-    let P::Program { named_address_maps, source_definitions, lib_definitions } = prog;
+    let P::Program {
+        named_address_maps,
+        source_definitions,
+        lib_definitions,
+    } = prog;
 
     context.set_is_source_def(false);
     let lib_definitions: Vec<_> = lib_definitions
         .into_iter()
-        .filter_map(|P::PackageDefinition { package, named_address_map, def }| {
-            context.set_current_package(package);
-            Some(P::PackageDefinition { package, named_address_map, def: filter_definition(context, def)? })
-        })
+        .filter_map(
+            |P::PackageDefinition {
+                 package,
+                 named_address_map,
+                 def,
+                 target_kind: pkg_def_kind,
+             }| {
+                context.set_current_package(package);
+                Some(P::PackageDefinition {
+                    package,
+                    named_address_map,
+                    def: filter_definition(context, def)?,
+                    target_kind: pkg_def_kind,
+                })
+            },
+        )
         .collect();
 
     context.set_is_source_def(true);
     let source_definitions: Vec<_> = source_definitions
         .into_iter()
-        .filter_map(|P::PackageDefinition { package, named_address_map, def }| {
-            context.set_current_package(package);
-            Some(P::PackageDefinition { package, named_address_map, def: filter_definition(context, def)? })
-        })
+        .filter_map(
+            |P::PackageDefinition {
+                 package,
+                 named_address_map,
+                 def,
+                 target_kind: pkg_def_kind,
+             }| {
+                context.set_current_package(package);
+                Some(P::PackageDefinition {
+                    package,
+                    named_address_map,
+                    def: filter_definition(context, def)?,
+                    target_kind: pkg_def_kind,
+                })
+            },
+        )
         .collect();
 
-    P::Program { named_address_maps, source_definitions, lib_definitions }
+    P::Program {
+        named_address_maps,
+        source_definitions,
+        lib_definitions,
+    }
 }
 
-fn filter_definition<T: FilterContext>(context: &mut T, def: P::Definition) -> Option<P::Definition> {
+fn filter_definition<T: FilterContext>(
+    context: &mut T,
+    def: P::Definition,
+) -> Option<P::Definition> {
     match def {
         P::Definition::Module(m) => filter_module(context, m).map(P::Definition::Module),
         P::Definition::Address(a) => filter_address(context, a).map(P::Definition::Address),
     }
 }
 
-fn filter_address<T: FilterContext>(context: &mut T, address_def: P::AddressDefinition) -> Option<P::AddressDefinition> {
+fn filter_address<T: FilterContext>(
+    context: &mut T,
+    address_def: P::AddressDefinition,
+) -> Option<P::AddressDefinition> {
     let address_def = context.filter_map_address(address_def)?;
 
-    let P::AddressDefinition { addr, attributes, loc, modules } = address_def;
+    let P::AddressDefinition {
+        addr,
+        attributes,
+        loc,
+        modules,
+    } = address_def;
 
-    let modules = modules.into_iter().filter_map(|m| filter_module(context, m)).collect();
+    let modules = modules
+        .into_iter()
+        .filter_map(|m| filter_module(context, m))
+        .collect();
 
-    Some(P::AddressDefinition { attributes, loc, addr, modules })
+    Some(P::AddressDefinition {
+        attributes,
+        loc,
+        addr,
+        modules,
+    })
 }
 
-fn filter_module<T: FilterContext>(context: &mut T, module_def: P::ModuleDefinition) -> Option<P::ModuleDefinition> {
+fn filter_module<T: FilterContext>(
+    context: &mut T,
+    module_def: P::ModuleDefinition,
+) -> Option<P::ModuleDefinition> {
     let module_def = context.filter_map_module(module_def)?;
 
-    let P::ModuleDefinition { attributes, loc, address, name, is_spec_module, members, definition_mode } = module_def;
+    let P::ModuleDefinition {
+        doc,
+        attributes,
+        loc,
+        address,
+        name,
+        is_spec_module,
+        members,
+        definition_mode,
+    } = module_def;
 
-    let new_members: Vec<_> = members.into_iter().filter_map(|member| filter_module_member(context, member)).collect();
+    let new_members: Vec<_> = members
+        .into_iter()
+        .filter_map(|member| filter_module_member(context, member))
+        .collect();
 
-    Some(P::ModuleDefinition { attributes, loc, address, name, is_spec_module, members: new_members, definition_mode })
+    Some(P::ModuleDefinition {
+        doc,
+        attributes,
+        loc,
+        address,
+        name,
+        is_spec_module,
+        members: new_members,
+        definition_mode,
+    })
 }
 
-fn filter_module_member<T: FilterContext>(context: &mut T, module_member: P::ModuleMember) -> Option<P::ModuleMember> {
+fn filter_module_member<T: FilterContext>(
+    context: &mut T,
+    module_member: P::ModuleMember,
+) -> Option<P::ModuleMember> {
     use P::ModuleMember as PM;
 
     match module_member {

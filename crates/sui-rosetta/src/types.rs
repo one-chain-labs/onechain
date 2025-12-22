@@ -11,7 +11,6 @@ use fastcrypto::encoding::Hex;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use strum_macros::{EnumIter, EnumString};
-
 use sui_sdk::rpc_types::{SuiExecutionStatus, SuiTransactionBlockKind};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
@@ -419,7 +418,7 @@ pub enum OperationType {
     StakeReward,
     StakePrinciple,
     // sui-rosetta supported operation type
-    PaySui,
+    PayOct,
     PayCoin,
     Stake,
     WithdrawStake,
@@ -440,7 +439,8 @@ impl From<&SuiTransactionBlockKind> for OperationType {
             SuiTransactionBlockKind::Genesis(_) => OperationType::Genesis,
             SuiTransactionBlockKind::ConsensusCommitPrologue(_)
             | SuiTransactionBlockKind::ConsensusCommitPrologueV2(_)
-            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_) => OperationType::ConsensusCommitPrologue,
+            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_)
+            | SuiTransactionBlockKind::ConsensusCommitPrologueV4(_) => OperationType::ConsensusCommitPrologue,
             SuiTransactionBlockKind::ProgrammableTransaction(_) => OperationType::ProgrammableTransaction,
             SuiTransactionBlockKind::AuthenticatorStateUpdate(_) => OperationType::AuthenticatorStateUpdate,
             SuiTransactionBlockKind::RandomnessStateUpdate(_) => OperationType::RandomnessStateUpdate,
@@ -863,7 +863,7 @@ pub struct PrefundedAccount {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum InternalOperation {
-    PaySui {
+    PayOct {
         sender: SuiAddress,
         recipients: Vec<SuiAddress>,
         amounts: Vec<u64>,
@@ -889,7 +889,7 @@ pub enum InternalOperation {
 impl InternalOperation {
     pub fn sender(&self) -> SuiAddress {
         match self {
-            InternalOperation::PaySui { sender, .. }
+            InternalOperation::PayOct { sender, .. }
             | InternalOperation::PayCoin { sender, .. }
             | InternalOperation::Stake { sender, .. }
             | InternalOperation::WithdrawStake { sender, .. } => *sender,
@@ -899,7 +899,7 @@ impl InternalOperation {
     /// Combine with ConstructionMetadata to form the TransactionData
     pub fn try_into_data(self, metadata: ConstructionMetadata) -> Result<TransactionData, Error> {
         let pt = match self {
-            Self::PaySui { recipients, amounts, .. } => {
+            Self::PayOct { recipients, amounts, .. } => {
                 let mut builder = ProgrammableTransactionBuilder::new();
                 builder.pay_oct(recipients, amounts)?;
                 builder.finish()

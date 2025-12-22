@@ -1,8 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use enum_dispatch::enum_dispatch;
 use std::collections::HashMap;
+
+use anemo::{
+    types::{PeerAffinity, PeerInfo},
+    PeerId,
+};
+use consensus_config::{Authority, Committee as ConsensusCommittee};
+use enum_dispatch::enum_dispatch;
+use serde::{Deserialize, Serialize};
+use sui_protocol_config::ProtocolVersion;
+use tracing::{error, warn};
 
 use crate::{
     base_types::{AuthorityName, EpochId, SuiAddress},
@@ -10,14 +19,6 @@ use crate::{
     crypto::{AuthorityPublicKey, NetworkPublicKey},
     multiaddr::Multiaddr,
 };
-use anemo::{
-    types::{PeerAffinity, PeerInfo},
-    PeerId,
-};
-use consensus_config::{Authority, Committee as ConsensusCommittee};
-use serde::{Deserialize, Serialize};
-use sui_protocol_config::ProtocolVersion;
-use tracing::{error, warn};
 
 #[enum_dispatch]
 pub trait EpochStartSystemStateTrait {
@@ -270,6 +271,11 @@ impl EpochStartValidatorInfoV1 {
 
 #[cfg(test)]
 mod test {
+    use fastcrypto::traits::KeyPair;
+    use mysten_network::Multiaddr;
+    use rand::thread_rng;
+    use sui_protocol_config::ProtocolVersion;
+
     use crate::{
         base_types::SuiAddress,
         committee::CommitteeTrait,
@@ -280,17 +286,13 @@ mod test {
             EpochStartValidatorInfoV1,
         },
     };
-    use fastcrypto::traits::KeyPair;
-    use mysten_network::Multiaddr;
-    use rand::thread_rng;
-    use sui_protocol_config::ProtocolVersion;
 
     #[test]
     fn test_sui_and_mysticeti_committee_are_same() {
         // GIVEN
         let mut active_validators = vec![];
 
-        for i in 0..10 {
+        for i in 0 .. 10 {
             let (sui_address, protocol_key): (SuiAddress, AuthorityKeyPair) = get_key_pair();
             let narwhal_network_key = NetworkKeyPair::generate(&mut thread_rng());
 

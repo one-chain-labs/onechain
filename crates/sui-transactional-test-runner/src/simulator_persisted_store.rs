@@ -1,13 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
 
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use simulacrum::Simulacrum;
-use std::num::NonZeroUsize;
 use sui_config::genesis;
 use sui_protocol_config::ProtocolVersion;
 use sui_swarm_config::{genesis_config::AccountConfig, network_config_builder::ConfigBuilder};
@@ -121,7 +120,7 @@ impl PersistedStore {
     where
         R: rand::RngCore + rand::CryptoRng,
     {
-        let path: PathBuf = path.unwrap_or(tempdir().unwrap().keep());
+        let path: PathBuf = path.unwrap_or(tempdir().unwrap().into_path());
 
         let mut builder = ConfigBuilder::new_with_temp_dir()
             .rng(&mut rng)
@@ -190,7 +189,14 @@ impl SimulatorStore for PersistedStore {
     }
 
     fn get_highest_checkpint(&self) -> Option<VerifiedCheckpoint> {
-        self.read_write.checkpoints.unbounded_iter().skip_to_last().next().map(|(_, checkpoint)| checkpoint.into())
+        self.read_write
+            .checkpoints
+            .reversed_safe_iter_with_bounds(None, None)
+            .expect("failed to fetch highest checkpoint")
+            .next()
+            .transpose()
+            .expect("failed to fetch highest checkpoint")
+            .map(|(_, checkpoint)| checkpoint.into())
     }
 
     fn get_checkpoint_contents(&self, digest: &CheckpointContentsDigest) -> Option<CheckpointContents> {
@@ -388,6 +394,8 @@ impl ChildObjectResolver for PersistedStore {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        _use_object_per_epoch_marker_table_v2: bool,
     ) -> sui_types::error::SuiResult<Option<Object>> {
         let recv_object = match SimulatorStore::get_object(self, receiving_object_id) {
             None => return Ok(None),
@@ -466,9 +474,9 @@ impl ReadStore for PersistedStoreInnerReadOnlyWrapper {
         self.sync();
         self.inner
             .checkpoints
-            .unbounded_iter()
-            .skip_to_last()
+            .reversed_safe_iter_with_bounds(None, None)?
             .next()
+            .transpose()?
             .map(|(_, checkpoint)| checkpoint.into())
             .ok_or(SuiError::UserInputError { error: UserInputError::LatestCheckpointSequenceNumberNotFound })
             .map_err(sui_types::storage::error::Error::custom)
@@ -581,8 +589,9 @@ impl Clone for PersistedStoreInnerReadOnlyWrapper {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rand::{rngs::StdRng, SeedableRng};
+
+    use super::*;
 
     #[tokio::test]
     async fn deterministic_genesis() {

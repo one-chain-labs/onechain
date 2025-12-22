@@ -1,12 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::object_store::{util::path_to_filesystem, ObjectStoreGetExt};
+use std::{fmt, fs, fs::File, io::Read, path::PathBuf};
+
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use object_store::path::Path;
-use std::{fmt, fs, fs::File, io::Read, path::PathBuf};
+
+use crate::object_store::{util::path_to_filesystem, ObjectStoreGetExt};
 
 pub struct LocalStorage {
     root: PathBuf,

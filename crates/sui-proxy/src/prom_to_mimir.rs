@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{remote_write, var};
 use itertools::Itertools;
 use prometheus::proto::{Counter, Gauge, Histogram, Metric, MetricFamily, MetricType};
 use protobuf::RepeatedField;
 use tracing::{debug, error};
+
+use crate::{remote_write, var};
 
 #[derive(Debug)]
 pub struct Mimir<S> {
@@ -169,9 +170,10 @@ impl Mimir<remote_write::TimeSeries> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{prom_to_mimir::Mimir, remote_write};
     use prometheus::proto;
     use protobuf::RepeatedField;
+
+    use crate::{prom_to_mimir::Mimir, remote_write};
 
     // protobuf stuff
     pub fn create_metric_family(

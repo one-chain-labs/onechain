@@ -6,7 +6,7 @@ The Analytics Watchdog Service is designed to monitor and analyze data changes o
 ## Running the Service
 Execute the compiled binary to start the service:
 ```shell
-cargo run --release -p one-security-watchdog
+cargo run --release -p sui-security-watchdog
 ```
 ## Usage
 The service will automatically start downloading the configured GitHub repository, parsing the configuration file, and scheduling SQL queries as specified. Metrics will be updated in Prometheus according to the results of these queries.
@@ -18,8 +18,8 @@ which has time based token unlocks, we want it to compare against a lower bound 
   {
     "name": "sui_10B",
     "cron_schedule": "0 0 * * *",  // Every day at midnight (UTC)
-    "sql_query": "SELECT total_sui FROM total_sui_mainnet ORDER BY epoch DESC LIMIT 1",
-    "metric_name": "total_sui_10B",
+    "sql_query": "SELECT total_oct FROM total_oct_mainnet ORDER BY epoch DESC LIMIT 1",
+    "metric_name": "total_oct_10B",
     "timed_exact_limits": {
       // total sui should always be exact 10B since
       // the dawn of time

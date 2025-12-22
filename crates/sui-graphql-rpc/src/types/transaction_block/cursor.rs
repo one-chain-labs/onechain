@@ -1,12 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    consistency::Checkpointed,
-    filter,
-    raw_query::RawQuery,
-    types::cursor::{self, Paginated, RawPaginated, ScanLimited, Target},
-};
 use diesel::{
     backend::Backend,
     deserialize::{self, FromSql, QueryableByName},
@@ -18,6 +12,12 @@ use serde::{Deserialize, Serialize};
 use sui_indexer::{models::transactions::StoredTransaction, schema::transactions};
 
 use super::Query;
+use crate::{
+    consistency::Checkpointed,
+    filter,
+    raw_query::RawQuery,
+    types::cursor::{self, Paginated, RawPaginated, ScanLimited, Target},
+};
 
 pub(crate) type Cursor = cursor::JsonCursor<TransactionBlockCursor>;
 

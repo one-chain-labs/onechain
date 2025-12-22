@@ -1,14 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use async_graphql::{
-    extensions::{Extension, ExtensionContext, ExtensionFactory, NextExecute, NextParseQuery},
-    parser::types::{ExecutableDocument, OperationType},
-    Response,
-    ServerError,
-    ServerResult,
-};
-use async_graphql_value::Variables;
 use std::{
     net::SocketAddr,
     sync::{
@@ -18,6 +10,15 @@ use std::{
     },
     time::Duration,
 };
+
+use async_graphql::{
+    extensions::{Extension, ExtensionContext, ExtensionFactory, NextExecute, NextParseQuery},
+    parser::types::{ExecutableDocument, OperationType},
+    Response,
+    ServerError,
+    ServerResult,
+};
+use async_graphql_value::Variables;
 use tokio::time::timeout;
 use tracing::error;
 use uuid::Uuid;

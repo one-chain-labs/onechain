@@ -37,16 +37,10 @@
 //!
 //! The above design is used for both objects and markers.
 
-use crate::{
-    authority::{
-        authority_per_epoch_store::AuthorityPerEpochStore,
-        authority_store::{ExecutionLockWriteGuard, LockDetailsDeprecated, ObjectLockStatus, SuiLockResult},
-        authority_store_tables::LiveObject,
-        epoch_start_configuration::{EpochFlag, EpochStartConfiguration},
-        AuthorityStore,
-    },
-    state_accumulator::AccumulatorStore,
-    transaction_outputs::TransactionOutputs,
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    hash::Hash,
+    sync::{atomic::AtomicU64, Arc},
 };
 
 use dashmap::{mapref::entry::Entry as DashMapEntry, DashMap};
@@ -55,25 +49,21 @@ use moka::sync::Cache as MokaCache;
 use mysten_common::sync::notify_read::NotifyRead;
 use parking_lot::Mutex;
 use prometheus::Registry;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    hash::Hash,
-    sync::Arc,
-};
 use sui_config::ExecutionCacheConfig;
-use sui_macros::fail_point_async;
+use sui_macros::fail_point;
 use sui_protocol_config::ProtocolVersion;
 use sui_types::{
     accumulator::Accumulator,
-    base_types::{EpochId, ObjectID, ObjectRef, SequenceNumber, VerifiedExecutionData},
+    base_types::{EpochId, FullObjectID, ObjectID, ObjectRef, SequenceNumber, VerifiedExecutionData},
     bridge::{get_bridge, Bridge},
     digests::{ObjectDigest, TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest},
     effects::{TransactionEffects, TransactionEvents},
     error::{SuiError, SuiResult, UserInputError},
+    executable_transaction::VerifiedExecutableTransaction,
     message_envelope::Message,
     messages_checkpoint::CheckpointSequenceNumber,
     object::Object,
-    storage::{MarkerValue, ObjectKey, ObjectOrTombstone, ObjectStore, PackageObject},
+    storage::{FullObjectKey, MarkerValue, ObjectKey, ObjectOrTombstone, ObjectStore, PackageObject},
     sui_system_state::{get_sui_system_state, SuiSystemState},
     transaction::{VerifiedSignedTransaction, VerifiedTransaction},
 };
@@ -81,7 +71,7 @@ use tap::TapOptional;
 use tracing::{debug, info, instrument, trace, warn};
 
 use super::{
-    cache_types::{CachedVersionMap, IsNewer, MonotonicCache, Ticket},
+    cache_types::{CacheResult, CachedVersionMap, IsNewer, MonotonicCache, Ticket},
     implement_passthrough_traits,
     object_locks::ObjectLocks,
     CheckpointCache,
@@ -94,6 +84,19 @@ use super::{
     StateSyncAPI,
     TestingAPI,
     TransactionCacheRead,
+};
+use crate::{
+    authority::{
+        authority_per_epoch_store::AuthorityPerEpochStore,
+        authority_store::{ExecutionLockWriteGuard, LockDetailsDeprecated, ObjectLockStatus, SuiLockResult},
+        authority_store_tables::LiveObject,
+        backpressure::BackpressureManager,
+        epoch_start_configuration::{EpochFlag, EpochStartConfiguration},
+        AuthorityStore,
+    },
+    fallback_fetch::{do_fallback_lookup, do_fallback_lookup_fallible},
+    state_accumulator::AccumulatorStore,
+    transaction_outputs::TransactionOutputs,
 };
 
 #[cfg(test)]
@@ -185,16 +188,7 @@ impl IsNewer for LatestObjectCacheEntry {
     }
 }
 
-type MarkerKey = (EpochId, ObjectID);
-
-enum CacheResult<T> {
-    /// Entry is in the cache
-    Hit(T),
-    /// Entry is not in the cache and is known to not exist
-    NegativeHit,
-    /// Entry is not in the cache and may or may not exist in the store
-    Miss,
-}
+type MarkerKey = (EpochId, FullObjectID);
 
 /// UncommitedData stores execution outputs that are not yet written to the db. Entries in this
 /// struct can only be purged after they are committed.
@@ -232,6 +226,9 @@ struct UncommittedData {
     // Transaction outputs that have not yet been written to the DB. Items are removed from this
     // table as they are flushed to the db.
     pending_transaction_writes: DashMap<TransactionDigest, Arc<TransactionOutputs>>,
+
+    total_transaction_inserts: AtomicU64,
+    total_transaction_commits: AtomicU64,
 }
 
 impl UncommittedData {
@@ -243,6 +240,8 @@ impl UncommittedData {
             executed_effects_digests: DashMap::new(),
             pending_transaction_writes: DashMap::new(),
             transaction_events: DashMap::new(),
+            total_transaction_inserts: AtomicU64::new(0),
+            total_transaction_commits: AtomicU64::new(0),
         }
     }
 
@@ -253,6 +252,8 @@ impl UncommittedData {
         self.executed_effects_digests.clear();
         self.pending_transaction_writes.clear();
         self.transaction_events.clear();
+        self.total_transaction_inserts.store(0, std::sync::atomic::Ordering::Relaxed);
+        self.total_transaction_commits.store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn is_empty(&self) -> bool {
@@ -264,9 +265,32 @@ impl UncommittedData {
                     && self.transaction_effects.is_empty()
                     && self.executed_effects_digests.is_empty()
                     && self.transaction_events.is_empty()
+                    && self.total_transaction_inserts.load(std::sync::atomic::Ordering::Relaxed)
+                        == self.total_transaction_commits.load(std::sync::atomic::Ordering::Relaxed),
             );
         }
         empty
+    }
+}
+
+// Point items (anything without a version number) can be negatively cached as None
+type PointCacheItem<T> = Option<T>;
+
+// PointCacheItem can only be used for insert-only collections, so a Some entry
+// is always newer than a None entry.
+impl<T: Eq + std::fmt::Debug> IsNewer for PointCacheItem<T> {
+    fn is_newer_than(&self, other: &PointCacheItem<T>) -> bool {
+        match (self, other) {
+            (Some(_), None) => true,
+
+            (Some(a), Some(b)) => {
+                // conflicting inserts should never happen
+                debug_assert_eq!(a, b);
+                false
+            }
+
+            _ => false,
+        }
     }
 }
 
@@ -285,13 +309,13 @@ struct CachedCommittedData {
     // See module level comment for an explanation of caching strategy.
     marker_cache: MokaCache<MarkerKey, Arc<Mutex<CachedVersionMap<MarkerValue>>>>,
 
-    transactions: MokaCache<TransactionDigest, Arc<VerifiedTransaction>>,
+    transactions: MonotonicCache<TransactionDigest, PointCacheItem<Arc<VerifiedTransaction>>>,
 
-    transaction_effects: MokaCache<TransactionEffectsDigest, Arc<TransactionEffects>>,
+    transaction_effects: MonotonicCache<TransactionEffectsDigest, PointCacheItem<Arc<TransactionEffects>>>,
 
-    transaction_events: MokaCache<TransactionEventsDigest, Arc<TransactionEvents>>,
+    transaction_events: MonotonicCache<TransactionEventsDigest, PointCacheItem<Arc<TransactionEvents>>>,
 
-    executed_effects_digests: MokaCache<TransactionDigest, TransactionEffectsDigest>,
+    executed_effects_digests: MonotonicCache<TransactionDigest, PointCacheItem<TransactionEffectsDigest>>,
 
     // Objects that were read at transaction signing time - allows us to access them again at
     // execution time with a single lock / hash lookup
@@ -302,10 +326,12 @@ impl CachedCommittedData {
     fn new(config: &ExecutionCacheConfig) -> Self {
         let object_cache = MokaCache::builder().max_capacity(config.object_cache_size()).build();
         let marker_cache = MokaCache::builder().max_capacity(config.marker_cache_size()).build();
-        let transactions = MokaCache::builder().max_capacity(config.transaction_cache_size()).build();
-        let transaction_effects = MokaCache::builder().max_capacity(config.effect_cache_size()).build();
-        let transaction_events = MokaCache::builder().max_capacity(config.events_cache_size()).build();
-        let executed_effects_digests = MokaCache::builder().max_capacity(config.executed_effect_cache_size()).build();
+
+        let transactions = MonotonicCache::new(config.transaction_cache_size());
+        let transaction_effects = MonotonicCache::new(config.effect_cache_size());
+        let transaction_events = MonotonicCache::new(config.events_cache_size());
+        let executed_effects_digests = MonotonicCache::new(config.executed_effect_cache_size());
+
         let transaction_objects = MokaCache::builder().max_capacity(config.transaction_objects_cache_size()).build();
 
         Self {
@@ -333,10 +359,10 @@ impl CachedCommittedData {
         assert_empty(&self.object_cache);
         assert!(&self.object_by_id_cache.is_empty());
         assert_empty(&self.marker_cache);
-        assert_empty(&self.transactions);
-        assert_empty(&self.transaction_effects);
-        assert_empty(&self.transaction_events);
-        assert_empty(&self.executed_effects_digests);
+        assert!(self.transactions.is_empty());
+        assert!(self.transaction_effects.is_empty());
+        assert!(self.transaction_events.is_empty());
+        assert!(self.executed_effects_digests.is_empty());
         assert_empty(&self._transaction_objects);
     }
 }
@@ -371,6 +397,8 @@ pub struct WritebackCache {
 
     executed_effects_digests_notify_read: NotifyRead<TransactionDigest, TransactionEffectsDigest>,
     store: Arc<AuthorityStore>,
+    backpressure_threshold: u64,
+    backpressure_manager: Arc<BackpressureManager>,
     metrics: Arc<ExecutionCacheMetrics>,
 }
 
@@ -412,7 +440,12 @@ macro_rules! check_cache_entry_by_latest {
 }
 
 impl WritebackCache {
-    pub fn new(config: &ExecutionCacheConfig, store: Arc<AuthorityStore>, metrics: Arc<ExecutionCacheMetrics>) -> Self {
+    pub fn new(
+        config: &ExecutionCacheConfig,
+        store: Arc<AuthorityStore>,
+        metrics: Arc<ExecutionCacheMetrics>,
+        backpressure_manager: Arc<BackpressureManager>,
+    ) -> Self {
         let packages = MokaCache::builder().max_capacity(config.package_cache_size()).build();
         Self {
             dirty: UncommittedData::new(),
@@ -421,23 +454,30 @@ impl WritebackCache {
             object_locks: ObjectLocks::new(),
             executed_effects_digests_notify_read: NotifyRead::new(),
             store,
+            backpressure_manager,
+            backpressure_threshold: config.backpressure_threshold(),
             metrics,
         }
     }
 
     pub fn new_for_tests(store: Arc<AuthorityStore>, registry: &Registry) -> Self {
-        Self::new(&Default::default(), store, ExecutionCacheMetrics::new(registry).into())
+        Self::new(
+            &Default::default(),
+            store,
+            ExecutionCacheMetrics::new(registry).into(),
+            BackpressureManager::new_for_tests(),
+        )
     }
 
     #[cfg(test)]
     pub fn reset_for_test(&mut self) {
-        let mut new = Self::new(&Default::default(), self.store.clone(), self.metrics.clone());
+        let mut new =
+            Self::new(&Default::default(), self.store.clone(), self.metrics.clone(), self.backpressure_manager.clone());
         std::mem::swap(self, &mut new);
     }
 
-    async fn write_object_entry(&self, object_id: &ObjectID, version: SequenceNumber, object: ObjectEntry) {
+    fn write_object_entry(&self, object_id: &ObjectID, version: SequenceNumber, object: ObjectEntry) {
         trace!(?object_id, ?version, ?object, "inserting object entry");
-        fail_point_async!("write_object_entry");
         self.metrics.record_cache_write("object");
 
         // We must hold the lock for the object entry while inserting to the
@@ -475,11 +515,15 @@ impl WritebackCache {
         entry.insert(version, object);
     }
 
-    async fn write_marker_value(&self, epoch_id: EpochId, object_key: &ObjectKey, marker_value: MarkerValue) {
-        tracing::trace!("inserting marker value {:?}: {:?}", object_key, marker_value);
-        fail_point_async!("write_marker_entry");
+    fn write_marker_value(&self, epoch_id: EpochId, object_key: FullObjectKey, marker_value: MarkerValue) {
+        tracing::trace!("inserting marker value {object_key:?}: {marker_value:?}",);
         self.metrics.record_cache_write("marker");
-        self.dirty.markers.entry((epoch_id, object_key.0)).or_default().value_mut().insert(object_key.1, marker_value);
+        self.dirty
+            .markers
+            .entry((epoch_id, object_key.id()))
+            .or_default()
+            .value_mut()
+            .insert(object_key.version(), marker_value);
     }
 
     // lock both the dirty and committed sides of the cache, and then pass the entries to
@@ -625,19 +669,26 @@ impl WritebackCache {
         }
     }
 
-    fn get_marker_value_cache_only(
-        &self,
-        object_id: &ObjectID,
-        version: SequenceNumber,
-        epoch_id: EpochId,
-    ) -> CacheResult<MarkerValue> {
+    fn get_marker_value_cache_only(&self, object_key: FullObjectKey, epoch_id: EpochId) -> CacheResult<MarkerValue> {
         Self::with_locked_cache_entries(
             &self.dirty.markers,
             &self.cached.marker_cache,
-            &(epoch_id, *object_id),
+            &(epoch_id, object_key.id()),
             |dirty_entry, cached_entry| {
-                check_cache_entry_by_version!(self, "marker_by_version", "uncommitted", dirty_entry, version);
-                check_cache_entry_by_version!(self, "marker_by_version", "committed", cached_entry, version);
+                check_cache_entry_by_version!(
+                    self,
+                    "marker_by_version",
+                    "uncommitted",
+                    dirty_entry,
+                    object_key.version()
+                );
+                check_cache_entry_by_version!(
+                    self,
+                    "marker_by_version",
+                    "committed",
+                    cached_entry,
+                    object_key.version()
+                );
                 CacheResult::Miss
             },
         )
@@ -645,13 +696,13 @@ impl WritebackCache {
 
     fn get_latest_marker_value_cache_only(
         &self,
-        object_id: &ObjectID,
+        object_id: FullObjectID,
         epoch_id: EpochId,
     ) -> CacheResult<(SequenceNumber, MarkerValue)> {
         Self::with_locked_cache_entries(
             &self.dirty.markers,
             &self.cached.marker_cache,
-            &(epoch_id, *object_id),
+            &(epoch_id, object_id),
             |dirty_entry, cached_entry| {
                 check_cache_entry_by_latest!(self, "marker_latest", "uncommitted", dirty_entry);
                 check_cache_entry_by_latest!(self, "marker_latest", "committed", cached_entry);
@@ -692,7 +743,7 @@ impl WritebackCache {
     }
 
     #[instrument(level = "debug", skip_all)]
-    async fn write_transaction_outputs(&self, epoch_id: EpochId, tx_outputs: Arc<TransactionOutputs>) {
+    fn write_transaction_outputs(&self, epoch_id: EpochId, tx_outputs: Arc<TransactionOutputs>) {
         trace!(digest = ?tx_outputs.transaction.digest(), "writing transaction outputs to cache");
 
         let TransactionOutputs { transaction, effects, markers, written, deleted, wrapped, events, .. } = &*tx_outputs;
@@ -702,28 +753,28 @@ impl WritebackCache {
         // not see the previous version of the child object, instead of the deleted/wrapped
         // tombstone, which would cause an execution fork
         for ObjectKey(id, version) in deleted.iter() {
-            self.write_object_entry(id, *version, ObjectEntry::Deleted).await;
+            self.write_object_entry(id, *version, ObjectEntry::Deleted);
         }
 
         for ObjectKey(id, version) in wrapped.iter() {
-            self.write_object_entry(id, *version, ObjectEntry::Wrapped).await;
+            self.write_object_entry(id, *version, ObjectEntry::Wrapped);
         }
 
         // Update all markers
         for (object_key, marker_value) in markers.iter() {
-            self.write_marker_value(epoch_id, object_key, *marker_value).await;
+            self.write_marker_value(epoch_id, *object_key, *marker_value);
         }
 
         // Write children before parents to ensure that readers do not observe a parent object
         // before its most recent children are visible.
         for (object_id, object) in written.iter() {
             if object.is_child_object() {
-                self.write_object_entry(object_id, object.version(), object.clone().into()).await;
+                self.write_object_entry(object_id, object.version(), object.clone().into());
             }
         }
         for (object_id, object) in written.iter() {
             if !object.is_child_object() {
-                self.write_object_entry(object_id, object.version(), object.clone().into()).await;
+                self.write_object_entry(object_id, object.version(), object.clone().into());
                 if object.is_package() {
                     debug!("caching package: {:?}", object.compute_object_reference());
                     self.packages.insert(*object_id, PackageObject::new(object.clone()));
@@ -763,12 +814,25 @@ impl WritebackCache {
         self.executed_effects_digests_notify_read.notify(&tx_digest, &effects_digest);
 
         self.metrics.pending_notify_read.set(self.executed_effects_digests_notify_read.num_pending() as i64);
+
+        let prev = self.dirty.total_transaction_inserts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        let pending_count =
+            (prev + 1).saturating_sub(self.dirty.total_transaction_commits.load(std::sync::atomic::Ordering::Relaxed));
+
+        self.set_backpressure(pending_count);
     }
 
     // Commits dirty data for the given TransactionDigest to the db.
     #[instrument(level = "debug", skip_all)]
-    async fn commit_transaction_outputs(&self, epoch: EpochId, digests: &[TransactionDigest]) {
-        fail_point_async!("writeback-cache-commit");
+    fn commit_transaction_outputs(
+        &self,
+        epoch: EpochId,
+        digests: &[TransactionDigest],
+        // TODO: Delete this parameter once table migration is complete.
+        use_object_per_epoch_marker_table_v2: bool,
+    ) {
+        fail_point!("writeback-cache-commit");
         trace!(?digests);
 
         let mut all_outputs = Vec::with_capacity(digests.len());
@@ -788,13 +852,40 @@ impl WritebackCache {
         // Flush writes to disk before removing anything from dirty set. otherwise,
         // a cache eviction could cause a value to disappear briefly, even if we insert to the
         // cache before removing from the dirty set.
-        self.store.write_transaction_outputs(epoch, &all_outputs).await.expect("db error");
+        self.store
+            .write_transaction_outputs(epoch, &all_outputs, use_object_per_epoch_marker_table_v2)
+            .expect("db error");
 
         for outputs in all_outputs.iter() {
             let tx_digest = outputs.transaction.digest();
             assert!(self.dirty.pending_transaction_writes.remove(tx_digest).is_some());
             self.flush_transactions_from_dirty_to_cached(epoch, *tx_digest, outputs);
         }
+
+        let num_outputs = all_outputs.len() as u64;
+        let num_commits =
+            self.dirty.total_transaction_commits.fetch_add(num_outputs, std::sync::atomic::Ordering::Relaxed)
+                + num_outputs;
+
+        let pending_count =
+            self.dirty.total_transaction_inserts.load(std::sync::atomic::Ordering::Relaxed).saturating_sub(num_commits);
+
+        self.set_backpressure(pending_count);
+    }
+
+    fn approximate_pending_transaction_count(&self) -> u64 {
+        let num_commits = self.dirty.total_transaction_commits.load(std::sync::atomic::Ordering::Relaxed);
+
+        self.dirty.total_transaction_inserts.load(std::sync::atomic::Ordering::Relaxed).saturating_sub(num_commits)
+    }
+
+    fn set_backpressure(&self, pending_count: u64) {
+        let backpressure = pending_count > self.backpressure_threshold;
+        let backpressure_changed = self.backpressure_manager.set_backpressure(backpressure);
+        if backpressure_changed {
+            self.metrics.backpressure_toggles.inc();
+        }
+        self.metrics.backpressure_status.set(if backpressure { 1 } else { 0 });
     }
 
     fn flush_transactions_from_dirty_to_cached(
@@ -812,10 +903,19 @@ impl WritebackCache {
 
         // Update cache before removing from self.dirty to avoid
         // unnecessary cache misses
-        self.cached.transactions.insert(tx_digest, transaction.clone());
-        self.cached.transaction_effects.insert(effects_digest, effects.clone().into());
-        self.cached.executed_effects_digests.insert(tx_digest, effects_digest);
-        self.cached.transaction_events.insert(events_digest, events.clone().into());
+        self.cached.transactions.insert(&tx_digest, PointCacheItem::Some(transaction.clone()), Ticket::Write).ok();
+        self.cached
+            .transaction_effects
+            .insert(&effects_digest, PointCacheItem::Some(effects.clone().into()), Ticket::Write)
+            .ok();
+        self.cached
+            .executed_effects_digests
+            .insert(&tx_digest, PointCacheItem::Some(effects_digest), Ticket::Write)
+            .ok();
+        self.cached
+            .transaction_events
+            .insert(&events_digest, PointCacheItem::Some(events.clone().into()), Ticket::Write)
+            .ok();
 
         self.dirty.transaction_effects.remove(&effects_digest).expect("effects must exist");
 
@@ -839,8 +939,8 @@ impl WritebackCache {
             Self::move_version_from_dirty_to_cache(
                 &self.dirty.markers,
                 &self.cached.marker_cache,
-                (epoch, object_key.0),
-                object_key.1,
+                (epoch, object_key.id()),
+                object_key.version(),
                 marker_value,
             );
         }
@@ -874,24 +974,6 @@ impl WritebackCache {
                 &ObjectEntry::Wrapped,
             );
         }
-    }
-
-    async fn persist_transactions(&self, digests: &[TransactionDigest]) {
-        let mut txns = Vec::with_capacity(digests.len());
-        for tx_digest in digests {
-            let Some(tx) = self.dirty.pending_transaction_writes.get(tx_digest).map(|o| o.transaction.clone()) else {
-                // tx should exist in the db if it is not in dirty set.
-                debug_assert!(self.store.get_transaction_block(tx_digest).unwrap().is_some());
-                // If the transaction is not in dirty, it does not need to be committed.
-                // This situation can happen if we build a checkpoint locally which was just executed
-                // via state sync.
-                continue;
-            };
-
-            txns.push((*tx_digest, (*tx).clone()));
-        }
-
-        self.store.commit_transactions(&txns).expect("db error");
     }
 
     // Move the oldest/least entry from the dirty queue to the cache queue.
@@ -1012,12 +1094,22 @@ impl WritebackCache {
 impl ExecutionCacheAPI for WritebackCache {}
 
 impl ExecutionCacheCommit for WritebackCache {
-    fn commit_transaction_outputs<'a>(&'a self, epoch: EpochId, digests: &'a [TransactionDigest]) -> BoxFuture<'a, ()> {
-        WritebackCache::commit_transaction_outputs(self, epoch, digests).boxed()
+    fn commit_transaction_outputs(
+        &self,
+        epoch: EpochId,
+        digests: &[TransactionDigest],
+        // TODO: Delete this parameter once table migration is complete.
+        use_object_per_epoch_marker_table_v2: bool,
+    ) {
+        WritebackCache::commit_transaction_outputs(self, epoch, digests, use_object_per_epoch_marker_table_v2)
     }
 
-    fn persist_transactions<'a>(&'a self, digests: &'a [TransactionDigest]) -> BoxFuture<'a, ()> {
-        WritebackCache::persist_transactions(self, digests).boxed()
+    fn persist_transaction(&self, tx: &VerifiedExecutableTransaction) {
+        self.store.persist_transaction(tx).expect("db error");
+    }
+
+    fn approximate_pending_transaction_count(&self) -> u64 {
+        WritebackCache::approximate_pending_transaction_count(self)
     }
 }
 
@@ -1026,9 +1118,19 @@ impl ObjectCacheRead for WritebackCache {
         self.metrics.record_cache_request("package", "package_cache");
         if let Some(p) = self.packages.get(package_id) {
             if cfg!(debug_assertions) {
-                if let Some(store_package) = self.store.get_object(package_id) {
+                let canonical_package = self
+                    .dirty
+                    .objects
+                    .get(package_id)
+                    .and_then(|v| match v.get_highest().map(|v| v.1.clone()) {
+                        Some(ObjectEntry::Object(object)) => Some(object),
+                        _ => None,
+                    })
+                    .or_else(|| self.store.get_object(package_id));
+
+                if let Some(canonical_package) = canonical_package {
                     assert_eq!(
-                        store_package.digest(),
+                        canonical_package.digest(),
                         p.object().digest(),
                         "Package object cache is inconsistent for package {:?}",
                         package_id
@@ -1300,26 +1402,39 @@ impl ObjectCacheRead for WritebackCache {
         get_bridge(self)
     }
 
-    fn get_marker_value(&self, object_id: &ObjectID, version: SequenceNumber, epoch_id: EpochId) -> Option<MarkerValue> {
-        match self.get_marker_value_cache_only(object_id, version, epoch_id) {
+    fn get_marker_value(
+        &self,
+        object_key: FullObjectKey,
+        epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        use_object_per_epoch_marker_table_v2: bool,
+    ) -> Option<MarkerValue> {
+        match self.get_marker_value_cache_only(object_key, epoch_id) {
             CacheResult::Hit(marker) => Some(marker),
             CacheResult::NegativeHit => None,
             CacheResult::Miss => self
                 .record_db_get("marker_by_version")
-                .get_marker_value(object_id, &version, epoch_id)
+                .get_marker_value(object_key, epoch_id, use_object_per_epoch_marker_table_v2)
                 .expect("db error"),
         }
     }
 
-    fn get_latest_marker(&self, object_id: &ObjectID, epoch_id: EpochId) -> Option<(SequenceNumber, MarkerValue)> {
+    fn get_latest_marker(
+        &self,
+        object_id: FullObjectID,
+        epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        use_object_per_epoch_marker_table_v2: bool,
+    ) -> Option<(SequenceNumber, MarkerValue)> {
         match self.get_latest_marker_value_cache_only(object_id, epoch_id) {
             CacheResult::Hit((v, marker)) => Some((v, marker)),
             CacheResult::NegativeHit => {
                 panic!("cannot have negative hit when getting latest marker")
             }
-            CacheResult::Miss => {
-                self.record_db_get("marker_latest").get_latest_marker(object_id, epoch_id).expect("db error")
-            }
+            CacheResult::Miss => self
+                .record_db_get("marker_latest")
+                .get_latest_marker(object_id, epoch_id, use_object_per_epoch_marker_table_v2)
+                .expect("db error"),
         }
     }
 
@@ -1394,9 +1509,11 @@ impl ObjectCacheRead for WritebackCache {
 
 impl TransactionCacheRead for WritebackCache {
     fn multi_get_transaction_blocks(&self, digests: &[TransactionDigest]) -> Vec<Option<Arc<VerifiedTransaction>>> {
+        let digests_and_tickets: Vec<_> =
+            digests.iter().map(|d| (*d, self.cached.transactions.get_ticket_for_read(d))).collect();
         do_fallback_lookup(
-            digests,
-            |digest| {
+            &digests_and_tickets,
+            |(digest, _)| {
                 self.metrics.record_cache_request("transaction_block", "uncommitted");
                 if let Some(tx) = self.dirty.pending_transaction_writes.get(digest) {
                     self.metrics.record_cache_hit("transaction_block", "uncommitted");
@@ -1405,21 +1522,35 @@ impl TransactionCacheRead for WritebackCache {
                 self.metrics.record_cache_miss("transaction_block", "uncommitted");
 
                 self.metrics.record_cache_request("transaction_block", "committed");
-                if let Some(tx) = self.cached.transactions.get(digest) {
-                    self.metrics.record_cache_hit("transaction_block", "committed");
-                    return CacheResult::Hit(Some(tx.clone()));
-                }
-                self.metrics.record_cache_miss("transaction_block", "committed");
 
-                CacheResult::Miss
+                match self.cached.transactions.get(digest).map(|l| l.lock().clone()) {
+                    Some(PointCacheItem::Some(tx)) => {
+                        self.metrics.record_cache_hit("transaction_block", "committed");
+                        CacheResult::Hit(Some(tx))
+                    }
+                    Some(PointCacheItem::None) => CacheResult::NegativeHit,
+                    None => {
+                        self.metrics.record_cache_miss("transaction_block", "committed");
+
+                        CacheResult::Miss
+                    }
+                }
             },
             |remaining| {
-                self.record_db_multi_get("transaction_block", remaining.len())
-                    .multi_get_transaction_blocks(remaining)
+                let remaining_digests: Vec<_> = remaining.iter().map(|(d, _)| *d).collect();
+                let results: Vec<_> = self
+                    .record_db_multi_get("transaction_block", remaining.len())
+                    .multi_get_transaction_blocks(&remaining_digests)
                     .expect("db error")
                     .into_iter()
                     .map(|o| o.map(Arc::new))
-                    .collect()
+                    .collect();
+                for ((digest, ticket), result) in remaining.iter().zip(results.iter()) {
+                    if result.is_none() {
+                        self.cached.transactions.insert(digest, None, *ticket).ok();
+                    }
+                }
+                results
             },
         )
     }
@@ -1428,9 +1559,11 @@ impl TransactionCacheRead for WritebackCache {
         &self,
         digests: &[TransactionDigest],
     ) -> Vec<Option<TransactionEffectsDigest>> {
+        let digests_and_tickets: Vec<_> =
+            digests.iter().map(|d| (*d, self.cached.executed_effects_digests.get_ticket_for_read(d))).collect();
         do_fallback_lookup(
-            digests,
-            |digest| {
+            &digests_and_tickets,
+            |(digest, _)| {
                 self.metrics.record_cache_request("executed_effects_digests", "uncommitted");
                 if let Some(digest) = self.dirty.executed_effects_digests.get(digest) {
                     self.metrics.record_cache_hit("executed_effects_digests", "uncommitted");
@@ -1439,26 +1572,40 @@ impl TransactionCacheRead for WritebackCache {
                 self.metrics.record_cache_miss("executed_effects_digests", "uncommitted");
 
                 self.metrics.record_cache_request("executed_effects_digests", "committed");
-                if let Some(digest) = self.cached.executed_effects_digests.get(digest) {
-                    self.metrics.record_cache_hit("executed_effects_digests", "committed");
-                    return CacheResult::Hit(Some(digest));
+                match self.cached.executed_effects_digests.get(digest).map(|l| *l.lock()) {
+                    Some(PointCacheItem::Some(digest)) => {
+                        self.metrics.record_cache_hit("executed_effects_digests", "committed");
+                        CacheResult::Hit(Some(digest))
+                    }
+                    Some(PointCacheItem::None) => CacheResult::NegativeHit,
+                    None => {
+                        self.metrics.record_cache_miss("executed_effects_digests", "committed");
+                        CacheResult::Miss
+                    }
                 }
-                self.metrics.record_cache_miss("executed_effects_digests", "committed");
-
-                CacheResult::Miss
             },
             |remaining| {
-                self.record_db_multi_get("executed_effects_digests", remaining.len())
-                    .multi_get_executed_effects_digests(remaining)
-                    .expect("db error")
+                let remaining_digests: Vec<_> = remaining.iter().map(|(d, _)| *d).collect();
+                let results = self
+                    .record_db_multi_get("executed_effects_digests", remaining.len())
+                    .multi_get_executed_effects_digests(&remaining_digests)
+                    .expect("db error");
+                for ((digest, ticket), result) in remaining.iter().zip(results.iter()) {
+                    if result.is_none() {
+                        self.cached.executed_effects_digests.insert(digest, None, *ticket).ok();
+                    }
+                }
+                results
             },
         )
     }
 
     fn multi_get_effects(&self, digests: &[TransactionEffectsDigest]) -> Vec<Option<TransactionEffects>> {
+        let digests_and_tickets: Vec<_> =
+            digests.iter().map(|d| (*d, self.cached.transaction_effects.get_ticket_for_read(d))).collect();
         do_fallback_lookup(
-            digests,
-            |digest| {
+            &digests_and_tickets,
+            |(digest, _)| {
                 self.metrics.record_cache_request("transaction_effects", "uncommitted");
                 if let Some(effects) = self.dirty.transaction_effects.get(digest) {
                     self.metrics.record_cache_hit("transaction_effects", "uncommitted");
@@ -1467,18 +1614,30 @@ impl TransactionCacheRead for WritebackCache {
                 self.metrics.record_cache_miss("transaction_effects", "uncommitted");
 
                 self.metrics.record_cache_request("transaction_effects", "committed");
-                if let Some(effects) = self.cached.transaction_effects.get(digest) {
-                    self.metrics.record_cache_hit("transaction_effects", "committed");
-                    return CacheResult::Hit(Some((*effects).clone()));
+                match self.cached.transaction_effects.get(digest).map(|l| l.lock().clone()) {
+                    Some(PointCacheItem::Some(effects)) => {
+                        self.metrics.record_cache_hit("transaction_effects", "committed");
+                        CacheResult::Hit(Some((*effects).clone()))
+                    }
+                    Some(PointCacheItem::None) => CacheResult::NegativeHit,
+                    None => {
+                        self.metrics.record_cache_miss("transaction_effects", "committed");
+                        CacheResult::Miss
+                    }
                 }
-                self.metrics.record_cache_miss("transaction_effects", "committed");
-
-                CacheResult::Miss
             },
             |remaining| {
-                self.record_db_multi_get("transaction_effects", remaining.len())
-                    .multi_get_effects(remaining.iter())
-                    .expect("db error")
+                let remaining_digests: Vec<_> = remaining.iter().map(|(d, _)| *d).collect();
+                let results = self
+                    .record_db_multi_get("transaction_effects", remaining.len())
+                    .multi_get_effects(remaining_digests.iter())
+                    .expect("db error");
+                for ((digest, ticket), result) in remaining.iter().zip(results.iter()) {
+                    if result.is_none() {
+                        self.cached.transaction_effects.insert(digest, None, *ticket).ok();
+                    }
+                }
+                results
             },
         )
     }
@@ -1501,9 +1660,11 @@ impl TransactionCacheRead for WritebackCache {
             }
         }
 
+        let digests_and_tickets: Vec<_> =
+            event_digests.iter().map(|d| (*d, self.cached.transaction_events.get_ticket_for_read(d))).collect();
         do_fallback_lookup(
-            event_digests,
-            |digest| {
+            &digests_and_tickets,
+            |(digest, _)| {
                 self.metrics.record_cache_request("transaction_events", "uncommitted");
                 if let Some(events) = self.dirty.transaction_events.get(digest).map(|e| e.1.clone()) {
                     self.metrics.record_cache_hit("transaction_events", "uncommitted");
@@ -1513,84 +1674,59 @@ impl TransactionCacheRead for WritebackCache {
                 self.metrics.record_cache_miss("transaction_events", "uncommitted");
 
                 self.metrics.record_cache_request("transaction_events", "committed");
-                if let Some(events) = self.cached.transaction_events.get(digest).map(|e| (*e).clone()) {
-                    self.metrics.record_cache_hit("transaction_events", "committed");
-                    return CacheResult::Hit(map_events(events));
+                match self.cached.transaction_events.get(digest).map(|l| l.lock().clone()) {
+                    Some(PointCacheItem::Some(events)) => {
+                        self.metrics.record_cache_hit("transaction_events", "committed");
+                        CacheResult::Hit(map_events((*events).clone()))
+                    }
+                    Some(PointCacheItem::None) => CacheResult::NegativeHit,
+                    None => {
+                        self.metrics.record_cache_miss("transaction_events", "committed");
+
+                        CacheResult::Miss
+                    }
                 }
-
-                self.metrics.record_cache_miss("transaction_events", "committed");
-
-                CacheResult::Miss
             },
-            |digests| self.store.multi_get_events(digests).expect("db error"),
+            |remaining| {
+                let remaining_digests: Vec<_> = remaining.iter().map(|(d, _)| *d).collect();
+                let results = self.store.multi_get_events(&remaining_digests).expect("db error");
+                for ((digest, ticket), result) in remaining.iter().zip(results.iter()) {
+                    if result.is_none() {
+                        self.cached.transaction_events.insert(digest, None, *ticket).ok();
+                    }
+                }
+                results
+            },
         )
     }
 }
 
 impl ExecutionCacheWrite for WritebackCache {
-    fn acquire_transaction_locks<'a>(
-        &'a self,
-        epoch_store: &'a AuthorityPerEpochStore,
-        owned_input_objects: &'a [ObjectRef],
+    fn acquire_transaction_locks(
+        &self,
+        epoch_store: &AuthorityPerEpochStore,
+        owned_input_objects: &[ObjectRef],
         tx_digest: TransactionDigest,
         signed_transaction: Option<VerifiedSignedTransaction>,
-    ) -> BoxFuture<'a, SuiResult> {
-        self.object_locks
-            .acquire_transaction_locks(self, epoch_store, owned_input_objects, tx_digest, signed_transaction)
-            .boxed()
+    ) -> SuiResult {
+        self.object_locks.acquire_transaction_locks(
+            self,
+            epoch_store,
+            owned_input_objects,
+            tx_digest,
+            signed_transaction,
+        )
     }
 
-    fn write_transaction_outputs(&self, epoch_id: EpochId, tx_outputs: Arc<TransactionOutputs>) -> BoxFuture<'_, ()> {
-        WritebackCache::write_transaction_outputs(self, epoch_id, tx_outputs).boxed()
+    fn write_transaction_outputs(
+        &self,
+        epoch_id: EpochId,
+        tx_outputs: Arc<TransactionOutputs>,
+        // TODO: Delete this parameter once table migration is complete.
+        _use_object_per_epoch_marker_table_v2: bool,
+    ) {
+        WritebackCache::write_transaction_outputs(self, epoch_id, tx_outputs);
     }
-}
-
-/// do_fallback_lookup is a helper function for multi-get operations.
-/// It takes a list of keys and first attempts to look up each key in the cache.
-/// The cache can return a hit, a miss, or a negative hit (if the object is known to not exist).
-/// Any keys that result in a miss are then looked up in the store.
-///
-/// The "get from cache" and "get from store" behavior are implemented by the caller and provided
-/// via the get_cached_key and multiget_fallback functions.
-fn do_fallback_lookup<K: Copy, V: Default + Clone>(
-    keys: &[K],
-    get_cached_key: impl Fn(&K) -> CacheResult<V>,
-    multiget_fallback: impl Fn(&[K]) -> Vec<V>,
-) -> Vec<V> {
-    do_fallback_lookup_fallible(keys, |key| Ok(get_cached_key(key)), |keys| Ok(multiget_fallback(keys)))
-        .expect("cannot fail")
-}
-
-fn do_fallback_lookup_fallible<K: Copy, V: Default + Clone>(
-    keys: &[K],
-    get_cached_key: impl Fn(&K) -> SuiResult<CacheResult<V>>,
-    multiget_fallback: impl Fn(&[K]) -> SuiResult<Vec<V>>,
-) -> SuiResult<Vec<V>> {
-    let mut results = vec![V::default(); keys.len()];
-    let mut fallback_keys = Vec::with_capacity(keys.len());
-    let mut fallback_indices = Vec::with_capacity(keys.len());
-
-    for (i, key) in keys.iter().enumerate() {
-        match get_cached_key(key)? {
-            CacheResult::Miss => {
-                fallback_keys.push(*key);
-                fallback_indices.push(i);
-            }
-            CacheResult::NegativeHit => (),
-            CacheResult::Hit(value) => {
-                results[i] = value;
-            }
-        }
-    }
-
-    let fallback_results = multiget_fallback(&fallback_keys)?;
-    assert_eq!(fallback_results.len(), fallback_indices.len());
-    assert_eq!(fallback_results.len(), fallback_keys.len());
-
-    for (i, result) in fallback_indices.into_iter().zip(fallback_results.into_iter()) {
-        results[i] = result;
-    }
-    Ok(results)
 }
 
 implement_passthrough_traits!(WritebackCache);
@@ -1708,5 +1844,46 @@ impl AccumulatorStore for WritebackCache {
         }
 
         Box::new(dirty_objects.into_values())
+    }
+}
+
+// TODO: For correctness, we must at least invalidate the cache when items are written through this
+// trait (since they could be negatively cached as absent). But it may or may not be optimal to
+// actually insert them into the cache. For instance if state sync is running ahead of execution,
+// they might evict other items that are about to be read. This could be an area for tuning in the
+// future.
+impl StateSyncAPI for WritebackCache {
+    fn insert_transaction_and_effects(
+        &self,
+        transaction: &VerifiedTransaction,
+        transaction_effects: &TransactionEffects,
+    ) {
+        self.store.insert_transaction_and_effects(transaction, transaction_effects).expect("db error");
+        self.cached
+            .transactions
+            .insert(transaction.digest(), PointCacheItem::Some(Arc::new(transaction.clone())), Ticket::Write)
+            .ok();
+        self.cached
+            .transaction_effects
+            .insert(
+                &transaction_effects.digest(),
+                PointCacheItem::Some(Arc::new(transaction_effects.clone())),
+                Ticket::Write,
+            )
+            .ok();
+    }
+
+    fn multi_insert_transaction_and_effects(&self, transactions_and_effects: &[VerifiedExecutionData]) {
+        self.store.multi_insert_transaction_and_effects(transactions_and_effects.iter()).expect("db error");
+        for VerifiedExecutionData { transaction, effects } in transactions_and_effects {
+            self.cached
+                .transactions
+                .insert(transaction.digest(), PointCacheItem::Some(Arc::new(transaction.clone())), Ticket::Write)
+                .ok();
+            self.cached
+                .transaction_effects
+                .insert(&effects.digest(), PointCacheItem::Some(Arc::new(effects.clone())), Ticket::Write)
+                .ok();
+        }
     }
 }

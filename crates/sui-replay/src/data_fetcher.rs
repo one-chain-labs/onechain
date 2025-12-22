@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{ReplayEngineError, EPOCH_CHANGE_STRUCT_TAG};
+use std::{collections::BTreeMap, num::NonZeroUsize, str::FromStr};
+
 use async_trait::async_trait;
 use futures::future::join_all;
 use lru::LruCache;
 use move_core_types::language_storage::StructTag;
 use parking_lot::RwLock;
 use rand::Rng;
-use std::{collections::BTreeMap, num::NonZeroUsize, str::FromStr};
 use sui_core::authority::NodeStateDump;
 use sui_json_rpc_api::QUERY_MAX_RESULT_LIMIT;
 use sui_json_rpc_types::{
@@ -29,6 +29,8 @@ use sui_types::{
     object::Object,
     transaction::{EndOfEpochTransactionKind, SenderSignedData, TransactionDataAPI, TransactionKind},
 };
+
+use crate::types::{ReplayEngineError, EPOCH_CHANGE_STRUCT_TAG};
 
 /// This trait defines the interfaces for fetching data from some local or remote store
 #[async_trait]
@@ -435,10 +437,10 @@ impl DataFetcher for RemoteFetcher {
         let checkpoint_id_end =
             checkpoint_id_end_inclusive.unwrap_or(self.get_latest_checkpoint_sequence_number().await?);
         let checkpoint_id_start = checkpoint_id_start_inclusive.unwrap_or(1);
-        let checkpoint_id = rand::thread_rng().gen_range(checkpoint_id_start..=checkpoint_id_end);
+        let checkpoint_id = rand::thread_rng().gen_range(checkpoint_id_start ..= checkpoint_id_end);
 
         let txs = self.get_checkpoint_txs(checkpoint_id).await?;
-        let tx_idx = rand::thread_rng().gen_range(0..txs.len());
+        let tx_idx = rand::thread_rng().gen_range(0 .. txs.len());
 
         Ok(txs[tx_idx])
     }
@@ -531,6 +533,7 @@ impl DataFetcher for RemoteFetcher {
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn convert_past_obj_response(resp: SuiPastObjectResponse) -> Result<Object, ReplayEngineError> {
     match resp {
         SuiPastObjectResponse::VersionFound(o) => obj_from_sui_obj_data(&o),
@@ -547,11 +550,13 @@ fn convert_past_obj_response(resp: SuiPastObjectResponse) -> Result<Object, Repl
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn obj_from_sui_obj_response(o: &SuiObjectResponse) -> Result<Object, ReplayEngineError> {
     let o = o.object().map_err(ReplayEngineError::from)?.clone();
     obj_from_sui_obj_data(&o)
 }
 
+#[allow(clippy::result_large_err)]
 fn obj_from_sui_obj_data(o: &SuiObjectData) -> Result<Object, ReplayEngineError> {
     match TryInto::<Object>::try_into(o.clone()) {
         Ok(obj) => Ok(obj),
@@ -559,6 +564,7 @@ fn obj_from_sui_obj_data(o: &SuiObjectData) -> Result<Object, ReplayEngineError>
     }
 }
 
+#[allow(clippy::result_large_err)]
 pub fn extract_epoch_and_version(ev: SuiEvent) -> Result<(u64, u64), ReplayEngineError> {
     if let serde_json::Value::Object(w) = ev.parsed_json {
         let epoch = u64::from_str(&w["epoch"].to_string().replace('\"', "")).unwrap();

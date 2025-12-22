@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use std::{collections::VecDeque, ops::Mul};
+
 use fastcrypto_zkp::bn254::poseidon::poseidon_bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{gas_algebra::InternalGas, vm_status::StatusCode};
@@ -12,7 +13,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::{collections::VecDeque, ops::Mul};
+
+use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 
 pub const NON_CANONICAL_INPUT: u64 = 0;
 pub const NOT_SUPPORTED_ERROR: u64 = 1;
@@ -76,7 +78,7 @@ pub fn poseidon_bn254_internal(
     );
 
     // Read the input vector
-    let field_elements = (0..length)
+    let field_elements = (0 .. length)
         .map(|i| {
             let reference = inputs.borrow_elem(i as usize, &Type::Vector(Box::new(Type::U8)))?;
             let value = reference.value_as::<VectorRef>()?.as_bytes_ref().clone();

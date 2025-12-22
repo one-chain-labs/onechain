@@ -2,6 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::inconsistent_digit_grouping)]
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
+
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::get,
+    Json,
+    Router,
+};
+use ethers::types::Address as EthAddress;
+use fastcrypto::{
+    ed25519::Ed25519PublicKey,
+    encoding::{Encoding, Hex},
+    traits::ToFromBytes,
+};
+use sui_types::{bridge::BridgeChainId, TypeTag};
+use tracing::{info, instrument};
+
 use crate::{
     crypto::BridgeAuthorityPublicKeyBytes,
     error::BridgeError,
@@ -22,22 +40,6 @@ use crate::{
     },
     with_metrics,
 };
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    routing::get,
-    Json,
-    Router,
-};
-use ethers::types::Address as EthAddress;
-use fastcrypto::{
-    ed25519::Ed25519PublicKey,
-    encoding::{Encoding, Hex},
-    traits::ToFromBytes,
-};
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use sui_types::{bridge::BridgeChainId, TypeTag};
-use tracing::{info, instrument};
 
 pub mod governance_verifier;
 pub mod handler;

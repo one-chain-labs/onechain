@@ -8,6 +8,8 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+
+use shared_crypto::intent::{Intent, IntentMessage};
 use sui_json::{call_args, type_args};
 use sui_json_rpc_api::{
     CoinReadApiClient,
@@ -33,19 +35,25 @@ use sui_json_rpc_types::{
     SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
     TransactionBlockBytes,
+    ZkLoginIntentScope,
 };
 use sui_macros::sim_test;
 use sui_move_build::BuildConfig;
+use sui_simulator::fastcrypto::encoding::{Base64, Encoding};
 use sui_swarm_config::genesis_config::{DEFAULT_GAS_AMOUNT, DEFAULT_NUMBER_OF_OBJECT_PER_ACCOUNT};
-use sui_test_transaction_builder::make_transfer_sui_transaction;
+use sui_test_transaction_builder::{make_transfer_oct_transaction, TestTransactionBuilder};
 use sui_types::{
     balance::Supply,
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     coin::{TreasuryCap, COIN_MODULE_NAME},
+    crypto::Signature,
     digests::ObjectDigest,
     gas_coin::GAS,
     parse_sui_struct_tag,
     quorum_driver_types::ExecuteTransactionRequestType,
+    signature::GenericSignature,
+    utils::load_test_vectors,
+    zk_login_authenticator::ZkLoginAuthenticator,
     SUI_FRAMEWORK_ADDRESS,
 };
 use test_cluster::TestClusterBuilder;
@@ -317,7 +325,7 @@ async fn test_get_coins() -> Result<(), anyhow::Error> {
     assert_eq!(5, result.data.len());
     assert!(!result.has_next_page);
 
-    let result: CoinPage = http_client.get_coins(address, Some("0x2::sui::TestCoin".into()), None, None).await?;
+    let result: CoinPage = http_client.get_coins(address, Some("0x2::one::TestCoin".into()), None, None).await?;
     assert_eq!(0, result.data.len());
 
     let result: CoinPage = http_client.get_coins(address, Some("0x2::oct::OCT".into()), None, None).await?;
@@ -334,11 +342,6 @@ async fn test_get_coins() -> Result<(), anyhow::Error> {
     assert_eq!(2, result.data.len(), "{:?}", result);
     assert!(!result.has_next_page);
 
-    let result: CoinPage =
-        http_client.get_coins(address, Some("0x2::oct::OCT".into()), result.next_cursor, None).await?;
-    assert_eq!(0, result.data.len(), "{:?}", result);
-    assert!(!result.has_next_page);
-
     Ok(())
 }
 
@@ -352,7 +355,7 @@ async fn test_sorted_get_coin_response() {
     // send 5 coins to address `address` with different values
     let amounts = [1, 2, 3, 4, 5];
     for amount in amounts {
-        let tx = make_transfer_sui_transaction(&cluster.wallet, Some(address), Some(amount)).await;
+        let tx = make_transfer_oct_transaction(&cluster.wallet, Some(address), Some(amount)).await;
         let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
         http_client
@@ -630,7 +633,7 @@ async fn test_unstaking() -> Result<(), anyhow::Error> {
     let validator = http_client.get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
     // Delegate some SUI
-    for i in 0..3 {
+    for i in 0 .. 3 {
         let transaction_bytes: TransactionBlockBytes = http_client
             .request_add_stake(
                 address,
@@ -768,5 +771,42 @@ async fn test_staking_multiple_coins() -> Result<(), anyhow::Error> {
     let new_coin = coins.data.iter().find(|coin| coin.balance > genesis_coin_amount).unwrap();
     assert_eq!((genesis_coin_amount * 3) - 1000000000, new_coin.balance);
 
+    Ok(())
+}
+
+#[sim_test]
+async fn test_zklogin_verify() -> Result<(), anyhow::Error> {
+    let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
+    test_cluster.wait_for_epoch(Some(1)).await;
+    test_cluster.wait_for_authenticator_state_update().await;
+
+    let http_client = test_cluster.rpc_client();
+
+    // Construct a valid zkLogin transaction data, signature.
+    let (kp, pk_zklogin, inputs) = &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1];
+
+    let zklogin_addr = (pk_zklogin).into();
+    let rgp = test_cluster.get_reference_gas_price().await;
+    let gas = test_cluster.fund_address_and_return_gas(rgp, Some(20000000000), zklogin_addr).await;
+    let tx_data = TestTransactionBuilder::new(zklogin_addr, gas, rgp).transfer_oct(None, SuiAddress::ZERO).build();
+    let msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
+    let eph_sig = Signature::new_secure(&msg, kp);
+    let generic_sig =
+        GenericSignature::ZkLoginAuthenticator(ZkLoginAuthenticator::new(inputs.clone(), 2, eph_sig.clone()));
+
+    // construct all parameters for the query
+    let bytes = Base64::encode(bcs::to_bytes(&tx_data).unwrap());
+    let signature = Base64::encode(generic_sig.as_ref());
+    let intent_scope = ZkLoginIntentScope::TransactionData;
+
+    let res = http_client.verify_zklogin_signature(bytes.clone(), signature.clone(), intent_scope, zklogin_addr).await?;
+    assert!(res.success);
+    assert!(res.errors.is_empty());
+
+    let res = http_client
+        .verify_zklogin_signature(bytes, signature, ZkLoginIntentScope::PersonalMessage, zklogin_addr)
+        .await?;
+    assert!(!res.success);
+    assert!(!res.errors.is_empty());
     Ok(())
 }

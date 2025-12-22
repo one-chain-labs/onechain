@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{env, str::FromStr};
+
 use sui_config::NodeConfig;
 use tap::TapFallible;
 use tokio::runtime::Runtime;

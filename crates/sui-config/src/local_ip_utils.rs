@@ -4,6 +4,7 @@
 use std::net::SocketAddr;
 #[cfg(msim)]
 use std::sync::{atomic::AtomicI16, Arc};
+
 use sui_types::multiaddr::Multiaddr;
 
 /// A singleton struct to manage IP addresses and ports for simtest.
@@ -72,7 +73,7 @@ pub fn get_available_port(_host: &str) -> u16 {
 pub fn get_available_port(host: &str) -> u16 {
     const MAX_PORT_RETRIES: u32 = 1000;
 
-    for _ in 0..MAX_PORT_RETRIES {
+    for _ in 0 .. MAX_PORT_RETRIES {
         if let Ok(port) = get_ephemeral_port(host) {
             return port;
         }

@@ -30,7 +30,7 @@ use super::{
     move_package::{self, MovePackage, MovePackageCheckpointFilter, MovePackageVersionFilter},
     move_registry::{named_move_package::NamedMovePackage, named_type::NamedType},
     move_type::MoveType,
-    object::{self, Object, ObjectFilter},
+    object::{self, Object, ObjectFilter, ObjectKey},
     owner::Owner,
     protocol_config::ProtocolConfigs,
     sui_address::SuiAddress,
@@ -270,6 +270,22 @@ impl Query {
         let Watermark { hi_cp, .. } = *ctx.data()?;
         let lookup = TransactionBlock::by_digest(digest, hi_cp);
         TransactionBlock::query(ctx, lookup).await.extend()
+    }
+
+    /// Fetch a list of objects by their IDs and versions.
+    async fn multi_get_objects(&self, ctx: &Context<'_>, keys: Vec<ObjectKey>) -> Result<Vec<Option<Object>>> {
+        let cfg: &ServiceConfig = ctx.data_unchecked();
+        if keys.len() > cfg.limits.max_multi_get_objects_keys as usize {
+            return Err(Error::Client(format!(
+                "Number of keys exceeds max limit of '{}'",
+                cfg.limits.max_multi_get_objects_keys
+            ))
+            .into());
+        }
+
+        let Watermark { hi_cp, .. } = *ctx.data()?;
+
+        Object::query_many(ctx, keys, hi_cp).await.extend()
     }
 
     /// The coin objects that exist in the network.

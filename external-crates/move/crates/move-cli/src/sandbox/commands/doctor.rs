@@ -26,18 +26,28 @@ pub fn doctor(state: &OnDiskStateView) -> Result<()> {
 
         let imm_deps = code_cache.get_immediate_dependencies(&module.self_id())?;
         if move_bytecode_verifier::dependencies::verify_module(module, imm_deps).is_err() {
-            bail!("Failed to link module {:?} against its dependencies", module.self_id())
+            bail!(
+                "Failed to link module {:?} against its dependencies",
+                module.self_id()
+            )
         }
 
-        let cyclic_check_result = move_bytecode_verifier::cyclic_dependencies::verify_module(module, |module_id| {
-            code_cache
-                .get_module(module_id)
-                .map_err(|_| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
-                .map(|m| m.immediate_dependencies())
-        });
+        let cyclic_check_result =
+            move_bytecode_verifier::cyclic_dependencies::verify_module(module, |module_id| {
+                code_cache
+                    .get_module(module_id)
+                    .map_err(|_| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
+                    .map(|m| m.immediate_dependencies())
+            });
         if let Err(cyclic_check_error) = cyclic_check_result {
-            assert_eq!(cyclic_check_error.major_status(), StatusCode::CYCLIC_MODULE_DEPENDENCY);
-            bail!("Cyclic module dependencies are detected with module {} in the loop", module.self_id())
+            assert_eq!(
+                cyclic_check_error.major_status(),
+                StatusCode::CYCLIC_MODULE_DEPENDENCY
+            );
+            bail!(
+                "Cyclic module dependencies are detected with module {} in the loop",
+                module.self_id()
+            )
         }
     }
 

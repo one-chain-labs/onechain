@@ -126,9 +126,8 @@ mod tests {
 
     use async_graphql::{registry::Registry, OutputType};
 
-    use crate::types::query::Query;
-
     use super::*;
+    use crate::types::query::Query;
 
     #[test]
     /// Makes sure all the functional groups correspond to real elements of the schema unless they

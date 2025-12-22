@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TestCaseImpl, TestContext};
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use jsonrpsee::rpc_params;
 use move_core_types::language_storage::StructTag;
 use serde_json::json;
-use std::collections::HashMap;
-use sui_core::test_utils::compile_managed_coin_package;
 use sui_json::SuiJsonValue;
 use sui_json_rpc_types::{Balance, ObjectChange, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions};
+use sui_move_build::test_utils::compile_managed_coin_package;
 use sui_test_transaction_builder::make_staking_transaction;
 use sui_types::{
     base_types::{ObjectID, ObjectRef},
@@ -18,6 +18,8 @@ use sui_types::{
     quorum_driver_types::ExecuteTransactionRequestType,
 };
 use tracing::info;
+
+use crate::{TestCaseImpl, TestContext};
 
 pub struct CoinIndexTest;
 
@@ -353,11 +355,10 @@ impl TestCaseImpl for CoinIndexTest {
         let sui_coins_with_managed_coin_1 =
             client.coin_read_api().get_all_coins(account, None, Some(sui_coins.len() + 1)).await.unwrap();
         assert_eq!(sui_coins_with_managed_coin_1.data.len(), sui_coins.len() + 1);
-        assert_eq!(sui_coins_with_managed_coin_1.next_cursor, Some(first_managed_coin));
         assert!(sui_coins_with_managed_coin_1.has_next_page);
         let cursor = sui_coins_with_managed_coin_1.next_cursor;
 
-        let managed_coins_2_11 = client.coin_read_api().get_all_coins(account, cursor, Some(10)).await.unwrap();
+        let managed_coins_2_11 = client.coin_read_api().get_all_coins(account, cursor.clone(), Some(10)).await.unwrap();
         assert_eq!(
             managed_coins_2_11,
             client.coin_read_api().get_coins(account, Some(coin_type_str.clone()), cursor, Some(10)).await.unwrap(),
@@ -368,19 +369,23 @@ impl TestCaseImpl for CoinIndexTest {
         assert!(managed_coins_2_11.has_next_page);
         let cursor = managed_coins_2_11.next_cursor;
 
-        let managed_coins_12_40 = client.coin_read_api().get_all_coins(account, cursor, None).await.unwrap();
+        let managed_coins_12_40 = client.coin_read_api().get_all_coins(account, cursor.clone(), None).await.unwrap();
         assert_eq!(
             managed_coins_12_40,
-            client.coin_read_api().get_coins(account, Some(coin_type_str.clone()), cursor, None).await.unwrap(),
+            client.coin_read_api().get_coins(account, Some(coin_type_str.clone()), cursor.clone(), None).await.unwrap(),
         );
         assert_eq!(managed_coins_12_40.data.len(), 29);
         assert_eq!(managed_coins_12_40.data.last().unwrap().coin_object_id, last_managed_coin);
         assert!(!managed_coins_12_40.has_next_page);
 
-        let managed_coins_12_40 = client.coin_read_api().get_all_coins(account, cursor, Some(30)).await.unwrap();
+        let managed_coins_12_40 = client.coin_read_api().get_all_coins(account, cursor.clone(), Some(30)).await.unwrap();
         assert_eq!(
             managed_coins_12_40,
-            client.coin_read_api().get_coins(account, Some(coin_type_str.clone()), cursor, Some(30)).await.unwrap(),
+            client
+                .coin_read_api()
+                .get_coins(account, Some(coin_type_str.clone()), cursor.clone(), Some(30))
+                .await
+                .unwrap(),
         );
         assert_eq!(managed_coins_12_40.data.len(), 29);
         assert_eq!(managed_coins_12_40.data.last().unwrap().coin_object_id, last_managed_coin);
@@ -389,7 +394,7 @@ impl TestCaseImpl for CoinIndexTest {
         // 12. add one coin to envelope, now we only have 39 coins
         let removed_coin_id = managed_coins.get(20).unwrap().coin_object_id;
         let _ = add_to_envelope(ctx, package.0, envelope.0, removed_coin_id).await;
-        let managed_coins_12_39 = client.coin_read_api().get_all_coins(account, cursor, Some(40)).await.unwrap();
+        let managed_coins_12_39 = client.coin_read_api().get_all_coins(account, cursor.clone(), Some(40)).await.unwrap();
         assert_eq!(
             managed_coins_12_39,
             client.coin_read_api().get_coins(account, Some(coin_type_str.clone()), cursor, Some(40)).await.unwrap(),

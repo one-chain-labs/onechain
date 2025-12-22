@@ -16,7 +16,7 @@ module tto::M2 {
     }
 
     public struct C has key {
-        id: UID,
+        id: UID, 
         wrapped: B,
     }
 

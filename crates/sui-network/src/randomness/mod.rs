@@ -1,7 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use self::{auth::AllowedPeersUpdatable, metrics::Metrics};
+use std::{
+    collections::{btree_map::BTreeMap, HashMap, HashSet},
+    ops::Bound,
+    sync::Arc,
+    time::{self, Duration},
+};
+
 use anemo::PeerId;
 use anyhow::Result;
 use fastcrypto::groups::bls12381;
@@ -14,12 +20,6 @@ use fastcrypto_tbls::{
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::anemo_ext::NetworkExt;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{btree_map::BTreeMap, HashMap, HashSet},
-    ops::Bound,
-    sync::Arc,
-    time::{self, Duration},
-};
 use sui_config::p2p::RandomnessConfig;
 use sui_macros::fail_point_if;
 use sui_types::{
@@ -29,6 +29,8 @@ use sui_types::{
 };
 use tokio::sync::{mpsc, oneshot, OnceCell};
 use tracing::{debug, error, info, instrument, warn};
+
+use self::{auth::AllowedPeersUpdatable, metrics::Metrics};
 
 mod auth;
 mod builder;
@@ -714,7 +716,7 @@ impl RandomnessEventLoop {
         );
 
         let mut rounds_to_aggregate = Vec::new();
-        for round in start_round.0..=highest_requested_round.0 {
+        for round in start_round.0 ..= highest_requested_round.0 {
             let round = RandomnessRound(round);
 
             if self.send_tasks.len() >= self.config.max_partial_sigs_concurrent_sends() {

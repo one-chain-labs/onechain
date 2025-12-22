@@ -7,13 +7,8 @@ use async_graphql::{
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Loc;
-use sui_types::move_package;
-
-use crate::{
-    consistency::{ConsistentIndexCursor, ConsistentNamedCursor},
-    error::Error,
-};
 use sui_package_resolver::Module as ParsedMoveModule;
+use sui_types::move_package;
 
 use super::{
     base64::Base64,
@@ -24,6 +19,10 @@ use super::{
     move_package::MovePackage,
     move_struct::MoveStruct,
     sui_address::SuiAddress,
+};
+use crate::{
+    consistency::{ConsistentIndexCursor, ConsistentNamedCursor},
+    error::Error,
 };
 
 #[derive(Clone)]

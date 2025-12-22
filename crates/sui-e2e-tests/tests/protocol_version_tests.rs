@@ -49,11 +49,11 @@ fn test_protocol_overrides_2() {
 #[cfg(msim)]
 mod sim_only_tests {
 
-    use super::*;
+    use std::{path::PathBuf, sync::Arc};
+
     use fastcrypto::encoding::Base64;
     use move_binary_format::{file_format_common::VERSION_MAX, CompiledModule};
     use move_core_types::ident_str;
-    use std::{path::PathBuf, sync::Arc};
     use sui_core::authority::framework_injection;
     use sui_framework::BuiltInFramework;
     use sui_json_rpc_api::WriteApiClient;
@@ -99,6 +99,8 @@ mod sim_only_tests {
     use test_cluster::TestCluster;
     use tokio::time::{sleep, Duration};
     use tracing::info;
+
+    use super::*;
 
     const START: u64 = ProtocolVersion::MAX.as_u64();
     const FINISH: u64 = ProtocolVersion::MAX_ALLOWED.as_u64();

@@ -1,14 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use criterion::*;
-
-use criterion::Criterion;
+use criterion::{Criterion, *};
 use sui_core::signature_verifier::SignatureVerifierMetrics;
 use sui_types::{digests::CertificateDigest, signature_verification::VerifiedDigestCache};
 
 fn verified_cert_cache_bench(c: &mut Criterion) {
-    let mut digests: Vec<_> = (0..(1 << 18)).map(|_| CertificateDigest::random()).collect();
+    let mut digests: Vec<_> = (0 .. (1 << 18)).map(|_| CertificateDigest::random()).collect();
     digests.extend_from_slice(&digests.clone());
     rand::seq::SliceRandom::shuffle(digests.as_mut_slice(), &mut rand::rngs::OsRng);
 

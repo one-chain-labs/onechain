@@ -35,7 +35,7 @@ async fn try_direct_commit() {
 
     // Leader rounds are the first rounds of each wave. In this case rounds 3 & 6.
     let mut leader_rounds: Vec<u32> =
-        (1..num_rounds_in_dag).map(|r| committer.leader_round(r)).collect::<HashSet<_>>().into_iter().collect();
+        (1 .. num_rounds_in_dag).map(|r| committer.leader_round(r)).collect::<HashSet<_>>().into_iter().collect();
 
     // Iterate from highest leader round first
     leader_rounds.sort_by(|a, b| b.cmp(a));
@@ -113,7 +113,7 @@ async fn multiple_direct_commit() {
     let committer = BaseCommitterBuilder::new(context.clone(), dag_state.clone()).build();
 
     let mut ancestors = None;
-    for n in 1..=10 {
+    for n in 1 ..= 10 {
         // note: rounds are zero indexed.
         let decision_round = committer.decision_round(n);
         ancestors = Some(build_dag(context.clone(), dag_state.clone(), ancestors, decision_round));

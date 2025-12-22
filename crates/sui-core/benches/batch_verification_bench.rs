@@ -1,28 +1,28 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use criterion::*;
-
-use itertools::Itertools as _;
-use rand::{prelude::*, seq::SliceRandom};
-
-use futures::future::join_all;
-use prometheus::Registry;
 use std::sync::Arc;
-use sui_core::test_utils::{make_cert_with_large_committee, make_dummy_tx};
+
+use criterion::*;
+use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
+use futures::future::join_all;
+use itertools::Itertools as _;
+use prometheus::Registry;
+use rand::{prelude::*, seq::SliceRandom};
+use sui_core::{
+    signature_verifier::*,
+    test_utils::{make_cert_with_large_committee, make_dummy_tx},
+};
 use sui_types::{
     committee::Committee,
     crypto::{get_key_pair, AccountKeyPair, AuthorityKeyPair},
+    signature_verification::VerifiedDigestCache,
     transaction::CertifiedTransaction,
 };
-
-use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
-use sui_core::signature_verifier::*;
-use sui_types::signature_verification::VerifiedDigestCache;
 fn gen_certs(committee: &Committee, key_pairs: &[AuthorityKeyPair], count: u64) -> Vec<CertifiedTransaction> {
     let (receiver, _): (_, AccountKeyPair) = get_key_pair();
 
-    let senders: Vec<_> = (0..count).map(|_| get_key_pair::<AccountKeyPair>()).collect();
+    let senders: Vec<_> = (0 .. count).map(|_| get_key_pair::<AccountKeyPair>()).collect();
 
     let txns: Vec<_> = senders.iter().map(|(sender, sender_sec)| make_dummy_tx(receiver, *sender, sender_sec)).collect();
 
@@ -68,11 +68,12 @@ fn async_verifier_bench(c: &mut Criterion) {
                         ZkLoginEnv::Test,
                         true,
                         true,
+                        true,
                         Some(30),
                     ));
 
                     b.iter(|| {
-                        let handles: Vec<_> = (0..(num_threads * over_subscription))
+                        let handles: Vec<_> = (0 .. (num_threads * over_subscription))
                             .map(|_| {
                                 let batch_verifier = batch_verifier.clone();
                                 let certs = certs.clone();

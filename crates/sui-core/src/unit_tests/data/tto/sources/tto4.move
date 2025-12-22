@@ -42,12 +42,12 @@ module tto::M4 {
 
     public entry fun aborter(_parent: &mut A, _x: Receiving<B>) { abort 0 }
 
-    public entry fun receive_abort(parent: &mut A, x: Receiving<B>) {
+    public entry fun receive_abort(parent: &mut A, x: Receiving<B>) { 
         let _b = transfer::receive(&mut parent.id, x);
         abort 0
     }
 
-    public entry fun receive_type_mismatch(parent: &mut A, x: Receiving<A>) {
+    public entry fun receive_type_mismatch(parent: &mut A, x: Receiving<A>) { 
         let _b: A = transfer::receive(&mut parent.id, x);
         abort 0
     }

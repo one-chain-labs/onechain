@@ -124,8 +124,8 @@ impl EpochState {
         )?;
 
         let transaction_data = transaction.data().transaction_data();
-        let (kind, signer, gas) = transaction_data.execution_parts();
-        Ok(self.executor.execute_transaction_to_effects(
+        let (kind, signer, gas_data) = transaction_data.execution_parts();
+        let (inner_temp_store, gas_status, effects, _timings, result) = self.executor.execute_transaction_to_effects(
             store.backing_store(),
             &self.protocol_config,
             self.limits_metrics.clone(),
@@ -134,11 +134,13 @@ impl EpochState {
             &self.epoch_start_state.epoch(),
             self.epoch_start_state.epoch_start_timestamp_ms(),
             checked_input_objects,
-            gas,
+            gas_data,
             gas_status,
             kind,
             signer,
             tx_digest,
-        ))
+            &mut None,
+        );
+        Ok((inner_temp_store, gas_status, effects, result))
     }
 }

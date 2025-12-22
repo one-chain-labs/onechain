@@ -1,11 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use axum::{extract::Extension, http::StatusCode, routing::get, Router};
-use dashmap::DashMap;
-use parking_lot::Mutex;
-use prometheus::core::{AtomicI64, GenericGauge};
-use simple_server_timing_header::Timer;
 use std::{
     future::Future,
     net::SocketAddr,
@@ -15,8 +10,12 @@ use std::{
     time::Instant,
 };
 
+use axum::{extract::Extension, http::StatusCode, routing::get, Router};
+use dashmap::DashMap;
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use prometheus::{
+    core::{AtomicI64, GenericGauge},
     register_histogram_with_registry,
     register_int_counter_vec_with_registry,
     register_int_gauge_vec_with_registry,
@@ -26,10 +25,10 @@ use prometheus::{
     Registry,
     TextEncoder,
 };
+pub use scopeguard;
+use simple_server_timing_header::Timer;
 use tap::TapFallible;
 use tracing::{warn, Span};
-
-pub use scopeguard;
 use uuid::Uuid;
 
 mod guards;
@@ -579,8 +578,9 @@ pub async fn metrics(Extension(registry_service): Extension<RegistryService>) ->
 
 #[cfg(test)]
 mod tests {
-    use crate::RegistryService;
     use prometheus::{IntCounter, Registry};
+
+    use crate::RegistryService;
 
     #[test]
     fn registry_service() {

@@ -6,8 +6,9 @@ mod rosetta_client;
 #[path = "custom_coins/test_coin_utils.rs"]
 mod test_coin_utils;
 
-use serde_json::json;
 use std::{num::NonZeroUsize, path::Path};
+
+use serde_json::json;
 use sui_json_rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions};
 use sui_rosetta::{
     operations::Operations,

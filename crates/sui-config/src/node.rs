@@ -1,5 +1,41 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    num::NonZeroUsize,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
+
+use anyhow::Result;
+use consensus_config::Parameters as ConsensusParameters;
+use mysten_common::fatal;
+use once_cell::sync::OnceCell;
+use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use sui_keys::keypair_file::{read_authority_keypair_from_file, read_keypair_from_file};
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    committee::EpochId,
+    crypto::{
+        get_key_pair_from_rng,
+        AccountKeyPair,
+        AuthorityKeyPair,
+        AuthorityPublicKeyBytes,
+        KeypairTraits,
+        NetworkKeyPair,
+        SuiKeyPair,
+    },
+    messages_checkpoint::CheckpointSequenceNumber,
+    multiaddr::Multiaddr,
+    supported_protocol_versions::{Chain, SupportedProtocolVersions},
+    traffic_control::{PolicyConfig, RemoteFirewallConfig},
+};
+use tracing::{error, info};
+
 use crate::{
     certificate_deny_config::CertificateDenyConfig,
     genesis,
@@ -9,37 +45,6 @@ use crate::{
     verifier_signing_config::VerifierSigningConfig,
     Config,
 };
-use anyhow::Result;
-use consensus_config::Parameters as ConsensusParameters;
-use mysten_common::fatal;
-use narwhal_config::Parameters as NarwhalParameters;
-use once_cell::sync::OnceCell;
-use rand::rngs::OsRng;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-    num::NonZeroUsize,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
-use sui_keys::keypair_file::{read_authority_keypair_from_file, read_keypair_from_file};
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    committee::EpochId,
-    crypto::{AuthorityPublicKeyBytes, KeypairTraits, NetworkKeyPair, SuiKeyPair},
-    messages_checkpoint::CheckpointSequenceNumber,
-    supported_protocol_versions::{Chain, SupportedProtocolVersions},
-    traffic_control::{PolicyConfig, RemoteFirewallConfig},
-};
-
-use sui_types::{
-    crypto::{get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair},
-    multiaddr::Multiaddr,
-};
-use tracing::info;
 
 // Default max number of concurrent requests served
 pub const DEFAULT_GRPC_CONCURRENCY_LIMIT: usize = 20000000000;
@@ -69,8 +74,6 @@ pub struct NodeConfig {
     #[serde(default = "default_json_rpc_address")]
     pub json_rpc_address: SocketAddr,
 
-    #[serde(default)]
-    pub enable_experimental_rest_api: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rpc: Option<sui_rpc_api::Config>,
 
@@ -121,7 +124,7 @@ pub struct NodeConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics: Option<MetricsConfig>,
 
-    /// In a `one-node` binary, this is set to SupportedProtocolVersions::SYSTEM_DEFAULT
+    /// In a `sui-node` binary, this is set to SupportedProtocolVersions::SYSTEM_DEFAULT
     /// in sui-node/src/main.rs. It is present in the config so that it can be changed by tests in
     /// order to test protocol upgrades.
     #[serde(skip)]
@@ -212,6 +215,18 @@ pub struct NodeConfig {
     /// By default, write stall is enabled on validators but not on fullnodes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_db_write_stall: Option<bool>,
+
+    /// Size of the channel used for buffering local execution time observations.
+    ///
+    /// If unspecified, this will default to `128`.
+    #[serde(default = "default_local_execution_time_channel_capacity")]
+    pub local_execution_time_channel_capacity: usize,
+
+    /// Size of the LRU cache used for storing local execution time observations.
+    ///
+    /// If unspecified, this will default to `10000`.
+    #[serde(default = "default_local_execution_time_cache_size")]
+    pub local_execution_time_cache_size: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -236,6 +251,13 @@ pub enum ExecutionCacheConfig {
         events_cache_size: Option<u64>, // defaults to transaction_cache_size
 
         transaction_objects_cache_size: Option<u64>, // defaults to 1000
+
+        /// Number of uncommitted transactions at which to pause consensus handler.
+        backpressure_threshold: Option<u64>,
+
+        /// Number of uncommitted transactions at which to refuse new transaction
+        /// submissions. Defaults to backpressure_threshold if unset.
+        backpressure_threshold_for_rpc: Option<u64>,
     },
 }
 
@@ -243,6 +265,8 @@ impl Default for ExecutionCacheConfig {
     fn default() -> Self {
         ExecutionCacheConfig::WritebackCache {
             max_cache_size: None,
+            backpressure_threshold: None,
+            backpressure_threshold_for_rpc: None,
             package_cache_size: None,
             object_cache_size: None,
             marker_cache_size: None,
@@ -344,6 +368,26 @@ impl ExecutionCacheConfig {
             }
         })
     }
+
+    pub fn backpressure_threshold(&self) -> u64 {
+        std::env::var("SUI_BACKPRESSURE_THRESHOLD").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
+            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+            ExecutionCacheConfig::WritebackCache { backpressure_threshold, .. } => {
+                backpressure_threshold.unwrap_or(100_000)
+            }
+        })
+    }
+
+    pub fn backpressure_threshold_for_rpc(&self) -> u64 {
+        std::env::var("SUI_BACKPRESSURE_THRESHOLD_FOR_RPC").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| {
+            match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache { backpressure_threshold_for_rpc, .. } => {
+                    backpressure_threshold_for_rpc.unwrap_or(self.backpressure_threshold())
+                }
+            }
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -426,6 +470,7 @@ pub fn default_zklogin_oauth_providers() -> BTreeMap<Chain, BTreeSet<String>> {
         "Arden".to_string(),
         "Huionepay".to_string(),
         "TestHuionepay".to_string(),
+        "FanTV".to_string(),
         "Telegram".to_string(),
     ]);
     map.insert(Chain::Mainnet, providers.clone());
@@ -477,6 +522,14 @@ pub fn default_concurrency_limit() -> Option<usize> {
 
 pub fn default_end_of_epoch_broadcast_channel_capacity() -> usize {
     128
+}
+
+pub fn default_local_execution_time_channel_capacity() -> usize {
+    128
+}
+
+pub fn default_local_execution_time_cache_size() -> usize {
+    10000
 }
 
 pub fn bool_true() -> bool {
@@ -560,6 +613,17 @@ impl NodeConfig {
     pub fn jsonrpc_server_type(&self) -> ServerType {
         self.jsonrpc_server_type.unwrap_or(ServerType::Http)
     }
+
+    pub fn rpc(&self) -> Option<&sui_rpc_api::Config> {
+        self.rpc.as_ref()
+    }
+
+    pub fn local_execution_time_cache_size(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.local_execution_time_cache_size).unwrap_or_else(|| {
+            error!("local_execution_time_cache_size must be non-zero - defaulting to 10000");
+            NonZeroUsize::new(10000).unwrap()
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -598,18 +662,10 @@ pub struct ConsensusConfig {
     /// on consensus latency estimates.
     pub submit_delay_step_override_millis: Option<u64>,
 
-    // Deprecated: Narwhal specific configs.
-    pub address: Multiaddr,
-    pub narwhal_config: NarwhalParameters,
-
     pub parameters: Option<ConsensusParameters>,
 }
 
 impl ConsensusConfig {
-    pub fn address(&self) -> &Multiaddr {
-        &self.address
-    }
-
     pub fn db_path(&self) -> &Path {
         &self.db_path
     }
@@ -620,10 +676,6 @@ impl ConsensusConfig {
 
     pub fn submit_delay_step_override(&self) -> Option<Duration> {
         self.submit_delay_step_override_millis.map(Duration::from_millis)
-    }
-
-    pub fn narwhal_config(&self) -> &NarwhalParameters {
-        &self.narwhal_config
     }
 
     pub fn db_retention_epochs(&self) -> u64 {
@@ -664,18 +716,18 @@ pub struct CheckpointExecutorConfig {
 pub struct ExpensiveSafetyCheckConfig {
     /// If enabled, at epoch boundary, we will check that the storage
     /// fund balance is always identical to the sum of the storage
-    /// rebate of all live objects, and that the total OCT in the network remains
+    /// rebate of all live objects, and that the total SUI in the network remains
     /// the same.
     #[serde(default)]
     enable_epoch_sui_conservation_check: bool,
 
-    /// If enabled, we will check that the total OCT in all input objects of a tx
-    /// (both the Move part and the storage rebate) matches the total OCT in all
+    /// If enabled, we will check that the total SUI in all input objects of a tx
+    /// (both the Move part and the storage rebate) matches the total SUI in all
     /// output objects of the tx + gas fees
     #[serde(default)]
     enable_deep_per_tx_sui_conservation_check: bool,
 
-    /// Disable epoch OCT conservation check even when we are running in debug mode.
+    /// Disable epoch SUI conservation check even when we are running in debug mode.
     #[serde(default)]
     force_disable_epoch_sui_conservation_check: bool,
 
@@ -797,6 +849,13 @@ pub struct AuthorityStorePruningConfig {
     pub killswitch_tombstone_pruning: bool,
     #[serde(default = "default_smoothing", skip_serializing_if = "is_true")]
     pub smooth: bool,
+    /// Enables the compaction filter for pruning the objects table.
+    /// If disabled, a range deletion approach is used instead.
+    /// While it is generally safe to switch between the two modes,
+    /// switching from the compaction filter approach back to range deletion
+    /// may result in some old versions that will never be pruned.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub enable_compaction_filter: bool,
 }
 
 fn default_num_latest_epoch_dbs_to_retain() -> usize {
@@ -836,6 +895,7 @@ impl Default for AuthorityStorePruningConfig {
             num_epochs_to_retain_for_checkpoints: if cfg!(msim) { Some(2) } else { None },
             killswitch_tombstone_pruning: false,
             smooth: true,
+            enable_compaction_filter: cfg!(test) || cfg!(msim),
         }
     }
 }
@@ -1236,6 +1296,14 @@ mod tests {
         let _template: NodeConfig = serde_yaml::from_str(TEMPLATE).unwrap();
     }
 
+    /// Tests that a legacy validator config (captured on 12/06/2024) can be parsed.
+    #[test]
+    fn legacy_validator_config() {
+        const FILE: &str = include_str!("../data/sui-node-legacy.yaml");
+
+        let _template: NodeConfig = serde_yaml::from_str(FILE).unwrap();
+    }
+
     #[test]
     fn load_key_pairs_to_node_config() {
         let protocol_key_pair: AuthorityKeyPair = get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
@@ -1270,5 +1338,12 @@ impl RunWithRange {
 
     pub fn matches_checkpoint(&self, seq_num: CheckpointSequenceNumber) -> bool {
         matches!(self, RunWithRange::Checkpoint(seq) if *seq == seq_num)
+    }
+
+    pub fn into_checkpoint_bound(self) -> Option<CheckpointSequenceNumber> {
+        match self {
+            RunWithRange::Epoch(_) => None,
+            RunWithRange::Checkpoint(seq) => Some(seq),
+        }
     }
 }

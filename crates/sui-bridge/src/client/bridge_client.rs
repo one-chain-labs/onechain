@@ -3,18 +3,20 @@
 
 //! `BridgeClient` talks to BridgeNode.
 
+use std::{str::FromStr, sync::Arc};
+
+use fastcrypto::{
+    encoding::{Encoding, Hex},
+    traits::ToFromBytes,
+};
+use url::Url;
+
 use crate::{
     crypto::{verify_signed_bridge_action, BridgeAuthorityPublicKeyBytes},
     error::{BridgeError, BridgeResult},
     server::APPLICATION_JSON,
     types::{BridgeAction, BridgeCommittee, VerifiedSignedBridgeAction},
 };
-use fastcrypto::{
-    encoding::{Encoding, Hex},
-    traits::ToFromBytes,
-};
-use std::{str::FromStr, sync::Arc};
-use url::Url;
 
 // Note: `base_url` is `Option<Url>` because `quorum_map_then_reduce_with_timeout_and_prefs`
 // uses `[]` to get Client based on key. Therefore even when the URL is invalid we need to
@@ -169,15 +171,6 @@ impl BridgeClient {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        abi::EthToSuiTokenBridgeV1,
-        crypto::BridgeAuthoritySignInfo,
-        events::EmittedSuiToEthTokenBridgeV1,
-        server::mock_handler::BridgeRequestMockHandler,
-        test_utils::{get_test_authority_and_key, get_test_sui_to_eth_bridge_action, run_mock_bridge_server},
-        types::SignedBridgeAction,
-    };
     use ethers::types::{Address as EthAddress, TxHash};
     use fastcrypto::{
         hash::{HashFunction, Keccak256},
@@ -190,6 +183,16 @@ mod tests {
         crypto::get_key_pair,
         digests::TransactionDigest,
         TypeTag,
+    };
+
+    use super::*;
+    use crate::{
+        abi::EthToSuiTokenBridgeV1,
+        crypto::BridgeAuthoritySignInfo,
+        events::EmittedSuiToEthTokenBridgeV1,
+        server::mock_handler::BridgeRequestMockHandler,
+        test_utils::{get_test_authority_and_key, get_test_sui_to_eth_bridge_action, run_mock_bridge_server},
+        types::SignedBridgeAction,
     };
 
     #[tokio::test]
@@ -427,7 +430,7 @@ mod tests {
         );
 
         let function_signature = "initializeV2()";
-        let selector = &Keccak256::digest(function_signature).digest[0..4];
+        let selector = &Keccak256::digest(function_signature).digest[0 .. 4];
         let mut call_data = selector.to_vec();
         let action = BridgeAction::EvmContractUpgradeAction(crate::types::EvmContractUpgradeAction {
             nonce: 123,

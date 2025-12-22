@@ -4,14 +4,15 @@
 use std::{fs, str::FromStr};
 
 use fastcrypto::{hash::HashFunction, traits::EncodeDecodeBase64};
-use sui_keys::key_derive::generate_new_key;
-use tempfile::TempDir;
-
-use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, InMemKeystore, Keystore};
+use sui_keys::{
+    key_derive::generate_new_key,
+    keystore::{AccountKeystore, FileBasedKeystore, InMemKeystore, Keystore},
+};
 use sui_types::{
     base_types::{SuiAddress, SUI_ADDRESS_LENGTH},
     crypto::{DefaultHash, Ed25519SuiSignature, SignatureScheme, SuiSignatureInner},
 };
+use tempfile::TempDir;
 
 #[test]
 fn alias_exists_test() {
@@ -138,6 +139,10 @@ fn update_alias_test() {
     let update = keystore.update_alias("o", None).unwrap();
     let aliases = keystore.alias_names();
     assert_eq!(vec![&update], aliases);
+
+    // check that updating alias does not allow duplicates
+    keystore.generate_and_add_new_key(SignatureScheme::ED25519, Some("my_alias_test".to_string()), None, None).unwrap();
+    assert!(keystore.update_alias("my_alias_test", Some(&update)).is_err());
 }
 
 #[test]
@@ -196,7 +201,7 @@ fn sui_wallet_address_mnemonic_test() -> Result<(), anyhow::Error> {
     hasher.update(pubkey);
     let g_arr = hasher.finalize();
     let mut res = [0u8; SUI_ADDRESS_LENGTH];
-    res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[..SUI_ADDRESS_LENGTH]);
+    res.copy_from_slice(&AsRef::<[u8]>::as_ref(&g_arr)[.. SUI_ADDRESS_LENGTH]);
     let address = SuiAddress::try_from(res.as_slice())?;
 
     assert_eq!(expected_address, address);

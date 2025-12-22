@@ -1,19 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
 use std::{collections::BTreeMap, path::Path};
+
+use anyhow::Result;
 use sui_data_ingestion_core::Worker;
-use sui_types::SYSTEM_PACKAGE_ADDRESSES;
+use sui_package_resolver::Resolver;
+use sui_types::{
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
+    object::Object,
+    SYSTEM_PACKAGE_ADDRESSES,
+};
 use tokio::sync::Mutex;
 
-use sui_package_resolver::Resolver;
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::object::Object;
-
-use crate::handlers::{get_move_struct, parse_struct, AnalyticsHandler};
-
 use crate::{
+    handlers::{get_move_struct, parse_struct, AnalyticsHandler},
     package_store::{LocalDBPackageStore, PackageCache},
     tables::WrappedObjectEntry,
     FileType,

@@ -1,10 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use anyhow::{Context, Result};
 use core::time::Duration;
+use std::net::SocketAddr;
+
+use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use std::net::SocketAddr;
 use tracing::debug;
 
 #[serde_as]

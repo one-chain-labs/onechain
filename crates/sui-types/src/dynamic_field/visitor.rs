@@ -9,9 +9,8 @@ use move_core_types::{
     u256::U256,
 };
 
-use crate::{base_types::ObjectID, id::UID};
-
 use super::{DynamicFieldInfo, DynamicFieldType};
+use crate::{base_types::ObjectID, id::UID};
 
 /// Visitor to deserialize the outer structure of a `0x2::dynamic_field::Field` while leaving its
 /// name and value untouched.
@@ -52,7 +51,7 @@ impl FieldVisitor {
     }
 }
 
-impl<'b, 'l> Field<'b, 'l> {
+impl Field<'_, '_> {
     /// If this field is a dynamic field, returns its value's type. If it is a dynamic object
     /// field, it returns the ID of the object the value points to (which must be fetched to
     /// extract its type).
@@ -95,7 +94,7 @@ impl<'b, 'l> Visitor<'b, 'l> for FieldVisitor {
                     }
 
                     // HACK: Bypassing `id`'s layout to deserialize its bytes as a Rust type.
-                    let bytes = &driver.bytes()[lo..hi];
+                    let bytes = &driver.bytes()[lo .. hi];
                     id = Some(ObjectID::from_bytes(bytes).map_err(|_| Error::NotADynamicField)?);
                 }
 
@@ -105,14 +104,14 @@ impl<'b, 'l> Visitor<'b, 'l> for FieldVisitor {
                     let hi = driver.position();
 
                     let (kind, layout) = extract_name_layout(layout)?;
-                    name_parts = Some((&driver.bytes()[lo..hi], layout, kind));
+                    name_parts = Some((&driver.bytes()[lo .. hi], layout, kind));
                 }
 
                 "value" => {
                     let lo = driver.position();
                     driver.skip_field()?;
                     let hi = driver.position();
-                    value_parts = Some((&driver.bytes()[lo..hi], layout));
+                    value_parts = Some((&driver.bytes()[lo .. hi], layout));
                 }
 
                 _ => {
@@ -208,14 +207,13 @@ mod tests {
 
     use move_core_types::{account_address::AccountAddress, annotated_value as A, language_storage::TypeTag};
 
+    use super::*;
     use crate::{
         base_types::ObjectID,
         dynamic_field,
         id::UID,
         object::bounded_visitor::tests::{enum_, layout_, value_, variant_},
     };
-
-    use super::*;
 
     #[test]
     fn test_dynamic_field_name() {

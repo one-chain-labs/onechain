@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
+
+use serde::{Deserialize, Serialize};
 use sui_config::Config;
 use sui_types::base_types::ObjectID;
 

@@ -1,6 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, sync::Arc, time::Duration};
+
+use backoff::{backoff::Constant, Error as BE, ExponentialBackoff};
+use sui_storage::blob::Blob;
+use sui_types::full_checkpoint_content::CheckpointData;
+use tokio_util::{bytes::Bytes, sync::CancellationToken};
+use tracing::debug;
+use url::Url;
+
 use crate::{
     ingestion::{
         local_client::LocalIngestionClient,
@@ -8,22 +17,8 @@ use crate::{
         Error as IngestionError,
         Result as IngestionResult,
     },
-    metrics::IndexerMetrics,
+    metrics::{CheckpointLagMetricReporter, IndexerMetrics},
 };
-use backoff::{backoff::Constant, Error as BE, ExponentialBackoff};
-use std::{
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
-use sui_storage::blob::Blob;
-use sui_types::full_checkpoint_content::CheckpointData;
-use tokio_util::{bytes::Bytes, sync::CancellationToken};
-use tracing::debug;
-use url::Url;
 
 /// Wait at most this long between retries for transient errors.
 const MAX_TRANSIENT_RETRY_INTERVAL: Duration = Duration::from_secs(60);
@@ -54,20 +49,27 @@ pub struct IngestionClient {
     client: Arc<dyn IngestionClientTrait>,
     /// Wrap the metrics in an `Arc` to keep copies of the client cheap.
     metrics: Arc<IndexerMetrics>,
-    latest_ingested_checkpoint: Arc<AtomicU64>,
+    checkpoint_lag_reporter: Arc<CheckpointLagMetricReporter>,
 }
 
 impl IngestionClient {
     pub(crate) fn new_remote(url: Url, metrics: Arc<IndexerMetrics>) -> IngestionResult<Self> {
         let client = Arc::new(RemoteIngestionClient::new(url)?);
-        let latest_ingested_checkpoint = Arc::new(AtomicU64::new(0));
-        Ok(IngestionClient { client, metrics, latest_ingested_checkpoint })
+        Ok(Self::new_impl(client, metrics))
     }
 
     pub(crate) fn new_local(path: PathBuf, metrics: Arc<IndexerMetrics>) -> Self {
         let client = Arc::new(LocalIngestionClient::new(path));
-        let latest_ingested_checkpoint = Arc::new(AtomicU64::new(0));
-        IngestionClient { client, metrics, latest_ingested_checkpoint }
+        Self::new_impl(client, metrics)
+    }
+
+    fn new_impl(client: Arc<dyn IngestionClientTrait>, metrics: Arc<IndexerMetrics>) -> Self {
+        let checkpoint_lag_reporter = CheckpointLagMetricReporter::new(
+            metrics.ingested_checkpoint_timestamp_lag.clone(),
+            metrics.latest_ingested_checkpoint_timestamp_lag_ms.clone(),
+            metrics.latest_ingested_checkpoint.clone(),
+        );
+        IngestionClient { client, metrics, checkpoint_lag_reporter }
     }
 
     /// Fetch checkpoint data by sequence number.
@@ -161,15 +163,7 @@ impl IngestionClient {
 
         debug!(checkpoint, elapsed_ms = elapsed * 1000.0, "Fetched checkpoint");
 
-        let lag = chrono::Utc::now().timestamp_millis() - data.checkpoint_summary.timestamp_ms as i64;
-        self.metrics.ingested_checkpoint_timestamp_lag.observe((lag as f64) / 1000.0);
-
-        let new_seq = data.checkpoint_summary.sequence_number;
-        let old_seq = self.latest_ingested_checkpoint.fetch_max(new_seq, Ordering::Relaxed);
-        if new_seq > old_seq {
-            self.metrics.latest_ingested_checkpoint.set(new_seq as i64);
-            self.metrics.latest_ingested_checkpoint_timestamp_lag_ms.set(lag);
-        }
+        self.checkpoint_lag_reporter.report_lag(checkpoint, data.checkpoint_summary.timestamp_ms);
 
         self.metrics.total_ingested_checkpoints.inc();
 

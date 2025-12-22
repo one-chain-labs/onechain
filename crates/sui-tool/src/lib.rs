@@ -2,10 +2,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use fastcrypto::traits::ToFromBytes;
-use futures::future::{join_all, AbortHandle};
-use itertools::Itertools;
 use std::{
     collections::BTreeMap,
     fmt::Write,
@@ -20,35 +16,18 @@ use std::{
     },
     time::Duration,
 };
-use sui_config::{genesis::Genesis, NodeConfig};
-use sui_core::{
-    authority_client::{AuthorityAPI, NetworkAuthorityClient},
-    execution_cache::build_execution_cache_from_env,
-};
-use sui_network::default_mysten_network_config;
-use sui_protocol_config::Chain;
-use sui_sdk::{SuiClient, SuiClientBuilder};
-use sui_storage::object_store::{
-    http::HttpDownloaderBuilder,
-    util::{Manifest, PerEpochManifest, MANIFEST_FILENAME},
-};
-use sui_types::{
-    accumulator::Accumulator,
-    base_types::*,
-    committee::QUORUM_THRESHOLD,
-    crypto::AuthorityPublicKeyBytes,
-    messages_grpc::LayoutGenerationOption,
-    multiaddr::Multiaddr,
-    object::Owner,
-};
-use tokio::{sync::mpsc, task::JoinHandle, time::Instant};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use eyre::ContextCompat;
-use fastcrypto::hash::MultisetHash;
-use futures::{StreamExt, TryStreamExt};
+use fastcrypto::{hash::MultisetHash, traits::ToFromBytes};
+use futures::{
+    future::{join_all, AbortHandle},
+    StreamExt,
+    TryStreamExt,
+};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use itertools::Itertools;
 use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use sui_archival::{
@@ -57,37 +36,51 @@ use sui_archival::{
     verify_archive_with_genesis_config,
 };
 use sui_config::{
+    genesis::Genesis,
     node::ArchiveReaderConfig,
     object_storage_config::{ObjectStoreConfig, ObjectStoreType},
+    NodeConfig,
 };
 use sui_core::{
     authority::{authority_store_tables::AuthorityPerpetualTables, AuthorityStore},
+    authority_client::{AuthorityAPI, NetworkAuthorityClient},
     checkpoints::CheckpointStore,
     epoch::committee_store::CommitteeStore,
+    execution_cache::build_execution_cache_from_env,
     storage::RocksDbStore,
 };
+use sui_network::default_mysten_network_config;
+use sui_protocol_config::Chain;
+use sui_sdk::{SuiClient, SuiClientBuilder};
 use sui_snapshot::{reader::StateSnapshotReaderV1, setup_db_state};
 use sui_storage::{
     object_store::{
-        util::{copy_file, exists, get_path},
+        http::HttpDownloaderBuilder,
+        util::{copy_file, exists, get_path, Manifest, PerEpochManifest, MANIFEST_FILENAME},
         ObjectStoreGetExt,
     },
     verify_checkpoint_range,
 };
 use sui_types::{
+    accumulator::Accumulator,
+    base_types::*,
+    committee::QUORUM_THRESHOLD,
+    crypto::AuthorityPublicKeyBytes,
     messages_checkpoint::{CheckpointCommitment, ECMHLiveObjectSetDigest},
     messages_grpc::{
+        LayoutGenerationOption,
         ObjectInfoRequest,
         ObjectInfoRequestKind,
         ObjectInfoResponse,
         TransactionInfoRequest,
         TransactionStatus,
     },
+    multiaddr::Multiaddr,
+    object::Owner,
+    storage::{ReadStore, SharedInMemoryStore},
 };
-
-use sui_types::storage::{ReadStore, SharedInMemoryStore};
+use tokio::{sync::mpsc, task::JoinHandle, time::Instant};
 use tracing::info;
-use typed_store::rocks::MetricConf;
 
 pub mod commands;
 pub mod db_tool;
@@ -504,7 +497,7 @@ fn start_summary_sync(
 ) -> JoinHandle<Result<(), anyhow::Error>> {
     tokio::spawn(async move {
         info!("Starting summary sync");
-        let store = AuthorityStore::open_no_genesis(perpetual_db, usize::MAX, false, &Registry::default())?;
+        let store = AuthorityStore::open_no_genesis(perpetual_db, false, &Registry::default())?;
         let cache_traits = build_execution_cache_from_env(&Registry::default(), &store);
         let state_sync_store = RocksDbStore::new(cache_traits, committee_store, checkpoint_store.clone());
         // Only insert the genesis checkpoint if the DB is empty and doesn't have it already
@@ -525,7 +518,7 @@ fn start_summary_sync(
         let manifest = archive_reader.get_manifest().await?;
 
         let end_of_epoch_checkpoint_seq_nums =
-            (0..=epoch).map(|e| manifest.next_checkpoint_after_epoch(e) - 1).collect::<Vec<_>>();
+            (0 ..= epoch).map(|e| manifest.next_checkpoint_after_epoch(e) - 1).collect::<Vec<_>>();
         let last_checkpoint = end_of_epoch_checkpoint_seq_nums.last().expect("Expected at least one checkpoint");
 
         let num_to_sync = if all_checkpoints { *last_checkpoint } else { end_of_epoch_checkpoint_seq_nums.len() as u64 };
@@ -561,7 +554,7 @@ fn start_summary_sync(
             archive_reader
                 .read_summaries_for_range_no_verify(
                     state_sync_store.clone(),
-                    s_start..last_checkpoint + 1,
+                    s_start .. last_checkpoint + 1,
                     sync_checkpoint_counter,
                 )
                 .await?;
@@ -616,7 +609,7 @@ fn start_summary_sync(
                     .update_highest_verified_checkpoint(&latest_verified)
                     .expect("Failed to update highest verified checkpoint");
 
-                let verify_range = v_start..last_checkpoint + 1;
+                let verify_range = v_start .. last_checkpoint + 1;
                 verify_checkpoint_range(
                     verify_range,
                     state_sync_store,
@@ -711,8 +704,7 @@ pub async fn download_formal_snapshot(
     let genesis = Genesis::load(genesis).unwrap();
     let genesis_committee = genesis.committee()?;
     let committee_store = Arc::new(CommitteeStore::new(path.join("epochs"), &genesis_committee, None));
-    let checkpoint_store =
-        Arc::new(CheckpointStore::open_tables_read_write(path.join("checkpoints"), MetricConf::default(), None, None));
+    let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
 
     let summaries_handle = start_summary_sync(
         perpetual_db.clone(),
@@ -749,9 +741,9 @@ pub async fn download_formal_snapshot(
             epoch,
             &snapshot_store_config,
             &local_store_config,
-            usize::MAX,
             NonZeroUsize::new(num_parallel_downloads).unwrap(),
             m_clone,
+            false, // skip_reset_local_store
         )
         .await
         .unwrap_or_else(|err| panic!("Failed to create reader: {}", err));

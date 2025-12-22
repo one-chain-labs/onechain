@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, Result};
-use move_core_types::ident_str;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display, Formatter, Write},
@@ -10,31 +8,15 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use sui_genesis_builder::validator_info::GenesisValidatorInfo;
-use url::{ParseError, Url};
 
-use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
-    crypto::{AuthorityPublicKey, NetworkPublicKey, Signable, DEFAULT_EPOCH_ID},
-    dynamic_field::Field,
-    multiaddr::Multiaddr,
-    object::Owner,
-    sui_system_state::{
-        sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
-        sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        SUI_SYSTEM_MODULE_NAME,
-    },
-    SUI_SYSTEM_PACKAGE_ID,
-};
-use tap::tap::TapOptional;
-
-use crate::fire_drill::get_gas_obj_ref;
+use anyhow::{anyhow, bail, Result};
 use clap::*;
 use colored::Colorize;
 use fastcrypto::{
     encoding::{Base64, Encoding},
     traits::{KeyPair, ToFromBytes},
 };
+use move_core_types::ident_str;
 use serde::Serialize;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
 use sui_bridge::{
@@ -42,6 +24,7 @@ use sui_bridge::{
     sui_client::SuiClient as SuiBridgeClient,
     sui_transaction_builder::{build_committee_register_transaction, build_committee_update_url_transaction},
 };
+use sui_genesis_builder::validator_info::GenesisValidatorInfo;
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions};
 use sui_keys::{
     key_derive::generate_new_key,
@@ -57,17 +40,35 @@ use sui_keys::{
 };
 use sui_sdk::{wallet_context::WalletContext, SuiClient};
 use sui_types::{
+    base_types::{ObjectID, ObjectRef, SuiAddress},
     crypto::{
         generate_proof_of_possession,
         get_authority_key_pair,
         AuthorityKeyPair,
+        AuthorityPublicKey,
         AuthorityPublicKeyBytes,
         NetworkKeyPair,
+        NetworkPublicKey,
+        Signable,
         SignatureScheme,
         SuiKeyPair,
+        DEFAULT_EPOCH_ID,
+    },
+    dynamic_field::Field,
+    multiaddr::Multiaddr,
+    object::Owner,
+    sui_system_state::{
+        sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
+        sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
+        SUI_SYSTEM_MODULE_NAME,
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
+    SUI_SYSTEM_PACKAGE_ID,
 };
+use tap::tap::TapOptional;
+use url::{ParseError, Url};
+
+use crate::fire_drill::get_gas_obj_ref;
 
 #[path = "unit_tests/validator_tests.rs"]
 #[cfg(test)]
@@ -254,7 +255,7 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
     } else {
         let kp = match key {
             Some(key) => {
-                println!("Generated new key file {:?} based on one.keystore file.", file_name);
+                println!("Generated new key file {:?} based on sui.keystore file.", file_name);
                 key
             }
             None => {
@@ -385,6 +386,7 @@ impl SuiValidatorCommand {
                 let resp = update_metadata(context, metadata, gas_budget).await?;
                 SuiValidatorCommandResponse::UpdateMetadata(resp)
             }
+
             SuiValidatorCommand::UpdateGasPrice { operation_cap_id, gas_price, gas_budget } => {
                 let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let resp = update_gas_price(context, operation_cap_id, gas_price, gas_budget).await?;
@@ -803,7 +805,10 @@ pub fn write_transaction_response(response: &SuiTransactionBlockResponse) -> Res
 impl Debug for SuiValidatorCommandResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let string = serde_json::to_string_pretty(self);
-        let s = string.unwrap_or_else(|err| format!("{err}").red().to_string());
+        let s = match string {
+            Ok(s) => s,
+            Err(err) => format!("{err}").red().to_string(),
+        };
         write!(f, "{}", s)
     }
 }

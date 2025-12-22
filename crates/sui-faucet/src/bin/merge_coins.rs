@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use shared_crypto::intent::Intent;
 use std::{str::FromStr, time::Duration};
+
+use shared_crypto::intent::Intent;
 use sui_config::{sui_config_dir, SUI_CLIENT_CONFIG};
 use sui_faucet::FaucetError;
 use sui_json_rpc_types::SuiTransactionBlockResponseOptions;

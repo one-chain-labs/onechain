@@ -1,17 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    key_derive::{derive_key_pair_from_path, generate_new_key},
-    random_names::{random_name, random_names},
-};
-use anyhow::{anyhow, bail, ensure, Context};
-use bip32::DerivationPath;
-use bip39::{Language, Mnemonic, Seed};
-use rand::{rngs::StdRng, SeedableRng};
-use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use shared_crypto::intent::{Intent, IntentMessage};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{Display, Formatter, Write},
@@ -20,6 +9,14 @@ use std::{
     io::BufReader,
     path::{Path, PathBuf},
 };
+
+use anyhow::{anyhow, bail, ensure, Context};
+use bip32::DerivationPath;
+use bip39::{Language, Mnemonic, Seed};
+use rand::{rngs::StdRng, SeedableRng};
+use regex::Regex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use shared_crypto::intent::{Intent, IntentMessage};
 use sui_types::{
     base_types::SuiAddress,
     crypto::{
@@ -31,6 +28,11 @@ use sui_types::{
         SignatureScheme,
         SuiKeyPair,
     },
+};
+
+use crate::{
+    key_derive::{derive_key_pair_from_path, generate_new_key},
+    random_names::{random_name, random_names},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -76,10 +78,7 @@ pub trait AccountKeystore: Send + Sync {
         if !self.alias_exists(old_alias) {
             bail!("The provided alias {old_alias} does not exist");
         }
-        let new_alias_name = match new_alias {
-            Some(x) => validate_alias(x)?,
-            None => random_name(&self.alias_names().into_iter().map(|x| x.to_string()).collect::<HashSet<_>>()),
-        };
+        let new_alias_name = self.create_alias(new_alias.map(str::to_string))?;
         for a in self.aliases_mut() {
             if a.alias == old_alias {
                 let pk = &a.public_key_base64;
@@ -470,7 +469,7 @@ impl AccountKeystore for InMemKeystore {
 impl InMemKeystore {
     pub fn new_insecure_for_tests(initial_key_number: usize) -> Self {
         let mut rng = StdRng::from_seed([0; 32]);
-        let keys = (0..initial_key_number)
+        let keys = (0 .. initial_key_number)
             .map(|_| get_key_pair_from_rng(&mut rng))
             .map(|(ad, k)| (ad, SuiKeyPair::Ed25519(k)))
             .collect::<BTreeMap<SuiAddress, SuiKeyPair>>();

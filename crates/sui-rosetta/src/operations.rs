@@ -10,7 +10,6 @@ use move_core_types::{
     resolver::ModuleResolver,
 };
 use serde::{Deserialize, Serialize};
-
 use sui_json_rpc_types::{
     BalanceChange,
     SuiArgument,
@@ -120,7 +119,7 @@ impl Operations {
     pub fn into_internal(self) -> Result<InternalOperation, Error> {
         let type_ = self.type_().ok_or_else(|| Error::MissingInput("Operation type".into()))?;
         match type_ {
-            OperationType::PaySui => self.pay_sui_ops_to_internal(),
+            OperationType::PayOct => self.pay_oct_ops_to_internal(),
             OperationType::PayCoin => self.pay_coin_ops_to_internal(),
             OperationType::Stake => self.stake_ops_to_internal(),
             OperationType::WithdrawStake => self.withdraw_stake_ops_to_internal(),
@@ -128,7 +127,7 @@ impl Operations {
         }
     }
 
-    fn pay_sui_ops_to_internal(self) -> Result<InternalOperation, Error> {
+    fn pay_oct_ops_to_internal(self) -> Result<InternalOperation, Error> {
         let mut recipients = vec![];
         let mut amounts = vec![];
         let mut sender = None;
@@ -147,7 +146,7 @@ impl Operations {
             }
         }
         let sender = sender.ok_or_else(|| Error::MissingInput("Sender address".to_string()))?;
-        Ok(InternalOperation::PaySui { sender, recipients, amounts })
+        Ok(InternalOperation::PayOct { sender, recipients, amounts })
     }
 
     fn pay_coin_ops_to_internal(self) -> Result<InternalOperation, Error> {
@@ -436,12 +435,12 @@ impl Operations {
                 });
                 match currency {
                     Some(_) => Operation::pay_coin(status, recipient, amount.into(), currency.clone()),
-                    None => Operation::pay_sui(status, recipient, amount.into()),
+                    None => Operation::pay_oct(status, recipient, amount.into()),
                 }
             }));
             match currency {
                 Some(_) => operations.push(Operation::pay_coin(status, sender, -(total_paid as i128), currency.clone())),
-                _ => operations.push(Operation::pay_sui(status, sender, -(total_paid as i128))),
+                _ => operations.push(Operation::pay_oct(status, sender, -(total_paid as i128))),
             }
         } else if !stake_ids.is_empty() {
             let stake_ids = stake_ids.into_iter().flatten().collect::<Vec<_>>();
@@ -590,7 +589,7 @@ impl Operations {
 
         let ops: Operations = ops.into_iter().chain(coin_change_operations).chain(staking_balance).collect();
 
-        // This is a workaround for the payCoin cases that are mistakenly considered to be paySui operations
+        // This is a workaround for the payCoin cases that are mistakenly considered to be payOct operations
         // In this case we remove any irrelevant, SUI specific operation entries that sum up to 0 balance changes per address
         // and keep only the actual entries for the right coin type transfers, as they have been extracted from the transaction's
         // balance changes section.
@@ -717,10 +716,10 @@ impl Operation {
         }
     }
 
-    fn pay_sui(status: Option<OperationStatus>, address: SuiAddress, amount: i128) -> Self {
+    fn pay_oct(status: Option<OperationStatus>, address: SuiAddress, amount: i128) -> Self {
         Operation {
             operation_identifier: Default::default(),
-            type_: OperationType::PaySui,
+            type_: OperationType::PayOct,
             status,
             account: Some(address.into()),
             amount: Some(Amount::new(amount, None)),

@@ -3,17 +3,16 @@
 
 use std::sync::Arc;
 
+use sui_pg_db::Db;
 use tokio::{task::JoinHandle, time::interval};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-use crate::{
-    db::Db,
-    metrics::IndexerMetrics,
-    watermarks::{ReaderWatermark, StoredWatermark},
-};
-
 use super::{Handler, PrunerConfig};
+use crate::{
+    metrics::IndexerMetrics,
+    models::watermarks::{ReaderWatermark, StoredWatermark},
+};
 
 /// The reader watermark task is responsible for updating the `reader_lo` and `pruner_timestamp`
 /// values for a pipeline's row in the watermark table, based on the pruner configuration, and the

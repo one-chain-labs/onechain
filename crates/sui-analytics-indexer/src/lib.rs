@@ -6,19 +6,25 @@ use std::{ops::Range, path::PathBuf};
 use anyhow::{anyhow, Result};
 use arrow_array::{Array, Int32Array};
 use clap::*;
-use gcp_bigquery_client::{model::query_request::QueryRequest, Client};
+use gcp_bigquery_client::{
+    model::{query_request::QueryRequest, query_response::ResultSet},
+    Client,
+};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use object_store::path::Path;
 use serde::{Deserialize, Serialize};
 use snowflake_api::{QueryResult, SnowflakeApi};
 use strum_macros::EnumIter;
-use tracing::info;
-
 use sui_config::object_storage_config::ObjectStoreConfig;
 use sui_data_ingestion_core::Worker;
-use sui_rpc_api::CheckpointData;
 use sui_storage::object_store::util::{find_all_dirs_with_epoch_prefix, find_all_files_with_epoch_prefix};
-use sui_types::{base_types::EpochId, dynamic_field::DynamicFieldType, messages_checkpoint::CheckpointSequenceNumber};
+use sui_types::{
+    base_types::EpochId,
+    dynamic_field::DynamicFieldType,
+    full_checkpoint_content::CheckpointData,
+    messages_checkpoint::CheckpointSequenceNumber,
+};
+use tracing::info;
 
 use crate::{
     analytics_metrics::AnalyticsMetrics,
@@ -237,9 +243,10 @@ impl BQMaxCheckpointReader {
 #[async_trait::async_trait]
 impl MaxCheckpointReader for BQMaxCheckpointReader {
     async fn max_checkpoint(&self) -> Result<i64> {
-        let mut result = self.client.job().query(&self.project_id, QueryRequest::new(&self.query)).await?;
-        if result.next_row() {
-            let max_checkpoint = result.get_i64(0)?.ok_or(anyhow!("No rows returned"))?;
+        let result = self.client.job().query(&self.project_id, QueryRequest::new(&self.query)).await?;
+        let mut result_set = ResultSet::new_from_query_response(result);
+        if result_set.next_row() {
+            let max_checkpoint = result_set.get_i64(0)?.ok_or(anyhow!("No rows returned"))?;
             Ok(max_checkpoint)
         } else {
             Ok(-1)
@@ -698,12 +705,10 @@ pub fn make_writer<S: Serialize + ParquetSchema>(
 }
 
 pub async fn get_starting_checkpoint_seq_num(config: AnalyticsIndexerConfig, file_type: FileType) -> Result<u64> {
-    let checkpoint = if let Some(starting_checkpoint_seq_num) = config.starting_checkpoint_seq_num {
-        starting_checkpoint_seq_num
-    } else {
-        read_store_for_checkpoint(config.remote_store_config.clone(), file_type, config.remote_store_path_prefix).await?
-    };
-    Ok(checkpoint)
+    let remote_latest =
+        read_store_for_checkpoint(config.remote_store_config, file_type, config.remote_store_path_prefix).await?;
+
+    Ok(config.starting_checkpoint_seq_num.map_or(remote_latest, |start| start.max(remote_latest)))
 }
 
 pub async fn make_analytics_processor(config: AnalyticsIndexerConfig, metrics: AnalyticsMetrics) -> Result<Processor> {

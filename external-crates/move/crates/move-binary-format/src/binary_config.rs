@@ -73,7 +73,12 @@ impl BinaryConfig {
         check_no_extraneous_bytes: bool,
         table_config: TableConfig,
     ) -> Self {
-        Self { max_binary_format_version, min_binary_format_version, check_no_extraneous_bytes, table_config }
+        Self {
+            max_binary_format_version,
+            min_binary_format_version,
+            check_no_extraneous_bytes,
+            table_config,
+        }
     }
 
     // We want to make this disappear from the public API in favor of a "true" config

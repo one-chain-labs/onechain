@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui_extra::msim_extra_1 {
+module oct_extra::msim_extra_1 {
     use one::object::{Self, UID};
     use one::transfer;
     use one::tx_context::TxContext;

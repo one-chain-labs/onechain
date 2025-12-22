@@ -32,13 +32,21 @@ fn verify_constant_type(idx: usize, type_: &SignatureToken) -> PartialVMResult<(
     if type_.is_valid_for_constant() {
         Ok(())
     } else {
-        Err(verification_error(StatusCode::INVALID_CONSTANT_TYPE, IndexKind::ConstantPool, idx as TableIndex))
+        Err(verification_error(
+            StatusCode::INVALID_CONSTANT_TYPE,
+            IndexKind::ConstantPool,
+            idx as TableIndex,
+        ))
     }
 }
 
 fn verify_constant_data(idx: usize, constant: &Constant) -> PartialVMResult<()> {
     match constant.deserialize_constant() {
         Some(_) => Ok(()),
-        None => Err(verification_error(StatusCode::MALFORMED_CONSTANT_DATA, IndexKind::ConstantPool, idx as TableIndex)),
+        None => Err(verification_error(
+            StatusCode::MALFORMED_CONSTANT_DATA,
+            IndexKind::ConstantPool,
+            idx as TableIndex,
+        )),
     }
 }

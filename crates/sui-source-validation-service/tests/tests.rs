@@ -1,9 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use expect_test::expect;
-use one_chain::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
-use reqwest::Client;
 use std::{
     fs,
     io::Read,
@@ -11,6 +8,12 @@ use std::{
     path::PathBuf,
     sync::{Arc, RwLock},
 };
+
+use expect_test::expect;
+use move_core_types::account_address::AccountAddress;
+use move_symbol_pool::Symbol;
+use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
+use reqwest::Client;
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::{BuildConfig, SuiPackageHooks};
 use sui_sdk::{
@@ -18,10 +21,6 @@ use sui_sdk::{
     types::{base_types::ObjectID, object::Owner, transaction::TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
     wallet_context::WalletContext,
 };
-use tokio::sync::oneshot;
-
-use move_core_types::account_address::AccountAddress;
-use move_symbol_pool::Symbol;
 use sui_source_validation_service::{
     host_port,
     initialize,
@@ -49,6 +48,7 @@ use sui_source_validation_service::{
     SUI_SOURCE_VALIDATION_VERSION_HEADER,
 };
 use test_cluster::TestClusterBuilder;
+use tokio::sync::oneshot;
 
 const LOCALNET_PORT: u16 = 9000;
 const TEST_FIXTURES_DIR: &str = "tests/fixture";
@@ -129,7 +129,7 @@ async fn test_end_to_end() -> anyhow::Result<()> {
     //////////////////////////
     let config = Config {
         packages: vec![PackageSource::Repository(RepositorySource {
-            repository: "https://github.com/one-chain-labs/onechain".into(),
+            repository: "https://github.com/mystenlabs/sui".into(),
             branches: vec![Branch {
                 branch: "main".into(),
                 paths: vec![Package { path: "move-stdlib".into(), watch: None }],
@@ -169,6 +169,7 @@ async fn run_publish(
         package_path: package_path.clone(),
         build_config,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
     }
@@ -196,8 +197,10 @@ async fn run_upgrade(
         upgrade_capability: cap.reference.object_id,
         build_config,
         skip_dependency_verification: false,
+        verify_deps: true,
         with_unpublished_dependencies: false,
         opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+        verify_compatibility: true,
     }
     .execute(context)
     .await?;
@@ -247,7 +250,7 @@ async fn test_api_route() -> anyhow::Result<()> {
 
     let address = "0x2";
     let module = "address";
-    let source_path = fixtures.keep().join("sui/move-stdlib/sources/address.move");
+    let source_path = fixtures.into_path().join("sui/move-stdlib/sources/address.move");
 
     let mut source_lookup = SourceLookup::new();
     source_lookup
@@ -326,10 +329,10 @@ fn test_parse_package_config() -> anyhow::Result<()> {
 [[packages]]
 source = "Repository"
 [packages.values]
-repository = "https://github.com/one-chain-labs/onechain"
+repository = "https://github.com/mystenlabs/sui"
 network = "mainnet"
 [[packages.values.branches]]
-branch = "main"
+branch = "framework/mainnet"
 paths = [
   { path = "crates/sui-framework/packages/deepbook", watch = "0xdee9" },
   { path = "crates/sui-framework/packages/move-stdlib", watch = "0x1" },
@@ -352,13 +355,13 @@ paths = [
             packages: [
                 Repository(
                     RepositorySource {
-                        repository: "https://github.com/one-chain-labs/onechain",
+                        repository: "https://github.com/mystenlabs/sui",
                         network: Some(
                             Mainnet,
                         ),
                         branches: [
                             Branch {
-                                branch: "main",
+                                branch: "framework/mainnet",
                                 paths: [
                                     Package {
                                         path: "crates/sui-framework/packages/deepbook",

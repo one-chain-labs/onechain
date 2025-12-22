@@ -115,7 +115,7 @@ module move_building_blocks::objects {
             delete_child(child);
         }
     }
-
+    
     public fun delete(object: Object) {
         let Object { id, mut wrapped, table } = object;
         object::delete(id);

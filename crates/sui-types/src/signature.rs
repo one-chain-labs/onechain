@@ -1,18 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    base_types::SuiAddress,
-    committee::EpochId,
-    crypto::{CompressedSignature, PublicKey, Signature, SignatureScheme, SuiSignature, ZkLoginAuthenticatorAsBytes},
-    digests::ZKLoginInputsDigest,
-    error::{SuiError, SuiResult},
-    multisig::MultiSig,
-    multisig_legacy::MultiSigLegacy,
-    passkey_authenticator::PasskeyAuthenticator,
-    signature_verification::VerifiedDigestCache,
-    zk_login_authenticator::ZkLoginAuthenticator,
-};
+use std::{hash::Hash, sync::Arc};
+
 pub use enum_dispatch::enum_dispatch;
 use fastcrypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
@@ -29,7 +19,27 @@ use im::hashmap::HashMap as ImHashMap;
 use schemars::JsonSchema;
 use serde::Serialize;
 use shared_crypto::intent::IntentMessage;
-use std::{hash::Hash, sync::Arc};
+
+use crate::{
+    base_types::SuiAddress,
+    committee::EpochId,
+    crypto::{
+        CompressedSignature,
+        PasskeyAuthenticatorAsBytes,
+        PublicKey,
+        Signature,
+        SignatureScheme,
+        SuiSignature,
+        ZkLoginAuthenticatorAsBytes,
+    },
+    digests::ZKLoginInputsDigest,
+    error::{SuiError, SuiResult},
+    multisig::MultiSig,
+    multisig_legacy::MultiSigLegacy,
+    passkey_authenticator::PasskeyAuthenticator,
+    signature_verification::VerifiedDigestCache,
+    zk_login_authenticator::ZkLoginAuthenticator,
+};
 #[derive(Default, Debug, Clone)]
 pub struct VerifyParams {
     // map from JwkId (iss, kid) => JWK
@@ -38,6 +48,7 @@ pub struct VerifyParams {
     pub zk_login_env: ZkLoginEnv,
     pub verify_legacy_zklogin_address: bool,
     pub accept_zklogin_in_multisig: bool,
+    pub accept_passkey_in_multisig: bool,
     pub zklogin_max_epoch_upper_bound_delta: Option<u64>,
 }
 
@@ -48,6 +59,7 @@ impl VerifyParams {
         zk_login_env: ZkLoginEnv,
         verify_legacy_zklogin_address: bool,
         accept_zklogin_in_multisig: bool,
+        accept_passkey_in_multisig: bool,
         zklogin_max_epoch_upper_bound_delta: Option<u64>,
     ) -> Self {
         Self {
@@ -56,6 +68,7 @@ impl VerifyParams {
             zk_login_env,
             verify_legacy_zklogin_address,
             accept_zklogin_in_multisig,
+            accept_passkey_in_multisig,
             zklogin_max_epoch_upper_bound_delta,
         }
     }
@@ -138,17 +151,23 @@ impl GenericSignature {
                         })?)
                             .into(),
                     )),
-                    SignatureScheme::Secp256r1 => Ok(CompressedSignature::Secp256r1(
-                        (&Secp256r1Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
-                            error: "Cannot parse secp256r1 sig".to_string(),
-                        })?)
-                            .into(),
-                    )),
+                    SignatureScheme::Secp256r1 | SignatureScheme::PasskeyAuthenticator => {
+                        Ok(CompressedSignature::Secp256r1(
+                            (&Secp256r1Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
+                                error: "Cannot parse secp256r1 sig".to_string(),
+                            })?)
+                                .into(),
+                        ))
+                    }
+
                     _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
                 }
             }
             GenericSignature::ZkLoginAuthenticator(s) => {
                 Ok(CompressedSignature::ZkLogin(ZkLoginAuthenticatorAsBytes(s.as_ref().to_vec())))
+            }
+            GenericSignature::PasskeyAuthenticator(s) => {
+                Ok(CompressedSignature::Passkey(PasskeyAuthenticatorAsBytes(s.as_ref().to_vec())))
             }
             _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
         }
@@ -182,6 +201,7 @@ impl GenericSignature {
                 }
             }
             GenericSignature::ZkLoginAuthenticator(s) => s.get_pk(),
+            GenericSignature::PasskeyAuthenticator(s) => s.get_pk(),
             _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
         }
     }

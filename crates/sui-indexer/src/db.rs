@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{database::Connection, errors::IndexerError, handlers::pruner::PrunableTable};
+use std::{
+    collections::{BTreeSet, HashSet},
+    time::Duration,
+};
+
 use clap::Args;
 use diesel::{
     migration::{Migration, MigrationSource, MigrationVersion},
@@ -11,12 +15,10 @@ use diesel::{
     QueryDsl,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations};
-use std::{
-    collections::{BTreeSet, HashSet},
-    time::Duration,
-};
 use strum::IntoEnumIterator;
 use tracing::info;
+
+use crate::{database::Connection, errors::IndexerError, handlers::pruner::PrunableTable};
 
 table! {
     __diesel_schema_migrations (version) {
@@ -178,10 +180,11 @@ pub async fn check_prunable_tables_valid(conn: &mut Connection<'_>) -> Result<()
 pub use setup_postgres::{reset_database, run_migrations};
 
 pub mod setup_postgres {
-    use crate::{database::Connection, db::MIGRATIONS};
     use anyhow::anyhow;
     use diesel_async::RunQueryDsl;
     use tracing::info;
+
+    use crate::{database::Connection, db::MIGRATIONS};
 
     pub async fn reset_database(mut conn: Connection<'static>) -> Result<(), anyhow::Error> {
         info!("Resetting PG database ...");
@@ -244,6 +247,13 @@ pub mod setup_postgres {
 
 #[cfg(test)]
 mod tests {
+    use diesel::{
+        migration::{Migration, MigrationSource},
+        pg::Pg,
+    };
+    use diesel_migrations::MigrationHarness;
+    use sui_pg_db::temp::TempDb;
+
     use crate::{
         database::{Connection, ConnectionPool},
         db::{
@@ -254,12 +264,6 @@ mod tests {
             MIGRATIONS,
         },
     };
-    use diesel::{
-        migration::{Migration, MigrationSource},
-        pg::Pg,
-    };
-    use diesel_migrations::MigrationHarness;
-    use sui_pg_temp_db::TempDb;
 
     // Check that the migration records in the database created from the local schema
     // pass the consistency check.
@@ -352,9 +356,10 @@ mod tests {
 
     #[tokio::test]
     async fn temp_db_smoketest() {
-        use crate::database::Connection;
         use diesel_async::RunQueryDsl;
-        use sui_pg_temp_db::TempDb;
+        use sui_pg_db::temp::TempDb;
+
+        use crate::database::Connection;
 
         telemetry_subscribers::init_for_testing();
 

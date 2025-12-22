@@ -1,28 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    config::IndexerConfig,
-    eth_bridge_indexer::{EthDataMapper, EthFinalizedSyncDatasource, EthSubscriptionDatasource},
-    metrics::BridgeIndexerMetrics,
-    models::{
-        GovernanceAction as DBGovernanceAction,
-        SuiErrorTransactions,
-        TokenTransfer as DBTokenTransfer,
-        TokenTransferData as DBTokenTransferData,
-    },
-    postgres_manager::PgPool,
-    storage::PgBridgePersistent,
-    sui_bridge_indexer::SuiBridgeDataMapper,
-};
-use ethers::{
-    providers::{Http, Provider},
-    types::Address as EthAddress,
-};
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
     sync::Arc,
+};
+
+use ethers::{
+    providers::{Http, Provider},
+    types::Address as EthAddress,
 };
 use strum_macros::Display;
 use sui_bridge::{
@@ -40,6 +27,21 @@ use sui_indexer_builder::{
 };
 use sui_sdk::SuiClientBuilder;
 use sui_types::base_types::{SuiAddress, TransactionDigest};
+
+use crate::{
+    config::IndexerConfig,
+    eth_bridge_indexer::{EthDataMapper, EthFinalizedSyncDatasource, EthSubscriptionDatasource},
+    metrics::BridgeIndexerMetrics,
+    models::{
+        GovernanceAction as DBGovernanceAction,
+        SuiErrorTransactions,
+        TokenTransfer as DBTokenTransfer,
+        TokenTransferData as DBTokenTransferData,
+    },
+    postgres_manager::PgPool,
+    storage::PgBridgePersistent,
+    sui_bridge_indexer::SuiBridgeDataMapper,
+};
 
 pub mod config;
 pub mod metrics;
@@ -229,7 +231,7 @@ pub async fn create_sui_indexer(
         config.remote_store_url.clone(),
         sui_client,
         config.concurrency as usize,
-        config.checkpoints_path.clone().map(|p| p.into()).unwrap_or(tempfile::tempdir()?.keep()),
+        config.checkpoints_path.clone().map(|p| p.into()).unwrap_or(tempfile::tempdir()?.into_path()),
         config.sui_bridge_genesis_checkpoint,
         ingestion_metrics,
         metrics.clone().boxed(),

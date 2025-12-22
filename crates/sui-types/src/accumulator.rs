@@ -4,9 +4,10 @@ pub type Accumulator = fastcrypto::hash::EllipticCurveMultisetHash;
 
 #[cfg(test)]
 mod tests {
-    use crate::{accumulator::Accumulator, base_types::ObjectDigest};
     use fastcrypto::hash::MultisetHash;
     use rand::seq::SliceRandom;
+
+    use crate::{accumulator::Accumulator, base_types::ObjectDigest};
 
     #[test]
     fn test_accumulator() {
@@ -101,11 +102,11 @@ mod tests {
 
     #[test]
     fn test_accumulator_insert_stress() {
-        let mut refs: Vec<_> = (0..100).map(|_| ObjectDigest::random()).collect();
+        let mut refs: Vec<_> = (0 .. 100).map(|_| ObjectDigest::random()).collect();
         let mut accumulator = Accumulator::default();
         accumulator.insert_all(&refs);
         let mut rng = rand::thread_rng();
-        (0..10).for_each(|_| {
+        (0 .. 10).for_each(|_| {
             refs.shuffle(&mut rng);
             let mut a = Accumulator::default();
             a.insert_all(&refs);
@@ -115,13 +116,13 @@ mod tests {
 
     #[test]
     fn test_accumulator_remove_stress() {
-        let mut refs1: Vec<_> = (0..100).map(|_| ObjectDigest::random()).collect();
-        let mut refs2: Vec<_> = (0..100).map(|_| ObjectDigest::random()).collect();
+        let mut refs1: Vec<_> = (0 .. 100).map(|_| ObjectDigest::random()).collect();
+        let mut refs2: Vec<_> = (0 .. 100).map(|_| ObjectDigest::random()).collect();
         let mut accumulator = Accumulator::default();
         accumulator.insert_all(&refs1);
 
         let mut rng = rand::thread_rng();
-        (0..10).for_each(|_| {
+        (0 .. 10).for_each(|_| {
             refs1.shuffle(&mut rng);
             let mut a = Accumulator::default();
             a.insert_all(&refs1);

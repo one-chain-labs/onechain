@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use std::collections::VecDeque;
+
 use fastcrypto_vdf::{
     class_group::{discriminant::DISCRIMINANT_3072, QuadraticForm},
     vdf::{wesolowski::DefaultVDF, VDF},
@@ -15,7 +16,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 
 pub const INVALID_INPUT_ERROR: u64 = 0;
 pub const NOT_SUPPORTED_ERROR: u64 = 1;

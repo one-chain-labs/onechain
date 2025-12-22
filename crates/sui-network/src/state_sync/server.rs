@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{PeerHeights, StateSync, StateSyncMessage};
-use anemo::{rpc::Status, types::response::StatusCode, Request, Response, Result};
-use dashmap::DashMap;
-use futures::future::BoxFuture;
-use serde::{Deserialize, Serialize};
 use std::{
     sync::{Arc, RwLock},
     task::{Context, Poll},
 };
+
+use anemo::{rpc::Status, types::response::StatusCode, Request, Response, Result};
+use dashmap::DashMap;
+use futures::future::BoxFuture;
+use serde::{Deserialize, Serialize};
 use sui_types::{
     digests::{CheckpointContentsDigest, CheckpointDigest},
     messages_checkpoint::{
@@ -21,6 +21,8 @@ use sui_types::{
     storage::WriteStore,
 };
 use tokio::sync::{mpsc, OwnedSemaphorePermit, Semaphore};
+
+use super::{PeerHeights, StateSync, StateSyncMessage};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GetCheckpointSummaryRequest {

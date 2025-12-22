@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use inquire::Select;
 use std::collections::BTreeMap;
+
+use inquire::Select;
 use sui_config::genesis::UnsignedGenesis;
 use sui_types::{
     base_types::ObjectID,
@@ -25,6 +26,7 @@ const STR_SUI_DISTRIBUTION: &str = "OCT Distribution";
 const STR_OBJECTS: &str = "Objects";
 const STR_VALIDATORS: &str = "Validators";
 
+#[allow(clippy::or_fun_call)]
 pub fn examine_genesis_checkpoint(genesis: UnsignedGenesis) {
     let system_object = genesis.sui_system_object().into_genesis_version_for_tooling();
 
@@ -168,7 +170,7 @@ fn examine_object(
                 for gas_coin in sui_map.values() {
                     display_sui(gas_coin, owner_map);
                 }
-                print_divider("OCT");
+                print_divider("Sui");
             }
             Ok(name) if name == STR_STAKED_OCT => {
                 for staked_oct_coin in staked_oct_map.values() {
@@ -222,16 +224,16 @@ fn examine_total_supply(sui_distribution: &BTreeMap<String, BTreeMap<String, (&s
         total_oct += amount_sum;
         if print {
             println!("Owner {:?}", owner);
-            println!("Total Amount of OCT/StakedOct Owned: {amount_sum} MIST or {} OCT:", amount_sum / MIST_PER_OCT);
+            println!("Total Amount of Sui/StakedOct Owned: {amount_sum} MIST or {} SUI:", amount_sum / MIST_PER_OCT);
             println!("{:#?}\n", coins);
         }
     }
     assert_eq!(total_oct, TOTAL_SUPPLY_MIST);
     // Always print this.
-    println!("Total Supply of OCT: {total_oct} MIST or {} OCT", total_oct / MIST_PER_OCT);
-    println!("Total Amount of StakedOct: {total_staked_oct} MIST or {} OCT\n", total_staked_oct / MIST_PER_OCT);
+    println!("Total Supply of Sui: {total_oct} MIST or {} SUI", total_oct / MIST_PER_OCT);
+    println!("Total Amount of StakedOct: {total_staked_oct} MIST or {} SUI\n", total_staked_oct / MIST_PER_OCT);
     if print {
-        print_divider("OCT Distribution");
+        print_divider("Sui Distribution");
     }
 }
 
@@ -248,11 +250,11 @@ fn display_validator(validator: &SuiValidatorGenesis) {
     println!("Staking Pool ID: {}", validator.staking_pool.id);
     println!("Staking Pool Activation Epoch: {:?}", validator.staking_pool.activation_epoch);
     println!("Staking Pool Deactivation Epoch: {:?}", validator.staking_pool.deactivation_epoch);
-    println!("Staking Pool OCT Balance: {:?}", validator.staking_pool.oct_balance);
+    println!("Staking Pool Sui Balance: {:?}", validator.staking_pool.oct_balance);
     println!("Rewards Pool: {}", validator.staking_pool.rewards_pool.value());
     println!("Pool Token Balance: {}", validator.staking_pool.pool_token_balance);
     println!("Pending Delegation: {}", validator.staking_pool.pending_stake);
-    println!("Pending Total OCT Withdraw: {}", validator.staking_pool.pending_total_oct_withdraw);
+    println!("Pending Total Sui Withdraw: {}", validator.staking_pool.pending_total_oct_withdraw);
     println!("Pendign Pool Token Withdraw: {}", validator.staking_pool.pending_pool_token_withdraw);
     println!("Exchange Rates ID: {}", validator.staking_pool.exchange_rates.id);
     println!("Exchange Rates Size: {}", validator.staking_pool.exchange_rates.size);

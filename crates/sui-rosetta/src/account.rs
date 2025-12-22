@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 //! This module implements the [Rosetta Account API](https://www.rosetta-api.org/docs/AccountApi.html)
+use std::time::Duration;
+
 use axum::{extract::State, Extension, Json};
 use axum_extra::extract::WithRejection;
 use futures::{future::join_all, StreamExt};
-
-use sui_sdk::{rpc_types::StakeStatus, SuiClient, SUI_COIN_TYPE};
-use sui_types::base_types::SuiAddress;
+use sui_sdk::{error::SuiRpcResult, rpc_types::StakeStatus, SuiClient, SUI_COIN_TYPE};
+use sui_types::{base_types::SuiAddress, messages_checkpoint::CheckpointSequenceNumber};
 use tracing::info;
 
 use crate::{
@@ -26,9 +27,6 @@ use crate::{
     OnlineServerContext,
     SuiEnv,
 };
-use std::time::Duration;
-use sui_sdk::error::SuiRpcResult;
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
 
 /// Get an array of all AccountBalances for an AccountIdentifier and the BlockIdentifier
 /// at which the balance lookup was performed.

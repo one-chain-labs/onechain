@@ -1,12 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{backfill::backfill_task::BackfillTask, database::ConnectionPool, schema::epochs};
+use std::ops::RangeInclusive;
+
 use async_trait::async_trait;
 use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::{AsyncConnection, RunQueryDsl};
-use std::ops::RangeInclusive;
 use sui_types::sui_system_state::sui_system_state_summary::SuiSystemStateSummary;
+
+use crate::{backfill::backfill_task::BackfillTask, database::ConnectionPool, schema::epochs};
 
 pub struct SystemStateSummaryJsonBackfill;
 

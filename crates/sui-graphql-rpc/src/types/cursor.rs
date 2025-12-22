@@ -223,6 +223,7 @@ impl Page<JsonCursor<ConsistentIndexCursor>> {
     /// cursors of the page are consistent, and returns two booleans indicating whether there is a
     /// previous or next page in the range, the `checkpoint_viewed_at` to set for consistency, and
     /// an iterator of cursors within that Page.
+    #[allow(clippy::type_complexity)]
     pub(crate) fn paginate_consistent_indices(
         &self,
         total: usize,
@@ -248,7 +249,7 @@ impl Page<JsonCursor<ConsistentIndexCursor>> {
             0 < lo,
             hi < total,
             checkpoint_viewed_at,
-            (lo..hi).map(move |ix| JsonCursor::new(ConsistentIndexCursor { ix, c: checkpoint_viewed_at })),
+            (lo .. hi).map(move |ix| JsonCursor::new(ConsistentIndexCursor { ix, c: checkpoint_viewed_at })),
         )))
     }
 }
@@ -603,8 +604,9 @@ impl<C: Eq> Eq for BcsCursor<C> {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_default_page() {

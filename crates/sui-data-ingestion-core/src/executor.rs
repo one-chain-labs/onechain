@@ -1,6 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, pin::Pin, sync::Arc};
+
+use anyhow::Result;
+use futures::Future;
+use mysten_metrics::spawn_monitored_task;
+use prometheus::Registry;
+use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
+use tokio::sync::{mpsc, oneshot};
+
 use crate::{
     progress_store::{ExecutorProgress, ProgressStore, ProgressStoreWrapper, ShimProgressStore},
     reader::CheckpointReader,
@@ -9,13 +18,6 @@ use crate::{
     ReaderOptions,
     Worker,
 };
-use anyhow::Result;
-use futures::Future;
-use mysten_metrics::spawn_monitored_task;
-use prometheus::Registry;
-use std::{path::PathBuf, pin::Pin, sync::Arc};
-use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
-use tokio::sync::{mpsc, oneshot};
 
 pub const MAX_CHECKPOINTS_IN_PROGRESS: usize = 10000;
 
@@ -120,7 +122,7 @@ pub async fn setup_single_workflow<W: Worker + 'static>(
     executor.register(worker_pool).await?;
     Ok((
         executor.run(
-            tempfile::tempdir()?.keep(),
+            tempfile::tempdir()?.into_path(),
             Some(remote_store_url),
             vec![],
             reader_options.unwrap_or_default(),

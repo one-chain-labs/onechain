@@ -3,15 +3,12 @@
 
 //! A mock implementation of Sui JSON-RPC client.
 
-use crate::{
-    error::{BridgeError, BridgeResult},
-    test_utils::DUMMY_MUTALBE_BRIDGE_OBJECT_ARG,
-};
-use async_trait::async_trait;
 use std::{
     collections::{HashMap, VecDeque},
     sync::{atomic::AtomicU64, Arc, Mutex},
 };
+
+use async_trait::async_trait;
 use sui_json_rpc_types::{EventFilter, EventPage, SuiEvent, SuiTransactionBlockResponse};
 use sui_types::{
     base_types::{ObjectID, ObjectRef},
@@ -25,7 +22,9 @@ use sui_types::{
 };
 
 use crate::{
+    error::{BridgeError, BridgeResult},
     sui_client::SuiClientInner,
+    test_utils::DUMMY_MUTALBE_BRIDGE_OBJECT_ARG,
     types::{BridgeAction, BridgeActionStatus, IsBridgePaused},
 };
 

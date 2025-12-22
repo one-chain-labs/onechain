@@ -27,17 +27,25 @@ pub fn verify(
     verify_fallthrough(current_function, &code.code)?;
 
     // check jumps
-    let context = &ControlFlowVerifier { current_function, code: &code.code };
+    let context = &ControlFlowVerifier {
+        current_function,
+        code: &code.code,
+    };
     let labels = instruction_labels(context);
     check_jumps(verifier_config, context, labels)
 }
 
-fn verify_fallthrough(current_function: FunctionDefinitionIndex, code: &[Bytecode]) -> PartialVMResult<()> {
+fn verify_fallthrough(
+    current_function: FunctionDefinitionIndex,
+    code: &[Bytecode],
+) -> PartialVMResult<()> {
     // Check to make sure that the bytecode vector ends with a branching instruction.
     match code.last() {
         None => Err(PartialVMError::new(StatusCode::EMPTY_CODE_UNIT)),
-        Some(last) if !last.is_unconditional_branch() => Err(PartialVMError::new(StatusCode::INVALID_FALL_THROUGH)
-            .at_code_offset(current_function, (code.len() - 1) as CodeOffset)),
+        Some(last) if !last.is_unconditional_branch() => {
+            Err(PartialVMError::new(StatusCode::INVALID_FALL_THROUGH)
+                .at_code_offset(current_function, (code.len() - 1) as CodeOffset))
+        }
         Some(_) => Ok(()),
     }
 }
@@ -55,11 +63,19 @@ struct ControlFlowVerifier<'a> {
 
 impl<'a> ControlFlowVerifier<'a> {
     fn code(&self) -> impl Iterator<Item = (CodeOffset, &'a Bytecode)> {
-        self.code.iter().enumerate().map(|(idx, instr)| (idx.try_into().unwrap(), instr))
+        self.code
+            .iter()
+            .enumerate()
+            .map(|(idx, instr)| (idx.try_into().unwrap(), instr))
     }
 
-    fn labeled_code<'b: 'a>(&self, labels: &'b [Label]) -> impl Iterator<Item = (CodeOffset, &'a Bytecode, &'b Label)> {
-        self.code().zip(labels).map(|((i, instr), lbl)| (i, instr, lbl))
+    fn labeled_code<'b: 'a>(
+        &self,
+        labels: &'b [Label],
+    ) -> impl Iterator<Item = (CodeOffset, &'a Bytecode, &'b Label)> {
+        self.code()
+            .zip(labels)
+            .map(|((i, instr), lbl)| (i, instr, lbl))
     }
 
     fn error(&self, status: StatusCode, offset: CodeOffset) -> PartialVMError {
@@ -69,12 +85,15 @@ impl<'a> ControlFlowVerifier<'a> {
 
 fn instruction_labels(context: &ControlFlowVerifier) -> Vec<Label> {
     let mut labels: Vec<Label> = (0..context.code.len()).map(|_| Label::Code).collect();
-    let mut loop_continue =
-        |loop_idx: CodeOffset, last_continue: CodeOffset| labels[loop_idx as usize] = Label::Loop { last_continue };
+    let mut loop_continue = |loop_idx: CodeOffset, last_continue: CodeOffset| {
+        labels[loop_idx as usize] = Label::Loop { last_continue }
+    };
     for (i, instr) in context.code() {
         match instr {
             // Back jump/"continue"
-            Bytecode::Branch(prev) | Bytecode::BrTrue(prev) | Bytecode::BrFalse(prev) if is_back_edge(i, *prev) => {
+            Bytecode::Branch(prev) | Bytecode::BrTrue(prev) | Bytecode::BrFalse(prev)
+                if is_back_edge(i, *prev) =>
+            {
                 loop_continue(*prev, i)
             }
             _ => (),
@@ -106,7 +125,9 @@ fn check_jumps(
     check_loop_depth(verifier_config, context, &labels, &loop_depth)
 }
 
-fn check_code<F: FnMut(&Vec<(CodeOffset, CodeOffset)>, CodeOffset, &Bytecode) -> PartialVMResult<()>>(
+fn check_code<
+    F: FnMut(&Vec<(CodeOffset, CodeOffset)>, CodeOffset, &Bytecode) -> PartialVMResult<()>,
+>(
     context: &ControlFlowVerifier,
     labels: &[Label],
     mut check: F,
@@ -170,7 +191,9 @@ fn check_breaks(context: &ControlFlowVerifier, labels: &[Label]) -> PartialVMRes
                 if !is_back_edge(cur_instr, *target) =>
             {
                 match loop_stack.last() {
-                    Some((_cur_loop_head, last_continue)) if target > last_continue && *target != last_continue + 1 => {
+                    Some((_cur_loop_head, last_continue))
+                        if target > last_continue && *target != last_continue + 1 =>
+                    {
                         // Invalid loop break. Must break immediately to the instruction after
                         // the last continue
                         Err(context.error(StatusCode::INVALID_LOOP_BREAK, cur_instr))
@@ -183,7 +206,11 @@ fn check_breaks(context: &ControlFlowVerifier, labels: &[Label]) -> PartialVMRes
     })
 }
 
-fn check_no_loop_splits(context: &ControlFlowVerifier, labels: &[Label], loop_depth: &[usize]) -> PartialVMResult<()> {
+fn check_no_loop_splits(
+    context: &ControlFlowVerifier,
+    labels: &[Label],
+    loop_depth: &[usize],
+) -> PartialVMResult<()> {
     let is_break = |loop_stack: &Vec<(CodeOffset, CodeOffset)>, jump_target: CodeOffset| -> bool {
         match loop_stack.last() {
             None => false,
@@ -193,7 +220,9 @@ fn check_no_loop_splits(context: &ControlFlowVerifier, labels: &[Label], loop_de
     check_code(context, labels, |loop_stack, i, instr| {
         match instr {
             // Forward jump/"break"
-            Bytecode::Branch(j) | Bytecode::BrTrue(j) | Bytecode::BrFalse(j) if *j > i && !is_break(loop_stack, *j) => {
+            Bytecode::Branch(j) | Bytecode::BrTrue(j) | Bytecode::BrFalse(j)
+                if *j > i && !is_break(loop_stack, *j) =>
+            {
                 let j = *j;
                 let before_depth = loop_depth[i as usize];
                 let after_depth = match &labels[j as usize] {

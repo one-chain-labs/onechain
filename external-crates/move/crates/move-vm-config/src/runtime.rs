@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::verifier::{VerifierConfig, DEFAULT_MAX_CONSTANT_VECTOR_LEN};
-use move_binary_format::{binary_config::BinaryConfig, file_format_common::VERSION_MAX};
+use move_binary_format::binary_config::BinaryConfig;
+use move_binary_format::file_format_common::VERSION_MAX;
 #[cfg(feature = "tracing")]
 use once_cell::sync::Lazy;
 
@@ -10,7 +11,8 @@ use once_cell::sync::Lazy;
 const MOVE_VM_PROFILER_ENV_VAR_NAME: &str = "MOVE_VM_PROFILE";
 
 #[cfg(feature = "tracing")]
-static PROFILER_ENABLED: Lazy<bool> = Lazy::new(|| std::env::var(MOVE_VM_PROFILER_ENV_VAR_NAME).is_ok());
+static PROFILER_ENABLED: Lazy<bool> =
+    Lazy::new(|| std::env::var(MOVE_VM_PROFILER_ENV_VAR_NAME).is_ok());
 
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
 
@@ -37,6 +39,8 @@ pub struct VMConfig {
     /// Maximal nodes which are allowed when converting to layout. This includes the types of
     /// fields for struct types.
     pub max_type_to_layout_nodes: Option<u64>,
+    /// Count variants as nodes.
+    pub variant_nodes: bool,
 }
 
 impl Default for VMConfig {
@@ -52,6 +56,7 @@ impl Default for VMConfig {
             binary_config: BinaryConfig::with_extraneous_bytes_check(false),
             rethrow_serialization_type_layout_errors: false,
             max_type_to_layout_nodes: Some(512),
+            variant_nodes: true,
         }
     }
 }

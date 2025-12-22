@@ -1,6 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::str::FromStr;
+
+use async_graphql::{
+    connection::{Connection, CursorType, Edge},
+    *,
+};
+use diesel::{
+    sql_types::{BigInt as SqlBigInt, Nullable, Text},
+    OptionalExtension,
+    QueryableByName,
+};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use serde::{Deserialize, Serialize};
+use sui_indexer::types::OwnerType;
+use sui_types::TypeTag;
+
 use super::{
     available_range::AvailableRange,
     big_int::BigInt,
@@ -17,20 +33,6 @@ use crate::{
     query,
     raw_query::RawQuery,
 };
-use async_graphql::{
-    connection::{Connection, CursorType, Edge},
-    *,
-};
-use diesel::{
-    sql_types::{BigInt as SqlBigInt, Nullable, Text},
-    OptionalExtension,
-    QueryableByName,
-};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use sui_indexer::types::OwnerType;
-use sui_types::TypeTag;
 
 /// The total balance for a particular coin type.
 #[derive(Clone, Debug, SimpleObject)]

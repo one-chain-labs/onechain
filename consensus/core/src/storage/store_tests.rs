@@ -209,24 +209,24 @@ async fn read_and_scan_commits(#[values(new_rocksdb_teststore(), new_mem_teststo
     }
 
     {
-        let scanned_commits = store.scan_commits((20..=24).into()).expect("Scan commits should not fail");
+        let scanned_commits = store.scan_commits((20 ..= 24).into()).expect("Scan commits should not fail");
         assert!(scanned_commits.is_empty(), "{:?}", scanned_commits);
     }
 
     {
-        let scanned_commits = store.scan_commits((3..=4).into()).expect("Scan commits should not fail");
+        let scanned_commits = store.scan_commits((3 ..= 4).into()).expect("Scan commits should not fail");
         assert_eq!(scanned_commits.len(), 2, "{:?}", scanned_commits);
         assert_eq!(scanned_commits, vec![written_commits[2].clone(), written_commits[3].clone()]);
     }
 
     {
-        let scanned_commits = store.scan_commits((0..=2).into()).expect("Scan commits should not fail");
+        let scanned_commits = store.scan_commits((0 ..= 2).into()).expect("Scan commits should not fail");
         assert_eq!(scanned_commits.len(), 2, "{:?}", scanned_commits);
         assert_eq!(scanned_commits, vec![written_commits[0].clone(), written_commits[1].clone()]);
     }
 
     {
-        let scanned_commits = store.scan_commits((0..=4).into()).expect("Scan commits should not fail");
+        let scanned_commits = store.scan_commits((0 ..= 4).into()).expect("Scan commits should not fail");
         assert_eq!(scanned_commits.len(), 4, "{:?}", scanned_commits);
         assert_eq!(scanned_commits, written_commits,);
     }

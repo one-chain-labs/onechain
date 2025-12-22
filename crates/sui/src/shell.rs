@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
 use std::{
     borrow::{Cow, Cow::Owned},
     cmp::Ordering,
@@ -12,6 +11,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::*;
 use colored::Colorize;
@@ -92,7 +92,7 @@ impl<P: Display, S: Send, H: AsyncHandler<S>> Shell<P, S, H> {
                                 continue;
                             }
                             "echo" => {
-                                let line = line.as_slice()[1..line.len()].join(" ");
+                                let line = line.as_slice()[1 .. line.len()].join(" ");
                                 writeln!(out, "{}", line)?;
                                 continue;
                             }
@@ -306,7 +306,7 @@ impl PartialOrd<Self> for CacheKey {
 /// ```
 /// use std::cmp::Ordering;
 /// use std::collections::BTreeMap;
-/// use sui::shell::CacheKey;
+/// use one::shell::CacheKey;
 ///
 /// assert_eq!(Ordering::Equal, CacheKey::flag("--flag").cmp(&CacheKey::new("any command", "--flag")));
 ///

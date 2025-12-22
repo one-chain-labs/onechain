@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diesel::prelude::*;
-
 use sui_json_rpc_types::Checkpoint as RpcCheckpoint;
 use sui_types::{base_types::TransactionDigest, digests::CheckpointDigest, gas::GasCostSummary};
 

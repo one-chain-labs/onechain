@@ -5,7 +5,6 @@ use std::{str::FromStr, sync::Arc};
 
 use diesel::prelude::*;
 use move_core_types::identifier::Identifier;
-
 use sui_json_rpc_types::{type_and_fields_from_move_event_data, BcsEvent, SuiEvent};
 use sui_package_resolver::{PackageStore, Resolver};
 use sui_types::{
@@ -114,9 +113,10 @@ impl StoredEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
     use sui_types::event::Event;
+
+    use super::*;
 
     #[test]
     fn test_canonical_string_of_event_type() {

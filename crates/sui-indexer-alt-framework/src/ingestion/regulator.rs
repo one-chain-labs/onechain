@@ -61,7 +61,7 @@ where
                     ingest_hi = subscribers_hi.values().copied().min().map(|hi| hi + buffer_size as u64);
                 }
 
-                res = checkpoint_tx.send(*cp), if ingest_hi.map_or(true, |hi| *cp <= hi) => if res.is_ok() {
+                res = checkpoint_tx.send(*cp), if ingest_hi.is_none_or(|hi| *cp <= hi) => if res.is_ok() {
                     checkpoints.next();
                 } else {
                     info!("Checkpoint channel closed, stopping regulator");
@@ -97,10 +97,10 @@ mod tests {
         let (cp_tx, mut cp_rx) = mpsc::channel(1);
         let cancel = CancellationToken::new();
 
-        let cps = 0..5;
+        let cps = 0 .. 5;
         let h_regulator = regulator(cps, 0, hi_rx, cp_tx, cancel.clone());
 
-        for i in 0..5 {
+        for i in 0 .. 5 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 
@@ -113,9 +113,9 @@ mod tests {
         let (cp_tx, mut cp_rx) = mpsc::channel(1);
         let cancel = CancellationToken::new();
 
-        let h_regulator = regulator(0.., 0, hi_rx, cp_tx, cancel.clone());
+        let h_regulator = regulator(0 .., 0, hi_rx, cp_tx, cancel.clone());
 
-        for i in 0..5 {
+        for i in 0 .. 5 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 
@@ -129,9 +129,9 @@ mod tests {
         let (cp_tx, mut cp_rx) = mpsc::channel(1);
         let cancel = CancellationToken::new();
 
-        let h_regulator = regulator(0.., 0, hi_rx, cp_tx, cancel.clone());
+        let h_regulator = regulator(0 .., 0, hi_rx, cp_tx, cancel.clone());
 
-        for i in 0..5 {
+        for i in 0 .. 5 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 
@@ -147,9 +147,9 @@ mod tests {
 
         hi_tx.send(("test", 4)).unwrap();
 
-        let h_regulator = regulator(0.., 0, hi_rx, cp_tx, cancel.clone());
+        let h_regulator = regulator(0 .., 0, hi_rx, cp_tx, cancel.clone());
 
-        for _ in 0..=4 {
+        for _ in 0 ..= 4 {
             expect_recv(&mut cp_rx).await;
         }
 
@@ -168,9 +168,9 @@ mod tests {
 
         hi_tx.send(("test", 2)).unwrap();
 
-        let h_regulator = regulator(0.., 2, hi_rx, cp_tx, cancel.clone());
+        let h_regulator = regulator(0 .., 2, hi_rx, cp_tx, cancel.clone());
 
-        for i in 0..=4 {
+        for i in 0 ..= 4 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 
@@ -189,9 +189,9 @@ mod tests {
 
         hi_tx.send(("test", 2)).unwrap();
 
-        let h_regulator = regulator(0.., 0, hi_rx, cp_tx, cancel.clone());
+        let h_regulator = regulator(0 .., 0, hi_rx, cp_tx, cancel.clone());
 
-        for i in 0..=2 {
+        for i in 0 ..= 2 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 
@@ -199,7 +199,7 @@ mod tests {
         expect_timeout(&mut cp_rx).await;
         hi_tx.send(("test", 4)).unwrap();
 
-        for i in 3..=4 {
+        for i in 3 ..= 4 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 
@@ -219,10 +219,10 @@ mod tests {
         hi_tx.send(("a", 2)).unwrap();
         hi_tx.send(("b", 3)).unwrap();
 
-        let cps = 0..10;
+        let cps = 0 .. 10;
         let h_regulator = regulator(cps, 0, hi_rx, cp_tx, cancel.clone());
 
-        for i in 0..=2 {
+        for i in 0 ..= 2 {
             assert_eq!(Some(i), expect_recv(&mut cp_rx).await);
         }
 

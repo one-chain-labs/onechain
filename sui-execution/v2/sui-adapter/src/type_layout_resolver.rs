@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::programmable_transactions::{context::load_type_from_struct, linkage_view::LinkageView};
 use move_core_types::{
     account_address::AccountAddress,
     annotated_value as A,
@@ -16,6 +15,8 @@ use sui_types::{
     layout_resolver::LayoutResolver,
     storage::{BackingPackageStore, PackageObject},
 };
+
+use crate::programmable_transactions::{context::load_type_from_struct, linkage_view::LinkageView};
 
 /// Retrieve a `MoveStructLayout` from a `Type`.
 /// Invocation into the `Session` to leverage the `LinkageView` implementation
@@ -36,7 +37,7 @@ impl<'state, 'vm> TypeLayoutResolver<'state, 'vm> {
     }
 }
 
-impl<'state, 'vm> LayoutResolver for TypeLayoutResolver<'state, 'vm> {
+impl LayoutResolver for TypeLayoutResolver<'_, '_> {
     fn get_annotated_layout(&mut self, struct_tag: &StructTag) -> Result<A::MoveDatatypeLayout, SuiError> {
         let Ok(ty) = load_type_from_struct(self.vm, &mut self.linkage_view, &[], struct_tag) else {
             return Err(SuiError::FailObjectLayout { st: format!("{}", struct_tag) });
@@ -49,13 +50,13 @@ impl<'state, 'vm> LayoutResolver for TypeLayoutResolver<'state, 'vm> {
     }
 }
 
-impl<'state> BackingPackageStore for NullSuiResolver<'state> {
+impl BackingPackageStore for NullSuiResolver<'_> {
     fn get_package_object(&self, package_id: &ObjectID) -> SuiResult<Option<PackageObject>> {
         self.0.get_package_object(package_id)
     }
 }
 
-impl<'state> ResourceResolver for NullSuiResolver<'state> {
+impl ResourceResolver for NullSuiResolver<'_> {
     type Error = SuiError;
 
     fn get_resource(&self, _address: &AccountAddress, _typ: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {

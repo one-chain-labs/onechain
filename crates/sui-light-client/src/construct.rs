@@ -1,11 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof::{Proof, ProofTarget, TransactionProof};
-
 use anyhow::anyhow;
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::effects::TransactionEffectsAPI;
+use sui_types::{
+    effects::TransactionEffectsAPI,
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
+};
+
+use crate::proof::{Proof, ProofTarget, TransactionProof};
 
 /// Construct a proof from the given checkpoint data and proof targets.
 ///

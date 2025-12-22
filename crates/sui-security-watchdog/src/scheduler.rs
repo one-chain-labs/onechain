@@ -1,20 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{any::Any, collections::BTreeMap, fs::File, io::Read, sync::Arc};
+
+use anyhow::anyhow;
+use chrono::{DateTime, Utc};
+use prometheus::{IntGauge, Registry};
+use serde::{Deserialize, Serialize};
+use tokio_cron_scheduler::{Job, JobScheduler};
+use tracing::{error, info};
+use uuid::Uuid;
+
 use crate::{
     metrics::WatchdogMetrics,
     pagerduty::{Body, CreateIncident, Incident, Pagerduty, Service},
     query_runner::{QueryRunner, SnowflakeQueryRunner},
     SecurityWatchdogConfig,
 };
-use anyhow::anyhow;
-use chrono::{DateTime, Utc};
-use prometheus::{IntGauge, Registry};
-use serde::{Deserialize, Serialize};
-use std::{any::Any, collections::BTreeMap, fs::File, io::Read, sync::Arc};
-use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{error, info};
-use uuid::Uuid;
 
 const MIST_PER_OCT: i128 = 1_000_000_000;
 
@@ -255,7 +257,7 @@ impl SchedulerService {
     }
 
     fn get_current_limit(limits: &BTreeMap<DateTime<Utc>, f64>) -> Option<f64> {
-        limits.range(..Utc::now()).next_back().map(|(_, val)| *val)
+        limits.range(.. Utc::now()).next_back().map(|(_, val)| *val)
     }
 
     fn extract_i128(value: &Box<dyn Any + Send>) -> Option<i128> {

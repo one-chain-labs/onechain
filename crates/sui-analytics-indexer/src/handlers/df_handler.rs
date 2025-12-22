@@ -1,25 +1,25 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashMap, path::Path};
+
 use anyhow::Result;
 use fastcrypto::encoding::{Base64, Encoding};
-use std::{collections::HashMap, path::Path};
 use sui_data_ingestion_core::Worker;
-use sui_indexer::errors::IndexerError;
-use sui_types::{object::bounded_visitor::BoundedVisitor, TypeTag, SYSTEM_PACKAGE_ADDRESSES};
-use tap::tap::TapFallible;
-use tokio::sync::Mutex;
-use tracing::warn;
-
-use sui_indexer::types::owner_to_owner_info;
+use sui_indexer::{errors::IndexerError, types::owner_to_owner_info};
 use sui_json_rpc_types::SuiMoveValue;
 use sui_package_resolver::Resolver;
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
 use sui_types::{
     base_types::ObjectID,
     dynamic_field::{visitor as DFV, DynamicFieldName, DynamicFieldType},
-    object::Object,
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
+    object::{bounded_visitor::BoundedVisitor, Object},
+    TypeTag,
+    SYSTEM_PACKAGE_ADDRESSES,
 };
+use tap::tap::TapFallible;
+use tokio::sync::Mutex;
+use tracing::warn;
 
 use crate::{
     handlers::AnalyticsHandler,

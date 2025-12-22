@@ -1,7 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::code, metrics::Metrics};
+use std::{fmt::Write, net::SocketAddr, sync::Arc};
+
 use async_graphql::{
     extensions::{
         Extension,
@@ -22,9 +23,10 @@ use async_graphql::{
     Variables,
 };
 use async_graphql_value::ConstValue;
-use std::{fmt::Write, net::SocketAddr, sync::Arc};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+use crate::{error::code, metrics::Metrics};
 
 #[derive(Clone, Debug)]
 pub struct LoggerConfig {

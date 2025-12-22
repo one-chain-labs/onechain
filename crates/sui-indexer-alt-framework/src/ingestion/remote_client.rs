@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use reqwest::{Client, StatusCode};
+use tracing::{debug, error};
+use url::Url;
+
 use crate::ingestion::{
     client::{FetchError, FetchResult, IngestionClientTrait},
     Result as IngestionResult,
 };
-use reqwest::{Client, StatusCode};
-use tracing::{debug, error};
-use url::Url;
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub enum HttpError {
@@ -94,13 +95,9 @@ impl IngestionClientTrait for RemoteIngestionClient {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
-    use crate::{
-        ingestion::{client::IngestionClient, error::Error, test_utils::test_checkpoint_data},
-        metrics::tests::test_metrics,
-    };
+    use std::sync::Mutex;
+
     use axum::http::StatusCode;
-    use std::sync::{Arc, Mutex};
     use tokio_util::sync::CancellationToken;
     use wiremock::{
         matchers::{method, path_regex},
@@ -109,6 +106,12 @@ pub(crate) mod tests {
         Request,
         Respond,
         ResponseTemplate,
+    };
+
+    use super::*;
+    use crate::{
+        ingestion::{client::IngestionClient, error::Error, test_utils::test_checkpoint_data},
+        metrics::tests::test_metrics,
     };
 
     pub(crate) async fn respond_with(server: &MockServer, response: impl Respond + 'static) {
@@ -120,7 +123,7 @@ pub(crate) mod tests {
     }
 
     fn remote_test_client(uri: String) -> IngestionClient {
-        IngestionClient::new_remote(Url::parse(&uri).unwrap(), Arc::new(test_metrics())).unwrap()
+        IngestionClient::new_remote(Url::parse(&uri).unwrap(), test_metrics()).unwrap()
     }
 
     fn assert_http_error(error: Error, checkpoint: u64, code: StatusCode) {

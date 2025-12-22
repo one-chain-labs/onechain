@@ -1,11 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::BridgeMetrics;
+use std::{fmt::Debug, sync::Arc};
+
 use ethers::providers::{Http, HttpClientError, JsonRpcClient, Provider};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, sync::Arc};
 use url::{ParseError, Url};
+
+use crate::metrics::BridgeMetrics;
 
 #[derive(Debug, Clone)]
 pub struct MeteredEthHttpProvier {
@@ -46,9 +48,10 @@ pub fn new_metered_eth_provider(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ethers::providers::Middleware;
     use prometheus::Registry;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_metered_eth_provider() {

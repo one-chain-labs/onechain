@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashSet, fmt::Debug};
+
 use futures::future::join_all;
 use itertools::Itertools;
-use std::{collections::HashSet, fmt::Debug};
 use sui_json_rpc_types::{
     SuiObjectDataOptions,
     SuiObjectResponse,
@@ -39,7 +40,7 @@ where
     }
 
     // Iterate through all indices (from 0 to length - 1) of the inner vectors.
-    for i in 0..length {
+    for i in 0 .. length {
         // Create an iterator that produces references to elements at position i in each inner vector of entities.
         let mut iter = entities.iter().map(|v| &v[i]);
 
@@ -146,7 +147,7 @@ pub(crate) async fn multi_get_object(clients: &[SuiClient], object_ids: &[Object
          {LOADGEN_QUERY_MAX_RESULT_LIMIT}: {}, time to implement chunking",
                 object_ids.len()
             );
-            &object_ids[0..LOADGEN_QUERY_MAX_RESULT_LIMIT]
+            &object_ids[0 .. LOADGEN_QUERY_MAX_RESULT_LIMIT]
         } else {
             object_ids
         };

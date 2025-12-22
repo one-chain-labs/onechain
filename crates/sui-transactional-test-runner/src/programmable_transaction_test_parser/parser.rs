@@ -3,6 +3,7 @@
 
 use std::{borrow::BorrowMut, marker::PhantomData, str::FromStr};
 
+use anyhow::{bail, Context, Result};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -17,6 +18,7 @@ use sui_types::{
     type_input::TypeInput,
 };
 
+use super::token::CommandToken;
 use crate::programmable_transaction_test_parser::token::{
     GAS_COIN,
     INPUT,
@@ -29,9 +31,6 @@ use crate::programmable_transaction_test_parser::token::{
     TRANSFER_OBJECTS,
     UPGRADE,
 };
-
-use super::token::CommandToken;
-use anyhow::{bail, Context, Result};
 
 /// A small parser used for parsing programmable transaction commands for transactional tests
 pub struct CommandParser<'a, I: Iterator<Item = (CommandToken, &'a str)>, P: BorrowMut<Parser<'a, CommandToken, I>>> {

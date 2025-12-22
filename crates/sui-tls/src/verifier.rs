@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeSet, sync::Arc};
+
 use arc_swap::ArcSwap;
 use fastcrypto::{ed25519::Ed25519PublicKey, traits::ToFromBytes};
 use rustls::{
     crypto::WebPkiSupportedAlgorithms,
     pki_types::{CertificateDer, PrivateKeyDer, ServerName, SignatureVerificationAlgorithm, TrustAnchor, UnixTime},
 };
-use std::{collections::BTreeSet, sync::Arc};
 
 static SUPPORTED_SIG_ALGS: &[&dyn SignatureVerificationAlgorithm] = &[webpki::ring::ED25519];
 
@@ -79,7 +80,7 @@ impl<A: Allower + 'static> ClientCertVerifier<A> {
         private_key: PrivateKeyDer<'static>,
     ) -> Result<rustls::ServerConfig, rustls::Error> {
         let mut config = rustls::ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()?
+            .with_protocol_versions(&[&rustls::version::TLS13])?
             .with_client_cert_verifier(std::sync::Arc::new(self))
             .with_single_cert(certificates, private_key)?;
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
@@ -169,7 +170,7 @@ impl ServerCertVerifier {
         private_key: PrivateKeyDer<'static>,
     ) -> Result<rustls::ClientConfig, rustls::Error> {
         rustls::ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()?
+            .with_protocol_versions(&[&rustls::version::TLS13])?
             .dangerous()
             .with_custom_certificate_verifier(std::sync::Arc::new(self))
             .with_client_auth_cert(certificates, private_key)
@@ -177,7 +178,7 @@ impl ServerCertVerifier {
 
     pub fn rustls_client_config_with_no_client_auth(self) -> Result<rustls::ClientConfig, rustls::Error> {
         Ok(rustls::ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()?
+            .with_protocol_versions(&[&rustls::version::TLS13])?
             .dangerous()
             .with_custom_certificate_verifier(std::sync::Arc::new(self))
             .with_no_client_auth())

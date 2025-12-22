@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{randomness::*, utils};
+use std::collections::BTreeSet;
+
 use fastcrypto::{groups::bls12381, serde_helpers::ToFromByteArray};
 use fastcrypto_tbls::{mocked_dkg, nodes};
-use std::collections::BTreeSet;
 use sui_swarm_config::test_utils::CommitteeFixture;
 use sui_types::{
     base_types::ConciseableName,
@@ -12,6 +12,8 @@ use sui_types::{
     crypto::{AuthorityPublicKeyBytes, ToFromBytes},
 };
 use tracing::Instrument;
+
+use crate::{randomness::*, utils};
 
 type PkG = bls12381::G2Element;
 type EncG = bls12381::G2Element;
@@ -262,7 +264,7 @@ async fn test_receive_full_sig() {
             None,
         );
     }
-    for rx in randomness_rxs[..7].iter_mut() {
+    for rx in randomness_rxs[.. 7].iter_mut() {
         let (epoch, round, bytes) = rx.recv().await.unwrap();
         assert_eq!(0, epoch);
         assert_eq!(0, round.0);
@@ -407,14 +409,14 @@ async fn test_byzantine_peer_handling() {
             None,
         );
     }
-    for rx in &mut randomness_rxs[2..] {
+    for rx in &mut randomness_rxs[2 ..] {
         // Validators (2, 3) can communicate normally.
         let (epoch, round, bytes) = rx.recv().await.unwrap();
         assert_eq!(0, epoch);
         assert_eq!(0, round.0);
         assert_ne!(0, bytes.len());
     }
-    for rx in &mut randomness_rxs[..2] {
+    for rx in &mut randomness_rxs[.. 2] {
         // Validators (0, 1) are byzantine.
         assert!(rx.try_recv().is_err());
     }
@@ -436,14 +438,14 @@ async fn test_byzantine_peer_handling() {
             None,
         );
     }
-    for rx in &mut randomness_rxs[..2] {
+    for rx in &mut randomness_rxs[.. 2] {
         // Validators (0, 1) can communicate normally in new epoch.
         let (epoch, round, bytes) = rx.recv().await.unwrap();
         assert_eq!(1, epoch);
         assert_eq!(0, round.0);
         assert_ne!(0, bytes.len());
     }
-    for rx in &mut randomness_rxs[2..] {
+    for rx in &mut randomness_rxs[2 ..] {
         // Validators (2, 3) are still on old epoch.
         assert!(rx.try_recv().is_err());
     }

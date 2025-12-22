@@ -10,10 +10,6 @@ use prometheus::{
     IntGaugeVec,
     Registry,
 };
-use tokio_stream::Stream;
-use tracing::{error, instrument, trace};
-
-use crate::streamer::Streamer;
 use sui_json_rpc_types::{
     EffectsWithInput,
     EventFilter,
@@ -24,6 +20,10 @@ use sui_json_rpc_types::{
     TransactionFilter,
 };
 use sui_types::{error::SuiResult, transaction::TransactionData};
+use tokio_stream::Stream;
+use tracing::{error, instrument, trace};
+
+use crate::streamer::Streamer;
 
 #[cfg(test)]
 #[path = "unit_tests/subscription_handler_tests.rs"]
@@ -35,6 +35,7 @@ pub struct SubscriptionMetrics {
     pub streaming_success: IntCounterVec,
     pub streaming_failure: IntCounterVec,
     pub streaming_active_subscriber_number: IntGaugeVec,
+    pub dropped_submissions: IntCounterVec,
 }
 
 impl SubscriptionMetrics {
@@ -61,6 +62,13 @@ impl SubscriptionMetrics {
                 registry,
             )
             .unwrap(),
+            dropped_submissions: register_int_counter_vec_with_registry!(
+                "streaming_dropped_submissions",
+                "Total number of submissions that are dropped",
+                &["type"],
+                registry,
+            )
+            .unwrap(),
         }
     }
 }
@@ -82,7 +90,7 @@ impl SubscriptionHandler {
 
 impl SubscriptionHandler {
     #[instrument(level = "trace", skip_all, fields(tx_digest =? effects.transaction_digest()), err)]
-    pub async fn process_tx(
+    pub fn process_tx(
         &self,
         input: &TransactionData,
         effects: &SuiTransactionBlockEffects,
@@ -95,14 +103,14 @@ impl SubscriptionHandler {
         );
 
         if let Err(e) =
-            self.transaction_streamer.send(EffectsWithInput { input: input.clone(), effects: effects.clone() }).await
+            self.transaction_streamer.try_send(EffectsWithInput { input: input.clone(), effects: effects.clone() })
         {
             error!(error =? e, "Failed to send transaction to dispatch");
         }
 
         // serially dispatch event processing to honor events' orders.
         for event in events.data.clone() {
-            if let Err(e) = self.event_streamer.send(event).await {
+            if let Err(e) = self.event_streamer.try_send(event) {
                 error!(error =? e, "Failed to send event to dispatch");
             }
         }

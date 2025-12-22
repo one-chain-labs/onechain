@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::str::FromStr;
+
 use move_core_types::language_storage::StructTag;
 use serde::Serialize;
 use serde_json::Value;
 use serde_with::serde_as;
-use std::str::FromStr;
 use sui_types::{base_types::ObjectType, parse_sui_struct_tag, sui_serde::SuiStructTag};
 
 #[test]

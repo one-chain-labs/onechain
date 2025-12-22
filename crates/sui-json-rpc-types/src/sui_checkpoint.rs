@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Page;
 use fastcrypto::encoding::Base64;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -23,6 +22,8 @@ use sui_types::{
     },
     sui_serde::BigInt,
 };
+
+use crate::Page;
 pub type CheckpointPage = Page<Checkpoint, BigInt<u64>>;
 
 #[serde_as]

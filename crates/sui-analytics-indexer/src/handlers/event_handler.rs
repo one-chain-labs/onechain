@@ -1,13 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::Path;
+
 use anyhow::Result;
 use fastcrypto::encoding::{Base64, Encoding};
 use move_core_types::annotated_value::MoveValue;
-use sui_types::SYSTEM_PACKAGE_ADDRESSES;
-
-use std::path::Path;
 use sui_data_ingestion_core::Worker;
+use sui_json_rpc_types::type_and_fields_from_move_event_data;
+use sui_package_resolver::Resolver;
+use sui_types::{
+    digests::TransactionDigest,
+    effects::TransactionEvents,
+    event::Event,
+    full_checkpoint_content::CheckpointData,
+    SYSTEM_PACKAGE_ADDRESSES,
+};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -16,10 +24,6 @@ use crate::{
     tables::EventEntry,
     FileType,
 };
-use sui_json_rpc_types::type_and_fields_from_move_event_data;
-use sui_package_resolver::Resolver;
-use sui_rpc_api::CheckpointData;
-use sui_types::{digests::TransactionDigest, effects::TransactionEvents, event::Event};
 
 pub struct EventHandler {
     state: Mutex<State>,

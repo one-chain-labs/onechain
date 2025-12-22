@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::PathBuf;
+
 use move_core_types::ident_str;
 use shared_crypto::intent::{Intent, IntentMessage};
-use std::path::PathBuf;
 use sui_genesis_builder::validator_info::GenesisValidatorMetadata;
 use sui_move_build::{BuildConfig, CompiledPackage};
 use sui_sdk::{
@@ -182,7 +183,6 @@ impl TestTransactionBuilder {
             CallArg::Pure(bcs::to_bytes(&validator.p2p_address).unwrap()),
             CallArg::Pure(bcs::to_bytes(&validator.primary_address).unwrap()),
             CallArg::Pure(bcs::to_bytes(&validator.worker_address).unwrap()),
-            CallArg::Pure(bcs::to_bytes(&validator.sui_address).unwrap()),
             CallArg::Pure(bcs::to_bytes(&DEFAULT_VALIDATOR_GAS_PRICE).unwrap()), // gas_price
             CallArg::Pure(bcs::to_bytes(&0u64).unwrap()),                        // commission_rate
         ])
@@ -200,7 +200,7 @@ impl TestTransactionBuilder {
     }
 
     pub fn transfer_oct(mut self, amount: Option<u64>, recipient: SuiAddress) -> Self {
-        self.test_data = TestTransactionData::TransferSui(TransferSuiData { amount, recipient });
+        self.test_data = TestTransactionData::TransferOct(TransferOctData { amount, recipient });
         self
     }
 
@@ -262,7 +262,7 @@ impl TestTransactionBuilder {
                 self.gas_budget.unwrap_or(self.gas_price * TEST_ONLY_GAS_UNIT_FOR_TRANSFER),
                 self.gas_price,
             ),
-            TestTransactionData::TransferSui(data) => TransactionData::new_transfer_oct(
+            TestTransactionData::TransferOct(data) => TransactionData::new_transfer_oct(
                 data.recipient,
                 self.sender,
                 data.amount,
@@ -355,7 +355,7 @@ impl TestTransactionBuilder {
 enum TestTransactionData {
     Move(MoveData),
     Transfer(TransferData),
-    TransferSui(TransferSuiData),
+    TransferOct(TransferOctData),
     Publish(PublishData),
     Programmable(ProgrammableTransaction),
     Empty,
@@ -382,7 +382,7 @@ struct TransferData {
     recipient: SuiAddress,
 }
 
-struct TransferSuiData {
+struct TransferOctData {
     amount: Option<u64>,
     recipient: SuiAddress,
 }
@@ -423,7 +423,7 @@ pub async fn batch_make_transfer_transactions(context: &WalletContext, max_txn_n
     res
 }
 
-pub async fn make_transfer_sui_transaction(
+pub async fn make_transfer_oct_transaction(
     context: &WalletContext,
     recipient: Option<SuiAddress>,
     amount: Option<u64>,

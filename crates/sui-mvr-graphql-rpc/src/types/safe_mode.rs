@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::gas::GasCostSummary;
 use async_graphql::*;
+
+use super::gas::GasCostSummary;
 
 /// Information about whether epoch changes are using safe mode.
 #[derive(Clone, Debug, PartialEq, Eq, SimpleObject)]

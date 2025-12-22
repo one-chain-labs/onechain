@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    base_types::{AuthorityName, ConciseableName, SuiAddress},
-    committee::{Committee, CommitteeTrait, EpochId, StakeUnit},
-    error::{SuiError, SuiResult},
-    signature::GenericSignature,
-    sui_serde::{Readable, SuiBitmap},
+use std::{
+    collections::BTreeMap,
+    fmt::{self, Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+    str::FromStr,
 };
+
 use anyhow::{anyhow, Error};
 use derive_more::{AsMut, AsRef, From};
 pub use enum_dispatch::enum_dispatch;
@@ -66,14 +66,16 @@ use schemars::JsonSchema;
 use serde::{ser::Serializer, Deserialize, Deserializer, Serialize};
 use serde_with::{serde_as, Bytes};
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
-use std::{
-    collections::BTreeMap,
-    fmt::{self, Debug, Display, Formatter},
-    hash::{Hash, Hasher},
-    str::FromStr,
-};
 use strum::EnumString;
 use tracing::{instrument, warn};
+
+use crate::{
+    base_types::{AuthorityName, ConciseableName, SuiAddress},
+    committee::{Committee, CommitteeTrait, EpochId, StakeUnit},
+    error::{SuiError, SuiResult},
+    signature::GenericSignature,
+    sui_serde::{Readable, SuiBitmap},
+};
 
 #[cfg(test)]
 #[path = "unit_tests/crypto_tests.rs"]
@@ -141,12 +143,12 @@ pub fn verify_proof_of_possession(
     )
 }
 ///////////////////////////////////////////////
-/// Account Keys
-///
-/// * The following section defines the keypairs that are used by
-/// * accounts to interact with Sui.
-/// * Currently we support eddsa and ecdsa on Sui.
-///
+// Account Keys
+//
+// * The following section defines the keypairs that are used by
+// * accounts to interact with Sui.
+// * Currently we support eddsa and ecdsa on Sui.
+//
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, From, PartialEq, Eq)]
@@ -217,13 +219,13 @@ impl SuiKeyPair {
         match SignatureScheme::from_flag_byte(bytes.first().ok_or_else(|| eyre!("Invalid length"))?) {
             Ok(x) => match x {
                 SignatureScheme::ED25519 => Ok(SuiKeyPair::Ed25519(Ed25519KeyPair::from_bytes(
-                    bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
+                    bytes.get(1 ..).ok_or_else(|| eyre!("Invalid length"))?,
                 )?)),
                 SignatureScheme::Secp256k1 => Ok(SuiKeyPair::Secp256k1(Secp256k1KeyPair::from_bytes(
-                    bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
+                    bytes.get(1 ..).ok_or_else(|| eyre!("Invalid length"))?,
                 )?)),
                 SignatureScheme::Secp256r1 => Ok(SuiKeyPair::Secp256r1(Secp256r1KeyPair::from_bytes(
-                    bytes.get(1..).ok_or_else(|| eyre!("Invalid length"))?,
+                    bytes.get(1 ..).ok_or_else(|| eyre!("Invalid length"))?,
                 )?)),
                 _ => Err(eyre!("Invalid flag byte")),
             },
@@ -324,22 +326,22 @@ impl EncodeDecodeBase64 for PublicKey {
             Some(x) => {
                 if x == &SignatureScheme::ED25519.flag() {
                     let pk: Ed25519PublicKey = Ed25519PublicKey::from_bytes(
-                        bytes.get(1..).ok_or(FastCryptoError::InputLengthWrong(Ed25519PublicKey::LENGTH + 1))?,
+                        bytes.get(1 ..).ok_or(FastCryptoError::InputLengthWrong(Ed25519PublicKey::LENGTH + 1))?,
                     )?;
                     Ok(PublicKey::Ed25519((&pk).into()))
                 } else if x == &SignatureScheme::Secp256k1.flag() {
                     let pk = Secp256k1PublicKey::from_bytes(
-                        bytes.get(1..).ok_or(FastCryptoError::InputLengthWrong(Secp256k1PublicKey::LENGTH + 1))?,
+                        bytes.get(1 ..).ok_or(FastCryptoError::InputLengthWrong(Secp256k1PublicKey::LENGTH + 1))?,
                     )?;
                     Ok(PublicKey::Secp256k1((&pk).into()))
                 } else if x == &SignatureScheme::Secp256r1.flag() {
                     let pk = Secp256r1PublicKey::from_bytes(
-                        bytes.get(1..).ok_or(FastCryptoError::InputLengthWrong(Secp256r1PublicKey::LENGTH + 1))?,
+                        bytes.get(1 ..).ok_or(FastCryptoError::InputLengthWrong(Secp256r1PublicKey::LENGTH + 1))?,
                     )?;
                     Ok(PublicKey::Secp256r1((&pk).into()))
                 } else if x == &SignatureScheme::PasskeyAuthenticator.flag() {
                     let pk = Secp256r1PublicKey::from_bytes(
-                        bytes.get(1..).ok_or(FastCryptoError::InputLengthWrong(Secp256r1PublicKey::LENGTH + 1))?,
+                        bytes.get(1 ..).ok_or(FastCryptoError::InputLengthWrong(Secp256r1PublicKey::LENGTH + 1))?,
                     )?;
                     Ok(PublicKey::Passkey((&pk).into()))
                 } else {
@@ -424,7 +426,7 @@ pub struct ConciseAuthorityPublicKeyBytesRef<'a>(&'a AuthorityPublicKeyBytes);
 
 impl Debug for ConciseAuthorityPublicKeyBytesRef<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let s = Hex::encode(self.0 .0.get(0..4).ok_or(std::fmt::Error)?);
+        let s = Hex::encode(self.0 .0.get(0 .. 4).ok_or(std::fmt::Error)?);
         write!(f, "k#{}..", s)
     }
 }
@@ -441,7 +443,7 @@ pub struct ConciseAuthorityPublicKeyBytes(AuthorityPublicKeyBytes);
 
 impl Debug for ConciseAuthorityPublicKeyBytes {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let s = Hex::encode(self.0 .0.get(0..4).ok_or(std::fmt::Error)?);
+        let s = Hex::encode(self.0 .0.get(0 .. 4).ok_or(std::fmt::Error)?);
         write!(f, "k#{}..", s)
     }
 }
@@ -575,7 +577,7 @@ where
 /// Generate a random committee key pairs with a given committee size
 pub fn random_committee_key_pairs_of_size(size: usize) -> Vec<AuthorityKeyPair> {
     let mut rng = StdRng::from_seed([0; 32]);
-    (0..size)
+    (0 .. size)
         .map(|_| {
             // TODO: We are generating the keys 4 times to match exactly as how we generate
             // keys in ConfigBuilder::build (sui-config/src/network_config_builder). This is because
@@ -628,7 +630,7 @@ where
             bytes.len()
         )));
     }
-    let sk = <KP as KeypairTraits>::PrivKey::from_bytes(bytes.get(..priv_length).ok_or(SuiError::InvalidPrivateKey)?)
+    let sk = <KP as KeypairTraits>::PrivKey::from_bytes(bytes.get(.. priv_length).ok_or(SuiError::InvalidPrivateKey)?)
         .map_err(|_| SuiError::InvalidPrivateKey)?;
     let kp: KP = sk.into();
     Ok((kp.public().into(), kp))
@@ -936,13 +938,13 @@ impl<S: SuiSignatureInner + Sized> SuiSignature for S {
     fn signature_bytes(&self) -> &[u8] {
         // Access array slice is safe because the array bytes is initialized as
         // flag || signature || pubkey with its defined length.
-        &self.as_ref()[1..1 + S::Sig::LENGTH]
+        &self.as_ref()[1 .. 1 + S::Sig::LENGTH]
     }
 
     fn public_key_bytes(&self) -> &[u8] {
         // Access array slice is safe because the array bytes is initialized as
         // flag || signature || pubkey with its defined length.
-        &self.as_ref()[S::Sig::LENGTH + 1..]
+        &self.as_ref()[S::Sig::LENGTH + 1 ..]
     }
 
     fn scheme(&self) -> SignatureScheme {
@@ -1037,7 +1039,7 @@ impl AuthoritySignInfoTrait for AuthoritySignInfo {
     ) -> SuiResult<()> {
         fp_ensure!(self.epoch == committee.epoch(), SuiError::WrongEpoch {
             expected_epoch: committee.epoch(),
-            actual_epoch: self.epoch
+            actual_epoch: self.epoch,
         });
         let weight = committee.weight(&self.authority);
         fp_ensure!(weight > 0, SuiError::UnknownSigner {
@@ -1176,7 +1178,7 @@ impl<const STRONG_THRESHOLD: bool> AuthoritySignInfoTrait for AuthorityQuorumSig
         // Check epoch
         fp_ensure!(self.epoch == committee.epoch(), SuiError::WrongEpoch {
             expected_epoch: committee.epoch(),
-            actual_epoch: self.epoch
+            actual_epoch: self.epoch,
         });
 
         let mut weight = 0;
@@ -1355,7 +1357,7 @@ where
         // Remove name tag before deserialization using BCS
         let name = serde_name::trace_name::<Self>().expect("Self should be a struct or an enum");
         let name_byte_len = format!("{}::", name).bytes().len();
-        Ok(bcs::from_bytes(bytes.get(name_byte_len..).ok_or_else(|| anyhow!("Failed to deserialize to {name}."))?)?)
+        Ok(bcs::from_bytes(bytes.get(name_byte_len ..).ok_or_else(|| anyhow!("Failed to deserialize to {name}."))?)?)
     }
 }
 
@@ -1478,7 +1480,7 @@ pub enum SignatureScheme {
     ED25519,
     Secp256k1,
     Secp256r1,
-    BLS12381, // This is currently not supported for user OneChain Address.
+    BLS12381, // This is currently not supported for user Sui Address.
     MultiSig,
     ZkLoginAuthenticator,
     PasskeyAuthenticator,
@@ -1491,7 +1493,7 @@ impl SignatureScheme {
             SignatureScheme::Secp256k1 => 0x01,
             SignatureScheme::Secp256r1 => 0x02,
             SignatureScheme::MultiSig => 0x03,
-            SignatureScheme::BLS12381 => 0x04, // This is currently not supported for user OneChain Address.
+            SignatureScheme::BLS12381 => 0x04, // This is currently not supported for user Sui Address.
             SignatureScheme::ZkLoginAuthenticator => 0x05,
             SignatureScheme::PasskeyAuthenticator => 0x06,
         }
@@ -1522,9 +1524,14 @@ pub enum CompressedSignature {
     Secp256k1(Secp256k1SignatureAsBytes),
     Secp256r1(Secp256r1SignatureAsBytes),
     ZkLogin(ZkLoginAuthenticatorAsBytes),
+    Passkey(PasskeyAuthenticatorAsBytes),
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ZkLoginAuthenticatorAsBytes(#[schemars(with = "Base64")] pub Vec<u8>);
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+pub struct PasskeyAuthenticatorAsBytes(#[schemars(with = "Base64")] pub Vec<u8>);
 
 impl AsRef<[u8]> for CompressedSignature {
     fn as_ref(&self) -> &[u8] {
@@ -1533,6 +1540,7 @@ impl AsRef<[u8]> for CompressedSignature {
             CompressedSignature::Secp256k1(sig) => &sig.0,
             CompressedSignature::Secp256r1(sig) => &sig.0,
             CompressedSignature::ZkLogin(sig) => &sig.0,
+            CompressedSignature::Passkey(sig) => &sig.0,
         }
     }
 }

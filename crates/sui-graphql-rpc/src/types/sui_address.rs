@@ -3,11 +3,12 @@
 
 use std::str::FromStr;
 
-use crate::error::Error;
 use async_graphql::*;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use sui_types::base_types::{ObjectID, SuiAddress as NativeSuiAddress};
+
+use crate::error::Error;
 
 const SUI_ADDRESS_LENGTH: usize = 32;
 
@@ -170,8 +171,9 @@ pub(crate) fn addr(bytes: impl AsRef<[u8]>) -> Result<SuiAddress, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use async_graphql::Value;
+
+    use super::*;
 
     const STR_ADDRESS: &str = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const ARR_ADDRESS: [u8; SUI_ADDRESS_LENGTH] = [
@@ -212,13 +214,13 @@ mod tests {
 
     #[test]
     fn test_parse_no_prefix() {
-        let err = SuiAddress::from_str(&STR_ADDRESS[2..]).unwrap_err();
+        let err = SuiAddress::from_str(&STR_ADDRESS[2 ..]).unwrap_err();
         assert_eq!(FromStrError::NoPrefix, err);
     }
 
     #[test]
     fn test_parse_invalid_prefix() {
-        let input = "1x".to_string() + &STR_ADDRESS[2..];
+        let input = "1x".to_string() + &STR_ADDRESS[2 ..];
         let err = SuiAddress::from_str(&input).unwrap_err();
         assert_eq!(FromStrError::NoPrefix, err)
     }
@@ -232,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_characters() {
-        let input = "0xg".to_string() + &STR_ADDRESS[3..];
+        let input = "0xg".to_string() + &STR_ADDRESS[3 ..];
         let err = SuiAddress::from_str(&input).unwrap_err();
         assert_eq!(FromStrError::BadHex('g', 2), err);
     }

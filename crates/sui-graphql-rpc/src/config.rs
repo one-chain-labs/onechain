@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use std::str::FromStr;
+use std::{collections::BTreeSet, fmt::Display, str::FromStr, time::Duration};
 
-use crate::functional_group::FunctionalGroup;
 use async_graphql::*;
 use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
 use move_core_types::{ident_str, identifier::IdentStr};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Display, time::Duration};
 use sui_default_config::DefaultConfig;
-use sui_json_rpc::name_service::NameServiceConfig;
+use sui_name_service::NameServiceConfig;
 use sui_types::base_types::{ObjectID, SuiAddress};
+
+use crate::functional_group::FunctionalGroup;
 
 pub(crate) const RPC_TIMEOUT_ERR_SLEEP_RETRY_PERIOD: Duration = Duration::from_millis(30_000);
 pub(crate) const MAX_CONCURRENT_REQUESTS: usize = 1_000;
@@ -18,10 +18,8 @@ pub(crate) const MAX_CONCURRENT_REQUESTS: usize = 1_000;
 // Move Registry constants
 pub(crate) const MOVE_REGISTRY_MODULE: &IdentStr = ident_str!("name");
 pub(crate) const MOVE_REGISTRY_TYPE: &IdentStr = ident_str!("Name");
-// TODO(manos): Replace with actual package id on mainnet.
-const MOVE_REGISTRY_PACKAGE: &str = "0x1a841abe817c38221596856bc975b3b84f2f68692191e9247e185213d3d02fd8";
-// TODO(manos): Replace with actual registry table id on mainnet.
-const MOVE_REGISTRY_TABLE_ID: &str = "0x250b60446b8e7b8d9d7251600a7228dbfda84ccb4b23a56a700d833e221fae4f";
+const MOVE_REGISTRY_PACKAGE: &str = "0x62c1f5b1cb9e3bfc3dd1f73c95066487b662048a6358eabdbf67f6cdeca6db4b";
+const MOVE_REGISTRY_TABLE_ID: &str = "0xe8417c530cde59eddf6dfb760e8a0e3e2c6f17c69ddaab5a73dd6a6e65fc463b";
 const DEFAULT_PAGE_LIMIT: u16 = 50;
 
 /// The combination of all configurations for the GraphQL service.
@@ -117,10 +115,12 @@ pub struct Limits {
     pub max_type_argument_width: u32,
     /// Maximum size of a fully qualified type.
     pub max_type_nodes: u32,
-    /// Maximum deph of a move value.
+    /// Maximum depth of a move value.
     pub max_move_value_depth: u32,
     /// Maximum number of transaction ids that can be passed to a `TransactionBlockFilter`.
     pub max_transaction_ids: u32,
+    /// Maximum number of keys that can be passed to a `multiGetObjects` query.
+    pub max_multi_get_objects_keys: u32,
     /// Maximum number of candidates to scan when gathering a page of results.
     pub max_scan_limit: u32,
 }
@@ -338,6 +338,11 @@ impl ServiceConfig {
         self.limits.max_transaction_ids
     }
 
+    /// Maximum number of keys that can be passed to a `multiGetObjects` query.
+    async fn max_multi_get_objects_keys(&self) -> u32 {
+        self.limits.max_multi_get_objects_keys
+    }
+
     /// Maximum number of candidates to scan when gathering a page of results.
     async fn max_scan_limit(&self) -> u32 {
         self.limits.max_scan_limit
@@ -491,6 +496,7 @@ impl Default for Limits {
             // Filter-specific limits, such as the number of transaction ids that can be specified
             // for the `TransactionBlockFilter`.
             max_transaction_ids: 1000,
+            max_multi_get_objects_keys: 500,
             max_scan_limit: 100_000_000,
             // This value is set to be the size of the max transaction bytes allowed + base64
             // overhead (roughly 1/3 of the original string). This is rounded up.
@@ -573,6 +579,7 @@ mod tests {
                 max-type-nodes = 128
                 max-move-value-depth = 256
                 max-transaction-ids = 11
+                max-multi-get-objects-keys = 11
                 max-scan-limit = 50
             "#,
         )
@@ -595,6 +602,7 @@ mod tests {
                 max_type_nodes: 128,
                 max_move_value_depth: 256,
                 max_transaction_ids: 11,
+                max_multi_get_objects_keys: 11,
                 max_scan_limit: 50,
             },
             ..Default::default()
@@ -656,6 +664,7 @@ mod tests {
                 max-type-nodes = 128
                 max-move-value-depth = 256
                 max-transaction-ids = 42
+                max-multi-get-objects-keys = 42
                 max-scan-limit = 420
 
                 [experiments]
@@ -681,6 +690,7 @@ mod tests {
                 max_type_nodes: 128,
                 max_move_value_depth: 256,
                 max_transaction_ids: 42,
+                max_multi_get_objects_keys: 42,
                 max_scan_limit: 420,
             },
             disabled_features: BTreeSet::from([FunctionalGroup::Analytics]),

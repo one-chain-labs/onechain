@@ -54,8 +54,9 @@ impl From<Vec<u8>> for Base64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use async_graphql::Value;
+
+    use super::*;
 
     fn assert_input_value_error<T, U>(result: Result<T, InputValueError<U>>) {
         match result {

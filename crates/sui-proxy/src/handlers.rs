@@ -1,12 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    admin::{Labels, ReqwestClient},
-    consumer::{convert_to_remote_write, populate_labels, NodeMetric},
-    histogram_relay::HistogramRelay,
-    middleware::LenDelimProtobuf,
-    peers::AllowedPeer,
-};
+use std::net::SocketAddr;
+
 use axum::{
     extract::{ConnectInfo, Extension},
     http::StatusCode,
@@ -14,7 +9,14 @@ use axum::{
 use multiaddr::Multiaddr;
 use once_cell::sync::Lazy;
 use prometheus::{register_counter_vec, register_histogram_vec, CounterVec, HistogramVec};
-use std::net::SocketAddr;
+
+use crate::{
+    admin::{Labels, ReqwestClient},
+    consumer::{convert_to_remote_write, populate_labels, NodeMetric},
+    histogram_relay::HistogramRelay,
+    middleware::LenDelimProtobuf,
+    peers::AllowedPeer,
+};
 
 static HANDLER_HITS: Lazy<CounterVec> = Lazy::new(|| {
     register_counter_vec!("http_handler_hits", "Number of HTTP requests made.", &["handler", "remote"]).unwrap()

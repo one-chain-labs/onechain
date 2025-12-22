@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use std::collections::VecDeque;
+
 use fastcrypto::{
     error::{FastCryptoError, FastCryptoResult},
     groups::{bls12381 as bls, FromTrustedByteArray, GroupElement, HashToGroupElement, MultiScalarMul, Pairing},
@@ -16,7 +17,8 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::{object_runtime::ObjectRuntime, NativesCostTable};
 
 pub const NOT_SUPPORTED_ERROR: u64 = 0;
 pub const INVALID_INPUT_ERROR: u64 = 1;
@@ -507,8 +509,8 @@ fn msm_num_of_additions(n: u64) -> u64 {
     let wbits = (64 - n.leading_zeros() - 1) as u64;
     let window_size = match wbits {
         0 => 1,
-        1..=4 => 2,
-        5..=12 => wbits - 2,
+        1 ..= 4 => 2,
+        5 ..= 12 => wbits - 2,
         _ => wbits - 3,
     };
     let num_of_windows = 255 / window_size + if 255 % window_size == 0 { 0 } else { 1 };
@@ -779,7 +781,7 @@ pub fn internal_sum(
             );
 
             // Read the input vector
-            (0..length)
+            (0 .. length)
                 .map(|i| {
                     inputs
                         .borrow_elem(i as usize, &Type::Vector(Box::new(Type::U8)))

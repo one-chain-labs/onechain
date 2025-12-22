@@ -8,7 +8,7 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     crypto::AccountKeyPair,
     object::Owner,
-    transaction::{CallArg, Transaction, TransactionData, TransactionDataAPI},
+    transaction::{CallArg, Command, Transaction, TransactionData, TransactionDataAPI},
     utils::to_sender_signed_transaction,
 };
 
@@ -19,7 +19,6 @@ use crate::{
     ExecutionEffects,
     ProgrammableTransactionBuilder,
 };
-use sui_types::transaction::Command;
 
 /// A Sui account and all of the objects it owns
 #[derive(Debug)]

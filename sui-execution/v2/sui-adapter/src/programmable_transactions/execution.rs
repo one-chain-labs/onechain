@@ -5,11 +5,12 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use crate::{
-        execution_mode::ExecutionMode,
-        execution_value::{CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value},
-        gas_charger::GasCharger,
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        fmt,
+        sync::Arc,
     };
+
     use move_binary_format::{
         compatibility::{Compatibility, InclusionCheck},
         errors::{Location, PartialVMResult, VMResult},
@@ -30,15 +31,11 @@ mod checked {
     };
     use move_vm_types::loaded_data::runtime_types::{CachedDatatype, Type};
     use serde::{de::DeserializeSeed, Deserialize};
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        fmt,
-        sync::Arc,
-    };
     use sui_move_natives::object_runtime::ObjectRuntime;
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::{
+            MoveLegacyTxContext,
             MoveObjectType,
             ObjectID,
             SuiAddress,
@@ -54,7 +51,7 @@ mod checked {
         error::{command_argument_error, ExecutionError, ExecutionErrorKind},
         execution_config_utils::to_binary_config,
         execution_status::{CommandArgumentError, PackageUpgradeError},
-        id::{RESOLVED_SUI_ID, UID},
+        id::RESOLVED_SUI_ID,
         metrics::LimitsMetrics,
         move_package::{
             normalize_deserialized_modules,
@@ -75,7 +72,13 @@ mod checked {
     };
     use tracing::instrument;
 
-    use crate::{adapter::substitute_package_id, programmable_transactions::context::*};
+    use crate::{
+        adapter::substitute_package_id,
+        execution_mode::ExecutionMode,
+        execution_value::{CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value},
+        gas_charger::GasCharger,
+        programmable_transactions::context::*,
+    };
 
     pub fn execute<Mode: ExecutionMode>(
         protocol_config: &ProtocolConfig,
@@ -206,7 +209,7 @@ mod checked {
                     .map(|amount_arg| {
                         let amount: u64 = context.by_value_arg(CommandKind::SplitCoins, 1, amount_arg)?;
                         let new_coin_id = context.fresh_id()?;
-                        let new_coin = coin.split(amount, UID::new(new_coin_id))?;
+                        let new_coin = coin.split(amount, new_coin_id)?;
                         let coin_type = obj.type_.clone();
                         // safe because we are propagating the coin type, and relying on the internal
                         // invariant that coin values have a coin type
@@ -416,7 +419,7 @@ mod checked {
         let dependencies = fetch_packages(context, &dep_ids)?;
         let package = context.new_package(&modules, dependencies.iter().map(|p| p.move_package()))?;
 
-        // Here we optimistacally push the package that is being published/upgraded
+        // Here we optimistically push the package that is being published/upgraded
         // and if there is an error of any kind (verification or module init) we
         // remove it.
         // The call to `pop_last_package` later is fine because we cannot re-enter and
@@ -636,7 +639,7 @@ mod checked {
         match tx_context_kind {
             TxContextKind::None => (),
             TxContextKind::Mutable | TxContextKind::Immutable => {
-                serialized_arguments.push(context.tx_context.to_vec());
+                serialized_arguments.push(context.tx_context.to_bcs_legacy_context());
             }
         }
         // script visibility checked manually for entry points
@@ -655,7 +658,7 @@ mod checked {
             let Some((_, ctx_bytes, _)) = result.mutable_reference_outputs.pop() else {
                 invariant_violation!("Missing TxContext in reference outputs");
             };
-            let updated_ctx: TxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
+            let updated_ctx: MoveLegacyTxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
                 ExecutionError::invariant_violation(format!("Unable to deserialize TxContext bytes. {e}"))
             })?;
             context.tx_context.update_state(updated_ctx)?;
@@ -1351,7 +1354,7 @@ mod checked {
 
     struct VectorElementVisitor<'a>(&'a PrimitiveArgumentLayout);
 
-    impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
+    impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1369,7 +1372,7 @@ mod checked {
 
     struct OptionElementVisitor<'a>(&'a PrimitiveArgumentLayout);
 
-    impl<'d, 'a> serde::de::Visitor<'d> for OptionElementVisitor<'a> {
+    impl<'d> serde::de::Visitor<'d> for OptionElementVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

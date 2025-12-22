@@ -1,19 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use futures::{future::BoxFuture, stream::FuturesUnordered, Future, StreamExt};
-use mysten_metrics::monitored_future;
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
     time::{Duration, Instant},
 };
+
+use futures::{future::BoxFuture, stream::FuturesUnordered, Future, StreamExt};
+use mysten_metrics::monitored_future;
 use sui_types::{
     base_types::ConciseableName,
     committee::{CommitteeTrait, StakeUnit},
 };
-
 use tokio::time::timeout;
 
 pub type AsyncResult<'a, T, E> = BoxFuture<'a, Result<T, E>>;

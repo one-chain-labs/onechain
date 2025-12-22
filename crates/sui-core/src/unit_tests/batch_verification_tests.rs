@@ -1,16 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    signature_verifier::*,
-    test_utils::{make_cert_with_large_committee, make_dummy_tx},
-};
+use std::sync::Arc;
+
 use fastcrypto::traits::KeyPair;
 use futures::future::join_all;
 use itertools::Itertools as _;
 use prometheus::Registry;
 use rand::{thread_rng, Rng};
-use std::sync::Arc;
 use sui_macros::sim_test;
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
@@ -22,11 +19,16 @@ use sui_types::{
     transaction::CertifiedTransaction,
 };
 
+use crate::{
+    signature_verifier::*,
+    test_utils::{make_cert_with_large_committee, make_dummy_tx},
+};
+
 // TODO consolidate with `gen_certs` in batch_verification_bench.rs
 fn gen_certs(committee: &Committee, key_pairs: &[AuthorityKeyPair], count: usize) -> Vec<CertifiedTransaction> {
     let (receiver, _): (_, AccountKeyPair) = get_key_pair();
 
-    let senders: Vec<_> = (0..count).map(|_| get_key_pair::<AccountKeyPair>()).collect();
+    let senders: Vec<_> = (0 .. count).map(|_| get_key_pair::<AccountKeyPair>()).collect();
 
     let txns: Vec<_> = senders.iter().map(|(sender, sender_sec)| make_dummy_tx(receiver, *sender, sender_sec)).collect();
 
@@ -34,7 +36,7 @@ fn gen_certs(committee: &Committee, key_pairs: &[AuthorityKeyPair], count: usize
 }
 
 fn gen_ckpts(committee: &Committee, key_pairs: &[AuthorityKeyPair], count: usize) -> Vec<SignedCheckpointSummary> {
-    (0..count)
+    (0 .. count)
         .map(|i| {
             let k = &key_pairs[i % key_pairs.len()];
             let name = k.public().into();
@@ -86,7 +88,7 @@ async fn test_batch_verify() {
     let (other_sender, other_sender_sec): (_, AccountKeyPair) = get_key_pair();
     // this test is a bit much for the current implementation - it was originally written to verify
     // a bisecting fall back approach.
-    for i in 0..16 {
+    for i in 0 .. 16 {
         let (receiver, _): (_, AccountKeyPair) = get_key_pair();
         let mut certs = certs.clone();
         let other_tx = make_dummy_tx(receiver, other_sender, &other_sender_sec);
@@ -121,10 +123,18 @@ async fn test_async_verifier() {
 
     let registry = Registry::new();
     let metrics = SignatureVerifierMetrics::new(&registry);
-    let verifier =
-        Arc::new(SignatureVerifier::new(committee.clone(), metrics, vec![], ZkLoginEnv::Test, true, true, Some(30)));
+    let verifier = Arc::new(SignatureVerifier::new(
+        committee.clone(),
+        metrics,
+        vec![],
+        ZkLoginEnv::Test,
+        true,
+        true,
+        true,
+        Some(30),
+    ));
 
-    let tasks: Vec<_> = (0..32)
+    let tasks: Vec<_> = (0 .. 32)
         .map(|_| {
             let verifier = verifier.clone();
             let committee = committee.clone();
@@ -138,7 +148,7 @@ async fn test_async_verifier() {
                 let other_cert = make_cert_with_large_committee(&committee, &key_pairs, &other_tx);
 
                 for mut c in certs.into_iter() {
-                    if thread_rng().gen_range(0..20) == 0 {
+                    if thread_rng().gen_range(0 .. 20) == 0 {
                         *c.auth_sig_mut_for_testing() = other_cert.auth_sig().clone();
                         verifier.verify_cert(c).await.unwrap_err();
                     } else {

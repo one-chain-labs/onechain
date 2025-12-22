@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeMap, sync::Arc};
+
 use super::ObjectKey;
 use crate::{
     base_types::{ObjectID, ObjectRef, VersionNumber},
     object::Object,
     storage::WriteKind,
 };
-use std::{collections::BTreeMap, sync::Arc};
 
 pub trait ObjectStore {
     fn get_object(&self, object_id: &ObjectID) -> Option<Object>;

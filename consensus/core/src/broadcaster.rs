@@ -17,7 +17,7 @@ use tokio::{
 use tracing::{trace, warn};
 
 use crate::{
-    block::{BlockAPI as _, VerifiedBlock},
+    block::{BlockAPI as _, ExtendedBlock, VerifiedBlock},
     context::Context,
     core::CoreSignalsReceivers,
     error::ConsensusResult,
@@ -74,7 +74,7 @@ impl Broadcaster {
     async fn push_blocks<C: NetworkClient>(
         context: Arc<Context>,
         network_client: Arc<C>,
-        mut rx_block_broadcast: broadcast::Receiver<VerifiedBlock>,
+        mut rx_block_broadcast: broadcast::Receiver<ExtendedBlock>,
         peer: AuthorityIndex,
     ) {
         let peer_hostname = &context.committee.authority(peer).hostname;
@@ -121,7 +121,8 @@ impl Broadcaster {
             tokio::select! {
                 result = rx_block_broadcast.recv(), if requests.len() < BROADCAST_CONCURRENCY => {
                     let block = match result {
-                        Ok(block) => block,
+                        // Other info from ExtendedBlock are ignored, because Broadcaster is not used in production.
+                        Ok(block) => block.block,
                         Err(broadcast::error::RecvError::Closed) => {
                             trace!("Sender to {peer} is shutting down!");
                             return;
@@ -191,7 +192,7 @@ mod test {
 
     use super::*;
     use crate::{
-        block::{BlockRef, TestBlock},
+        block::{BlockRef, ExtendedBlock, TestBlock},
         commit::CommitRange,
         core::CoreSignals,
         network::BlockStream,
@@ -286,7 +287,10 @@ mod test {
         let _broadcaster = Broadcaster::new(context.clone(), network_client.clone(), &signals_receiver);
 
         let block = VerifiedBlock::new_for_test(TestBlock::new(9, 1).build());
-        assert!(core_signals.new_block(block.clone()).is_ok(), "No subscriber active to receive the block");
+        assert!(
+            core_signals.new_block(ExtendedBlock { block: block.clone(), excluded_ancestors: vec![] }).is_ok(),
+            "No subscriber active to receive the block"
+        );
 
         // block should be broadcasted immediately to all peers.
         sleep(Duration::from_millis(1)).await;

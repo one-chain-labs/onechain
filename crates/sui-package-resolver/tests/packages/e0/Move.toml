@@ -10,4 +10,3 @@ StdLib = { local = "../std" }
 
 [addresses]
 e = "0xe0"
-one = "0x2"

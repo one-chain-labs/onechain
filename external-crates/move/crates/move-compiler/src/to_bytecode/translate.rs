@@ -8,25 +8,15 @@ use crate::{
     compiled_unit::*,
     diag,
     diagnostics::DiagnosticReporter,
-    expansion::ast::{AbilitySet, Address, Attributes, ModuleIdent, ModuleIdent_, Mutability, TargetKind},
+    expansion::ast::{AbilitySet, Address, Attributes, ModuleIdent, ModuleIdent_, Mutability},
     hlir::ast::{self as H, Value_, Var, Visibility},
     naming::{
         ast::{BuiltinTypeName_, DatatypeTypeParameter, TParam},
         fake_natives,
     },
     parser::ast::{
-        Ability,
-        Ability_,
-        BinOp,
-        BinOp_,
-        ConstantName,
-        DatatypeName,
-        Field,
-        FunctionName,
-        ModuleName,
-        UnaryOp,
-        UnaryOp_,
-        VariantName,
+        Ability, Ability_, BinOp, BinOp_, ConstantName, DatatypeName, Field, FunctionName,
+        ModuleName, TargetKind, UnaryOp, UnaryOp_, VariantName,
     },
     shared::{unique_map::UniqueMap, *},
     FullyCompiledProgram,
@@ -50,10 +40,18 @@ fn extract_decls(
     compilation_env: &CompilationEnv,
     pre_compiled_lib: Option<Arc<FullyCompiledProgram>>,
     prog: &G::Program,
-) -> (HashMap<ModuleIdent, usize>, DatatypeDeclarations, HashMap<(ModuleIdent, FunctionName), FunctionDeclaration>) {
+) -> (
+    HashMap<ModuleIdent, usize>,
+    DatatypeDeclarations,
+    HashMap<(ModuleIdent, FunctionName), FunctionDeclaration>,
+) {
     let pre_compiled_modules = || {
         pre_compiled_lib.iter().flat_map(|pre_compiled| {
-            pre_compiled.cfgir.modules.key_cloned_iter().filter(|(mident, _m)| !prog.modules.contains_key(mident))
+            pre_compiled
+                .cfgir
+                .modules
+                .key_cloned_iter()
+                .filter(|(mident, _m)| !prog.modules.contains_key(mident))
         })
     };
 
@@ -111,7 +109,13 @@ fn extract_decls(
                 })
         })
         .map(|(key, (seen_datatypes, sig))| {
-            (key, FunctionDeclaration { seen_datatypes, signature: function_signature(context, sig) })
+            (
+                key,
+                FunctionDeclaration {
+                    seen_datatypes,
+                    signature: function_signature(context, sig),
+                },
+            )
         })
         .collect();
     (orderings, ddecls, fdecls)
@@ -129,7 +133,11 @@ pub fn program(
     let mut units = vec![];
     let reporter = compilation_env.diagnostic_reporter_at_top_level();
     let (orderings, ddecls, fdecls) = extract_decls(compilation_env, pre_compiled_lib, &prog);
-    let G::Program { modules: gmodules, warning_filters_table, info: _ } = prog;
+    let G::Program {
+        modules: gmodules,
+        warning_filters_table,
+        info: _,
+    } = prog;
 
     let mut source_modules = gmodules
         .into_iter()
@@ -137,7 +145,15 @@ pub fn program(
         .collect::<Vec<_>>();
     source_modules.sort_by_key(|(_, mdef)| mdef.dependency_order);
     for (m, mdef) in source_modules {
-        if let Some(unit) = module(compilation_env, &reporter, m, mdef, &orderings, &ddecls, &fdecls) {
+        if let Some(unit) = module(
+            compilation_env,
+            &reporter,
+            m,
+            mdef,
+            &orderings,
+            &ddecls,
+            &fdecls,
+        ) {
             units.push(unit)
         }
     }
@@ -177,17 +193,32 @@ fn module(
     let constants = constants(&mut context, &ident, gconstants);
     let (collected_function_infos, functions) = functions(&mut context, &ident, gfunctions);
 
-    let friends = gfriends.into_iter().map(|(mident, _loc)| Context::translate_module_ident(mident)).collect();
+    let friends = gfriends
+        .into_iter()
+        .map(|(mident, _loc)| Context::translate_module_ident(mident))
+        .collect();
 
     let addr_name = match &ident.value.address {
         Address::Numerical { name: None, .. } => None,
-        Address::Numerical { name: Some(name), .. } | Address::NamedUnassigned(name) => Some(*name),
+        Address::Numerical {
+            name: Some(name), ..
+        }
+        | Address::NamedUnassigned(name) => Some(*name),
     };
     let addr_bytes = context.resolve_address(ident.value.address);
-    let (imports, explicit_dependency_declarations) =
-        context.materialize(dependency_orderings, datatype_declarations, function_declarations);
+    let (imports, explicit_dependency_declarations) = context.materialize(
+        dependency_orderings,
+        datatype_declarations,
+        function_declarations,
+    );
 
-    let sp!(ident_loc, ModuleIdent_ { address: _, module: module_name }) = ident;
+    let sp!(
+        ident_loc,
+        ModuleIdent_ {
+            address: _,
+            module: module_name
+        }
+    ) = ident;
     let ir_module = IR::ModuleDefinition {
         specified_version: compilation_env.flags().bytecode_version(),
         loc: ident_loc,
@@ -204,13 +235,17 @@ fn module(
         functions,
     };
     let deps: Vec<&F::CompiledModule> = vec![];
-    let (mut module, source_map) = match move_ir_to_bytecode::compiler::compile_module(ir_module, deps) {
-        Ok(res) => res,
-        Err(e) => {
-            reporter.add_diag(diag!(Bug::BytecodeGeneration, (ident_loc, format!("IR ERROR: {}", e))));
-            return None;
-        }
-    };
+    let (mut module, source_map) =
+        match move_ir_to_bytecode::compiler::compile_module(ir_module, deps) {
+            Ok(res) => res,
+            Err(e) => {
+                reporter.add_diag(diag!(
+                    Bug::BytecodeGeneration,
+                    (ident_loc, format!("IR ERROR: {}", e))
+                ));
+                return None;
+            }
+        };
     canonicalize_handles::in_module(&mut module, &address_names(dependency_orderings.keys()));
     let function_infos = module_function_infos(&module, &source_map, &collected_function_infos);
     let module = NamedCompiledModule {
@@ -232,12 +267,19 @@ fn module(
 
 /// Generate a mapping from numerical address and module name to named address, for modules whose
 /// identities contained a named address.
-fn address_names<'a>(dependencies: impl Iterator<Item = &'a ModuleIdent>) -> HashMap<(MoveAddress, &'a str), Symbol> {
+fn address_names<'a>(
+    dependencies: impl Iterator<Item = &'a ModuleIdent>,
+) -> HashMap<(MoveAddress, &'a str), Symbol> {
     dependencies
         .filter_map(|sp!(_, mident)| {
             let ModuleIdent_ { address, module } = mident;
             let ModuleName(sp!(_, module)) = module;
-            if let Address::Numerical { name: Some(sp!(_, named)), value: sp!(_, numeric), .. } = address {
+            if let Address::Numerical {
+                name: Some(sp!(_, named)),
+                value: sp!(_, numeric),
+                ..
+            } = address
+            {
                 Some(((numeric.into_inner(), module.as_str()), *named))
             } else {
                 None
@@ -276,15 +318,25 @@ fn function_info_map(
         .map(|(n, v)| (Symbol::from(n.as_str()), v))
         .collect();
     let (params, attributes) = collected_function_infos.get_(&name).unwrap();
-    let parameters = params.iter().map(|(_mut, v, ty)| var_info(&local_map, *v, ty.clone())).collect();
-    let function_info = FunctionInfo { parameters, attributes: attributes.clone() };
+    let parameters = params
+        .iter()
+        .map(|(_mut, v, ty)| var_info(&local_map, *v, ty.clone()))
+        .collect();
+    let function_info = FunctionInfo {
+        parameters,
+        attributes: attributes.clone(),
+    };
 
     let name_loc = *collected_function_infos.get_loc_(&name).unwrap();
     let function_name = FunctionName(sp(name_loc, name));
     (function_name, function_info)
 }
 
-fn var_info(local_map: &BTreeMap<Symbol, F::LocalIndex>, v: Var, type_: H::SingleType) -> (Var, VarInfo) {
+fn var_info(
+    local_map: &BTreeMap<Symbol, F::LocalIndex>,
+    v: Var,
+    type_: H::SingleType,
+) -> (Var, VarInfo) {
     let index = *local_map.get(&v.0.value).unwrap();
     (v, VarInfo { type_, index })
 }
@@ -300,7 +352,10 @@ fn struct_defs(
 ) -> Vec<IR::StructDefinition> {
     let mut structs = structs.into_iter().collect::<Vec<_>>();
     structs.sort_by_key(|(_, s)| s.index);
-    structs.into_iter().map(|(s, sdef)| struct_def(context, m, s, sdef)).collect()
+    structs
+        .into_iter()
+        .map(|(s, sdef)| struct_def(context, m, s, sdef))
+        .collect()
 }
 
 fn struct_def(
@@ -322,21 +377,39 @@ fn struct_def(
     let abilities = abilities(&abs);
     let type_formals = datatype_type_parameters(tys);
     let fields = struct_fields(context, loc, fields);
-    sp(loc, IR::StructDefinition_ { name, abilities, type_formals, fields })
+    sp(
+        loc,
+        IR::StructDefinition_ {
+            name,
+            abilities,
+            type_formals,
+            fields,
+        },
+    )
 }
 
-fn struct_fields(context: &mut Context, loc: Loc, gfields: H::StructFields) -> IR::StructDefinitionFields {
+fn struct_fields(
+    context: &mut Context,
+    loc: Loc,
+    gfields: H::StructFields,
+) -> IR::StructDefinitionFields {
     use H::StructFields as HF;
     use IR::StructDefinitionFields as IRF;
     match gfields {
         HF::Native(_) => IRF::Native,
         HF::Defined(field_vec) if field_vec.is_empty() => {
             // empty fields are not allowed in the bytecode, add a dummy field
-            let fake_field = vec![(Field(sp(loc, symbol!("dummy_field"))), H::BaseType_::bool(loc))];
+            let fake_field = vec![(
+                Field(sp(loc, symbol!("dummy_field"))),
+                H::BaseType_::bool(loc),
+            )];
             struct_fields(context, loc, HF::Defined(fake_field))
         }
         HF::Defined(field_vec) => {
-            let fields = field_vec.into_iter().map(|(f, ty)| (field(f), base_type(context, ty))).collect();
+            let fields = field_vec
+                .into_iter()
+                .map(|(f, ty)| (field(f), base_type(context, ty)))
+                .collect();
             IRF::Move { fields }
         }
     }
@@ -353,10 +426,18 @@ fn enum_defs(
 ) -> Vec<IR::EnumDefinition> {
     let mut enums = enums.into_iter().collect::<Vec<_>>();
     enums.sort_by_key(|(_, e)| e.index);
-    enums.into_iter().map(|(e, edef)| enum_def(context, m, e, edef)).collect()
+    enums
+        .into_iter()
+        .map(|(e, edef)| enum_def(context, m, e, edef))
+        .collect()
 }
 
-fn enum_def(context: &mut Context, m: &ModuleIdent, e: DatatypeName, edef: H::EnumDefinition) -> IR::EnumDefinition {
+fn enum_def(
+    context: &mut Context,
+    m: &ModuleIdent,
+    e: DatatypeName,
+    edef: H::EnumDefinition,
+) -> IR::EnumDefinition {
     let H::EnumDefinition {
         warning_filter: _warning_filter,
         index: _index,
@@ -370,7 +451,15 @@ fn enum_def(context: &mut Context, m: &ModuleIdent, e: DatatypeName, edef: H::En
     let abilities = abilities(&abs);
     let type_formals = datatype_type_parameters(tys);
     let variants = enum_variants(context, variants);
-    sp(loc, IR::EnumDefinition_ { name, abilities, type_formals, variants })
+    sp(
+        loc,
+        IR::EnumDefinition_ {
+            name,
+            abilities,
+            type_formals,
+            variants,
+        },
+    )
 }
 
 fn enum_variants(
@@ -383,8 +472,15 @@ fn enum_variants(
         .into_iter()
         .map(|(name, v)| {
             let vloc = v.loc;
-            let fields = v.fields.into_iter().map(|(f, ty)| (field(f), base_type(context, ty))).collect();
-            let variant_ = IR::VariantDefinition_ { name: context.variant_name(name), fields };
+            let fields = v
+                .fields
+                .into_iter()
+                .map(|(f, ty)| (field(f), base_type(context, ty)))
+                .collect();
+            let variant_ = IR::VariantDefinition_ {
+                name: context.variant_name(name),
+                fields,
+            };
             sp(vloc, variant_)
         })
         .collect::<Vec<_>>()
@@ -401,15 +497,36 @@ fn constants(
 ) -> Vec<IR::Constant> {
     let mut constants = constants.into_iter().collect::<Vec<_>>();
     constants.sort_by_key(|(_, c)| c.index);
-    constants.into_iter().map(|(n, c)| constant(context, m, n, c)).collect::<Vec<_>>()
+    constants
+        .into_iter()
+        .map(|(n, c)| constant(context, m, n, c))
+        .collect()
 }
 
-fn constant(context: &mut Context, m: &ModuleIdent, n: ConstantName, c: G::Constant) -> IR::Constant {
-    let is_error_constant = c.attributes.contains_key_(&known_attributes::ErrorAttribute.into());
+fn constant(
+    context: &mut Context,
+    m: &ModuleIdent,
+    n: ConstantName,
+    c: G::Constant,
+) -> IR::Constant {
+    let G::Constant {
+        loc: _,
+        warning_filter: _,
+        index: _,
+        attributes,
+        signature,
+        value,
+    } = c;
+    let is_error_constant = attributes.contains_key_(&known_attributes::ErrorAttribute.into());
     let name = context.constant_definition_name(m, n);
-    let signature = base_type(context, c.signature);
-    let value = c.value.unwrap();
-    IR::Constant { name, signature, value, is_error_constant }
+    let signature = base_type(context, signature);
+    let value = value.unwrap();
+    IR::Constant {
+        name,
+        signature,
+        value,
+        is_error_constant,
+    }
 }
 
 //**************************************************************************************************
@@ -467,14 +584,33 @@ fn function(
     let signature = function_signature(context, signature);
     let body = match body.value {
         G::FunctionBody_::Native => IR::FunctionBody::Native,
-        G::FunctionBody_::Defined { locals, start, block_info, blocks } => {
-            let (locals, code) = function_body(context, &f, parameters.clone(), locals, block_info, start, blocks);
+        G::FunctionBody_::Defined {
+            locals,
+            start,
+            block_info,
+            blocks,
+        } => {
+            let (locals, code) = function_body(
+                context,
+                &f,
+                parameters.clone(),
+                locals,
+                block_info,
+                start,
+                blocks,
+            );
             IR::FunctionBody::Bytecode { locals, code }
         }
     };
     let name_loc = f.loc();
     let name = context.function_definition_name(m, f);
-    let ir_function = IR::Function_ { loc, visibility: v, is_entry: entry.is_some(), signature, body };
+    let ir_function = IR::Function_ {
+        loc,
+        visibility: v,
+        is_entry: entry.is_some(),
+        signature,
+        body,
+    };
     ((name, sp(name_loc, ir_function)), (parameters, attributes))
 }
 
@@ -488,15 +624,25 @@ fn visibility(_context: &mut Context, v: Visibility) -> IR::FunctionVisibility {
 
 fn function_signature(context: &mut Context, sig: H::FunctionSignature) -> IR::FunctionSignature {
     let return_type = types(context, sig.return_type);
-    let formals = sig.parameters.into_iter().map(|(_mut, v, st)| (var(v), single_type(context, st))).collect();
+    let formals = sig
+        .parameters
+        .into_iter()
+        .map(|(_mut, v, st)| (var(v), single_type(context, st)))
+        .collect();
     let type_parameters = fun_type_parameters(sig.type_parameters);
-    IR::FunctionSignature { return_type, formals, type_formals: type_parameters }
+    IR::FunctionSignature {
+        return_type,
+        formals,
+        type_formals: type_parameters,
+    }
 }
 
 fn seen_datatypes(sig: &H::FunctionSignature) -> BTreeSet<(ModuleIdent, DatatypeName)> {
     let mut seen = BTreeSet::new();
     seen_datatypes_type(&mut seen, &sig.return_type);
-    sig.parameters.iter().for_each(|(_, _, st)| seen_datatypes_single_type(&mut seen, st));
+    sig.parameters
+        .iter()
+        .for_each(|(_, _, st)| seen_datatypes_single_type(&mut seen, st));
     seen
 }
 
@@ -505,18 +651,26 @@ fn seen_datatypes_type(seen: &mut BTreeSet<(ModuleIdent, DatatypeName)>, sp!(_, 
     match t_ {
         T::Unit => (),
         T::Single(st) => seen_datatypes_single_type(seen, st),
-        T::Multiple(ss) => ss.iter().for_each(|st| seen_datatypes_single_type(seen, st)),
+        T::Multiple(ss) => ss
+            .iter()
+            .for_each(|st| seen_datatypes_single_type(seen, st)),
     }
 }
 
-fn seen_datatypes_single_type(seen: &mut BTreeSet<(ModuleIdent, DatatypeName)>, sp!(_, st_): &H::SingleType) {
+fn seen_datatypes_single_type(
+    seen: &mut BTreeSet<(ModuleIdent, DatatypeName)>,
+    sp!(_, st_): &H::SingleType,
+) {
     use H::SingleType_ as S;
     match st_ {
         S::Base(bt) | S::Ref(_, bt) => seen_datatypes_base_type(seen, bt),
     }
 }
 
-fn seen_datatypes_base_type(seen: &mut BTreeSet<(ModuleIdent, DatatypeName)>, sp!(_, bt_): &H::BaseType) {
+fn seen_datatypes_base_type(
+    seen: &mut BTreeSet<(ModuleIdent, DatatypeName)>,
+    sp!(_, bt_): &H::BaseType,
+) {
     use H::{BaseType_ as B, TypeName_ as TN};
     match bt_ {
         B::Unreachable | B::UnresolvedError => {
@@ -541,7 +695,9 @@ fn function_body(
     start: H::Label,
     blocks_map: H::BasicBlocks,
 ) -> (Vec<(IR::Var, IR::Type)>, IR::BytecodeBlocks) {
-    parameters.iter().for_each(|(_, var, _)| assert!(locals_map.remove(var).is_some()));
+    parameters
+        .iter()
+        .for_each(|(_, var, _)| assert!(locals_map.remove(var).is_some()));
     let mut locals = locals_map
         .into_iter()
         .filter(|(_, (_, ty))| {
@@ -593,11 +749,18 @@ fn var(v: Var) -> IR::Var {
 
 fn field(f: Field) -> IR::Field {
     // If it's a positional field, lower it into `pos{field_idx}` so they're a valid identifier
-    let field_ident = if f.0.value.parse::<u8>().is_ok() { format!("pos{}", f.0.value).into() } else { f.0.value };
+    let field_ident = if f.0.value.parse::<u8>().is_ok() {
+        format!("pos{}", f.0.value).into()
+    } else {
+        f.0.value
+    };
     sp(f.0.loc, IR::Field_(field_ident))
 }
 
-fn struct_definition_name(context: &mut Context, sp!(_, t_): H::Type) -> (IR::DatatypeName, Vec<IR::Type>) {
+fn struct_definition_name(
+    context: &mut Context,
+    sp!(_, t_): H::Type,
+) -> (IR::DatatypeName, Vec<IR::Type>) {
     match t_ {
         H::Type_::Single(st) => struct_definition_name_single(context, st),
         _ => panic!("ICE expected single type"),
@@ -609,16 +772,22 @@ fn struct_definition_name_single(
     sp!(_, st_): H::SingleType,
 ) -> (IR::DatatypeName, Vec<IR::Type>) {
     match st_ {
-        H::SingleType_::Ref(_, bt) | H::SingleType_::Base(bt) => struct_definition_name_base(context, bt),
+        H::SingleType_::Ref(_, bt) | H::SingleType_::Base(bt) => {
+            struct_definition_name_base(context, bt)
+        }
     }
 }
 
-fn struct_definition_name_base(context: &mut Context, sp!(_, bt_): H::BaseType) -> (IR::DatatypeName, Vec<IR::Type>) {
+fn struct_definition_name_base(
+    context: &mut Context,
+    sp!(_, bt_): H::BaseType,
+) -> (IR::DatatypeName, Vec<IR::Type>) {
     use H::{BaseType_ as B, TypeName_ as TN};
     match bt_ {
-        B::Apply(_, sp!(_, TN::ModuleType(m, s)), tys) => {
-            (context.struct_definition_name(&m, s), base_types(context, tys))
-        }
+        B::Apply(_, sp!(_, TN::ModuleType(m, s)), tys) => (
+            context.struct_definition_name(&m, s),
+            base_types(context, tys),
+        ),
         _ => panic!("ICE expected module struct type"),
     }
 }
@@ -643,7 +812,9 @@ fn abilities(set: &AbilitySet) -> BTreeSet<IR::Ability> {
 }
 
 fn fun_type_parameters(tps: Vec<TParam>) -> Vec<(IR::TypeVar, BTreeSet<IR::Ability>)> {
-    tps.into_iter().map(|tp| (type_var(tp.user_specified_name), abilities(&tp.abilities))).collect()
+    tps.into_iter()
+        .map(|tp| (type_var(tp.user_specified_name), abilities(&tp.abilities)))
+        .collect()
 }
 
 fn datatype_type_parameters(tps: Vec<DatatypeTypeParameter>) -> Vec<IR::DatatypeTypeParameter> {
@@ -679,7 +850,10 @@ fn base_type(context: &mut Context, sp!(bt_loc, bt_): H::BaseType) -> IR::Type {
 
         B::Apply(_, sp!(_, TN::Builtin(sp!(_, BT::Bool))), _) => IRT::Bool,
         B::Apply(_, sp!(_, TN::Builtin(sp!(_, BT::Vector))), mut args) => {
-            assert!(args.len() == 1, "ICE vector must have exactly 1 type argument");
+            assert!(
+                args.len() == 1,
+                "ICE vector must have exactly 1 type argument"
+            );
             IRT::Vector(Box::new(base_type(context, args.pop().unwrap())))
         }
         B::Apply(_, sp!(_, TN::ModuleType(m, s)), tys) => {
@@ -687,7 +861,10 @@ fn base_type(context: &mut Context, sp!(bt_loc, bt_): H::BaseType) -> IR::Type {
             let tys = base_types(context, tys);
             IRT::Datatype(n, tys)
         }
-        B::Param(TParam { user_specified_name, .. }) => IRT::TypeParameter(type_var(user_specified_name).value),
+        B::Param(TParam {
+            user_specified_name,
+            ..
+        }) => IRT::TypeParameter(type_var(user_specified_name).value),
     };
     sp(bt_loc, type_)
 }
@@ -697,7 +874,10 @@ fn single_type(context: &mut Context, sp!(st_loc, st_): H::SingleType) -> IR::Ty
     use IR::Type_ as IRT;
     match st_ {
         S::Base(bt) => base_type(context, bt),
-        S::Ref(mut_, bt) => sp(st_loc, IRT::Reference(mut_, Box::new(base_type(context, bt)))),
+        S::Ref(mut_, bt) => sp(
+            st_loc,
+            IRT::Reference(mut_, Box::new(base_type(context, bt))),
+        ),
     }
 }
 
@@ -746,12 +926,20 @@ fn command(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, cmd_): 
             }
         }
         C::Jump { target, .. } => code.push(sp(loc, B::Branch(label(target)))),
-        C::JumpIf { cond, if_true, if_false } => {
+        C::JumpIf {
+            cond,
+            if_true,
+            if_false,
+        } => {
             exp(context, code, cond);
             code.push(sp(loc, B::BrFalse(label(if_false))));
             code.push(sp(loc, B::Branch(label(if_true))));
         }
-        C::VariantSwitch { subject, enum_name, arms } => {
+        C::VariantSwitch {
+            subject,
+            enum_name,
+            arms,
+        } => {
             exp(context, code, subject);
             let name = context.enum_definition_name(context.current_module().unwrap(), enum_name);
             let arms = arms
@@ -783,7 +971,11 @@ fn lvalue(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, l_): H::
     use IR::Bytecode_ as B;
     match l_ {
         L::Ignore => code.push(sp(loc, B::Pop)),
-        L::Var { var: v, unused_assignment, ty } => {
+        L::Var {
+            var: v,
+            unused_assignment,
+            ty,
+        } => {
             if unused_assignment && ty.value.abilities(loc).has_ability_(Ability_::Drop) {
                 code.push(sp(loc, B::Pop));
             } else {
@@ -809,14 +1001,24 @@ fn lvalue(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, l_): H::
             let n = context.enum_definition_name(context.current_module().unwrap(), e);
             code.push(sp(
                 loc,
-                B::UnpackVariant(n, context.variant_name(v), base_types(context, tys), convert_unpack_type(unpack_type)),
+                B::UnpackVariant(
+                    n,
+                    context.variant_name(v),
+                    base_types(context, tys),
+                    convert_unpack_type(unpack_type),
+                ),
             ));
         }
         L::UnpackVariant(e, v, unpack_type, _rhs_loc, tys, field_ls) => {
             let n = context.enum_definition_name(context.current_module().unwrap(), e);
             code.push(sp(
                 loc,
-                B::UnpackVariant(n, context.variant_name(v), base_types(context, tys), convert_unpack_type(unpack_type)),
+                B::UnpackVariant(
+                    n,
+                    context.variant_name(v),
+                    base_types(context, tys),
+                    convert_unpack_type(unpack_type),
+                ),
             ));
 
             lvalues_(context, code, field_ls.into_iter().map(|(_, l)| l));
@@ -862,8 +1064,9 @@ fn exp(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                     }
                 }
                 v_ @ V::Address(_) | v_ @ V::Vector(_, _) => {
-                    let [ty]: [IR::Type; 1] =
-                        types(context, e.ty).try_into().expect("ICE value type should have one element");
+                    let [ty]: [IR::Type; 1] = types(context, e.ty)
+                        .try_into()
+                        .expect("ICE value type should have one element");
                     B::LdConst(ty, move_value_from_value_(v_))
                 }
             };
@@ -876,24 +1079,41 @@ fn exp(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
 
         E::Constant(c) => code.push(sp(loc, B::LdNamedConst(context.constant_name(c)))),
 
-        E::ErrorConstant { line_number_loc, error_constant } => {
-            let line_no = context.env.mapped_files().start_position(&line_number_loc).user_line();
+        E::ErrorConstant {
+            line_number_loc,
+            error_constant,
+        } => {
+            let line_no = context
+                .env
+                .mapped_files()
+                .start_position(&line_number_loc)
+                .user_line();
 
             // Clamp line number to u16::MAX -- so if the line number exceeds u16::MAX, we don't
             // record the line number essentially.
             let line_number = std::cmp::min(line_no, u16::MAX as usize) as u16;
 
-            code.push(sp(loc, B::ErrorConstant {
-                line_number,
-                constant: error_constant.map(|n| context.constant_name(n)),
-            }));
+            code.push(sp(
+                loc,
+                B::ErrorConstant {
+                    line_number,
+                    constant: error_constant.map(|n| context.constant_name(n)),
+                },
+            ));
         }
 
         E::ModuleCall(mcall) => {
             for arg in mcall.arguments {
                 exp(context, code, arg);
             }
-            module_call(context, loc, code, mcall.module, mcall.name, mcall.type_arguments);
+            module_call(
+                context,
+                loc,
+                code,
+                mcall.module,
+                mcall.name,
+                mcall.type_arguments,
+            );
         }
 
         E::Freeze(er) => {
@@ -969,12 +1189,20 @@ fn exp(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
         E::Borrow(mut_, el, f, _) => {
             let (n, tys) = struct_definition_name(context, el.ty.clone());
             exp(context, code, *el);
-            let instr = if mut_ { B::MutBorrowField(n, tys, field(f)) } else { B::ImmBorrowField(n, tys, field(f)) };
+            let instr = if mut_ {
+                B::MutBorrowField(n, tys, field(f))
+            } else {
+                B::ImmBorrowField(n, tys, field(f))
+            };
             code.push(sp(loc, instr));
         }
 
         E::BorrowLocal(mut_, v) => {
-            let instr = if mut_ { B::MutBorrowLoc(var(v)) } else { B::ImmBorrowLoc(var(v)) };
+            let instr = if mut_ {
+                B::MutBorrowLoc(var(v))
+            } else {
+                B::ImmBorrowLoc(var(v))
+            };
             code.push(sp(loc, instr));
         }
 
@@ -1018,38 +1246,44 @@ fn module_call(
 fn unary_op(code: &mut IR::BytecodeBlock, sp!(loc, op_): UnaryOp) {
     use UnaryOp_ as O;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match op_ {
-        O::Not => B::Not,
-    }));
+    code.push(sp(
+        loc,
+        match op_ {
+            O::Not => B::Not,
+        },
+    ));
 }
 
 fn binary_op(code: &mut IR::BytecodeBlock, sp!(loc, op_): BinOp) {
     use BinOp_ as O;
     use IR::Bytecode_ as B;
-    code.push(sp(loc, match op_ {
-        O::Add => B::Add,
-        O::Sub => B::Sub,
-        O::Mul => B::Mul,
-        O::Mod => B::Mod,
-        O::Div => B::Div,
-        O::BitOr => B::BitOr,
-        O::BitAnd => B::BitAnd,
-        O::Xor => B::Xor,
-        O::Shl => B::Shl,
-        O::Shr => B::Shr,
+    code.push(sp(
+        loc,
+        match op_ {
+            O::Add => B::Add,
+            O::Sub => B::Sub,
+            O::Mul => B::Mul,
+            O::Mod => B::Mod,
+            O::Div => B::Div,
+            O::BitOr => B::BitOr,
+            O::BitAnd => B::BitAnd,
+            O::Xor => B::Xor,
+            O::Shl => B::Shl,
+            O::Shr => B::Shr,
 
-        O::And => B::And,
-        O::Or => B::Or,
+            O::And => B::And,
+            O::Or => B::Or,
 
-        O::Eq => B::Eq,
-        O::Neq => B::Neq,
+            O::Eq => B::Eq,
+            O::Neq => B::Neq,
 
-        O::Lt => B::Lt,
-        O::Gt => B::Gt,
+            O::Lt => B::Lt,
+            O::Gt => B::Gt,
 
-        O::Le => B::Le,
-        O::Ge => B::Ge,
+            O::Le => B::Le,
+            O::Ge => B::Ge,
 
-        O::Range | O::Implies | O::Iff => panic!("specification operator unexpected"),
-    }));
+            O::Range | O::Implies | O::Iff => panic!("specification operator unexpected"),
+        },
+    ));
 }

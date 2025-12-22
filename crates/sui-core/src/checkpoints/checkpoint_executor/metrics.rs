@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use mysten_metrics::histogram::Histogram as MystenHistogram;
 use prometheus::{
     register_histogram_with_registry,
@@ -11,7 +13,6 @@ use prometheus::{
     IntGauge,
     Registry,
 };
-use std::sync::Arc;
 
 pub struct CheckpointExecutorMetrics {
     pub checkpoint_exec_sync_tps: IntGauge,

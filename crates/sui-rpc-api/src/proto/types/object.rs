@@ -1,18 +1,19 @@
-use super::TryFromProtoError;
 use tap::Pipe;
+
+use super::TryFromProtoError;
 
 //
 // ObjectReference
 //
 
-impl From<sui_sdk_types::types::ObjectReference> for super::ObjectReference {
-    fn from(value: sui_sdk_types::types::ObjectReference) -> Self {
+impl From<sui_sdk_types::ObjectReference> for super::ObjectReference {
+    fn from(value: sui_sdk_types::ObjectReference) -> Self {
         let (object_id, version, digest) = value.into_parts();
         Self { object_id: Some(object_id.into()), version: Some(version), digest: Some(digest.into()) }
     }
 }
 
-impl TryFrom<&super::ObjectReference> for sui_sdk_types::types::ObjectReference {
+impl TryFrom<&super::ObjectReference> for sui_sdk_types::ObjectReference {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::ObjectReference) -> Result<Self, Self::Error> {
@@ -30,8 +31,8 @@ impl TryFrom<&super::ObjectReference> for sui_sdk_types::types::ObjectReference 
 // Object
 //
 
-impl From<sui_sdk_types::types::Object> for super::Object {
-    fn from(value: sui_sdk_types::types::Object) -> Self {
+impl From<sui_sdk_types::Object> for super::Object {
+    fn from(value: sui_sdk_types::Object) -> Self {
         Self {
             object_id: Some(value.object_id().into()),
             version: Some(value.version()),
@@ -43,7 +44,7 @@ impl From<sui_sdk_types::types::Object> for super::Object {
     }
 }
 
-impl TryFrom<&super::Object> for sui_sdk_types::types::Object {
+impl TryFrom<&super::Object> for sui_sdk_types::Object {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::Object) -> Result<Self, Self::Error> {
@@ -65,10 +66,11 @@ impl TryFrom<&super::Object> for sui_sdk_types::types::Object {
 // Owner
 //
 
-impl From<sui_sdk_types::types::Owner> for super::Owner {
-    fn from(value: sui_sdk_types::types::Owner) -> Self {
+impl From<sui_sdk_types::Owner> for super::Owner {
+    fn from(value: sui_sdk_types::Owner) -> Self {
+        use sui_sdk_types::Owner::*;
+
         use super::owner::Kind;
-        use sui_sdk_types::types::Owner::*;
 
         let kind = match value {
             Address(address) => Kind::Address(address.into()),
@@ -81,7 +83,7 @@ impl From<sui_sdk_types::types::Owner> for super::Owner {
     }
 }
 
-impl TryFrom<&super::Owner> for sui_sdk_types::types::Owner {
+impl TryFrom<&super::Owner> for sui_sdk_types::Owner {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::Owner) -> Result<Self, Self::Error> {
@@ -101,10 +103,11 @@ impl TryFrom<&super::Owner> for sui_sdk_types::types::Owner {
 // ObjectData
 //
 
-impl From<sui_sdk_types::types::ObjectData> for super::ObjectData {
-    fn from(value: sui_sdk_types::types::ObjectData) -> Self {
+impl From<sui_sdk_types::ObjectData> for super::ObjectData {
+    fn from(value: sui_sdk_types::ObjectData) -> Self {
+        use sui_sdk_types::ObjectData::*;
+
         use super::object_data::Kind;
-        use sui_sdk_types::types::ObjectData::*;
 
         let kind = match value {
             Struct(s) => Kind::Struct(s.into()),
@@ -115,7 +118,7 @@ impl From<sui_sdk_types::types::ObjectData> for super::ObjectData {
     }
 }
 
-impl TryFrom<&super::ObjectData> for sui_sdk_types::types::ObjectData {
+impl TryFrom<&super::ObjectData> for sui_sdk_types::ObjectData {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::ObjectData) -> Result<Self, Self::Error> {
@@ -133,8 +136,8 @@ impl TryFrom<&super::ObjectData> for sui_sdk_types::types::ObjectData {
 // MoveStruct
 //
 
-impl From<sui_sdk_types::types::MoveStruct> for super::MoveStruct {
-    fn from(value: sui_sdk_types::types::MoveStruct) -> Self {
+impl From<sui_sdk_types::MoveStruct> for super::MoveStruct {
+    fn from(value: sui_sdk_types::MoveStruct) -> Self {
         Self {
             object_id: Some(value.object_id().into()),
             object_type: Some(value.object_type().to_owned().into()),
@@ -145,7 +148,7 @@ impl From<sui_sdk_types::types::MoveStruct> for super::MoveStruct {
     }
 }
 
-impl TryFrom<&super::MoveStruct> for sui_sdk_types::types::MoveStruct {
+impl TryFrom<&super::MoveStruct> for sui_sdk_types::MoveStruct {
     type Error = TryFromProtoError;
 
     fn try_from(
@@ -167,8 +170,8 @@ impl TryFrom<&super::MoveStruct> for sui_sdk_types::types::MoveStruct {
 // MovePackage
 //
 
-impl From<sui_sdk_types::types::MovePackage> for super::MovePackage {
-    fn from(value: sui_sdk_types::types::MovePackage) -> Self {
+impl From<sui_sdk_types::MovePackage> for super::MovePackage {
+    fn from(value: sui_sdk_types::MovePackage) -> Self {
         let modules = value
             .modules
             .into_iter()
@@ -180,12 +183,10 @@ impl From<sui_sdk_types::types::MovePackage> for super::MovePackage {
         let linkage_table = value
             .linkage_table
             .into_iter()
-            .map(|(original_id, sui_sdk_types::types::UpgradeInfo { upgraded_id, upgraded_version })| {
-                super::UpgradeInfo {
-                    original_id: Some(original_id.into()),
-                    upgraded_id: Some(upgraded_id.into()),
-                    upgraded_version: Some(upgraded_version),
-                }
+            .map(|(original_id, sui_sdk_types::UpgradeInfo { upgraded_id, upgraded_version })| super::UpgradeInfo {
+                original_id: Some(original_id.into()),
+                upgraded_id: Some(upgraded_id.into()),
+                upgraded_version: Some(upgraded_version),
             })
             .collect();
 
@@ -193,7 +194,7 @@ impl From<sui_sdk_types::types::MovePackage> for super::MovePackage {
     }
 }
 
-impl TryFrom<&super::MovePackage> for sui_sdk_types::types::MovePackage {
+impl TryFrom<&super::MovePackage> for sui_sdk_types::MovePackage {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::MovePackage) -> Result<Self, Self::Error> {
@@ -231,7 +232,7 @@ impl TryFrom<&super::MovePackage> for sui_sdk_types::types::MovePackage {
                 let upgraded_version =
                     upgrade_info.upgraded_version.ok_or_else(|| TryFromProtoError::missing("upgraded_version"))?;
 
-                Ok((original_id, sui_sdk_types::types::UpgradeInfo { upgraded_id, upgraded_version }))
+                Ok((original_id, sui_sdk_types::UpgradeInfo { upgraded_id, upgraded_version }))
             })
             .collect::<Result<_, TryFromProtoError>>()?;
 
@@ -245,8 +246,8 @@ impl TryFrom<&super::MovePackage> for sui_sdk_types::types::MovePackage {
 // TypeOrigin
 //
 
-impl From<sui_sdk_types::types::TypeOrigin> for super::TypeOrigin {
-    fn from(value: sui_sdk_types::types::TypeOrigin) -> Self {
+impl From<sui_sdk_types::TypeOrigin> for super::TypeOrigin {
+    fn from(value: sui_sdk_types::TypeOrigin) -> Self {
         Self {
             module_name: Some(value.module_name.into()),
             struct_name: Some(value.struct_name.into()),
@@ -255,7 +256,7 @@ impl From<sui_sdk_types::types::TypeOrigin> for super::TypeOrigin {
     }
 }
 
-impl TryFrom<&super::TypeOrigin> for sui_sdk_types::types::TypeOrigin {
+impl TryFrom<&super::TypeOrigin> for sui_sdk_types::TypeOrigin {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::TypeOrigin) -> Result<Self, Self::Error> {
@@ -275,8 +276,8 @@ impl TryFrom<&super::TypeOrigin> for sui_sdk_types::types::TypeOrigin {
 // GenesisObject
 //
 
-impl From<sui_sdk_types::types::GenesisObject> for super::GenesisObject {
-    fn from(value: sui_sdk_types::types::GenesisObject) -> Self {
+impl From<sui_sdk_types::GenesisObject> for super::GenesisObject {
+    fn from(value: sui_sdk_types::GenesisObject) -> Self {
         Self {
             object_id: Some(value.object_id().into()),
             version: Some(value.version()),
@@ -286,7 +287,7 @@ impl From<sui_sdk_types::types::GenesisObject> for super::GenesisObject {
     }
 }
 
-impl TryFrom<&super::GenesisObject> for sui_sdk_types::types::GenesisObject {
+impl TryFrom<&super::GenesisObject> for sui_sdk_types::GenesisObject {
     type Error = TryFromProtoError;
 
     fn try_from(value: &super::GenesisObject) -> Result<Self, Self::Error> {

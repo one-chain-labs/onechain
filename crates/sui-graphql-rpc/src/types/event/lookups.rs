@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt::Write;
+
+use super::Cursor;
 use crate::{
     data::pg::bytea_literal,
     filter,
@@ -13,10 +16,6 @@ use crate::{
         type_filter::{ModuleFilter, TypeFilter},
     },
 };
-
-use std::fmt::Write;
-
-use super::Cursor;
 
 fn select_ev(sender: Option<SuiAddress>, from: &str) -> RawQuery {
     let query = query!(format!("SELECT tx_sequence_number, event_sequence_number FROM {}", from));

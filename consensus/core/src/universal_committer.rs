@@ -59,10 +59,11 @@ impl UniversalCommitter {
         // reason to try and iterate on higher rounds as in order to make a direct
         // decision for a leader at round R we need blocks from round R+2 to figure
         // out that enough certificates and support exist to commit a leader.
-        'outer: for round in (last_round..=highest_accepted_round.saturating_sub(2)).rev() {
+        'outer: for round in (last_round ..= highest_accepted_round.saturating_sub(2)).rev() {
             for committer in self.committers.iter().rev() {
                 // Skip committers that don't have a leader for this round.
                 let Some(slot) = committer.elect_leader(round) else {
+                    tracing::debug!("No leader for round {round}, skipping");
                     continue;
                 };
 
@@ -98,7 +99,7 @@ impl UniversalCommitter {
             let Some(decided_leader) = leader.into_decided_leader() else {
                 break;
             };
-            self.update_metrics(&decided_leader, decision);
+            Self::update_metrics(&self.context, &decided_leader, decision);
             decided_leaders.push(decided_leader);
         }
         tracing::debug!("Decided {decided_leaders:?}");
@@ -112,14 +113,18 @@ impl UniversalCommitter {
     }
 
     /// Update metrics.
-    fn update_metrics(&self, decided_leader: &DecidedLeader, decision: Decision) {
-        let decision_str = if decision == Decision::Direct { "direct" } else { "indirect" };
+    pub(crate) fn update_metrics(context: &Context, decided_leader: &DecidedLeader, decision: Decision) {
+        let decision_str = match decision {
+            Decision::Direct => "direct",
+            Decision::Indirect => "indirect",
+            Decision::Certified => "certified",
+        };
         let status = match decided_leader {
             DecidedLeader::Commit(..) => format!("{decision_str}-commit"),
             DecidedLeader::Skip(..) => format!("{decision_str}-skip"),
         };
-        let leader_host = &self.context.committee.authority(decided_leader.slot().authority).hostname;
-        self.context.metrics.node_metrics.committed_leaders_total.with_label_values(&[leader_host, &status]).inc();
+        let leader_host = &context.committee.authority(decided_leader.slot().authority).hostname;
+        context.metrics.node_metrics.committed_leaders_total.with_label_values(&[leader_host, &status]).inc();
     }
 }
 
@@ -173,8 +178,8 @@ pub(crate) mod universal_committer_builder {
         pub(crate) fn build(self) -> UniversalCommitter {
             let mut committers = Vec::new();
             let pipeline_stages = if self.pipeline { self.wave_length } else { 1 };
-            for round_offset in 0..pipeline_stages {
-                for leader_offset in 0..self.number_of_leaders {
+            for round_offset in 0 .. pipeline_stages {
+                for leader_offset in 0 .. self.number_of_leaders {
                     let options = BaseCommitterOptions {
                         wave_length: self.wave_length,
                         round_offset,

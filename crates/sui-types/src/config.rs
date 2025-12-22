@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::base_types::EpochId;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -10,7 +9,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{id::UID, MoveTypeTagTrait, SUI_FRAMEWORK_ADDRESS};
+use crate::{base_types::EpochId, id::UID, MoveTypeTagTrait, SUI_FRAMEWORK_ADDRESS};
 
 pub const CONFIG_MODULE_NAME: &IdentStr = ident_str!("config");
 pub const CONFIG_STRUCT_NAME: &IdentStr = ident_str!("Config");

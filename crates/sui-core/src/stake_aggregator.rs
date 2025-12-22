@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::Serialize;
-use shared_crypto::intent::Intent;
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
     hash::Hash,
     sync::Arc,
 };
+
+use serde::Serialize;
+use shared_crypto::intent::Intent;
 use sui_types::{
     base_types::{AuthorityName, ConciseableName},
     committee::{Committee, CommitteeTrait, StakeUnit},

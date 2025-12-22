@@ -1,20 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    consistency::ConsistentIndexCursor,
-    data::{apys::calculate_apy, DataLoader, Db},
-    types::cursor::{JsonCursor, Page},
-};
+use std::collections::{BTreeMap, HashMap};
+
 use async_graphql::{
     connection::{Connection, CursorType, Edge},
     dataloader::Loader,
+    *,
 };
-use std::collections::{BTreeMap, HashMap};
-use sui_indexer::apis::GovernanceReadApi;
-use sui_types::{committee::EpochId, sui_system_state::PoolTokenExchangeRate};
-
-use sui_types::base_types::SuiAddress as NativeSuiAddress;
+use sui_indexer::apis::{governance_api::exchange_rates, GovernanceReadApi};
+use sui_types::{
+    base_types::SuiAddress as NativeSuiAddress,
+    committee::EpochId,
+    sui_system_state::{
+        sui_system_state_summary::SuiValidatorSummary as NativeSuiValidatorSummary,
+        PoolTokenExchangeRate,
+    },
+};
 
 use super::{
     address::Address,
@@ -27,10 +29,12 @@ use super::{
     uint53::UInt53,
     validator_credentials::ValidatorCredentials,
 };
-use crate::error::Error;
-use async_graphql::*;
-use sui_indexer::apis::governance_api::exchange_rates;
-use sui_types::sui_system_state::sui_system_state_summary::SuiValidatorSummary as NativeSuiValidatorSummary;
+use crate::{
+    consistency::ConsistentIndexCursor,
+    data::{apys::calculate_apy, DataLoader, Db},
+    error::Error,
+    types::cursor::{JsonCursor, Page},
+};
 #[derive(Clone, Debug)]
 pub(crate) struct Validator {
     pub validator_summary: NativeSuiValidatorSummary,
@@ -223,7 +227,7 @@ impl Validator {
         self.validator_summary.staking_pool_activation_epoch.map(UInt53::from)
     }
 
-    /// The total number of OCT tokens in this pool.
+    /// The total number of SUI tokens in this pool.
     async fn staking_pool_oct_balance(&self) -> Option<BigInt> {
         Some(BigInt::from(self.validator_summary.staking_pool_oct_balance))
     }
@@ -270,7 +274,7 @@ impl Validator {
         Some(self.validator_summary.commission_rate)
     }
 
-    /// The total number of OCT tokens in this pool plus
+    /// The total number of SUI tokens in this pool plus
     /// the pending stake amount for this epoch.
     async fn next_epoch_stake(&self) -> Option<BigInt> {
         Some(BigInt::from(self.validator_summary.next_epoch_stake))

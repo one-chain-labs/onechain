@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
+use std::{
+    future::Future,
+    task::{Context, Poll},
+};
+
 use async_trait::async_trait;
-use std::future::Future;
 // TODO: complete tests - This kinda sorta facades the whole tokio::mpsc::{Sender, Receiver}: without tests, this will be fragile to maintain.
 use futures::{FutureExt, Stream, TryFutureExt};
 use prometheus::{IntCounter, IntGauge};
-use std::task::{Context, Poll};
 use tokio::sync::mpsc::{
     self,
     error::{SendError, TryRecvError, TrySendError},
@@ -147,7 +150,7 @@ impl<'a, T> Permit<'a, T> {
     }
 }
 
-impl<'a, T> Drop for Permit<'a, T> {
+impl<T> Drop for Permit<'_, T> {
     fn drop(&mut self) {
         // in the case the permit is dropped without sending, we still want to decrease the occupancy of the channel
         if self.permit.is_some() {
@@ -235,11 +238,10 @@ impl<T> Sender<T> {
 }
 
 ////////////////////////////////
-/// Stream API Wrappers!
+// Stream API Wrappers!
 ////////////////////////////////
 
 /// A wrapper around [`crate::metered_channel::Receiver`] that implements [`Stream`].
-///
 #[derive(Debug)]
 pub struct ReceiverStream<T> {
     inner: Receiver<T>,
@@ -292,7 +294,7 @@ impl<T> From<Receiver<T>> for ReceiverStream<T> {
 // TODO: add prom metrics reporting for gauge and migrate all existing use cases.
 
 ////////////////////////////////////////////////////////////////
-/// Constructor
+// Constructor
 ////////////////////////////////////////////////////////////////
 
 /// Similar to `mpsc::channel`, `channel` creates a pair of `Sender` and `Receiver`

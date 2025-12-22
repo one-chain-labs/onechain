@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::gas_charger::GasCharger;
+use std::collections::{BTreeMap, HashSet};
+
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag, resolver::ResourceResolver};
 use parking_lot::RwLock;
-use std::collections::{BTreeMap, HashSet};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
     base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest, VersionDigest},
@@ -38,6 +38,8 @@ use sui_types::{
     SUI_SYSTEM_STATE_OBJECT_ID,
 };
 
+use crate::gas_charger::GasCharger;
+
 pub struct TemporaryStore<'backing> {
     // The backing store for retrieving Move packages onchain.
     // When executing a Move call, the dependent packages are not going to be
@@ -47,6 +49,7 @@ pub struct TemporaryStore<'backing> {
     store: &'backing dyn BackingStore,
     tx_digest: TransactionDigest,
     input_objects: BTreeMap<ObjectID, Object>,
+    deleted_consensus_objects: BTreeMap<ObjectID, SequenceNumber>,
     /// The version to assign to all objects written by the transaction using this store.
     lamport_timestamp: SequenceNumber,
     mutable_input_refs: BTreeMap<ObjectID, (VersionDigest, Owner)>, // Inputs that are mutable
@@ -79,12 +82,14 @@ impl<'backing> TemporaryStore<'backing> {
     ) -> Self {
         let mutable_input_refs = input_objects.mutable_inputs();
         let lamport_timestamp = input_objects.lamport_timestamp(&[]);
+        let deleted_consensus_objects = input_objects.deleted_consensus_objects();
         let objects = input_objects.into_object_map();
 
         Self {
             store,
             tx_digest,
             input_objects: objects,
+            deleted_consensus_objects,
             lamport_timestamp,
             mutable_input_refs,
             written: BTreeMap::new(),
@@ -145,6 +150,7 @@ impl<'backing> TemporaryStore<'backing> {
     pub fn into_inner(self) -> InnerTemporaryStore {
         InnerTemporaryStore {
             input_objects: self.input_objects,
+            deleted_consensus_objects: self.deleted_consensus_objects,
             mutable_inputs: self.mutable_input_refs,
             written: self.written.into_iter().map(|(id, (obj, _))| (id, obj)).collect(),
             events: TransactionEvents { data: self.events },
@@ -453,14 +459,14 @@ impl<'backing> TemporaryStore<'backing> {
             .expect("0x5 object must be muated in system tx with unmetered storage rebate")
             .clone();
         // In unmetered execution, storage_rebate field of mutated object must be 0.
-        // If not, we would be dropping SUI on the floor by overriding it.
+        // If not, we would be dropping OCT on the floor by overriding it.
         assert_eq!(system_state_wrapper.storage_rebate, 0);
         system_state_wrapper.storage_rebate = unmetered_storage_rebate;
         self.write_object(system_state_wrapper, WriteKind::Mutate);
     }
 }
 
-impl<'backing> TemporaryStore<'backing> {
+impl TemporaryStore<'_> {
     /// returns lists of (objects whose owner we must authenticate, objects whose owner has already been authenticated)
     fn get_objects_to_authenticate(
         &self,
@@ -613,7 +619,7 @@ impl<'backing> TemporaryStore<'backing> {
     }
 }
 
-impl<'backing> TemporaryStore<'backing> {
+impl TemporaryStore<'_> {
     /// Return the storage rebate of object `id`
     fn get_input_storage_rebate(&self, id: &ObjectID, expected_version: SequenceNumber) -> u64 {
         // A mutated object must either be from input object or child object.
@@ -709,7 +715,7 @@ impl<'backing> TemporaryStore<'backing> {
 // Charge gas current - end
 //==============================================================================
 
-impl<'backing> TemporaryStore<'backing> {
+impl TemporaryStore<'_> {
     pub fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams, protocol_config: &ProtocolConfig) {
         let wrapper =
             get_sui_system_state_wrapper(self.store.as_object_store()).expect("System state wrapper object must exist");
@@ -720,7 +726,7 @@ impl<'backing> TemporaryStore<'backing> {
 
 type ModifiedObjectInfo<'a> = (ObjectID, Option<(SequenceNumber, u64)>, Option<&'a Object>);
 
-impl<'backing> TemporaryStore<'backing> {
+impl TemporaryStore<'_> {
     fn get_input_oct(
         &self,
         id: &ObjectID,
@@ -739,7 +745,7 @@ impl<'backing> TemporaryStore<'backing> {
             }
             obj.get_total_oct(layout_resolver).map_err(|e| {
                 make_invariant_violation!(
-                    "Failed looking up input SUI in SUI conservation checking for input with \
+                    "Failed looking up input OCT in OCT conservation checking for input with \
                          type {:?}: {e:#?}",
                     obj.struct_tag(),
                 )
@@ -747,11 +753,11 @@ impl<'backing> TemporaryStore<'backing> {
         } else {
             // not in input objects, must be a dynamic field
             let Some(obj) = self.store.get_object_by_key(id, expected_version) else {
-                invariant_violation!("Failed looking up dynamic field {id} in SUI conservation checking");
+                invariant_violation!("Failed looking up dynamic field {id} in OCT conservation checking");
             };
             obj.get_total_oct(layout_resolver).map_err(|e| {
                 make_invariant_violation!(
-                    "Failed looking up input SUI in SUI conservation checking for type \
+                    "Failed looking up input OCT in OCT conservation checking for type \
                          {:?}: {e:#?}",
                     obj.struct_tag(),
                 )
@@ -787,19 +793,19 @@ impl<'backing> TemporaryStore<'backing> {
             .collect()
     }
 
-    /// Check that this transaction neither creates nor destroys SUI. This should hold for all txes
+    /// Check that this transaction neither creates nor destroys OCT. This should hold for all txes
     /// except the epoch change tx, which mints staking rewards equal to the gas fees burned in the
     /// previous epoch.  Specifically, this checks two key invariants about storage fees and storage
     /// rebate:
     ///
-    /// 1. all SUI in storage rebate fields of input objects should flow either to the transaction
+    /// 1. all OCT in storage rebate fields of input objects should flow either to the transaction
     ///    storage rebate, or the transaction non-refundable storage rebate
-    /// 2. all SUI charged for storage should flow into the storage rebate field of some output
+    /// 2. all OCT charged for storage should flow into the storage rebate field of some output
     ///    object
     ///
     /// If `do_expensive_checks` is true, this will also check a third invariant:
     ///
-    /// 3. all SUI in input objects (including coins etc in the Move part of an object) should flow
+    /// 3. all OCT in input objects (including coins etc in the Move part of an object) should flow
     ///    either to an output object, or be burned as part of computation fees or non-refundable
     ///    storage rebate
     ///
@@ -807,8 +813,8 @@ impl<'backing> TemporaryStore<'backing> {
     /// rebate to the gas object, but *before* we have updated object versions.  If
     /// `do_expensive_checks` is false, this function will only check conservation of object storage
     /// rea `epoch_fees` and `epoch_rebates` are only set for advance epoch transactions.  The
-    /// advance epoch transaction would mint `epoch_fees` amount of SUI, and burn `epoch_rebates`
-    /// amount of SUI. We need these information for conservation check.
+    /// advance epoch transaction would mint `epoch_fees` amount of OCT, and burn `epoch_rebates`
+    /// amount of OCT. We need these information for conservation check.
     pub fn check_sui_conserved(
         &self,
         gas_summary: &GasCostSummary,
@@ -816,13 +822,13 @@ impl<'backing> TemporaryStore<'backing> {
         layout_resolver: &mut impl LayoutResolver,
         do_expensive_checks: bool,
     ) -> Result<(), ExecutionError> {
-        // total amount of SUI in input objects, including both coins and storage rebates
+        // total amount of OCT in input objects, including both coins and storage rebates
         let mut total_input_oct = 0;
-        // total amount of SUI in output objects, including both coins and storage rebates
+        // total amount of OCT in output objects, including both coins and storage rebates
         let mut total_output_oct = 0;
-        // total amount of SUI in storage rebate of input objects
+        // total amount of OCT in storage rebate of input objects
         let mut total_input_rebate = 0;
-        // total amount of SUI in storage rebate of output objects
+        // total amount of OCT in storage rebate of output objects
         let mut total_output_rebate = 0;
         for (id, input, output) in self.get_modified_objects() {
             if let Some((version, storage_rebate)) = input {
@@ -836,7 +842,7 @@ impl<'backing> TemporaryStore<'backing> {
                 if do_expensive_checks {
                     total_output_oct += object.get_total_oct(layout_resolver).map_err(|e| {
                         make_invariant_violation!(
-                            "Failed looking up output SUI in SUI conservation checking for \
+                            "Failed looking up output OCT in OCT conservation checking for \
                              mutated type {:?}: {e:#?}",
                             object.struct_tag(),
                         )
@@ -855,28 +861,28 @@ impl<'backing> TemporaryStore<'backing> {
             }
             if total_input_oct != total_output_oct {
                 return Err(ExecutionError::invariant_violation(format!(
-                    "SUI conservation failed: input={}, output={}, this transaction either mints or burns SUI",
+                    "OCT conservation failed: input={}, output={}, this transaction either mints or burns OCT",
                     total_input_oct, total_output_oct
                 )));
             }
         }
 
-        // all SUI in storage rebate fields of input objects should flow either to the transaction storage rebate, or the non-refundable
+        // all OCT in storage rebate fields of input objects should flow either to the transaction storage rebate, or the non-refundable
         // storage rebate pool
         if total_input_rebate != gas_summary.storage_rebate + gas_summary.non_refundable_storage_fee {
             // TODO: re-enable once we fix the edge case with OOG, gas smashing, and storage rebate
             /*return Err(ExecutionError::invariant_violation(
-                format!("SUI conservation failed--{} SUI in storage rebate field of input objects, {} SUI in tx storage rebate or tx non-refundable storage rebate",
+                format!("OCT conservation failed--{} OCT in storage rebate field of input objects, {} OCT in tx storage rebate or tx non-refundable storage rebate",
                 total_input_rebate,
                 gas_summary.non_refundable_storage_fee))
             );*/
         }
 
-        // all SUI charged for storage should flow into the storage rebate field of some output object
+        // all OCT charged for storage should flow into the storage rebate field of some output object
         if gas_summary.storage_cost != total_output_rebate {
             // TODO: re-enable once we fix the edge case with OOG, gas smashing, and storage rebate
             /*return Err(ExecutionError::invariant_violation(
-                format!("SUI conservation failed--{} SUI charged for storage, {} SUI in storage rebate field of output objects",
+                format!("OCT conservation failed--{} OCT charged for storage, {} OCT in storage rebate field of output objects",
                 gas_summary.storage_cost,
                 total_output_rebate))
             );*/
@@ -885,7 +891,7 @@ impl<'backing> TemporaryStore<'backing> {
     }
 }
 
-impl<'backing> ChildObjectResolver for TemporaryStore<'backing> {
+impl ChildObjectResolver for TemporaryStore<'_> {
     fn read_child_object(
         &self,
         parent: &ObjectID,
@@ -908,16 +914,24 @@ impl<'backing> ChildObjectResolver for TemporaryStore<'backing> {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         epoch_id: EpochId,
+        // TODO: Delete this parameter once table migration is complete.
+        use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         // You should never be able to try and receive an object after deleting it or writing it in the same
         // transaction since `Receiving` doesn't have copy.
         debug_assert!(!self.deleted.contains_key(receiving_object_id));
         debug_assert!(!self.written.contains_key(receiving_object_id));
-        self.store.get_object_received_at_version(owner, receiving_object_id, receive_object_at_version, epoch_id)
+        self.store.get_object_received_at_version(
+            owner,
+            receiving_object_id,
+            receive_object_at_version,
+            epoch_id,
+            use_object_per_epoch_marker_table_v2,
+        )
     }
 }
 
-impl<'backing> Storage for TemporaryStore<'backing> {
+impl Storage for TemporaryStore<'_> {
     fn reset(&mut self) {
         TemporaryStore::drop_writes(self);
     }
@@ -952,7 +966,7 @@ impl<'backing> Storage for TemporaryStore<'backing> {
     }
 }
 
-impl<'backing> BackingPackageStore for TemporaryStore<'backing> {
+impl BackingPackageStore for TemporaryStore<'_> {
     fn get_package_object(&self, package_id: &ObjectID) -> SuiResult<Option<PackageObject>> {
         if let Some((obj, _)) = self.written.get(package_id) {
             Ok(Some(PackageObject::new(obj.clone())))
@@ -971,7 +985,7 @@ impl<'backing> BackingPackageStore for TemporaryStore<'backing> {
     }
 }
 
-impl<'backing> ResourceResolver for TemporaryStore<'backing> {
+impl ResourceResolver for TemporaryStore<'_> {
     type Error = SuiError;
 
     fn get_resource(&self, address: &AccountAddress, struct_tag: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
@@ -1002,7 +1016,7 @@ impl<'backing> ResourceResolver for TemporaryStore<'backing> {
     }
 }
 
-impl<'backing> ParentSync for TemporaryStore<'backing> {
+impl ParentSync for TemporaryStore<'_> {
     fn get_latest_parent_entry_ref_deprecated(&self, object_id: ObjectID) -> Option<ObjectRef> {
         self.store.get_latest_parent_entry_ref_deprecated(object_id)
     }

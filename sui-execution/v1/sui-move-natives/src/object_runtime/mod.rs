@@ -1,6 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+
 use better_any::{Tid, TidAble};
 use linked_hash_map::LinkedHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -16,10 +21,6 @@ use move_core_types::{
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
-};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
 };
 use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
 use sui_types::{
@@ -41,7 +42,6 @@ pub(crate) mod object_store;
 use object_store::ChildObjectStore;
 
 use self::object_store::{ChildObjectEffect, ObjectResult};
-
 use super::get_object_id;
 
 pub enum ObjectEvent {
@@ -118,6 +118,9 @@ pub(crate) struct LocalProtocolConfig {
 
 impl LocalProtocolConfig {
     fn new(config: &ProtocolConfig) -> Self {
+        // This should always be false for old protocol versions.
+        assert!(!config.use_object_per_epoch_marker_table_v2_as_option().unwrap_or(false));
+
         Self {
             max_num_deleted_move_object_ids: config.max_num_deleted_move_object_ids(),
             max_num_event_emit: config.max_num_event_emit(),
@@ -612,7 +615,7 @@ pub fn get_all_uids(
     struct UIDTraversal<'i>(&'i mut BTreeSet<ObjectID>);
     struct UIDCollector<'i>(&'i mut BTreeSet<ObjectID>);
 
-    impl<'i, 'b, 'l> AV::Traversal<'b, 'l> for UIDTraversal<'i> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for UIDTraversal<'_> {
         type Error = AV::Error;
 
         fn traverse_struct(&mut self, driver: &mut AV::StructDriver<'_, 'b, 'l>) -> Result<(), Self::Error> {
@@ -625,7 +628,7 @@ pub fn get_all_uids(
         }
     }
 
-    impl<'i, 'b, 'l> AV::Traversal<'b, 'l> for UIDCollector<'i> {
+    impl<'b, 'l> AV::Traversal<'b, 'l> for UIDCollector<'_> {
         type Error = AV::Error;
 
         fn traverse_address(

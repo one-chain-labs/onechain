@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(msim)]
-pub use msim::*;
-
-#[cfg(msim)]
 use std::hash::Hasher;
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // Re-export things used by sui-macros
@@ -16,7 +12,9 @@ pub use anemo_tower;
 pub use fastcrypto;
 pub use lru;
 pub use move_package;
-pub use narwhal_network;
+#[cfg(msim)]
+pub use msim::*;
+pub use mysten_network;
 pub use sui_framework;
 pub use sui_move_build;
 pub use sui_types;
@@ -26,18 +24,18 @@ pub use tower;
 
 #[cfg(msim)]
 pub mod configs {
-    use msim::*;
     use std::{collections::HashMap, ops::Range, time::Duration};
 
+    use msim::*;
     use tracing::info;
 
     fn ms_to_dur(range: Range<u64>) -> Range<Duration> {
-        Duration::from_millis(range.start)..Duration::from_millis(range.end)
+        Duration::from_millis(range.start) .. Duration::from_millis(range.end)
     }
 
     /// A network with constant uniform latency.
     pub fn constant_latency_ms(latency: u64) -> SimConfig {
-        uniform_latency_ms(latency..(latency + 1))
+        uniform_latency_ms(latency .. (latency + 1))
     }
 
     /// A network with latency sampled uniformly from a range.
@@ -138,11 +136,12 @@ pub fn current_simnode_id() -> msim::task::NodeId {
 
 #[cfg(msim)]
 pub mod random {
-    use super::*;
+    use std::{cell::RefCell, collections::HashSet, hash::Hash};
 
     use rand_crate::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
     use serde::Serialize;
-    use std::{cell::RefCell, collections::HashSet, hash::Hash};
+
+    use super::*;
 
     /// Given a value, produce a random probability using the value as a seed, with
     /// an additional seed that is constant only for the current test thread.
@@ -159,7 +158,7 @@ pub mod random {
                 seed.hash(&mut hasher);
                 value.hash(&mut hasher);
                 let mut rng = SmallRng::seed_from_u64(hasher.finish());
-                rng.gen_range(0.0..1.0)
+                rng.gen_range(0.0 .. 1.0)
             })
     }
 

@@ -2,6 +2,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use mysten_network::metrics::MetricsCallbackProvider;
 use prometheus::{
     register_histogram_vec_with_registry,
@@ -14,10 +16,9 @@ use prometheus::{
     IntGaugeVec,
     Registry,
 };
-use std::time::Duration;
 use tonic::Code;
 
-/// Prometheus metrics which can be displayed in Grafana, queried and alerted on
+// Prometheus metrics which can be displayed in Grafana, queried and alerted on
 
 /// Metrics relevant to the requests coming into the service
 #[derive(Clone, Debug)]
@@ -202,5 +203,5 @@ pub fn normalize_path(path: &str) -> &str {
 /// Determines whether the given path should be tracked for metrics collection.
 /// Only specified paths relevant to monitoring are included.
 pub fn is_path_tracked(path: &str) -> bool {
-    matches!(path, "/v1/gas" | "/gas" | "/v1/status")
+    matches!(path, "/v1/gas" | "/gas" | "/v1/status" | "/v1/faucet_web_gas" | "/v1/faucet_discord")
 }

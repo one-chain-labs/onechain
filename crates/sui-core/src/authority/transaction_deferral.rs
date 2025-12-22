@@ -1,9 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use narwhal_types::Round;
 use serde::{Deserialize, Serialize};
-use sui_types::base_types::ObjectID;
+use sui_types::{base_types::ObjectID, messages_consensus::Round};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DeferralKey {
@@ -73,13 +72,14 @@ pub fn transaction_deferral_within_limit(
 
 #[cfg(test)]
 mod object_cost_tests {
-    use super::*;
     use typed_store::{
         rocks::{DBMap, MetricConf},
         traits::{TableSummary, TypedStoreDebug},
         DBMapUtils,
         Map,
     };
+
+    use super::*;
 
     #[tokio::test]
     async fn test_deferral_key_sort_order() {
@@ -95,9 +95,9 @@ mod object_cost_tests {
 
         let db = TestDB::open_tables_read_write(tempdir.path().to_owned(), MetricConf::new("test_db"), None, None);
 
-        for _ in 0..10000 {
-            let future_round = rand::thread_rng().gen_range(0..u64::MAX);
-            let current_round = rand::thread_rng().gen_range(0..u64::MAX);
+        for _ in 0 .. 10000 {
+            let future_round = rand::thread_rng().gen_range(0 .. u64::MAX);
+            let current_round = rand::thread_rng().gen_range(0 .. u64::MAX);
 
             let key = DeferralKey::new_for_consensus_round(future_round, current_round);
             db.deferred_certs.insert(&key, &()).unwrap();
@@ -133,9 +133,9 @@ mod object_cost_tests {
         // All future rounds are between 100 and 300.
         let min_future_round = 100;
         let max_future_round = 300;
-        for _ in 0..10000 {
-            let future_round = rand::thread_rng().gen_range(min_future_round..=max_future_round);
-            let current_round = rand::thread_rng().gen_range(0..u64::MAX);
+        for _ in 0 .. 10000 {
+            let future_round = rand::thread_rng().gen_range(min_future_round ..= max_future_round);
+            let current_round = rand::thread_rng().gen_range(0 .. u64::MAX);
 
             db.deferred_certs.insert(&DeferralKey::new_for_consensus_round(future_round, current_round), &()).unwrap();
             // Add a randomness deferral txn to make sure that it won't show up when fetching deferred consensus round txs.

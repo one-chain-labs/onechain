@@ -3,6 +3,7 @@
 
 use axum::{extract::State, Extension, Json};
 use axum_extra::extract::WithRejection;
+use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 use tracing::debug;
 
 use crate::{
@@ -19,9 +20,8 @@ use crate::{
     OnlineServerContext,
     SuiEnv,
 };
-use sui_json_rpc_types::SuiTransactionBlockResponseOptions;
 
-/// This module implements the [Rosetta Block API](https://www.rosetta-api.org/docs/BlockApi.html)
+// This module implements the [Rosetta Block API](https://www.rosetta-api.org/docs/BlockApi.html)
 
 /// Get a block by its Block Identifier.
 /// [Rosetta API Spec](https://www.rosetta-api.org/docs/BlockApi.html#block)

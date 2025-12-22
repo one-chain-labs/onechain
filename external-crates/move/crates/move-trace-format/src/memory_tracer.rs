@@ -33,7 +33,11 @@ pub struct TraceState {
 
 impl TraceState {
     pub fn new() -> Self {
-        Self { loaded_state: BTreeMap::new(), operand_stack: vec![], call_stack: BTreeMap::new() }
+        Self {
+            loaded_state: BTreeMap::new(),
+            operand_stack: vec![],
+            call_stack: BTreeMap::new(),
+        }
     }
 
     /// Apply an event to the state machine and update the locals state accordingly.
@@ -49,10 +53,13 @@ impl TraceState {
                     locals.insert(i, p.clone());
                 }
 
-                self.call_stack.insert(frame.frame_id, (locals, frame.is_native));
+                self.call_stack
+                    .insert(frame.frame_id, (locals, frame.is_native));
             }
             TraceEvent::CloseFrame { .. } => {
-                self.call_stack.pop_last().expect("Unbalanced call stack in memory tracer -- this should never happen");
+                self.call_stack
+                    .pop_last()
+                    .expect("Unbalanced call stack in memory tracer -- this should never happen");
             }
             TraceEvent::Effect(ef) => match &**ef {
                 Effect::ExecutionError(_) => (),
@@ -60,11 +67,15 @@ impl TraceState {
                     self.operand_stack.push(value.clone());
                 }
                 Effect::Pop(_) => {
-                    self.operand_stack
-                        .pop()
-                        .expect("Tried to pop off the empty operand stack -- this should never happen");
+                    self.operand_stack.pop().expect(
+                        "Tried to pop off the empty operand stack -- this should never happen",
+                    );
                 }
-                Effect::Read(Read { location, root_value_read: _, moved }) => {
+                Effect::Read(Read {
+                    location,
+                    root_value_read: _,
+                    moved,
+                }) => {
                     if *moved {
                         match location {
                             Location::Local(frame_idx, idx) => {
@@ -80,7 +91,10 @@ impl TraceState {
                         }
                     }
                 }
-                Effect::Write(Write { location, root_value_after_write: value_written }) => match location {
+                Effect::Write(Write {
+                    location,
+                    root_value_after_write: value_written,
+                }) => match location {
                     Location::Local(frame_idx, idx) => {
                         let frame = self.call_stack.get_mut(frame_idx).unwrap();
                         frame.0.insert(*idx, value_written.clone());
@@ -94,7 +108,9 @@ impl TraceState {
                         *val = value_written.snapshot().clone();
                     }
                 },
-                Effect::DataLoad(DataLoad { location, snapshot, .. }) => {
+                Effect::DataLoad(DataLoad {
+                    location, snapshot, ..
+                }) => {
                     let Location::Global(id) = location else {
                         unreachable!("Dataload by reference must have a global location");
                     };
@@ -122,13 +138,21 @@ impl TraceState {
     }
 }
 
+impl Default for TraceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Tracer for TraceState {
     fn notify(&mut self, event: &TraceEvent, mut write: Writer<'_>) {
         self.apply_event(event);
         // We only emit the state when we hit a non-effect internal event. This coincides with
         // emitting the current state of the VM before each instruction/function call.
         match event {
-            TraceEvent::Instruction { .. } | TraceEvent::OpenFrame { .. } | TraceEvent::CloseFrame { .. } => {
+            TraceEvent::Instruction { .. }
+            | TraceEvent::OpenFrame { .. }
+            | TraceEvent::CloseFrame { .. } => {
                 write.push(self.to_string());
             }
             _ => (),
@@ -141,7 +165,12 @@ impl fmt::Display for TraceState {
         if !self.loaded_state.is_empty() {
             writeln!(f, "Loaded state:")?;
             for (id, v) in &self.loaded_state {
-                writeln!(f, "\t{}: {}", id, format!("{:#}", v).replace('\n', "\n\t  "))?;
+                writeln!(
+                    f,
+                    "\t{}: {}",
+                    id,
+                    format!("{:#}", v).replace('\n', "\n\t  ")
+                )?;
             }
         }
 
@@ -158,7 +187,12 @@ impl fmt::Display for TraceState {
                 if !frame.is_empty() {
                     writeln!(f, "\tFrame {}:", i)?;
                     for (j, v) in frame.iter() {
-                        writeln!(f, "\t\t{}: {}", j, format!("{:#}", v).replace('\n', "\n\t\t"))?;
+                        writeln!(
+                            f,
+                            "\t\t{}: {}",
+                            j,
+                            format!("{:#}", v).replace('\n', "\n\t\t")
+                        )?;
                     }
                 }
             }

@@ -1,12 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{read_manifest, FileMetadata, FileType, Manifest, CHECKPOINT_FILE_MAGIC, SUMMARY_FILE_MAGIC};
-use anyhow::{anyhow, Context, Result};
-use bytes::{buf::Reader, Buf, Bytes};
-use futures::{StreamExt, TryStreamExt};
-use prometheus::{register_int_counter_vec_with_registry, IntCounterVec, Registry};
-use rand::seq::SliceRandom;
 use std::{
     borrow::Borrow,
     future,
@@ -17,6 +11,12 @@ use std::{
     },
     time::Duration,
 };
+
+use anyhow::{anyhow, Context, Result};
+use bytes::{buf::Reader, Buf, Bytes};
+use futures::{StreamExt, TryStreamExt};
+use prometheus::{register_int_counter_vec_with_registry, IntCounterVec, Registry};
+use rand::seq::SliceRandom;
 use sui_config::node::ArchiveReaderConfig;
 use sui_storage::{
     compute_sha3_checksum_for_bytes,
@@ -36,6 +36,8 @@ use sui_types::{
 };
 use tokio::sync::{oneshot, oneshot::Sender, Mutex};
 use tracing::info;
+
+use crate::{read_manifest, FileMetadata, FileType, Manifest, CHECKPOINT_FILE_MAGIC, SUMMARY_FILE_MAGIC};
 
 #[derive(Debug)]
 pub struct ArchiveReaderMetrics {

@@ -8,12 +8,11 @@ use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::scoped_futures::ScopedFutureExt;
 use sui_indexer::schema::{epochs, feature_flags, protocol_configs};
 
+use super::uint53::UInt53;
 use crate::{
     data::{Db, DbConnection, QueryExecutor},
     error::Error,
 };
-
-use super::uint53::UInt53;
 
 /// A single protocol configuration value.
 #[derive(Clone, Debug, SimpleObject)]

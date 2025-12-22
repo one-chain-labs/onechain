@@ -29,14 +29,14 @@ const _: () = {
     assert!(BinaryFlavor::mask_and_shift_to_unflavor(x) == BinaryFlavor::SUI_FLAVOR);
 };
 
-/// Encoding of a the flavor into the version of the binary format for versions >= 7.
+/// Encoding of the flavor into the version of the binary format for versions >= 7.
 pub struct BinaryFlavor;
 impl BinaryFlavor {
     pub const FLAVOR_MASK: u32 = 0xFF00_0000;
-    const SHIFT_AMOUNT: u8 = 24;
+    pub const VERSION_MASK: u32 = 0x00FF_FFFF;
     // The Sui flavor is 0x05
     pub const SUI_FLAVOR: u8 = 0x05;
-    pub const VERSION_MASK: u32 = 0x00FF_FFFF;
+    const SHIFT_AMOUNT: u8 = 24;
 
     pub fn encode_version(unflavored_version: u32) -> u32 {
         if unflavored_version <= VERSION_6 {
@@ -66,7 +66,7 @@ impl BinaryFlavor {
     }
 
     const fn shift_and_flavor(unflavored: u32) -> u32 {
-        (Self::SUI_FLAVOR as u32) << Self::SHIFT_AMOUNT | unflavored
+        ((Self::SUI_FLAVOR as u32) << Self::SHIFT_AMOUNT) | unflavored
     }
 }
 
@@ -75,11 +75,11 @@ impl BinaryFlavor {
 /// The binary header is magic +  version info + table count.
 pub enum BinaryConstants {}
 impl BinaryConstants {
-    /// The `DIEM_MAGIC` size, 4 byte for major version and 1 byte for table count.
-    pub const HEADER_SIZE: usize = BinaryConstants::MOVE_MAGIC_SIZE + 5;
-    pub const MOVE_MAGIC: [u8; BinaryConstants::MOVE_MAGIC_SIZE] = [0xA1, 0x1C, 0xEB, 0x0B];
     /// The blob that must start a binary.
     pub const MOVE_MAGIC_SIZE: usize = 4;
+    pub const MOVE_MAGIC: [u8; BinaryConstants::MOVE_MAGIC_SIZE] = [0xA1, 0x1C, 0xEB, 0x0B];
+    /// The `DIEM_MAGIC` size, 4 byte for major version and 1 byte for table count.
+    pub const HEADER_SIZE: usize = BinaryConstants::MOVE_MAGIC_SIZE + 5;
     /// A (Table Type, Start Offset, Byte Count) size, which is 1 byte for the type and
     /// 4 bytes for the offset/count.
     pub const TABLE_HEADER_SIZE: u8 = size_of::<u32>() as u8 * 2 + 1;
@@ -345,7 +345,9 @@ pub(crate) struct BinaryData {
 /// The wrapper mirrors Vector operations but provides additional checks against overflow
 impl BinaryData {
     pub fn new() -> Self {
-        BinaryData { _binary: Vec::new() }
+        BinaryData {
+            _binary: Vec::new(),
+        }
     }
 
     pub fn as_inner(&self) -> &[u8] {
@@ -360,7 +362,11 @@ impl BinaryData {
         if self.len().checked_add(1).is_some() {
             self._binary.push(item);
         } else {
-            bail!("binary size ({}) + 1 is greater than limit ({})", self.len(), BINARY_SIZE_LIMIT,);
+            bail!(
+                "binary size ({}) + 1 is greater than limit ({})",
+                self.len(),
+                BINARY_SIZE_LIMIT,
+            );
         }
         Ok(())
     }
@@ -370,7 +376,12 @@ impl BinaryData {
         if self.len().checked_add(vec_len).is_some() {
             self._binary.extend(vec);
         } else {
-            bail!("binary size ({}) + {} is greater than limit ({})", self.len(), vec.len(), BINARY_SIZE_LIMIT,);
+            bail!(
+                "binary size ({}) + {} is greater than limit ({})",
+                self.len(),
+                vec.len(),
+                BINARY_SIZE_LIMIT,
+            );
         }
         Ok(())
     }
@@ -432,7 +443,10 @@ pub(crate) fn write_u128(binary: &mut BinaryData, value: u128) -> Result<()> {
 }
 
 /// Write a `u256` in Little Endian format.
-pub(crate) fn write_u256(binary: &mut BinaryData, value: move_core_types::u256::U256) -> Result<()> {
+pub(crate) fn write_u256(
+    binary: &mut BinaryData,
+    value: move_core_types::u256::U256,
+) -> Result<()> {
     binary.extend(&value.to_le_bytes())
 }
 

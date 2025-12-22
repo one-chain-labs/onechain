@@ -9,7 +9,9 @@ use move_vm_runtime::{
     native_charge_gas_early_exit,
     native_functions::{NativeContext, NativeFunction},
 };
-use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+};
 use sha2::{Digest, Sha256};
 use sha3::Sha3_256;
 use smallvec::smallvec;
@@ -41,18 +43,27 @@ fn native_sha2_256(
     let hash_arg = pop_arg!(arguments, Vec<u8>);
 
     let cost = gas_params.base
-        + gas_params.per_byte * std::cmp::max(NumBytes::new(hash_arg.len() as u64), gas_params.legacy_min_input_len);
+        + gas_params.per_byte
+            * std::cmp::max(
+                NumBytes::new(hash_arg.len() as u64),
+                gas_params.legacy_min_input_len,
+            );
     // Charge before doing work
     native_charge_gas_early_exit!(context, cost);
 
     let hash_vec = Sha256::digest(hash_arg.as_slice()).to_vec();
-    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::vector_u8(hash_vec)]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![Value::vector_u8(hash_vec)],
+    ))
 }
 
 pub fn make_native_sha2_256(gas_params: Sha2_256GasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_sha2_256(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_sha2_256(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************
@@ -81,18 +92,27 @@ fn native_sha3_256(
     let hash_arg = pop_arg!(arguments, Vec<u8>);
 
     let cost = gas_params.base
-        + gas_params.per_byte * std::cmp::max(NumBytes::new(hash_arg.len() as u64), gas_params.legacy_min_input_len);
+        + gas_params.per_byte
+            * std::cmp::max(
+                NumBytes::new(hash_arg.len() as u64),
+                gas_params.legacy_min_input_len,
+            );
     // Charge before doing work
     native_charge_gas_early_exit!(context, cost);
 
     let hash_vec = Sha3_256::digest(hash_arg.as_slice()).to_vec();
-    Ok(NativeResult::ok(context.gas_used(), smallvec![Value::vector_u8(hash_vec)]))
+    Ok(NativeResult::ok(
+        context.gas_used(),
+        smallvec![Value::vector_u8(hash_vec)],
+    ))
 }
 
 pub fn make_native_sha3_256(gas_params: Sha3_256GasParameters) -> NativeFunction {
-    Arc::new(move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-        native_sha3_256(&gas_params, context, ty_args, args)
-    })
+    Arc::new(
+        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
+            native_sha3_256(&gas_params, context, ty_args, args)
+        },
+    )
 }
 
 /***************************************************************************************************

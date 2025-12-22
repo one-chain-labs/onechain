@@ -6,20 +6,10 @@ use anyhow::Result;
 use crossbeam::channel::{bounded, select};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
-    notification::Notification as _,
-    request::Request as _,
-    CompletionOptions,
-    Diagnostic,
-    HoverProviderCapability,
-    InlayHintOptions,
-    InlayHintServerCapabilities,
-    OneOf,
-    SaveOptions,
-    TextDocumentSyncCapability,
-    TextDocumentSyncKind,
-    TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability,
-    WorkDoneProgressOptions,
+    notification::Notification as _, request::Request as _, CompletionOptions, Diagnostic,
+    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, OneOf, SaveOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 use move_compiler::linters::LintLevel;
 use std::{
@@ -29,10 +19,7 @@ use std::{
 };
 
 use crate::{
-    completions::on_completion_request,
-    context::Context,
-    inlay_hints,
-    symbols,
+    completions::on_completion_request, context::Context, inlay_hints, symbols,
     vfs::on_text_document_sync_notification,
 };
 use url::Url;
@@ -47,32 +34,49 @@ pub fn run() {
     // stdio is used to communicate Language Server Protocol requests and responses.
     // stderr is used for logging (and, when Visual Studio Code is used to communicate with this
     // server, it captures this output in a dedicated "output channel").
-    let exe = std::env::current_exe().unwrap().to_string_lossy().to_string();
-    eprintln!("Starting language server '{}' communicating via stdio...", exe);
+    let exe = std::env::current_exe()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    eprintln!(
+        "Starting language server '{}' communicating via stdio...",
+        exe
+    );
 
     let (connection, io_threads) = Connection::stdio();
     let symbols_map = Arc::new(Mutex::new(BTreeMap::new()));
-    let pkg_deps = Arc::new(Mutex::new(BTreeMap::<PathBuf, symbols::PrecomputedPkgDepsInfo>::new()));
+    let pkg_deps = Arc::new(Mutex::new(
+        BTreeMap::<PathBuf, symbols::PrecomputedPkgInfo>::new(),
+    ));
     let ide_files_root: VfsPath = MemoryFS::new().into();
 
-    let (id, client_response) = connection.initialize_start().expect("could not start connection initialization");
+    let (id, client_response) = connection
+        .initialize_start()
+        .expect("could not start connection initialization");
 
     let capabilities = serde_json::to_value(lsp_types::ServerCapabilities {
         // The server receives notifications from the client as users open, close,
         // and modify documents.
-        text_document_sync: Some(TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
-            open_close: Some(true),
-            // TODO: We request that the language server client send us the entire text of any
-            // files that are modified. We ought to use the "incremental" sync kind, which would
-            // have clients only send us what has changed and where, thereby requiring far less
-            // data be sent "over the wire." However, to do so, our language server would need
-            // to be capable of applying deltas to its view of the client's open files. See the
-            // 'move_analyzer::vfs' module for details.
-            change: Some(TextDocumentSyncKind::FULL),
-            will_save: None,
-            will_save_wait_until: None,
-            save: Some(SaveOptions { include_text: Some(true) }.into()),
-        })),
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                // TODO: We request that the language server client send us the entire text of any
+                // files that are modified. We ought to use the "incremental" sync kind, which would
+                // have clients only send us what has changed and where, thereby requiring far less
+                // data be sent "over the wire." However, to do so, our language server would need
+                // to be capable of applying deltas to its view of the client's open files. See the
+                // 'move_analyzer::vfs' module for details.
+                change: Some(TextDocumentSyncKind::FULL),
+                will_save: None,
+                will_save_wait_until: None,
+                save: Some(
+                    SaveOptions {
+                        include_text: Some(true),
+                    }
+                    .into(),
+                ),
+            },
+        )),
         selection_range_provider: None,
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         // The server provides completions as a user is typing.
@@ -86,17 +90,23 @@ pub fn run() {
             // completions in that case.)
             trigger_characters: Some(vec![":".to_string(), ".".to_string(), "{".to_string()]),
             all_commit_characters: None,
-            work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: None,
+            },
             completion_item: None,
         }),
         definition_provider: Some(OneOf::Left(true)),
         type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
-        inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(InlayHintOptions {
-            work_done_progress_options: WorkDoneProgressOptions { work_done_progress: None },
-            resolve_provider: None,
-        }))),
+        inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
+            InlayHintOptions {
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+                resolve_provider: None,
+            },
+        ))),
         ..Default::default()
     })
     .expect("could not serialize server capabilities");
@@ -143,6 +153,7 @@ pub fn run() {
                 Arc::new(Mutex::new(BTreeMap::new())),
                 ide_files_root.clone(),
                 p.as_path(),
+                None,
                 lint,
                 None,
             ) {
@@ -268,7 +279,7 @@ fn on_request(
     context: &Context,
     request: &Request,
     ide_files_root: VfsPath,
-    pkg_dependencies: Arc<Mutex<BTreeMap<PathBuf, symbols::PrecomputedPkgDepsInfo>>>,
+    pkg_dependencies: Arc<Mutex<BTreeMap<PathBuf, symbols::PrecomputedPkgInfo>>>,
     shutdown_request_received: bool,
 ) -> bool {
     if shutdown_request_received {
@@ -277,7 +288,11 @@ fn on_request(
             lsp_server::ErrorCode::InvalidRequest as i32,
             "a shutdown request already received by the server".to_string(),
         );
-        if let Err(err) = context.connection.sender.send(lsp_server::Message::Response(response)) {
+        if let Err(err) = context
+            .connection
+            .sender
+            .send(lsp_server::Message::Response(response))
+        {
             eprintln!("could not send shutdown response: {:?}", err);
         }
         return true;
@@ -306,8 +321,13 @@ fn on_request(
         }
         lsp_types::request::Shutdown::METHOD => {
             eprintln!("Shutdown request received");
-            let response = lsp_server::Response::new_ok(request.id.clone(), serde_json::Value::Null);
-            if let Err(err) = context.connection.sender.send(lsp_server::Message::Response(response)) {
+            let response =
+                lsp_server::Response::new_ok(request.id.clone(), serde_json::Value::Null);
+            if let Err(err) = context
+                .connection
+                .sender
+                .send(lsp_server::Message::Response(response))
+            {
                 eprintln!("could not send shutdown response: {:?}", err);
             }
             return true;

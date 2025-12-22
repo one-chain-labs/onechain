@@ -1,11 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{string_input::impl_string_input, sui_address::SuiAddress};
-use crate::{filter, raw_query::RawQuery};
+use std::{fmt, result::Result, str::FromStr};
+
 use async_graphql::*;
 use move_core_types::language_storage::StructTag;
-use std::{fmt, result::Result, str::FromStr};
 use sui_types::{
     parse_sui_address,
     parse_sui_fq_name,
@@ -14,6 +13,9 @@ use sui_types::{
     parse_sui_type_tag,
     TypeTag,
 };
+
+use super::{string_input::impl_string_input, sui_address::SuiAddress};
+use crate::{filter, raw_query::RawQuery};
 
 /// A GraphQL scalar containing a filter on types that requires an exact match.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,8 +299,9 @@ impl From<StructTag> for TypeFilter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use expect_test::expect;
+
+    use super::*;
 
     #[test]
     fn test_valid_exact_type_filters() {

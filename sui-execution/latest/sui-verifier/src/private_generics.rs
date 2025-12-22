@@ -100,7 +100,7 @@ fn verify_private_transfer(
         PUBLIC_TRANSFER_FUNCTIONS
     } else {
         // Before protocol version 33, the `receiving_object_id` function was not public
-        &PUBLIC_TRANSFER_FUNCTIONS[..PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
+        &PUBLIC_TRANSFER_FUNCTIONS[.. PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
     };
     let self_handle = view.module_handle_at(view.self_handle_idx());
     if addr_module(view, self_handle) == (SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) {

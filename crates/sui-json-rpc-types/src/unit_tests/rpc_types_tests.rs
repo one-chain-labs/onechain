@@ -11,7 +11,6 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use serde_json::json;
-
 use sui_types::{
     base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress},
     gas_coin::GasCoin,

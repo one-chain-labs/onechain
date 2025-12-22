@@ -64,7 +64,7 @@ async fn test_get_coins() -> Result<(), anyhow::Error> {
     assert!(!result.has_next_page);
 
     // We should get 0 coins for a non-existent coin type.
-    let result: CoinPage = http_client.get_coins(address, Some("0x2::sui::TestCoin".into()), None, None).await?;
+    let result: CoinPage = http_client.get_coins(address, Some("0x2::one::TestCoin".into()), None, None).await?;
     assert_eq!(0, result.data.len());
 
     // We should get all the 5 coins for SUI with the right balance.
@@ -135,7 +135,7 @@ async fn test_events() -> Result<(), anyhow::Error> {
     limit = None;
     let result = http_client.query_events(event_filter.clone(), cursor, limit, descending_order).await?;
     assert_eq!(2, result.data.len());
-    assert_eq!(forward_paginated_events[1..], result.data[..]);
+    assert_eq!(forward_paginated_events[1 ..], result.data[..]);
 
     // now descending order - make sure to reset parameters
     cursor = None;
@@ -159,7 +159,7 @@ async fn test_events() -> Result<(), anyhow::Error> {
     limit = None;
     let result = http_client.query_events(event_filter.clone(), cursor, limit, descending_order).await?;
     assert_eq!(2, result.data.len());
-    assert_eq!(backward_paginated_events[1..], result.data[..]);
+    assert_eq!(backward_paginated_events[1 ..], result.data[..]);
 
     // check that the forward and backward paginated events are in reverse order
     assert_eq!(forward_paginated_events.into_iter().rev().collect::<Vec<_>>(), backward_paginated_events);

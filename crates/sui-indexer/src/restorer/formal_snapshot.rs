@@ -1,17 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, fs, num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use futures::future::{AbortHandle, AbortRegistration, Abortable};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use object_store::path::Path;
-use tokio::{
-    sync::{Mutex, Semaphore},
-    task,
-};
-use tracing::info;
-
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
 use sui_core::authority::authority_store_tables::LiveObject;
 use sui_snapshot::{
@@ -20,6 +14,11 @@ use sui_snapshot::{
 };
 use sui_storage::object_store::{util::get, ObjectStoreGetExt};
 use sui_types::accumulator::Accumulator;
+use tokio::{
+    sync::{Mutex, Semaphore},
+    task,
+};
+use tracing::info;
 
 use crate::{
     config::RestoreConfig,
@@ -53,14 +52,6 @@ impl IndexerFormalSnapshotRestorer {
 
         let base_path = PathBuf::from(restore_config.snapshot_download_dir.clone());
         let snapshot_dir = base_path.join("snapshot");
-        if snapshot_dir.exists() {
-            fs::remove_dir_all(snapshot_dir.clone()).unwrap();
-            info!("Deleted all files from snapshot directory: {:?}", snapshot_dir);
-        } else {
-            fs::create_dir(snapshot_dir.clone()).unwrap();
-            info!("Created snapshot directory: {:?}", snapshot_dir);
-        }
-
         let local_store_config = ObjectStoreConfig {
             object_store: Some(ObjectStoreType::File),
             directory: Some(snapshot_dir.clone().to_path_buf()),
@@ -72,9 +63,9 @@ impl IndexerFormalSnapshotRestorer {
             restore_config.start_epoch,
             &remote_store_config,
             &local_store_config,
-            usize::MAX,
             NonZeroUsize::new(restore_config.object_store_concurrent_limit).unwrap(),
             m.clone(),
+            true, // skip_reset_local_store
         )
         .await
         .unwrap_or_else(|err| panic!("Failed to create reader: {}", err));

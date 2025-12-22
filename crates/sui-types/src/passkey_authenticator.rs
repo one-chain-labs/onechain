@@ -1,5 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
+
+use fastcrypto::{
+    error::FastCryptoError,
+    hash::{HashFunction, Sha256},
+    rsa::{Base64UrlUnpadded, Encoding},
+    secp256r1::{Secp256r1PublicKey, Secp256r1Signature},
+    traits::{ToFromBytes, VerifyingKey},
+};
+use once_cell::sync::OnceCell;
+use passkey_types::webauthn::{ClientDataType, CollectedClientData};
+use schemars::JsonSchema;
+use serde::{Deserialize, Deserializer, Serialize};
+use shared_crypto::intent::IntentMessage;
+
 use crate::{
     base_types::{EpochId, SuiAddress},
     crypto::{
@@ -15,22 +33,6 @@ use crate::{
     error::{SuiError, SuiResult},
     signature::{AuthenticatorTrait, VerifyParams},
     signature_verification::VerifiedDigestCache,
-};
-use fastcrypto::{
-    error::FastCryptoError,
-    hash::{HashFunction, Sha256},
-    rsa::{Base64UrlUnpadded, Encoding},
-    secp256r1::{Secp256r1PublicKey, Secp256r1Signature},
-    traits::{ToFromBytes, VerifyingKey},
-};
-use once_cell::sync::OnceCell;
-use passkey_types::webauthn::{ClientDataType, CollectedClientData};
-use schemars::JsonSchema;
-use serde::{Deserialize, Deserializer, Serialize};
-use shared_crypto::intent::IntentMessage;
-use std::{
-    hash::{Hash, Hasher},
-    sync::Arc,
 };
 
 #[cfg(test)]
@@ -228,7 +230,7 @@ impl ToFromBytes for PasskeyAuthenticator {
             return Err(FastCryptoError::InvalidInput);
         }
         let passkey: PasskeyAuthenticator =
-            bcs::from_bytes(&bytes[1..]).map_err(|_| FastCryptoError::InvalidSignature)?;
+            bcs::from_bytes(&bytes[1 ..]).map_err(|_| FastCryptoError::InvalidSignature)?;
         Ok(passkey)
     }
 }

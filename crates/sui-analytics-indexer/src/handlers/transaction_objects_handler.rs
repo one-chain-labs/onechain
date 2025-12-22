@@ -3,10 +3,13 @@
 
 use anyhow::Result;
 use sui_data_ingestion_core::Worker;
+use sui_types::{
+    base_types::ObjectID,
+    effects::TransactionEffects,
+    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
+    transaction::TransactionDataAPI,
+};
 use tokio::sync::Mutex;
-
-use sui_rpc_api::{CheckpointData, CheckpointTransaction};
-use sui_types::{base_types::ObjectID, effects::TransactionEffects, transaction::TransactionDataAPI};
 
 use crate::{
     handlers::{AnalyticsHandler, InputObjectTracker, ObjectStatusTracker},

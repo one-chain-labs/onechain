@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use diesel::prelude::*;
+use itertools::Itertools;
+
 use crate::{
     schema::{
         tx_affected_addresses,
@@ -15,8 +18,6 @@ use crate::{
     },
     types::TxIndex,
 };
-use diesel::prelude::*;
-use itertools::Itertools;
 
 #[derive(QueryableByName)]
 pub struct TxSequenceNumber {

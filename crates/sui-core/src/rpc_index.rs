@@ -1,20 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityStore},
-    checkpoints::CheckpointStore,
-    par_index_live_object_set::{LiveObjectIndexer, ParMakeLiveObjectIndexer},
-};
-use move_core_types::language_storage::StructTag;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Instant,
 };
+
+use move_core_types::language_storage::StructTag;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use sui_types::{
     base_types::{MoveObjectType, ObjectID, SequenceNumber, SuiAddress},
     digests::TransactionDigest,
@@ -31,6 +27,12 @@ use typed_store::{
     traits::{Map, TableSummary, TypedStoreDebug},
     DBMapUtils,
     TypedStoreError,
+};
+
+use crate::{
+    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityStore},
+    checkpoints::CheckpointStore,
+    par_index_live_object_set::{LiveObjectIndexer, ParMakeLiveObjectIndexer},
 };
 
 const CURRENT_DB_VERSION: u64 = 0;
@@ -173,7 +175,7 @@ impl IndexStoreTables {
             let lowest_available_checkpoint =
                 checkpoint_store.get_highest_pruned_checkpoint_seq_number()?.saturating_add(1);
 
-            let checkpoint_range = lowest_available_checkpoint..=highest_executed_checkpint;
+            let checkpoint_range = lowest_available_checkpoint ..= highest_executed_checkpint;
 
             info!("Indexing {} checkpoints in range {checkpoint_range:?}", checkpoint_range.size_hint().0);
             let start_time = Instant::now();
@@ -229,7 +231,7 @@ impl IndexStoreTables {
         &self,
         checkpoint: &CheckpointData,
         resolver: &mut dyn LayoutResolver,
-    ) -> Result<(), StorageError> {
+    ) -> Result<typed_store::rocks::DBBatch, StorageError> {
         debug!(checkpoint = checkpoint.checkpoint_summary.sequence_number, "indexing checkpoint");
 
         let mut batch = self.transactions.batch();
@@ -313,7 +315,7 @@ impl IndexStoreTables {
 
                 // coin indexing
                 //
-                // coin indexing relys on the fact that CoinMetadata and TreasuryCap are created in
+                // coin indexing relies on the fact that CoinMetadata and TreasuryCap are created in
                 // the same transaction so we don't need to worry about overriding any older value
                 // that may exist in the database (because there necessarily cannot be).
                 for (key, value) in tx.created_objects().flat_map(try_create_coin_index_info) {
@@ -335,10 +337,9 @@ impl IndexStoreTables {
             batch.insert_batch(&self.coin, coin_index)?;
         }
 
-        batch.write()?;
-
         debug!(checkpoint = checkpoint.checkpoint_summary.sequence_number, "finished indexing checkpoint");
-        Ok(())
+
+        Ok(batch)
     }
 
     fn get_transaction_info(&self, digest: &TransactionDigest) -> Result<Option<TransactionInfo>, TypedStoreError> {
@@ -350,15 +351,9 @@ impl IndexStoreTables {
         owner: SuiAddress,
         cursor: Option<ObjectID>,
     ) -> Result<impl Iterator<Item = (OwnerIndexKey, OwnerIndexInfo)> + '_, TypedStoreError> {
-        let lower_bound = OwnerIndexKey::new(owner, ObjectID::ZERO);
+        let lower_bound = OwnerIndexKey::new(owner, cursor.unwrap_or(ObjectID::ZERO));
         let upper_bound = OwnerIndexKey::new(owner, ObjectID::MAX);
-        let mut iter = self.owner.iter_with_bounds(Some(lower_bound), Some(upper_bound));
-
-        if let Some(cursor) = cursor {
-            iter = iter.skip_to(&OwnerIndexKey::new(owner, cursor))?;
-        }
-
-        Ok(iter)
+        Ok(self.owner.iter_with_bounds(Some(lower_bound), Some(upper_bound)))
     }
 
     fn dynamic_field_iter(
@@ -366,14 +361,9 @@ impl IndexStoreTables {
         parent: ObjectID,
         cursor: Option<ObjectID>,
     ) -> Result<impl Iterator<Item = (DynamicFieldKey, DynamicFieldIndexInfo)> + '_, TypedStoreError> {
-        let lower_bound = DynamicFieldKey::new(parent, ObjectID::ZERO);
+        let lower_bound = DynamicFieldKey::new(parent, cursor.unwrap_or(ObjectID::ZERO));
         let upper_bound = DynamicFieldKey::new(parent, ObjectID::MAX);
-        let mut iter = self.dynamic_field.iter_with_bounds(Some(lower_bound), Some(upper_bound));
-
-        if let Some(cursor) = cursor {
-            iter = iter.skip_to(&DynamicFieldKey::new(parent, cursor))?;
-        }
-
+        let iter = self.dynamic_field.iter_with_bounds(Some(lower_bound), Some(upper_bound));
         Ok(iter)
     }
 
@@ -385,6 +375,7 @@ impl IndexStoreTables {
 
 pub struct RpcIndexStore {
     tables: IndexStoreTables,
+    pending_updates: Mutex<BTreeMap<u64, typed_store::rocks::DBBatch>>,
 }
 
 impl RpcIndexStore {
@@ -425,26 +416,46 @@ impl RpcIndexStore {
             }
         };
 
-        Self { tables }
+        Self { tables, pending_updates: Default::default() }
     }
 
     pub fn new_without_init(dir: &Path) -> Self {
         let path = Self::db_path(dir);
         let tables = IndexStoreTables::open(path);
 
-        Self { tables }
+        Self { tables, pending_updates: Default::default() }
     }
 
     pub fn prune(&self, checkpoint_contents_to_prune: &[CheckpointContents]) -> Result<(), TypedStoreError> {
         self.tables.prune(checkpoint_contents_to_prune)
     }
 
-    pub fn index_checkpoint(
-        &self,
-        checkpoint: &CheckpointData,
-        resolver: &mut dyn LayoutResolver,
-    ) -> Result<(), StorageError> {
-        self.tables.index_checkpoint(checkpoint, resolver)
+    /// Index a checkpoint and stage the index updated in `pending_updates`.
+    ///
+    /// Updates will not be committed to the database until `commit_update_for_checkpoint` is
+    /// called.
+    pub fn index_checkpoint(&self, checkpoint: &CheckpointData, resolver: &mut dyn LayoutResolver) {
+        let sequence_number = checkpoint.checkpoint_summary.sequence_number;
+        let batch = self.tables.index_checkpoint(checkpoint, resolver).expect("db error");
+
+        self.pending_updates.lock().unwrap().insert(sequence_number, batch);
+    }
+
+    /// Commits the pending updates for the provided checkpoint number.
+    ///
+    /// Invariants:
+    /// - `index_checkpoint` must have been called for the provided checkpoint
+    /// - Callers of this function must ensure that it is called for each checkpoint in sequential
+    ///   order. This will panic if the provided checkpoint does not match the expected next
+    ///   checkpoint to commit.
+    pub fn commit_update_for_checkpoint(&self, checkpoint: u64) -> Result<(), StorageError> {
+        let next_batch = self.pending_updates.lock().unwrap().pop_first();
+
+        // Its expected that the next batch exists
+        let (next_sequence_number, batch) = next_batch.unwrap();
+        assert_eq!(checkpoint, next_sequence_number, "commit_update_for_checkpoint must be called in order");
+
+        Ok(batch.write()?)
     }
 
     pub fn get_transaction_info(&self, digest: &TransactionDigest) -> Result<Option<TransactionInfo>, TypedStoreError> {
@@ -557,7 +568,7 @@ impl<'a> ParMakeLiveObjectIndexer for RpcParLiveObjectSetIndexer<'a> {
     }
 }
 
-impl<'a> LiveObjectIndexer for RpcLiveObjectIndexer<'a> {
+impl LiveObjectIndexer for RpcLiveObjectIndexer<'_> {
     fn index_object(&mut self, object: Object) -> Result<(), StorageError> {
         match object.owner {
             // Owner Index

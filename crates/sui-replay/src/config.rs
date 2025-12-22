@@ -3,11 +3,12 @@
 
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
-use crate::types::ReplayEngineError;
 use http::Uri;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tracing::info;
+
+use crate::types::ReplayEngineError;
 
 pub const DEFAULT_CONFIG_PATH: &str = "~/.sui-replay/network-config.yaml";
 
@@ -35,6 +36,7 @@ pub struct ReplayableNetworkBaseConfig {
 }
 
 impl ReplayableNetworkConfigSet {
+    #[allow(clippy::result_large_err)]
     pub fn load_config(path: String) -> Result<Self, ReplayEngineError> {
         let path = shellexpand::tilde(&path).to_string();
         let path = PathBuf::from_str(&path).unwrap();
@@ -44,6 +46,7 @@ impl ReplayableNetworkConfigSet {
         })
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn save_config(&self, override_path: Option<String>) -> Result<PathBuf, ReplayEngineError> {
         let path = override_path.unwrap_or_else(|| DEFAULT_CONFIG_PATH.to_string());
         let path = shellexpand::tilde(&path).to_string();
@@ -55,6 +58,7 @@ impl ReplayableNetworkConfigSet {
         Ok(path)
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn from_file(path: PathBuf) -> Result<Self, ReplayEngineError> {
         let file = File::open(path.clone()).map_err(|err| ReplayEngineError::UnableToOpenYamlFile {
             path: path.as_os_str().to_string_lossy().to_string(),
@@ -70,6 +74,7 @@ impl ReplayableNetworkConfigSet {
         Ok(config)
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn to_file(&self, path: PathBuf) -> Result<(), ReplayEngineError> {
         let prefix = path.parent().unwrap();
         std::fs::create_dir_all(prefix).unwrap();
@@ -95,7 +100,7 @@ impl Default for ReplayableNetworkConfigSet {
             name: "testnet".to_string(),
             epoch_zero_start_timestamp: 0,
             epoch_zero_rgp: 0,
-            public_full_node: url_from_str("https://fullnode.testnet.sui.io:443")
+            public_full_node: url_from_str("https://rpc-testnet.onelabs.cc:443")
                 .expect("invalid socket address")
                 .to_string(),
         };
@@ -103,7 +108,7 @@ impl Default for ReplayableNetworkConfigSet {
             name: "devnet".to_string(),
             epoch_zero_start_timestamp: 0,
             epoch_zero_rgp: 0,
-            public_full_node: url_from_str("https://fullnode.devnet.sui.io:443")
+            public_full_node: url_from_str("https://rpc-devnet.onelabs.cc:443")
                 .expect("invalid socket address")
                 .to_string(),
         };
@@ -111,7 +116,7 @@ impl Default for ReplayableNetworkConfigSet {
             name: "mainnet".to_string(),
             epoch_zero_start_timestamp: 0,
             epoch_zero_rgp: 0,
-            public_full_node: url_from_str("https://fullnode.mainnet.sui.io:443")
+            public_full_node: url_from_str("https://rpc-mainnet.onelabs.cc:443")
                 .expect("invalid socket address")
                 .to_string(),
         };
@@ -125,6 +130,7 @@ pub fn default_full_node_address() -> String {
     "0.0.0.0:9000".to_string()
 }
 
+#[allow(clippy::result_large_err)]
 pub fn url_from_str(s: &str) -> Result<Uri, ReplayEngineError> {
     Uri::from_str(s).map_err(|e| ReplayEngineError::InvalidUrl { err: e.to_string(), url: s.to_string() })
 }

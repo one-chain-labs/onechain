@@ -58,7 +58,7 @@ that you provided and match it against the amount owed.
 Later on (either asynchronously or in a batch at the end of the day), you can
 process the payments you've received by iterating over the set of
 `IdentifiedPayment` objects under your account, `unpack`ing them, and then
-using the unpacked SUI coin.
+using the unpacked OCT coin.
 
 Overall, this is a very simple representation for on-chain payments and
 relatively easy to set up. However, it has some issues:
@@ -136,7 +136,7 @@ With transfer-to-object, we can combine the benefits of the two previous impleme
 - An easy way of dynamically adding, removing, and enforcing permissions on who
   can withdraw payments.
 - Payments can still be made using the `identified_payment::make_payment`
-  function that uses `sui::transfer::transfer` under the hood, so payments can
+  function that uses `one::transfer::transfer` under the hood, so payments can
   happen in parallel across all restaurant locations without needing to be
   sequenced against the shared `Register` object.
 
@@ -196,9 +196,9 @@ public fun handle_payment(
 One additional benefit of transfer-to-object is that, in addition to being able
 to specify custom transfer rules for `key`-only objects, you can also specify
 custom receiving rules for `key`-only objects in a very similar manner: if an
-object is `key`-only, then the `sui::transfer::receive` function can be called
+object is `key`-only, then the `one::transfer::receive` function can be called
 in the module that defines the object, but not elsewhere. Elsewhere, the
-`sui::transfer::public_receive` function must be called and can only be used on
+`one::transfer::public_receive` function must be called and can only be used on
 objects that also have the `store` ability.
 
 With this information, we can define a wrapper around `IdentifiedPayment`s

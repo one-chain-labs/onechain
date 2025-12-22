@@ -1,16 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{executor::MAX_CHECKPOINTS_IN_PROGRESS, reducer::reduce, Reducer, Worker};
-use mysten_metrics::spawn_monitored_task;
 use std::{
     collections::{BTreeSet, VecDeque},
     sync::Arc,
     time::Instant,
 };
+
+use mysten_metrics::spawn_monitored_task;
 use sui_types::{full_checkpoint_content::CheckpointData, messages_checkpoint::CheckpointSequenceNumber};
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
+
+use crate::{executor::MAX_CHECKPOINTS_IN_PROGRESS, reducer::reduce, Reducer, Worker};
 
 pub struct WorkerPool<W: Worker> {
     pub task_name: String,
@@ -46,13 +48,13 @@ impl<W: Worker + 'static> WorkerPool<W> {
         let (progress_sender, mut progress_receiver) = mpsc::channel(MAX_CHECKPOINTS_IN_PROGRESS);
         let (reducer_sender, reducer_receiver) = mpsc::channel(MAX_CHECKPOINTS_IN_PROGRESS);
         let mut workers = vec![];
-        let mut idle: BTreeSet<_> = (0..self.concurrency).collect();
+        let mut idle: BTreeSet<_> = (0 .. self.concurrency).collect();
         let mut checkpoints = VecDeque::new();
 
         let mut join_handles = vec![];
 
         // spawn child workers
-        for worker_id in 0..self.concurrency {
+        for worker_id in 0 .. self.concurrency {
             let (worker_sender, mut worker_recv) = mpsc::channel::<Arc<CheckpointData>>(MAX_CHECKPOINTS_IN_PROGRESS);
             let (term_sender, mut term_receiver) = oneshot::channel::<()>();
             let cloned_progress_sender = progress_sender.clone();

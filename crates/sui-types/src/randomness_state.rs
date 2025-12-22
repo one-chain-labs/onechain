@@ -5,9 +5,8 @@ use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use move_bytecode_utils::resolve_struct;
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
 
-use crate::base_types::SequenceNumber;
-
 use crate::{
+    base_types::SequenceNumber,
     error::SuiResult,
     object::Owner,
     storage::ObjectStore,

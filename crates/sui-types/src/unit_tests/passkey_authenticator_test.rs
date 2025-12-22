@@ -3,27 +3,16 @@
 
 use std::sync::Arc;
 
-use super::to_signing_message;
-use crate::{
-    base_types::{dbg_addr, ObjectID, SuiAddress},
-    crypto::{DefaultHash, PublicKey, Signature, SignatureScheme},
-    error::SuiError,
-    object::Object,
-    passkey_authenticator::{PasskeyAuthenticator, RawPasskeyAuthenticator},
-    signature::GenericSignature,
-    signature_verification::VerifiedDigestCache,
-    transaction::{TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
-};
 use fastcrypto::{
     hash::HashFunction,
     rsa::{Base64UrlUnpadded, Encoding as _},
     traits::ToFromBytes,
 };
 use p256::pkcs8::DecodePublicKey;
-use passkey_authenticator::{Authenticator, UserValidationMethod};
+use passkey_authenticator::{Authenticator, UserCheck, UserValidationMethod};
 use passkey_client::Client;
 use passkey_types::{
-    ctap2::Aaguid,
+    ctap2::{Aaguid, Ctap2Error},
     rand::random_vec,
     webauthn::{
         AttestationConveyancePreference,
@@ -43,16 +32,31 @@ use passkey_types::{
 use shared_crypto::intent::{Intent, IntentMessage};
 use url::Url;
 
+use super::to_signing_message;
+use crate::{
+    base_types::{dbg_addr, ObjectID, SuiAddress},
+    crypto::{DefaultHash, PublicKey, Signature, SignatureScheme},
+    error::SuiError,
+    object::Object,
+    passkey_authenticator::{PasskeyAuthenticator, RawPasskeyAuthenticator},
+    signature::GenericSignature,
+    signature_verification::VerifiedDigestCache,
+    transaction::{TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
+};
+
 /// Helper struct to initialize passkey client.
 pub struct MyUserValidationMethod {}
 #[async_trait::async_trait]
 impl UserValidationMethod for MyUserValidationMethod {
-    async fn check_user_presence(&self) -> bool {
-        true
-    }
+    type PasskeyItem = Passkey;
 
-    async fn check_user_verification(&self) -> bool {
-        true
+    async fn check_user<'a>(
+        &self,
+        _credential: Option<&'a Passkey>,
+        presence: bool,
+        verification: bool,
+    ) -> Result<UserCheck, Ctap2Error> {
+        Ok(UserCheck { presence, verification })
     }
 
     fn is_verification_enabled(&self) -> Option<bool> {
@@ -102,7 +106,7 @@ async fn create_credential_and_sign_test_tx(
     pk_bytes.extend_from_slice(x.unwrap());
     let pk = PublicKey::try_from_bytes(SignatureScheme::PasskeyAuthenticator, &pk_bytes).unwrap();
 
-    // Derives its OneChain address and make a test transaction with it as sender.
+    // Derives its sui address and make a test transaction with it as sender.
     let sender = SuiAddress::from(&pk);
     let recipient = dbg_addr(2);
     let object_id = ObjectID::ZERO;

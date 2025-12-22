@@ -8,7 +8,7 @@ use move_core_types::language_storage::StructTag;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use sui_json_rpc::name_service::{validate_label, Domain};
+use sui_name_service::{validate_label, Domain};
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     collection_types::VecMap,
@@ -17,12 +17,11 @@ use sui_types::{
     object::MoveObject as NativeMoveObject,
 };
 
+use super::error::MoveRegistryError;
 use crate::{
     config::{MoveRegistryConfig, MOVE_REGISTRY_MODULE, MOVE_REGISTRY_TYPE},
     types::base64::Base64,
 };
-
-use super::error::MoveRegistryError;
 
 /// Regex to parse a dot move name. Version is optional (defaults to latest).
 /// For versioned format, the expected format is `@org/app/1` (1 == version).
@@ -161,8 +160,9 @@ impl TryFrom<NativeMoveObject> for AppRecord {
 
 #[cfg(test)]
 mod tests {
-    use super::VersionedName;
     use std::str::FromStr;
+
+    use super::VersionedName;
 
     #[test]
     fn parse_some_names() {
@@ -230,7 +230,7 @@ mod tests {
         let repeated_chars = chars.repeat(3);
 
         // Take the first 63 characters to form the string
-        let fixed_string = &repeated_chars[0..len];
+        let fixed_string = &repeated_chars[0 .. len];
 
         fixed_string.to_string()
     }

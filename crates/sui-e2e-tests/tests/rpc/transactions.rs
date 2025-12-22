@@ -2,32 +2,94 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_macros::sim_test;
-use sui_rpc_api::{client::sdk::Client, rest::transactions::ListTransactionsCursorParameters};
+use sui_rpc_api::{
+    field_mask::{FieldMask, FieldMaskUtil},
+    proto::node::v2::{node_service_client::NodeServiceClient, GetTransactionRequest, GetTransactionResponse},
+};
 use test_cluster::TestClusterBuilder;
 
-use crate::transfer_coin;
+use crate::stake_with_validator;
 
 #[sim_test]
 async fn get_transaction() {
     let test_cluster = TestClusterBuilder::new().build().await;
 
-    let transaction_digest = transfer_coin(&test_cluster.wallet).await;
+    let transaction_digest = stake_with_validator(&test_cluster).await;
 
-    let client = Client::new(test_cluster.rpc_url()).unwrap();
+    let mut grpc_client = NodeServiceClient::connect(test_cluster.rpc_url().to_owned()).await.unwrap();
 
-    let _transaction = client.get_transaction(&transaction_digest).await.unwrap();
-}
+    // Request with no provided read_mask
+    let GetTransactionResponse {
+        digest,
+        transaction,
+        transaction_bcs,
+        signatures,
+        signatures_bytes,
+        effects,
+        effects_bcs,
+        events,
+        events_bcs,
+        checkpoint,
+        timestamp,
+    } = grpc_client.get_transaction(GetTransactionRequest::new(transaction_digest)).await.unwrap().into_inner();
 
-#[sim_test]
-async fn list_checkpoint() {
-    let test_cluster = TestClusterBuilder::new().build().await;
+    // These fields default to being read
+    assert!(digest.is_some());
 
-    let _transaction_digest = transfer_coin(&test_cluster.wallet).await;
+    // while these fields default to not being read
+    assert!(transaction.is_none());
+    assert!(transaction_bcs.is_none());
+    assert!(signatures.is_empty());
+    assert!(signatures_bytes.is_empty());
+    assert!(effects.is_none());
+    assert!(effects_bcs.is_none());
+    assert!(events.is_none());
+    assert!(events_bcs.is_none());
+    assert!(checkpoint.is_none());
+    assert!(timestamp.is_none());
 
-    let client = Client::new(test_cluster.rpc_url()).unwrap();
+    // Request all fields
+    let response = grpc_client
+        .get_transaction(GetTransactionRequest::new(transaction_digest).with_read_mask(FieldMask::from_paths([
+            "digest",
+            "transaction",
+            "transaction_bcs",
+            "signatures",
+            "signatures_bytes",
+            "effects",
+            "effects_bcs",
+            "events",
+            "events_bcs",
+            "checkpoint",
+            "timestamp",
+        ])))
+        .await
+        .unwrap()
+        .into_inner();
 
-    let transactions =
-        client.list_transactions(&ListTransactionsCursorParameters::default()).await.unwrap().into_inner();
+    let GetTransactionResponse {
+        digest,
+        transaction,
+        transaction_bcs,
+        signatures,
+        signatures_bytes,
+        effects,
+        effects_bcs,
+        events,
+        events_bcs,
+        checkpoint,
+        timestamp,
+    } = &response;
 
-    assert!(!transactions.is_empty());
+    assert!(digest.is_some());
+    assert!(transaction.is_some());
+    assert!(transaction_bcs.is_some());
+    assert!(!signatures.is_empty());
+    assert!(!signatures_bytes.is_empty());
+    assert!(effects.is_some());
+    assert!(effects_bcs.is_some());
+    assert!(events.is_some());
+    assert!(events_bcs.is_some());
+    assert!(checkpoint.is_some());
+    assert!(timestamp.is_some());
 }

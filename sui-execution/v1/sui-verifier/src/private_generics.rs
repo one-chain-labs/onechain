@@ -41,7 +41,7 @@ pub const TRANSFER_IMPL_FUNCTIONS: &[&IdentStr] = &[
 /// - `T` must be a type declared in the current module
 pub fn verify_module(module: &CompiledModule) -> Result<(), ExecutionError> {
     if *module.address() == SUI_FRAMEWORK_ADDRESS && module.name() == IdentStr::new(TEST_SCENARIO_MODULE_NAME).unwrap() {
-        // exclude test_module which is a test-only module in the OneChain framework which "emulates"
+        // exclude test_module which is a test-only module in the Sui framework which "emulates"
         // transactional execution and needs to allow test code to bypass private generics
         return Ok(());
     }

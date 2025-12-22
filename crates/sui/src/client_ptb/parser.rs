@@ -10,6 +10,12 @@ use move_core_types::parsing::{
 };
 use sui_types::{base_types::ObjectID, Identifier};
 
+use super::{
+    ast::{self as A, is_keyword, Argument, ModuleAccess, ParsedPTBCommand, ParsedProgram},
+    error::{PTBError, PTBResult, Span, Spanned},
+    lexer::Lexer,
+    token::{Lexeme, Token},
+};
 use crate::{
     client_ptb::{
         ast::{all_keywords, COMMANDS},
@@ -18,13 +24,6 @@ use crate::{
     err,
     error,
     sp,
-};
-
-use super::{
-    ast::{self as A, is_keyword, Argument, ModuleAccess, ParsedPTBCommand, ParsedProgram},
-    error::{PTBError, PTBResult, Span, Spanned},
-    lexer::Lexer,
-    token::{Lexeme, Token},
 };
 
 /// Parse a program
@@ -654,7 +653,7 @@ impl<'a, I: Iterator<Item = &'a str>> ProgramParser<'a, I> {
         Ok(sp.wrap(addr))
     }
 
-    /// Parse a numeric addres literal (must be prefixed by an `@` symbol).
+    /// Parse a numeric address literal (must be prefixed by an `@` symbol).
     fn parse_address_literal(&mut self) -> PTBResult<Spanned<NumericalAddress>> {
         let sp!(sp, _) = self.expect(Token::At).map_err(|e| {
             err!(e.span => help: {
@@ -839,12 +838,12 @@ mod tests {
             "address",
             "vector<u8>",
             // Structs
-            "sui::object::ID",
+            "one::object::ID",
             "0x2::object::UID",
             "3::staking_pool::StakedOct",
             // Generic types
             "0x2::coin::Coin<2::oct::OCT>",
-            "sui::table::Table<sui::object::ID, vector<0x1::option::Option<u32>>>",
+            "one::table::Table<one::object::ID, vector<0x1::option::Option<u32>>>",
         ];
         let mut parsed = Vec::new();
         for input in inputs {
@@ -901,7 +900,7 @@ mod tests {
             "--make-move-vec <u64> []",
             "--make-move-vec <u8> [1u8, 2u8]",
             // Move Call
-            "--move-call 0x3::sui_system::request_add_stake system coins.0 validator",
+            "--move-call 0x3::one_system::request_add_stake system coins.0 validator",
             "--move-call std::option::is_none <u64> p",
             "--move-call std::option::is_some<u32> q",
             // Assign

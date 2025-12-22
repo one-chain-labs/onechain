@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::Node;
-use anyhow::Result;
-use futures::future::try_join_all;
-use rand::rngs::OsRng;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -13,9 +9,11 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
 
+use anyhow::Result;
+use futures::future::try_join_all;
 use one_node::SuiNodeHandle;
+use rand::rngs::OsRng;
 use sui_config::{
     node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
     ExecutionCacheConfig,
@@ -35,9 +33,16 @@ use sui_swarm_config::{
     },
     node_config_builder::FullnodeConfigBuilder,
 };
-use sui_types::{base_types::AuthorityName, object::Object, supported_protocol_versions::SupportedProtocolVersions};
+use sui_types::{
+    base_types::AuthorityName,
+    object::Object,
+    supported_protocol_versions::SupportedProtocolVersions,
+    traffic_control::{PolicyConfig, RemoteFirewallConfig},
+};
 use tempfile::TempDir;
 use tracing::info;
+
+use super::Node;
 
 pub struct SwarmBuilder<R = OsRng> {
     rng: R,
@@ -381,7 +386,7 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
         }
 
         if self.fullnode_count > 0 {
-            (0..self.fullnode_count).for_each(|idx| {
+            (0 .. self.fullnode_count).for_each(|idx| {
                 let mut builder = fullnode_config_builder.clone();
                 if idx == 0 {
                     // Only the first fullnode is used as the rpc fullnode, we can only use the
@@ -477,7 +482,7 @@ impl Swarm {
     /// Returns an iterator over all currently active validators.
     pub fn active_validators(&self) -> impl Iterator<Item = &Node> {
         self.validator_nodes().filter(|node| {
-            node.get_node_handle().map_or(false, |handle| {
+            node.get_node_handle().is_some_and(|handle| {
                 let state = handle.state();
                 state.is_validator(&state.epoch_store_for_testing())
             })
@@ -537,8 +542,9 @@ impl AsRef<Path> for SwarmDirectory {
 
 #[cfg(test)]
 mod test {
-    use super::Swarm;
     use std::num::NonZeroUsize;
+
+    use super::Swarm;
 
     #[tokio::test]
     async fn launch() {

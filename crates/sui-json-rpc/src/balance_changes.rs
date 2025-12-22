@@ -8,8 +8,6 @@ use std::{
 
 use async_trait::async_trait;
 use move_core_types::language_storage::TypeTag;
-use tokio::sync::RwLock;
-
 use sui_json_rpc_types::BalanceChange;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber},
@@ -22,6 +20,7 @@ use sui_types::{
     storage::WriteKind,
     transaction::InputObjectKind,
 };
+use tokio::sync::RwLock;
 use tracing::instrument;
 
 #[instrument(skip_all, fields(transaction_digest = %effects.transaction_digest()))]

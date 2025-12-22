@@ -3,13 +3,7 @@
 
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use sui_json_rpc::error::SuiRpcInputError;
-use sui_types::{error::SuiObjectResponseError, object::ObjectRead};
-use sui_types::base_types::SuiAddress;
-use sui_json_rpc_types::ZkLoginIntentScope;
-use sui_json_rpc_types::ZkLoginVerifyResult;
-use crate::{errors::IndexerError, indexer_reader::IndexerReader};
-use sui_json_rpc::SuiRpcModule;
+use sui_json_rpc::{error::SuiRpcInputError, SuiRpcModule};
 use sui_json_rpc_api::{ReadApiServer, QUERY_MAX_RESULT_LIMIT};
 use sui_json_rpc_types::{
     Checkpoint,
@@ -23,14 +17,20 @@ use sui_json_rpc_types::{
     SuiPastObjectResponse,
     SuiTransactionBlockResponse,
     SuiTransactionBlockResponseOptions,
+    ZkLoginIntentScope,
+    ZkLoginVerifyResult,
 };
 use sui_open_rpc::Module;
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
 use sui_types::{
-    base_types::{ObjectID, SequenceNumber},
+    base_types::{ObjectID, SequenceNumber, SuiAddress},
     digests::{ChainIdentifier, TransactionDigest},
+    error::SuiObjectResponseError,
+    object::ObjectRead,
     sui_serde::BigInt,
 };
+
+use crate::{errors::IndexerError, indexer_reader::IndexerReader};
 
 #[derive(Clone)]
 pub struct ReadApi {
@@ -137,11 +137,11 @@ impl ReadApiServer for ReadApi {
         _version: SequenceNumber,
         _options: Option<SuiObjectDataOptions>,
     ) -> RpcResult<SuiPastObjectResponse> {
-        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
+        Err(jsonrpsee::types::error::ErrorCode::MethodNotFound.into())
     }
 
     async fn try_get_object_before_version(&self, _: ObjectID, _: SequenceNumber) -> RpcResult<SuiPastObjectResponse> {
-        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
+        Err(jsonrpsee::types::error::ErrorCode::MethodNotFound.into())
     }
 
     async fn try_multi_get_past_objects(
@@ -149,7 +149,7 @@ impl ReadApiServer for ReadApi {
         _past_objects: Vec<SuiGetPastObjectRequest>,
         _options: Option<SuiObjectDataOptions>,
     ) -> RpcResult<Vec<SuiPastObjectResponse>> {
-        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
+        Err(jsonrpsee::types::error::ErrorCode::MethodNotFound.into())
     }
 
     async fn get_latest_checkpoint_sequence_number(&self) -> RpcResult<BigInt<u64>> {
@@ -179,15 +179,6 @@ impl ReadApiServer for ReadApi {
         let next_cursor = checkpoints.last().map(|d| d.sequence_number.into());
 
         Ok(CheckpointPage { data: checkpoints, next_cursor, has_next_page })
-    }
-
-    async fn get_checkpoints_deprecated_limit(
-        &self,
-        cursor: Option<BigInt<u64>>,
-        limit: Option<BigInt<u64>>,
-        descending_order: bool,
-    ) -> RpcResult<CheckpointPage> {
-        self.get_checkpoints(cursor, limit.map(|l| l.into_inner() as usize), descending_order).await
     }
 
     async fn get_events(&self, transaction_digest: TransactionDigest) -> RpcResult<Vec<SuiEvent>> {
@@ -223,7 +214,7 @@ impl ReadApiServer for ReadApi {
         _intent_scope: ZkLoginIntentScope,
         _author: SuiAddress,
     ) -> RpcResult<ZkLoginVerifyResult> {
-        Err(jsonrpsee::types::error::CallError::Custom(jsonrpsee::types::error::ErrorCode::MethodNotFound.into()).into())
+        Err(jsonrpsee::types::error::ErrorCode::MethodNotFound.into())
     }
 }
 
@@ -253,13 +244,15 @@ async fn object_read_to_object_response(
                     Ok(rendered_fields) => display_fields = Some(rendered_fields),
                     Err(e) => {
                         return Ok(SuiObjectResponse::new(
-                            Some((object_ref, o, layout, options, None).try_into()?),
+                            Some((object_ref, o, layout, options, None).try_into().map_err(IndexerError::from)?),
                             Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
                         ));
                     }
                 }
             }
-            Ok(SuiObjectResponse::new_with_data((object_ref, o, layout, options, display_fields).try_into()?))
+            Ok(SuiObjectResponse::new_with_data(
+                (object_ref, o, layout, options, display_fields).try_into().map_err(IndexerError::from)?,
+            ))
         }
         ObjectRead::Deleted((object_id, version, digest)) => {
             Ok(SuiObjectResponse::new_with_error(SuiObjectResponseError::Deleted { object_id, version, digest }))

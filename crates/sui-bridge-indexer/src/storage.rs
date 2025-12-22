@@ -13,6 +13,13 @@ use diesel::{
     TextExpressionMethods,
 };
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
+use sui_indexer_builder::{
+    indexer_builder::{IndexerProgressStore, Persistent},
+    progress::ProgressSavingPolicy,
+    Task,
+    Tasks,
+    LIVE_TASK_TARGET_CHECKPOINT,
+};
 
 use crate::{
     models::ProgressStore,
@@ -25,13 +32,6 @@ use crate::{
         token_transfer_data,
     },
     ProcessedTxnData,
-};
-use sui_indexer_builder::{
-    indexer_builder::{IndexerProgressStore, Persistent},
-    progress::ProgressSavingPolicy,
-    Task,
-    Tasks,
-    LIVE_TASK_TARGET_CHECKPOINT,
 };
 
 /// Persistent layer impl

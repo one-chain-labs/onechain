@@ -1,17 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{
-        authority_test_utils::{publish_package_on_single_authority, upgrade_package_on_single_authority},
-        test_authority_builder::TestAuthorityBuilder,
-        AuthorityState,
-    },
-    test_utils::make_transfer_sui_transaction,
-};
+use std::{path::PathBuf, sync::Arc};
+
 use fastcrypto::{ed25519::Ed25519KeyPair, traits::KeyPair};
 use move_core_types::ident_str;
-use std::{path::PathBuf, sync::Arc};
 use sui_config::{
     certificate_deny_config::CertificateDenyConfigBuilder,
     transaction_deny_config::{TransactionDenyConfig, TransactionDenyConfigBuilder},
@@ -42,6 +35,15 @@ use sui_types::{
         to_sender_signed_transaction,
         to_sender_signed_transaction_with_multi_signers,
     },
+};
+
+use crate::{
+    authority::{
+        auth_unit_test_utils::{publish_package_on_single_authority, upgrade_package_on_single_authority},
+        test_authority_builder::TestAuthorityBuilder,
+        AuthorityState,
+    },
+    test_utils::make_transfer_oct_transaction,
 };
 
 const ACCOUNT_NUM: usize = 5;
@@ -317,10 +319,11 @@ async fn test_package_denied() {
     .await
     .unwrap();
 
-    state
-        .get_cache_commit()
-        .commit_transaction_outputs(state.epoch_store_for_testing().epoch(), &[tx_c, tx_b, tx_a, tx_c_prime, tx_b_prime])
-        .await;
+    state.get_cache_commit().commit_transaction_outputs(
+        state.epoch_store_for_testing().epoch(),
+        &[tx_c, tx_b, tx_a, tx_c_prime, tx_b_prime],
+        true,
+    );
 
     // Re-create the state such that we could deny package c.
     let state = reload_state_with_new_deny_config(
@@ -398,7 +401,7 @@ async fn test_package_denied() {
 async fn test_certificate_deny() {
     let (network_config, state) = setup_test(TransactionDenyConfig::default()).await;
     let (sender, key, gas_objects) = get_accounts_and_coins(&network_config, &state).pop().unwrap();
-    let tx = make_transfer_sui_transaction(
+    let tx = make_transfer_oct_transaction(
         gas_objects[0],
         sender,
         None,

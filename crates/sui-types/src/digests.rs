@@ -3,7 +3,6 @@
 
 use std::{env, fmt};
 
-use crate::{error::SuiError, sui_serde::Readable};
 use fastcrypto::encoding::{Base58, Encoding, Hex};
 use once_cell::sync::{Lazy, OnceCell};
 use schemars::JsonSchema;
@@ -11,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, Bytes};
 use sui_protocol_config::Chain;
 use tracing::info;
+
+use crate::{error::SuiError, sui_serde::Readable};
 
 /// A representation of a 32 byte digest
 #[serde_as]
@@ -230,7 +231,7 @@ pub fn get_testnet_chain_identifier() -> ChainIdentifier {
 
 impl fmt::Display for ChainIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for byte in self.0 .0 .0[0..4].iter() {
+        for byte in self.0 .0 .0[0 .. 4].iter() {
             write!(f, "{:02x}", byte)?;
         }
 
@@ -1016,6 +1017,27 @@ impl fmt::Display for ConsensusCommitDigest {
 impl fmt::Debug for ConsensusCommitDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("ConsensusCommitDigest").field(&self.0).finish()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct AdditionalConsensusStateDigest(Digest);
+
+impl AdditionalConsensusStateDigest {
+    pub const fn new(digest: [u8; 32]) -> Self {
+        Self(Digest::new(digest))
+    }
+}
+
+impl fmt::Display for AdditionalConsensusStateDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Debug for AdditionalConsensusStateDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("AdditionalConsensusStateDigest").field(&self.0).finish()
     }
 }
 

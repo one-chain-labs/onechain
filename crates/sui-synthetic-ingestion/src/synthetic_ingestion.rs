@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use simulacrum::Simulacrum;
 use std::{collections::BTreeMap, path::PathBuf};
+
+use simulacrum::Simulacrum;
 use sui_storage::blob::Blob;
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
@@ -59,8 +60,8 @@ pub async fn generate_ingestion(config: Config) {
     sim.override_next_checkpoint_number(starting_checkpoint);
 
     let mut tx_count = 0;
-    for i in 0..num_checkpoints {
-        for _ in 0..checkpoint_size {
+    for i in 0 .. num_checkpoints {
+        for _ in 0 .. checkpoint_size {
             let tx_data =
                 TestTransactionBuilder::new(sender, gas_object, gas_price).transfer_oct(Some(1), sender).build();
             let tx = to_sender_signed_transaction(tx_data, &keypair);
@@ -91,14 +92,16 @@ pub async fn read_ingestion_data(path: &PathBuf) -> anyhow::Result<BTreeMap<u64,
 
 #[cfg(test)]
 mod tests {
-    use crate::synthetic_ingestion::generate_ingestion;
     use std::path::PathBuf;
+
     use sui_storage::blob::Blob;
     use sui_types::full_checkpoint_content::CheckpointData;
 
+    use crate::synthetic_ingestion::generate_ingestion;
+
     #[tokio::test]
     async fn test_ingestion_from_zero() {
-        let ingestion_dir = tempfile::tempdir().unwrap().keep();
+        let ingestion_dir = tempfile::tempdir().unwrap().into_path();
         let config = super::Config {
             ingestion_dir: ingestion_dir.clone(),
             starting_checkpoint: 0,
@@ -111,7 +114,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ingestion_from_non_zero() {
-        let ingestion_dir = tempfile::tempdir().unwrap().keep();
+        let ingestion_dir = tempfile::tempdir().unwrap().into_path();
         let config = super::Config {
             ingestion_dir: ingestion_dir.clone(),
             starting_checkpoint: 10,
@@ -128,7 +131,7 @@ mod tests {
         num_checkpoints: u64,
         checkpoint_size: u64,
     ) {
-        for checkpoint in first_checkpoint..first_checkpoint + num_checkpoints {
+        for checkpoint in first_checkpoint .. first_checkpoint + num_checkpoints {
             let path = ingestion_dir.join(format!("{}.chk", checkpoint));
             let bytes = tokio::fs::read(&path).await.unwrap();
             let checkpoint_data: CheckpointData = Blob::from_bytes(&bytes).unwrap();

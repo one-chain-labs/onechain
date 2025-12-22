@@ -1,20 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    command::Component,
-    mock_account::{batch_create_account_and_gas, Account},
-    mock_storage::InMemoryObjectStore,
-    single_node::SingleValidator,
-    tx_generator::{RootObjectCreateTxGenerator, SharedObjectCreateTxGenerator, TxGenerator},
-    workload::Workload,
-};
-use futures::{stream::FuturesUnordered, StreamExt};
 use std::{
     collections::{BTreeMap, HashMap},
     ops::Deref,
     sync::Arc,
 };
+
+use futures::{stream::FuturesUnordered, StreamExt};
 use sui_config::node::RunWithRange;
 use sui_test_transaction_builder::PublishData;
 use sui_types::{
@@ -25,6 +18,15 @@ use sui_types::{
     transaction::{CertifiedTransaction, SignedTransaction, Transaction, VerifiedTransaction},
 };
 use tracing::info;
+
+use crate::{
+    command::Component,
+    mock_account::{batch_create_account_and_gas, Account},
+    mock_storage::InMemoryObjectStore,
+    single_node::SingleValidator,
+    tx_generator::{RootObjectCreateTxGenerator, SharedObjectCreateTxGenerator, TxGenerator},
+    workload::Workload,
+};
 
 pub struct BenchmarkContext {
     validator: SingleValidator,
@@ -91,11 +93,11 @@ impl BenchmarkContext {
         let results = self.execute_raw_transactions(root_object_create_transactions).await;
         let mut new_gas_objects = HashMap::new();
         for effects in results {
-            self.validator()
-                .get_validator()
-                .get_cache_commit()
-                .commit_transaction_outputs(effects.executed_epoch(), &[*effects.transaction_digest()])
-                .await;
+            self.validator().get_validator().get_cache_commit().commit_transaction_outputs(
+                effects.executed_epoch(),
+                &[*effects.transaction_digest()],
+                true,
+            );
             let (owner, root_object) = effects
                 .created()
                 .into_iter()
@@ -150,7 +152,7 @@ impl BenchmarkContext {
             // live objects to construct the in memory object store, hence requiring these objects committed to DB.
             // For checkpoint executor, in order to commit a checkpoint it is required previous versions
             // of objects are already committed.
-            cache_commit.commit_transaction_outputs(epoch_id, &[*effects.transaction_digest()]).await;
+            cache_commit.commit_transaction_outputs(epoch_id, &[*effects.transaction_digest()], true);
         }
         self.refresh_gas_objects(new_gas_objects);
         info!("Finished preparing shared objects");
@@ -314,20 +316,17 @@ impl BenchmarkContext {
         let checkpoints = validator.build_checkpoints(transactions, effects, checkpoint_size).await;
         info!("Built {} checkpoints", checkpoints.len());
         let last_checkpoint_seq = *checkpoints.last().unwrap().0.sequence_number();
-        let (mut checkpoint_executor, checkpoint_sender) = validator.create_checkpoint_executor();
+        let checkpoint_executor = validator.create_checkpoint_executor();
         for (checkpoint, contents) in checkpoints {
             let state = validator.get_validator();
             state.get_checkpoint_store().insert_verified_checkpoint(&checkpoint).unwrap();
             state.get_state_sync_store().multi_insert_transaction_and_effects(contents.transactions());
             state.get_checkpoint_store().insert_verified_checkpoint_contents(&checkpoint, contents).unwrap();
             state.get_checkpoint_store().update_highest_synced_checkpoint(&checkpoint).unwrap();
-            checkpoint_sender.send(checkpoint).unwrap();
         }
         let start_time = std::time::Instant::now();
         info!("Starting checkpoint execution. You can now attach a profiler");
-        checkpoint_executor
-            .run_epoch(validator.get_epoch_store().clone(), Some(RunWithRange::Checkpoint(last_checkpoint_seq)))
-            .await;
+        checkpoint_executor.run_epoch(Some(RunWithRange::Checkpoint(last_checkpoint_seq))).await;
         let elapsed = start_time.elapsed().as_millis() as f64 / 1000f64;
         info!("Checkpoint execution finished in {}s, TPS={}.", elapsed, tx_count as f64 / elapsed,);
     }

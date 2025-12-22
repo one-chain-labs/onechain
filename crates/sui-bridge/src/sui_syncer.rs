@@ -4,20 +4,22 @@
 //! The SuiSyncer module is responsible for synchronizing Events emitted
 //! on Sui blockchain from concerned modules of bridge package 0x9.
 
-use crate::{
-    error::BridgeResult,
-    metrics::BridgeMetrics,
-    retry_with_max_elapsed_time,
-    sui_client::{SuiClient, SuiClientInner},
-};
-use mysten_metrics::spawn_logged_monitored_task;
 use std::{collections::HashMap, sync::Arc};
+
+use mysten_metrics::spawn_logged_monitored_task;
 use sui_json_rpc_types::SuiEvent;
 use sui_types::{event::EventID, Identifier, BRIDGE_PACKAGE_ID};
 use tokio::{
     sync::Notify,
     task::JoinHandle,
     time::{self, Duration},
+};
+
+use crate::{
+    error::BridgeResult,
+    metrics::BridgeMetrics,
+    retry_with_max_elapsed_time,
+    sui_client::{SuiClient, SuiClientInner},
 };
 
 const SUI_EVENTS_CHANNEL_SIZE: usize = 1000;
@@ -71,7 +73,7 @@ where
 
     async fn run_event_listening_task(
         // The module where interested events are defined.
-        // Moudle is always of bridge package 0x9.
+        // Module is always of bridge package 0x9.
         module: Identifier,
         mut cursor: Option<EventID>,
         events_sender: mysten_metrics::metered_channel::Sender<(Identifier, Vec<SuiEvent>)>,
@@ -135,13 +137,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::{sui_client::SuiClient, sui_mock_client::SuiMockClient};
     use prometheus::Registry;
     use sui_json_rpc_types::EventPage;
     use sui_types::{digests::TransactionDigest, event::EventID, Identifier};
     use tokio::time::timeout;
+
+    use super::*;
+    use crate::{sui_client::SuiClient, sui_mock_client::SuiMockClient};
 
     #[tokio::test]
     async fn test_sui_syncer_basic() -> anyhow::Result<()> {

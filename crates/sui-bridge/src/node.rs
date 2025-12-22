@@ -1,6 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, HashMap},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
+
+use arc_swap::ArcSwap;
+use ethers::{providers::Provider, types::Address as EthAddress};
+use mysten_metrics::spawn_logged_monitored_task;
+use sui_types::{
+    bridge::{
+        BRIDGE_COMMITTEE_MODULE_NAME,
+        BRIDGE_LIMITER_MODULE_NAME,
+        BRIDGE_MODULE_NAME,
+        BRIDGE_TREASURY_MODULE_NAME,
+    },
+    event::EventID,
+    Identifier,
+};
+use tokio::task::JoinHandle;
+use tracing::info;
+
 use crate::{
     action_executor::BridgeActionExecutor,
     client::bridge_authority_aggregator::BridgeAuthorityAggregator,
@@ -28,27 +51,6 @@ use crate::{
     types::BridgeCommittee,
     utils::{get_committee_voting_power_by_name, get_eth_contract_addresses, get_validator_names_by_pub_keys},
 };
-use arc_swap::ArcSwap;
-use ethers::{providers::Provider, types::Address as EthAddress};
-use mysten_metrics::spawn_logged_monitored_task;
-use std::{
-    collections::{BTreeMap, HashMap},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
-use sui_types::{
-    bridge::{
-        BRIDGE_COMMITTEE_MODULE_NAME,
-        BRIDGE_LIMITER_MODULE_NAME,
-        BRIDGE_MODULE_NAME,
-        BRIDGE_TREASURY_MODULE_NAME,
-    },
-    event::EventID,
-    Identifier,
-};
-use tokio::task::JoinHandle;
-use tracing::info;
 
 pub async fn run_bridge_node(
     config: BridgeNodeConfig,
@@ -135,10 +137,17 @@ async fn start_watchdog(
     sui_client: Arc<SuiBridgeClient>,
 ) {
     let watchdog_metrics = WatchdogMetrics::new(registry);
-    let (_committee_address, _limiter_address, vault_address, _config_address, weth_address, usdt_address) =
-        get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider)
-            .await
-            .unwrap_or_else(|e| panic!("get_eth_contract_addresses should not fail: {}", e));
+    let (
+        _committee_address,
+        _limiter_address,
+        vault_address,
+        _config_address,
+        weth_address,
+        usdt_address,
+        _wbtc_address,
+    ) = get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider)
+        .await
+        .unwrap_or_else(|e| panic!("get_eth_contract_addresses should not fail: {}", e));
 
     let eth_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
@@ -149,6 +158,7 @@ async fn start_watchdog(
     )
     .await
     .unwrap_or_else(|e| panic!("Failed to create eth vault balance: {}", e));
+
     let usdt_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
         vault_address,
@@ -159,6 +169,16 @@ async fn start_watchdog(
     .await
     .unwrap_or_else(|e| panic!("Failed to create usdt vault balance: {}", e));
 
+    let wbtc_vault_balance = EthereumVaultBalance::new(
+        eth_provider.clone(),
+        vault_address,
+        _wbtc_address,
+        VaultAsset::WBTC,
+        watchdog_metrics.wbtc_vault_balance.clone(),
+    )
+    .await
+    .unwrap_or_else(|e| panic!("Failed to create wbtc vault balance: {}", e));
+
     let eth_bridge_status =
         EthBridgeStatus::new(eth_provider, eth_bridge_proxy_address, watchdog_metrics.eth_bridge_paused.clone());
 
@@ -167,6 +187,7 @@ async fn start_watchdog(
     let mut observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
         Box::new(eth_vault_balance),
         Box::new(usdt_vault_balance),
+        Box::new(wbtc_vault_balance),
         Box::new(eth_bridge_status),
         Box::new(sui_bridge_status),
     ];
@@ -342,15 +363,8 @@ fn get_eth_contracts_to_watch(
 #[cfg(test)]
 mod tests {
     use ethers::types::Address as EthAddress;
-    use prometheus::Registry;
-
-    use super::*;
-    use crate::{
-        config::{default_ed25519_key_pair, BridgeNodeConfig, EthConfig, SuiConfig},
-        e2e_tests::test_utils::{BridgeTestCluster, BridgeTestClusterBuilder},
-        utils::wait_for_server_to_be_up,
-    };
     use fastcrypto::secp256k1::Secp256k1KeyPair;
+    use prometheus::Registry;
     use sui_config::local_ip_utils::get_available_port;
     use sui_types::{
         base_types::SuiAddress,
@@ -360,6 +374,13 @@ mod tests {
         event::EventID,
     };
     use tempfile::tempdir;
+
+    use super::*;
+    use crate::{
+        config::{default_ed25519_key_pair, BridgeNodeConfig, EthConfig, SuiConfig},
+        e2e_tests::test_utils::{BridgeTestCluster, BridgeTestClusterBuilder},
+        utils::wait_for_server_to_be_up,
+    };
 
     #[tokio::test]
     async fn test_get_eth_contracts_to_watch() {
@@ -480,7 +501,7 @@ mod tests {
         let kp = bridge_test_cluster.bridge_authority_key(0);
 
         // prepare node config (server only)
-        let tmp_dir = tempdir().unwrap().keep();
+        let tmp_dir = tempdir().unwrap().into_path();
         let authority_key_path = "test_starting_bridge_node_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");
         let base64_encoded = kp.encode_base64();
@@ -528,7 +549,7 @@ mod tests {
         let kp = bridge_test_cluster.bridge_authority_key(0);
 
         // prepare node config (server + client)
-        let tmp_dir = tempdir().unwrap().keep();
+        let tmp_dir = tempdir().unwrap().into_path();
         let db_path = tmp_dir.join("test_starting_bridge_node_with_client_db");
         let authority_key_path = "test_starting_bridge_node_with_client_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");
@@ -542,7 +563,7 @@ mod tests {
         bridge_test_cluster
             .test_cluster
             .inner
-            .transfer_sui_must_exceed(sender_address, client_sui_address, 1000000000)
+            .transfer_oct_must_exceed(sender_address, client_sui_address, 1000000000)
             .await;
 
         let config = BridgeNodeConfig {
@@ -592,7 +613,7 @@ mod tests {
         let kp = bridge_test_cluster.bridge_authority_key(0);
 
         // prepare node config (server + client)
-        let tmp_dir = tempdir().unwrap().keep();
+        let tmp_dir = tempdir().unwrap().into_path();
         let db_path = tmp_dir.join("test_starting_bridge_node_with_client_and_separate_client_key_db");
         let authority_key_path = "test_starting_bridge_node_with_client_and_separate_client_key_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");
@@ -612,7 +633,7 @@ mod tests {
         let gas_obj = bridge_test_cluster
             .test_cluster
             .inner
-            .transfer_sui_must_exceed(sender_address, client_sui_address, 1000000000)
+            .transfer_oct_must_exceed(sender_address, client_sui_address, 1000000000)
             .await;
 
         let config = BridgeNodeConfig {

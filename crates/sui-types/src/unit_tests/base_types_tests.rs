@@ -8,7 +8,10 @@ use std::str::FromStr;
 
 use fastcrypto::{encoding::Base58, traits::EncodeDecodeBase64};
 use move_binary_format::file_format;
+use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
+use sui_protocol_config::ProtocolConfig;
 
+use super::*;
 use crate::{
     crypto::{
         bcs_signable_test::{Bar, Foo},
@@ -27,10 +30,6 @@ use crate::{
     object::Object,
     SUI_FRAMEWORK_ADDRESS,
 };
-use shared_crypto::intent::{Intent, IntentMessage, IntentScope};
-use sui_protocol_config::ProtocolConfig;
-
-use super::*;
 
 #[test]
 fn test_bcs_enum() {
@@ -269,8 +268,8 @@ fn test_transaction_digest_serde_not_human_readable() {
     let serialized = bincode::serialize(&digest).unwrap();
     let bcs_serialized = bcs::to_bytes(&digest).unwrap();
     // bincode use 8 bytes for BYTES len and bcs use 1 byte
-    assert_eq!(serialized[8..], bcs_serialized[1..]);
-    assert_eq!(digest.inner(), &serialized[8..]);
+    assert_eq!(serialized[8 ..], bcs_serialized[1 ..]);
+    assert_eq!(digest.inner(), &serialized[8 ..]);
     let deserialized: TransactionDigest = bincode::deserialize(&serialized).unwrap();
     assert_eq!(deserialized, digest);
 }

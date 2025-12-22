@@ -1,31 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    FileMetadata,
-    FileType,
-    Manifest,
-    MAGIC_BYTES,
-    MANIFEST_FILE_MAGIC,
-    OBJECT_FILE_MAGIC,
-    OBJECT_ID_BYTES,
-    OBJECT_REF_BYTES,
-    REFERENCE_FILE_MAGIC,
-    SEQUENCE_NUM_BYTES,
-    SHA3_BYTES,
-};
-use anyhow::{anyhow, Context, Result};
-use byteorder::{BigEndian, ReadBytesExt};
-use bytes::{Buf, Bytes};
-use fastcrypto::hash::{HashFunction, MultisetHash, Sha3_256};
-use futures::{
-    future::{AbortRegistration, Abortable},
-    StreamExt,
-    TryStreamExt,
-};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use integer_encoding::VarIntReader;
-use object_store::path::Path;
 use std::{
     collections::BTreeMap,
     fs,
@@ -38,17 +13,32 @@ use std::{
         Arc,
     },
 };
+
+use anyhow::{anyhow, Context, Result};
+use byteorder::{BigEndian, ReadBytesExt};
+use bytes::{Buf, Bytes};
+use fastcrypto::hash::{HashFunction, MultisetHash, Sha3_256};
+use futures::{
+    future::{AbortRegistration, Abortable},
+    StreamExt,
+    TryStreamExt,
+};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use integer_encoding::VarIntReader;
+use object_store::path::Path;
 use sui_config::object_storage_config::ObjectStoreConfig;
 use sui_core::authority::{
     authority_store_tables::{AuthorityPerpetualTables, LiveObject},
     AuthorityStore,
 };
+use sui_indexer_alt_framework::task::TrySpawnStreamExt;
 use sui_storage::{
     blob::{Blob, BlobEncoding},
     object_store::{
         http::HttpDownloaderBuilder,
         util::{copy_file, copy_files, path_to_filesystem},
         ObjectStoreGetExt,
+        ObjectStoreListExt,
         ObjectStorePutExt,
     },
 };
@@ -63,9 +53,24 @@ use tokio::{
 };
 use tracing::{error, info};
 
+use crate::{
+    FileMetadata,
+    FileType,
+    Manifest,
+    MAGIC_BYTES,
+    MANIFEST_FILE_MAGIC,
+    OBJECT_FILE_MAGIC,
+    OBJECT_ID_BYTES,
+    OBJECT_REF_BYTES,
+    REFERENCE_FILE_MAGIC,
+    SEQUENCE_NUM_BYTES,
+    SHA3_BYTES,
+};
+
 pub type SnapshotChecksums = (DigestByBucketAndPartition, Accumulator);
 pub type DigestByBucketAndPartition = BTreeMap<u32, BTreeMap<u32, [u8; 32]>>;
 pub type Sha3DigestType = Arc<Mutex<BTreeMap<u32, BTreeMap<u32, [u8; 32]>>>>;
+#[derive(Clone)]
 pub struct StateSnapshotReaderV1 {
     epoch: u64,
     local_staging_dir_root: PathBuf,
@@ -73,7 +78,6 @@ pub struct StateSnapshotReaderV1 {
     local_object_store: Arc<dyn ObjectStorePutExt>,
     ref_files: BTreeMap<u32, BTreeMap<u32, FileMetadata>>,
     object_files: BTreeMap<u32, BTreeMap<u32, FileMetadata>>,
-    indirect_objects_threshold: usize,
     m: MultiProgress,
     concurrency: usize,
 }
@@ -83,9 +87,9 @@ impl StateSnapshotReaderV1 {
         epoch: u64,
         remote_store_config: &ObjectStoreConfig,
         local_store_config: &ObjectStoreConfig,
-        indirect_objects_threshold: usize,
         download_concurrency: NonZeroUsize,
         m: MultiProgress,
+        skip_reset_local_store: bool,
     ) -> Result<Self> {
         let epoch_dir = format!("epoch_{}", epoch);
         let remote_object_store = if remote_store_config.no_sign_request {
@@ -94,12 +98,15 @@ impl StateSnapshotReaderV1 {
             remote_store_config.make().map(Arc::new)?
         };
         let local_object_store: Arc<dyn ObjectStorePutExt> = local_store_config.make().map(Arc::new)?;
+        let local_object_store_list: Arc<dyn ObjectStoreListExt> = local_store_config.make().map(Arc::new)?;
         let local_staging_dir_root = local_store_config.directory.as_ref().context("No directory specified")?.clone();
-        let local_epoch_dir_path = local_staging_dir_root.join(&epoch_dir);
-        if local_epoch_dir_path.exists() {
-            fs::remove_dir_all(&local_epoch_dir_path)?;
+        if !skip_reset_local_store {
+            let local_epoch_dir_path = local_staging_dir_root.join(&epoch_dir);
+            if local_epoch_dir_path.exists() {
+                fs::remove_dir_all(&local_epoch_dir_path)?;
+            }
+            fs::create_dir_all(&local_epoch_dir_path)?;
         }
-        fs::create_dir_all(&local_epoch_dir_path)?;
         // Download MANIFEST first
         let manifest_file_path = Path::from(epoch_dir.clone()).child("MANIFEST");
         copy_file(&manifest_file_path, &manifest_file_path, &remote_object_store, &local_object_store).await?;
@@ -138,24 +145,40 @@ impl StateSnapshotReaderV1 {
             })
             .collect();
 
+        let files_to_download = if skip_reset_local_store {
+            let mut list_stream = local_object_store_list.list_objects(Some(&epoch_dir_path)).await;
+            let mut existing_files = std::collections::HashSet::new();
+            while let Some(Ok(meta)) = list_stream.next().await {
+                existing_files.insert(meta.location);
+            }
+            let mut missing_files = Vec::new();
+            for file in &files {
+                if !existing_files.contains(file) {
+                    missing_files.push(file.clone());
+                }
+            }
+            missing_files
+        } else {
+            files
+        };
         let progress_bar = m.add(
-            ProgressBar::new(files.len() as u64).with_style(
+            ProgressBar::new(files_to_download.len() as u64).with_style(
                 ProgressStyle::with_template(
-                    "[{elapsed_precise}] {wide_bar} {pos} out of {len} .ref files done ({msg})",
+                    "[{elapsed_precise}] {wide_bar} {pos} out of {len} missing .ref files done ({msg})",
                 )
                 .unwrap(),
             ),
         );
         copy_files(
-            &files,
-            &files,
+            &files_to_download,
+            &files_to_download,
             &remote_object_store,
             &local_object_store,
             download_concurrency,
             Some(progress_bar.clone()),
         )
         .await?;
-        progress_bar.finish_with_message("ref files download complete");
+        progress_bar.finish_with_message("Missing ref files download complete");
         Ok(StateSnapshotReaderV1 {
             epoch,
             local_staging_dir_root,
@@ -163,7 +186,6 @@ impl StateSnapshotReaderV1 {
             local_object_store,
             ref_files,
             object_files,
-            indirect_objects_threshold,
             m,
             concurrency: download_concurrency.get(),
         })
@@ -207,32 +229,44 @@ impl StateSnapshotReaderV1 {
             ),
         );
 
-        for (bucket, part_files) in self.ref_files.clone().iter() {
-            for (part, _part_file) in part_files.iter() {
-                let mut sha3_digests = sha3_digests.lock().await;
-                let ref_iter = self.ref_iter(*bucket, *part)?;
-                let mut hasher = Sha3_256::default();
-                let mut empty = true;
-                self.object_files
-                    .get(bucket)
-                    .context(format!("No bucket exists for: {bucket}"))?
-                    .get(part)
-                    .context(format!("No part exists for bucket: {bucket}, part: {part}"))?;
-                for object_ref in ref_iter {
-                    hasher.update(object_ref.2.inner());
-                    empty = false;
+        let ref_files_iter = self.ref_files.clone().into_iter();
+        futures::stream::iter(ref_files_iter)
+            .flat_map(|(bucket, part_files)| {
+                futures::stream::iter(part_files.into_iter().map(move |(part, part_file)| (bucket, part, part_file)))
+            })
+            .try_for_each_spawned(self.concurrency, |(bucket, part, _part_file)| {
+                let sha3_digests = sha3_digests.clone();
+                let object_files = self.object_files.clone();
+                let bar = checksum_progress_bar.clone();
+                let this = self.clone();
+
+                async move {
+                    let ref_iter = this.ref_iter(bucket, part)?;
+                    let mut hasher = Sha3_256::default();
+                    let mut empty = true;
+
+                    object_files
+                        .get(&bucket)
+                        .context(format!("No bucket exists for: {bucket}"))?
+                        .get(&part)
+                        .context(format!("No part exists for bucket: {bucket}, part: {part}"))?;
+
+                    for object_ref in ref_iter {
+                        hasher.update(object_ref.2.inner());
+                        empty = false;
+                    }
+
+                    if !empty {
+                        let mut digests = sha3_digests.lock().await;
+                        digests.entry(bucket).or_insert(BTreeMap::new()).entry(part).or_insert(hasher.finalize().digest);
+                    }
+
+                    bar.inc(1);
+                    bar.set_message(format!("Bucket: {}, Part: {}", bucket, part));
+                    Ok::<(), anyhow::Error>(())
                 }
-                if !empty {
-                    sha3_digests
-                        .entry(*bucket)
-                        .or_insert(BTreeMap::new())
-                        .entry(*part)
-                        .or_insert(hasher.finalize().digest);
-                }
-                checksum_progress_bar.inc(1);
-                checksum_progress_bar.set_message(format!("Bucket: {}, Part: {}", bucket, part));
-            }
-        }
+            })
+            .await?;
         checksum_progress_bar.finish_with_message("Checksumming complete");
         Ok((sha3_digests, num_part_files))
     }
@@ -329,7 +363,6 @@ impl StateSnapshotReaderV1 {
     ) -> Result<(), anyhow::Error> {
         let epoch_dir = self.epoch_dir();
         let concurrency = self.concurrency;
-        let threshold = self.indirect_objects_threshold;
         let remote_object_store = self.remote_object_store.clone();
         let input_files: Vec<_> = self
             .object_files
@@ -380,13 +413,8 @@ impl StateSnapshotReaderV1 {
                         let bytes_len = bytes.len();
                         let result: Result<(), anyhow::Error> =
                             LiveObjectIter::new(&file_metadata, bytes).map(|obj_iter| {
-                                AuthorityStore::bulk_insert_live_objects(
-                                    perpetual_db,
-                                    obj_iter,
-                                    threshold,
-                                    &sha3_digest,
-                                )
-                                .expect("Failed to insert live objects");
+                                AuthorityStore::bulk_insert_live_objects(perpetual_db, obj_iter, &sha3_digest)
+                                    .expect("Failed to insert live objects");
                             });
                         downloaded_bytes.fetch_add(bytes_len, Ordering::Relaxed);
                         obj_progress_bar_clone.inc(1);
@@ -463,7 +491,7 @@ impl StateSnapshotReaderV1 {
         }
         manifest_reader.rewind()?;
         manifest_reader.seek(SeekFrom::Start(MAGIC_BYTES as u64))?;
-        let manifest = bcs::from_bytes(&content_buf[MAGIC_BYTES..])?;
+        let manifest = bcs::from_bytes(&content_buf[MAGIC_BYTES ..])?;
         Ok(manifest)
     }
 
@@ -531,10 +559,10 @@ impl ObjectRefIter {
     fn next_ref(&mut self) -> Result<ObjectRef> {
         let mut buf = [0u8; OBJECT_REF_BYTES];
         self.reader.read_exact(&mut buf)?;
-        let object_id = &buf[0..OBJECT_ID_BYTES];
+        let object_id = &buf[0 .. OBJECT_ID_BYTES];
         let sequence_number =
-            &buf[OBJECT_ID_BYTES..OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES].reader().read_u64::<BigEndian>()?;
-        let sha3_digest = &buf[OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES..OBJECT_REF_BYTES];
+            &buf[OBJECT_ID_BYTES .. OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES].reader().read_u64::<BigEndian>()?;
+        let sha3_digest = &buf[OBJECT_ID_BYTES + SEQUENCE_NUM_BYTES .. OBJECT_REF_BYTES];
         let object_ref: ObjectRef = (
             ObjectID::from_bytes(object_id)?,
             SequenceNumber::from_u64(*sequence_number),

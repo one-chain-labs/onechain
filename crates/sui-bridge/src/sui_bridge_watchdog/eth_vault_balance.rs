@@ -1,21 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{abi::EthERC20, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use ethers::{
     providers::Provider,
     types::{Address as EthAddress, U256},
 };
 use prometheus::IntGauge;
-use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info};
+
+use crate::{abi::EthERC20, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
 
 #[derive(Debug)]
 pub enum VaultAsset {
     WETH,
     USDT,
+    WBTC,
 }
 
 pub struct EthereumVaultBalance {

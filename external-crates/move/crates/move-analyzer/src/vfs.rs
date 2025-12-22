@@ -13,11 +13,8 @@
 use crate::symbols;
 use lsp_server::Notification;
 use lsp_types::{
-    notification::Notification as _,
-    DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams,
+    notification::Notification as _, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams,
 };
 use std::{io::Write, path::PathBuf};
 use vfs::VfsPath;
@@ -57,9 +54,16 @@ pub fn on_text_document_sync_notification(
     symbolicator_runner: &symbols::SymbolicatorRunner,
     notification: &Notification,
 ) {
-    fn vfs_file_create(ide_files: &VfsPath, file_path: PathBuf, first_access: bool) -> Option<Box<dyn Write + Send>> {
+    fn vfs_file_create(
+        ide_files: &VfsPath,
+        file_path: PathBuf,
+        first_access: bool,
+    ) -> Option<Box<dyn Write + Send>> {
         let Some(vfs_path) = ide_files.join(file_path.to_string_lossy()).ok() else {
-            eprintln!("Could not construct file path for file creation at {:?}", file_path);
+            eprintln!(
+                "Could not construct file path for file creation at {:?}",
+                file_path
+            );
             return None;
         };
         if first_access {
@@ -75,7 +79,10 @@ pub fn on_text_document_sync_notification(
 
     fn vfs_file_remove(ide_files: &VfsPath, file_path: PathBuf) {
         let Some(vfs_path) = ide_files.join(file_path.to_string_lossy()).ok() else {
-            eprintln!("Could not construct file path for file removal at {:?}", file_path);
+            eprintln!(
+                "Could not construct file path for file removal at {:?}",
+                file_path
+            );
             return;
         };
         if vfs_path.remove_file().is_err() {
@@ -86,29 +93,47 @@ pub fn on_text_document_sync_notification(
     eprintln!("text document notification");
     match notification.method.as_str() {
         lsp_types::notification::DidOpenTextDocument::METHOD => {
-            let parameters = serde_json::from_value::<DidOpenTextDocumentParams>(notification.params.clone())
-                .expect("could not deserialize notification");
+            let parameters =
+                serde_json::from_value::<DidOpenTextDocumentParams>(notification.params.clone())
+                    .expect("could not deserialize notification");
             let Some(file_path) = parameters.text_document.uri.to_file_path().ok() else {
-                eprintln!("Could not create file path from URI {:?}", parameters.text_document.uri);
+                eprintln!(
+                    "Could not create file path from URI {:?}",
+                    parameters.text_document.uri
+                );
                 return;
             };
-            let Some(mut vfs_file) = vfs_file_create(&ide_files_root, file_path.clone(), /* first_access */ true) else {
+            let Some(mut vfs_file) = vfs_file_create(
+                &ide_files_root,
+                file_path.clone(),
+                /* first_access */ true,
+            ) else {
                 return;
             };
-            if vfs_file.write_all(parameters.text_document.text.as_bytes()).is_ok() {
+            if vfs_file
+                .write_all(parameters.text_document.text.as_bytes())
+                .is_ok()
+            {
                 symbolicator_runner.run(file_path);
             }
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
-            let parameters = serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
-                .expect("could not deserialize notification");
+            let parameters =
+                serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
+                    .expect("could not deserialize notification");
 
             let Some(file_path) = parameters.text_document.uri.to_file_path().ok() else {
-                eprintln!("Could not create file path from URI {:?}", parameters.text_document.uri);
+                eprintln!(
+                    "Could not create file path from URI {:?}",
+                    parameters.text_document.uri
+                );
                 return;
             };
-            let Some(mut vfs_file) = vfs_file_create(&ide_files_root, file_path.clone(), /* first_access */ false)
-            else {
+            let Some(mut vfs_file) = vfs_file_create(
+                &ide_files_root,
+                file_path.clone(),
+                /* first_access */ false,
+            ) else {
                 return;
             };
             let Some(changes) = parameters.content_changes.last() else {
@@ -120,14 +145,21 @@ pub fn on_text_document_sync_notification(
             }
         }
         lsp_types::notification::DidSaveTextDocument::METHOD => {
-            let parameters = serde_json::from_value::<DidSaveTextDocumentParams>(notification.params.clone())
-                .expect("could not deserialize notification");
+            let parameters =
+                serde_json::from_value::<DidSaveTextDocumentParams>(notification.params.clone())
+                    .expect("could not deserialize notification");
             let Some(file_path) = parameters.text_document.uri.to_file_path().ok() else {
-                eprintln!("Could not create file path from URI {:?}", parameters.text_document.uri);
+                eprintln!(
+                    "Could not create file path from URI {:?}",
+                    parameters.text_document.uri
+                );
                 return;
             };
-            let Some(mut vfs_file) = vfs_file_create(&ide_files_root, file_path.clone(), /* first_access */ false)
-            else {
+            let Some(mut vfs_file) = vfs_file_create(
+                &ide_files_root,
+                file_path.clone(),
+                /* first_access */ false,
+            ) else {
                 return;
             };
             let Some(content) = parameters.text else {
@@ -142,10 +174,14 @@ pub fn on_text_document_sync_notification(
             }
         }
         lsp_types::notification::DidCloseTextDocument::METHOD => {
-            let parameters = serde_json::from_value::<DidCloseTextDocumentParams>(notification.params.clone())
-                .expect("could not deserialize notification");
+            let parameters =
+                serde_json::from_value::<DidCloseTextDocumentParams>(notification.params.clone())
+                    .expect("could not deserialize notification");
             let Some(file_path) = parameters.text_document.uri.to_file_path().ok() else {
-                eprintln!("Could not create file path from URI {:?}", parameters.text_document.uri);
+                eprintln!(
+                    "Could not create file path from URI {:?}",
+                    parameters.text_document.uri
+                );
                 return;
             };
             vfs_file_remove(&ide_files_root, file_path.clone());

@@ -21,7 +21,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::{serde_as, DisplayFromStr};
-
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
     base_types::{
@@ -656,7 +655,24 @@ impl SuiData for SuiParsedData {
     }
 
     fn try_from_package(package: MovePackage) -> Result<Self, anyhow::Error> {
-        Ok(Self::Package(SuiMovePackage { disassembled: package.disassemble()? }))
+        let mut disassembled = BTreeMap::new();
+        for bytecode in package.serialized_module_map().values() {
+            // this function is only from JSON RPC - it is OK to deserialize with max Move binary
+            // version
+            let module = move_binary_format::CompiledModule::deserialize_with_defaults(bytecode)
+                .map_err(|error| SuiError::ModuleDeserializationFailure { error: error.to_string() })?;
+            let d = move_disassembler::disassembler::Disassembler::from_module_with_max_size(
+                &module,
+                move_ir_types::location::Spanned::unsafe_no_loc(()).loc,
+                *sui_types::move_package::MAX_DISASSEMBLED_MODULE_SIZE,
+            )
+            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+            let bytecode_str =
+                d.disassemble().map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+            disassembled.insert(module.name().to_string(), Value::String(bytecode_str));
+        }
+
+        Ok(Self::Package(SuiMovePackage { disassembled }))
     }
 
     fn try_as_move(&self) -> Option<&Self::ObjectType> {

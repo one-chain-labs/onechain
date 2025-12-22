@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    errors::IndexerError,
-    schema::{epochs, feature_flags, protocol_configs},
-};
 use diesel::{
     prelude::{AsChangeset, Identifiable},
     Insertable,
@@ -16,6 +12,11 @@ use sui_types::{
     event::SystemEpochInfoEvent,
     messages_checkpoint::CertifiedCheckpointSummary,
     sui_system_state::sui_system_state_summary::SuiSystemStateSummary,
+};
+
+use crate::{
+    errors::IndexerError,
+    schema::{epochs, feature_flags, protocol_configs},
 };
 
 #[derive(Queryable, Insertable, Debug, Clone, Default)]

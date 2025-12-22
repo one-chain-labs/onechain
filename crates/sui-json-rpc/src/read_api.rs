@@ -6,12 +6,13 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use backoff::{future::retry, ExponentialBackoff};
-use fastcrypto::encoding::{Base64, Encoding};
+use fastcrypto::{
+    encoding::{Base64, Encoding},
+    traits::ToFromBytes,
+};
 use fastcrypto_zkp::bn254::zk_login_api::ZkLoginEnv;
 use futures::future::join_all;
 use im::hashmap::HashMap as ImHashMap;
-use shared_crypto::intent::{IntentMessage, PersonalMessage};
-use shared_crypto::intent::Intent;
 use indexmap::map::IndexMap;
 use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
@@ -20,10 +21,8 @@ use move_core_types::{
     annotated_value::{MoveStruct, MoveStructLayout, MoveValue},
     language_storage::StructTag,
 };
-use tap::TapFallible;
-use tracing::{debug, error, info, instrument, trace, warn};
-use sui_types::authenticator_state::{get_authenticator_state, ActiveJwk};
 use mysten_metrics::{add_server_timing, spawn_monitored_task};
+use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
 use sui_core::authority::AuthorityState;
 use sui_json_rpc_api::{
     validate_limit,
@@ -61,19 +60,22 @@ use sui_open_rpc::Module;
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
 use sui_storage::key_value_store::TransactionKeyValueStore;
 use sui_types::{
-    base_types::{ObjectID, SequenceNumber,SuiAddress, TransactionDigest},
+    authenticator_state::{get_authenticator_state, ActiveJwk},
+    base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest},
     collection_types::VecMap,
-    crypto::{AggregateAuthoritySignature,ToFromBytes},
+    crypto::AggregateAuthoritySignature,
     display::DisplayVersionUpdatedEvent,
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, SuiObjectResponseError},
     messages_checkpoint::{CheckpointContents, CheckpointSequenceNumber, CheckpointSummary, CheckpointTimestamp},
     object::{Object, ObjectRead, PastObjectRead},
     signature::{GenericSignature, VerifyParams},
-    sui_serde::BigInt,
     signature_verification::VerifiedDigestCache,
-    transaction::{Transaction,TransactionData, TransactionDataAPI},
+    sui_serde::BigInt,
+    transaction::{Transaction, TransactionData, TransactionDataAPI},
 };
+use tap::TapFallible;
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     authority_state::{StateRead, StateReadError, StateReadResult},
@@ -85,7 +87,6 @@ use crate::{
     ObjectProviderCache,
     SuiRpcModule,
 };
-
 const MAX_DISPLAY_NESTED_LEVEL: usize = 10;
 
 // An implementation of the read portion of the JSON-RPC interface intended for use in
@@ -244,7 +245,7 @@ impl ReadApi {
 
         let unique_checkpoint_numbers = temp_response
             .values()
-            .filter_map(|cache_entry| cache_entry.checkpoint_seq.map(<u64>::from))
+            .filter_map(|cache_entry| cache_entry.checkpoint_seq)
             // It's likely that many transactions have the same checkpoint, so we don't
             // need to over-fetch
             .unique()
@@ -270,13 +271,7 @@ impl ReadApi {
             if cache_entry.checkpoint_seq.is_some() {
                 // safe to unwrap because is_some is checked
                 cache_entry.timestamp = *checkpoint_to_timestamp
-                    .get(
-                        cache_entry
-                            .checkpoint_seq
-                            .map(<u64>::from)
-                            .as_ref()
-                            .unwrap(),
-                    )
+                    .get(cache_entry.checkpoint_seq.as_ref().unwrap())
                     // Safe to unwrap because checkpoint_seq is guaranteed to exist in checkpoint_to_timestamp
                     .unwrap();
             }
@@ -850,18 +845,6 @@ impl ReadApiServer for ReadApi {
     }
 
     #[instrument(skip(self))]
-    async fn get_checkpoints_deprecated_limit(
-        &self,
-        cursor: Option<BigInt<u64>>,
-        limit: Option<BigInt<u64>>,
-        descending_order: bool,
-    ) -> RpcResult<CheckpointPage> {
-        with_tracing!(async move {
-            self.get_checkpoints(cursor, limit.map(|l| *l as usize), descending_order).await.map_err(Error::from)
-        })
-    }
-
-    #[instrument(skip(self))]
     async fn get_protocol_config(&self, version: Option<BigInt<u64>>) -> RpcResult<ProtocolConfigResponse> {
         with_tracing!(async move {
             version
@@ -896,37 +879,23 @@ impl ReadApiServer for ReadApi {
     ) -> RpcResult<ZkLoginVerifyResult> {
         let epoch_store = self.state.load_epoch_store_one_call_per_task();
         let curr_epoch = epoch_store.epoch();
-        let zklogin_env_native = match self
-            .state
-            .get_chain_identifier()
-            .expect("get chain identifier should not fail")
-            .chain()
-        {
-            sui_protocol_config::Chain::Mainnet | sui_protocol_config::Chain::Testnet => {
-                ZkLoginEnv::Prod
-            }
-            _ => ZkLoginEnv::Test,
-        };
+        let zklogin_env_native =
+            match self.state.get_chain_identifier().expect("get chain identifier should not fail").chain() {
+                sui_protocol_config::Chain::Mainnet | sui_protocol_config::Chain::Testnet => ZkLoginEnv::Prod,
+                _ => ZkLoginEnv::Test,
+            };
         let GenericSignature::ZkLoginAuthenticator(zklogin_sig) =
-            GenericSignature::from_bytes(&Base64::decode(&signature).map_err(Error::from)?)
-                .map_err(Error::from)?
+            GenericSignature::from_bytes(&Base64::decode(&signature).map_err(Error::from)?).map_err(Error::from)?
         else {
-            return Err(SuiRpcInputError::GenericNotFound(
-                "Endpoint only supports zkLogin signature".to_string(),
-            )
-            .into());
+            return Err(SuiRpcInputError::GenericNotFound("Endpoint only supports zkLogin signature".to_string()).into());
         };
 
-        let new_jwks =
-            match get_authenticator_state(self.state.get_object_store()).map_err(Error::from)? {
-                Some(authenticator_state) => authenticator_state.active_jwks,
-                None => {
-                    return Err(SuiRpcInputError::GenericNotFound(
-                        "Authenticator state not found".to_string(),
-                    )
-                    .into());
-                }
-            };
+        let new_jwks = match get_authenticator_state(self.state.get_object_store()).map_err(Error::from)? {
+            Some(authenticator_state) => authenticator_state.active_jwks,
+            None => {
+                return Err(SuiRpcInputError::GenericNotFound("Authenticator state not found".to_string()).into());
+            }
+        };
 
         // construct verify params with active jwks and zklogin_env.
         let mut oidc_provider_jwks = ImHashMap::new();
@@ -941,19 +910,12 @@ impl ReadApiServer for ReadApi {
                 }
             }
         }
-        let verify_params = VerifyParams::new(
-            oidc_provider_jwks,
-            vec![],
-            zklogin_env_native,
-            true,
-            true,
-            Some(30)
-        );
+        let verify_params =
+            VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, true, Some(30));
         match intent_scope {
             ZkLoginIntentScope::TransactionData => {
                 let tx_data: TransactionData =
-                    bcs::from_bytes(&Base64::decode(&bytes).map_err(Error::from)?)
-                        .map_err(Error::from)?;
+                    bcs::from_bytes(&Base64::decode(&bytes).map_err(Error::from)?).map_err(Error::from)?;
                 let intent_msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
                 let sig = GenericSignature::ZkLoginAuthenticator(zklogin_sig);
                 match sig.verify_authenticator(
@@ -963,20 +925,12 @@ impl ReadApiServer for ReadApi {
                     &verify_params,
                     Arc::new(VerifiedDigestCache::new_empty()),
                 ) {
-                    Ok(_) => Ok(ZkLoginVerifyResult {
-                        success: true,
-                        errors: vec![],
-                    }),
-                    Err(e) => Ok(ZkLoginVerifyResult {
-                        success: false,
-                        errors: vec![e.to_string()],
-                    }),
+                    Ok(_) => Ok(ZkLoginVerifyResult { success: true, errors: vec![] }),
+                    Err(e) => Ok(ZkLoginVerifyResult { success: false, errors: vec![e.to_string()] }),
                 }
             }
             ZkLoginIntentScope::PersonalMessage => {
-                let data = PersonalMessage {
-                    message: Base64::decode(&bytes).map_err(Error::from)?,
-                };
+                let data = PersonalMessage { message: Base64::decode(&bytes).map_err(Error::from)? };
                 let intent_msg = IntentMessage::new(Intent::personal_message(), data);
 
                 let sig = GenericSignature::ZkLoginAuthenticator(zklogin_sig);
@@ -987,14 +941,8 @@ impl ReadApiServer for ReadApi {
                     &verify_params,
                     Arc::new(VerifiedDigestCache::new_empty()),
                 ) {
-                    Ok(_) => Ok(ZkLoginVerifyResult {
-                        success: true,
-                        errors: vec![],
-                    }),
-                    Err(e) => Ok(ZkLoginVerifyResult {
-                        success: false,
-                        errors: vec![e.to_string()],
-                    }),
+                    Ok(_) => Ok(ZkLoginVerifyResult { success: true, errors: vec![] }),
+                    Err(e) => Ok(ZkLoginVerifyResult { success: false, errors: vec![e.to_string()] }),
                 }
             }
         }
@@ -1294,9 +1242,9 @@ fn calculate_checkpoint_numbers(
     };
 
     if descending_order {
-        (start_index..=end_index).rev().collect()
+        (start_index ..= end_index).rev().collect()
     } else {
-        (start_index..=end_index).collect()
+        (start_index ..= end_index).collect()
     }
 }
 
@@ -1361,7 +1309,7 @@ mod tests {
 
         let checkpoint_numbers = calculate_checkpoint_numbers(cursor, limit, descending_order, max_checkpoint);
 
-        assert_eq!(checkpoint_numbers, (0..=15).collect::<Vec<_>>());
+        assert_eq!(checkpoint_numbers, (0 ..= 15).collect::<Vec<_>>());
     }
 
     #[test]
@@ -1373,6 +1321,6 @@ mod tests {
 
         let checkpoint_numbers = calculate_checkpoint_numbers(cursor, limit, descending_order, max_checkpoint);
 
-        assert_eq!(checkpoint_numbers, (0..=15).rev().collect::<Vec<_>>());
+        assert_eq!(checkpoint_numbers, (0 ..= 15).rev().collect::<Vec<_>>());
     }
 }

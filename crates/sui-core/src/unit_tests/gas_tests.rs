@@ -1,16 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
-
-use super::{
-    authority_tests::{init_state_with_ids, send_and_confirm_transaction},
-    move_integration_tests::build_and_try_publish_test_package,
-};
-use crate::authority::{
-    authority_tests::init_state_with_ids_and_object_basics,
-    test_authority_builder::TestAuthorityBuilder,
-};
 use move_core_types::{account_address::AccountAddress, ident_str};
 use once_cell::sync::Lazy;
 use sui_protocol_config::ProtocolConfig;
@@ -25,12 +15,43 @@ use sui_types::{
     utils::to_sender_signed_transaction,
 };
 
+use super::{
+    authority_tests::{init_state_with_ids, send_and_confirm_transaction},
+    move_integration_tests::build_and_try_publish_test_package,
+    *,
+};
+use crate::authority::{
+    authority_tests::init_state_with_ids_and_object_basics,
+    test_authority_builder::TestAuthorityBuilder,
+};
+
 // The cost table is used only to get the max budget available which is not dependent on
 // the gas price
 static MAX_GAS_BUDGET: Lazy<u64> = Lazy::new(|| ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas());
 // MIN_GAS_BUDGET_PRE_RGP has to be multiplied by the RGP to get the proper minimum
 static MIN_GAS_BUDGET_PRE_RGP: Lazy<u64> =
     Lazy::new(|| ProtocolConfig::get_for_max_version_UNSAFE().base_tx_cost_fixed());
+
+#[test]
+fn test_gas_invariants() {
+    let max_tx_gas = ProtocolConfig::get_for_max_version_UNSAFE().max_tx_gas();
+    assert!(
+        DEV_INSPECT_GAS_COIN_VALUE >= max_tx_gas,
+        "DEV_INSPECT_GAS_COIN_VALUE {} cannot be less than max_tx_gas {}",
+        DEV_INSPECT_GAS_COIN_VALUE,
+        max_tx_gas
+    );
+
+    let max_gas_price = ProtocolConfig::get_for_max_version_UNSAFE().max_gas_price();
+    let base_tx_cost_fixed = ProtocolConfig::get_for_max_version_UNSAFE().base_tx_cost_fixed();
+    assert!(
+        max_gas_price * base_tx_cost_fixed <= max_tx_gas,
+        "max_gas_price {} * base_tx_cost_fixed {} > max_tx_gas {}",
+        max_gas_price,
+        base_tx_cost_fixed,
+        max_tx_gas
+    );
+}
 
 #[tokio::test]
 async fn test_tx_less_than_minimum_gas_budget() {
@@ -171,7 +192,7 @@ where
     assert_eq!(effects.mutated().len(), 1);
     // extra coins are deleted
     assert_eq!(effects.deleted().len() as u64, coin_num - 1);
-    for gas_coin_id in &gas_coin_ids[1..] {
+    for gas_coin_id in &gas_coin_ids[1 ..] {
         assert!(effects.deleted().iter().any(|deleted| deleted.0 == *gas_coin_id));
     }
     let gas_ref = effects.gas_object().0;
@@ -187,7 +208,7 @@ where
 fn make_gas_coins(owner: SuiAddress, gas_amount: u64, coin_num: u64) -> Vec<Object> {
     let mut objects = vec![];
     let coin_balance = gas_amount / coin_num;
-    for _ in 1..coin_num {
+    for _ in 1 .. coin_num {
         let gas_object_id = ObjectID::random();
         objects.push(Object::with_id_owner_gas_for_testing(gas_object_id, owner, coin_balance));
     }
@@ -449,7 +470,7 @@ async fn test_native_transfer_gas_price_is_used() {
 }
 
 #[tokio::test]
-async fn test_transfer_sui_insufficient_gas() {
+async fn test_transfer_oct_insufficient_gas() {
     let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
     let recipient = dbg_addr(2);
     let authority_state = TestAuthorityBuilder::new().build().await;
@@ -731,10 +752,10 @@ async fn test_tx_gas_coins_input_coins() {
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
 
     // create coins for transaction
-    let gas_coins = (0..250).map(|_| Object::with_owner_for_testing(sender)).collect::<Vec<_>>();
+    let gas_coins = (0 .. 250).map(|_| Object::with_owner_for_testing(sender)).collect::<Vec<_>>();
     let gas_coin_refs = gas_coins.iter().map(|obj| obj.compute_object_reference()).collect::<Vec<_>>();
     authority_state.insert_genesis_objects(&gas_coins).await;
-    let coins = (0..260).map(|_| Object::with_owner_for_testing(sender)).collect::<Vec<_>>();
+    let coins = (0 .. 260).map(|_| Object::with_owner_for_testing(sender)).collect::<Vec<_>>();
     let coin_refs = coins.iter().map(|obj| obj.compute_object_reference()).collect::<Vec<_>>();
     authority_state.insert_genesis_objects(&coins).await;
     let coin = Object::with_owner_for_testing(sender);

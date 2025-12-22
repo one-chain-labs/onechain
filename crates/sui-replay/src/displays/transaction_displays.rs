@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{displays::Pretty, replay::LocalExec};
-use move_core_types::{
-    annotated_value::{MoveTypeLayout, MoveValue},
-    language_storage::TypeTag,
-};
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
+};
+
+use move_core_types::{
+    annotated_value::{MoveTypeLayout, MoveValue},
+    language_storage::TypeTag,
 };
 use sui_execution::Executor;
 use sui_types::{
@@ -30,6 +30,8 @@ use tabled::{
     settings::{style::HorizontalLine, Panel as TablePanel, Style as TableStyle},
 };
 
+use crate::{displays::Pretty, replay::LocalExec};
+
 pub struct FullPTB {
     pub ptb: ProgrammableTransaction,
     pub results: Vec<ResolvedResults>,
@@ -42,7 +44,7 @@ pub struct ResolvedResults {
 
 /// These Display implementations provide alternate displays that are used to format info contained
 /// in these Structs when calling the CLI replay command with an additional provided flag.
-impl<'a> Display for Pretty<'a, FullPTB> {
+impl Display for Pretty<'_, FullPTB> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(full_ptb) = self;
         let FullPTB { ptb, results } = full_ptb;
@@ -142,7 +144,7 @@ impl<'a> Display for Pretty<'a, FullPTB> {
     }
 }
 
-impl<'a> Display for Pretty<'a, Command> {
+impl Display for Pretty<'_, Command> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(command) = self;
         match command {
@@ -189,7 +191,7 @@ impl<'a> Display for Pretty<'a, Command> {
     }
 }
 
-impl<'a> Display for Pretty<'a, ProgrammableMoveCall> {
+impl Display for Pretty<'_, ProgrammableMoveCall> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(move_call) = self;
         let ProgrammableMoveCall { package, module, function, type_arguments, arguments } = move_call;
@@ -209,7 +211,7 @@ impl<'a> Display for Pretty<'a, ProgrammableMoveCall> {
     }
 }
 
-impl<'a> Display for Pretty<'a, Argument> {
+impl Display for Pretty<'_, Argument> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(argument) = self;
 
@@ -222,7 +224,7 @@ impl<'a> Display for Pretty<'a, Argument> {
         write!(f, "{}", output)
     }
 }
-impl<'a> Display for Pretty<'a, ResolvedResults> {
+impl Display for Pretty<'_, ResolvedResults> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(ResolvedResults { mutable_reference_outputs, return_values }) = self;
 
@@ -255,7 +257,7 @@ impl<'a> Display for Pretty<'a, ResolvedResults> {
     }
 }
 
-impl<'a> Display for Pretty<'a, TypeTag> {
+impl Display for Pretty<'_, TypeTag> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Pretty(type_tag) = self;
         match type_tag {

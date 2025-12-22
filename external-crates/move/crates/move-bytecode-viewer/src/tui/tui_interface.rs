@@ -57,16 +57,21 @@ impl DebugInterface {
 impl TUIInterface for DebugInterface {
     const LEFT_TITLE: &'static str = "Left pane";
     const RIGHT_TITLE: &'static str = "Right pane";
-
     fn on_redraw(&mut self, line_number: u16, column_number: u16) -> TUIOutput {
         TUIOutput {
             left_screen: self.text.iter().map(|x| Spans::from(x.clone())).collect(),
-            right_screen: vec![Spans::from(format!("line number: {}   column number: {}", line_number, column_number))],
+            right_screen: vec![Spans::from(format!(
+                "line number: {}   column number: {}",
+                line_number, column_number
+            ))],
         }
     }
 
     fn bound_line(&self, line_number: u16) -> u16 {
-        std::cmp::min(line_number, (self.text.len().checked_sub(1).unwrap()) as u16)
+        std::cmp::min(
+            line_number,
+            (self.text.len().checked_sub(1).unwrap()) as u16,
+        )
     }
 
     fn bound_column(&self, line_number: u16, column_number: u16) -> u16 {
@@ -76,7 +81,9 @@ impl TUIInterface for DebugInterface {
 
 /// Starts a two-pane TUI using the provided `Interface` to update the screen according to cursor
 /// movements.
-pub fn start_tui_with_interface<Interface: TUIInterface>(interface: Interface) -> Result<(), Box<dyn Error>> {
+pub fn start_tui_with_interface<Interface: TUIInterface>(
+    interface: Interface,
+) -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;

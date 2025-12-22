@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context};
 use std::{
     collections::HashMap,
     fs::File,
@@ -9,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::{bail, Context};
 use move_core_types::account_address::AccountAddress;
 use move_package::{
     lock_file::{self, schema::ManagedPackage, LockFile},
@@ -19,6 +19,8 @@ use move_symbol_pool::Symbol;
 use sui_json_rpc_types::{get_new_package_obj_from_response, SuiTransactionBlockResponse};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
+
+pub mod system_package_versions;
 
 const PUBLISHED_AT_MANIFEST_FIELD: &str = "published-at";
 
@@ -70,14 +72,14 @@ pub async fn update_lock_file(
     let Some(lock_file) = lock_file else {
         bail!(
             "Expected a `Move.lock` file to exist after publishing \
-             package, but none found. Consider running `one_chain move build` to \
+             package, but none found. Consider running `one move build` to \
              generate the `Move.lock` file in the package directory."
         )
     };
     let install_dir = install_dir.unwrap_or(PathBuf::from("."));
     let env = context.config.get_active_env().context(
         "Could not resolve environment from active wallet context. \
-         Try ensure `one_chain client active-env` is valid.",
+         Try ensure `one client active-env` is valid.",
     )?;
 
     let mut lock = LockFile::from(install_dir.clone(), &lock_file)?;

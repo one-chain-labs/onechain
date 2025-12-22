@@ -4,7 +4,6 @@
 use std::{collections::BTreeMap, env, sync::Arc};
 
 use rustyline::{completion::Completer, history::History, Context};
-
 use sui_types::base_types::ObjectID;
 
 use crate::shell::{

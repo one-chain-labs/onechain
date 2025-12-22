@@ -262,13 +262,13 @@ Other metadata (keys, addresses etc) only come into effect at the next epoch.
 
 To update metadata, a validator makes a MoveCall transaction that interacts with the System Object. For example:
 
-1. to update name to `new_validator_name`, use the Sui Client CLI to call `sui_system::update_validator_name`:
+1. to update name to `new_validator_name`, use the Sui Client CLI to call `one_system::update_validator_name`:
 
 ```
 sui client call --package 0x3 --module sui_system --function update_validator_name --args 0x5 \"new_validator_name\" --gas-budget 10000
 ```
 
-2. to update p2p address starting from next epoch to `/ip4/192.168.1.1`, use the Sui Client CLI to call `sui_system::update_validator_next_epoch_p2p_address`:
+2. to update p2p address starting from next epoch to `/ip4/192.168.1.1`, use the Sui Client CLI to call `one_system::update_validator_next_epoch_p2p_address`:
 
 ```
 sui client call --package 0x3 --module sui_system --function update_validator_next_epoch_p2p_address --args 0x5 "[4, 192, 168, 1, 1]" --gas-budget 10000
@@ -282,7 +282,7 @@ To avoid touching account keys too often and allowing them to be stored off-line
 
 Upon creating a `Validator`, an `UnverifiedValidatorOperationCap` is created as well and transferred to the validator address. The holder of this `Cap` object (short for "Capability") therefore could perform operational actions for this validator. To authorize another address to conduct these operations, a validator transfers the object to another address that they control. The transfer can be done by using Sui Client CLI: `sui client transfer`.
 
-To rotate the delegatee address or revoke the authorization, the current holder of `Cap` transfers it to another address. In the event of compromised or lost keys, the validator could create a new `Cap` object to invalidate the incumbent one. This is done by calling `sui_system::rotate_operation_cap`:
+To rotate the delegatee address or revoke the authorization, the current holder of `Cap` transfers it to another address. In the event of compromised or lost keys, the validator could create a new `Cap` object to invalidate the incumbent one. This is done by calling `one_system::rotate_operation_cap`:
 
 ```
 sui client call --package 0x3 --module sui_system --function rotate_operation_cap --args 0x5 --gas-budget 10000
@@ -294,7 +294,7 @@ To get the current valid `Cap` object's ID of a validator, use the Sui Client CL
 
 ### Updating the Gas Price Survey Quote
 
-To update the Gas Price Survey Quote of a validator, which is used to calculate the Reference Gas Price at the end of the epoch, the sender needs to hold a valid [`UnverifiedValidatorOperationCap`](#operation-cap). The sender could be the validator itself, or a trusted delegatee. To do so, call `sui_system::request_set_gas_price`:
+To update the Gas Price Survey Quote of a validator, which is used to calculate the Reference Gas Price at the end of the epoch, the sender needs to hold a valid [`UnverifiedValidatorOperationCap`](#operation-cap). The sender could be the validator itself, or a trusted delegatee. To do so, call `one_system::request_set_gas_price`:
 
 ```
 sui client call --package 0x3 --module sui_system --function request_set_gas_price --args 0x5 {cap_object_id} {new_gas_price} --gas-budget 10000
@@ -302,7 +302,7 @@ sui client call --package 0x3 --module sui_system --function request_set_gas_pri
 
 ### Reporting/Un-reporting Validators
 
-To report a validator or undo an existing reporting, the sender needs to hold a valid [`UnverifiedValidatorOperationCap`](#operation-cap). The sender could be the validator itself, or a trusted delegatee. To do so, call `sui_system::report_validator/undo_report_validator`:
+To report a validator or undo an existing reporting, the sender needs to hold a valid [`UnverifiedValidatorOperationCap`](#operation-cap). The sender could be the validator itself, or a trusted delegatee. To do so, call `one_system::report_validator/undo_report_validator`:
 
 ```
 sui client call --package 0x3 --module sui_system --function report_validator/undo_report_validator --args 0x5 {cap_object_id} {reportee_address} --gas-budget 10000
@@ -312,14 +312,14 @@ Once a validator is reported by `2f + 1` other validators by voting power, their
 
 ### Joining the Validator Set
 
-In order for a Sui address to join the validator set, they need to first sign up as a validator candidate by calling `sui_system::request_add_validator_candidate` with their metadata and initial configs:
+In order for a Sui address to join the validator set, they need to first sign up as a validator candidate by calling `one_system::request_add_validator_candidate` with their metadata and initial configs:
 
 ```
 sui client call --package 0x3 --module sui_system --function request_add_validator_candidate --args 0x5 {protocol_pubkey_bytes} {network_pubkey_bytes} {worker_pubkey_bytes} {proof_of_possession} {name} {description} {image_url} {project_url} {net_address}
 {p2p_address} {primary_address} {worker_address} {gas_price} {commission_rate} --gas-budget 10000
 ```
 
-After an address becomes a validator candidate, any address (including the candidate address itself) can start staking with the candidate's staking pool. Refer to our dedicated staking FAQ on how staking works. Once a candidate's staking pool has accumulated at least `sui_system::MIN_VALIDATOR_JOINING_STAKE` amount of stake, the candidate can call `sui_system::request_add_validator` to officially add themselves to the next epoch's active validator set:
+After an address becomes a validator candidate, any address (including the candidate address itself) can start staking with the candidate's staking pool. Refer to our dedicated staking FAQ on how staking works. Once a candidate's staking pool has accumulated at least `one_system::MIN_VALIDATOR_JOINING_STAKE` amount of stake, the candidate can call `one_system::request_add_validator` to officially add themselves to the next epoch's active validator set:
 
 ```
 sui client call --package 0x3 --module sui_system --function request_add_validator --args 0x5 --gas-budget 10000000
@@ -327,7 +327,7 @@ sui client call --package 0x3 --module sui_system --function request_add_validat
 
 ### Leaving the Validator Set
 
-To leave the validator set starting the next epoch, the sender needs to be an active validator in the current epoch and should call `sui_system::request_remove_validator`:
+To leave the validator set starting the next epoch, the sender needs to be an active validator in the current epoch and should call `one_system::request_remove_validator`:
 
 ```
 sui client call --package 0x3 --module sui_system --function request_remove_validator --args 0x5 --gas-budget 10000

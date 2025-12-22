@@ -87,7 +87,7 @@ pub async fn test_checkpoint_range_ingestion() -> Result<(), IndexerError> {
     sim.set_data_ingestion_path(data_ingestion_path.clone());
 
     // Create multiple checkpoints
-    for _ in 0..10 {
+    for _ in 0 .. 10 {
         let transfer_recipient = SuiAddress::random_for_testing_only();
         let (transaction, _) = sim.transfer_txn(transfer_recipient);
         let (_, err) = sim.execute_transaction(transaction).unwrap();
@@ -181,7 +181,7 @@ pub async fn test_objects_snapshot() -> Result<(), IndexerError> {
     // Run 10 transfer transactions and create 10 checkpoints
     let mut last_transaction = None;
     let total_checkpoint_sequence_number = 7usize;
-    for _ in 0..total_checkpoint_sequence_number {
+    for _ in 0 .. total_checkpoint_sequence_number {
         let transfer_recipient = SuiAddress::random_for_testing_only();
         let (transaction, _) = sim.transfer_txn(transfer_recipient);
         let (_, err) = sim.execute_transaction(transaction.clone()).unwrap();
@@ -236,7 +236,7 @@ pub async fn test_objects_ingestion() -> Result<(), IndexerError> {
     let (_, pg_store, _, _database) = set_up(Arc::new(sim), data_ingestion_path).await;
 
     let mut objects = Vec::new();
-    for _ in 0..1000 {
+    for _ in 0 .. 1000 {
         objects.push(TransactionObjectChangesToCommit {
             changed_objects: vec![IndexedObject::random()],
             deleted_objects: vec![IndexedDeletedObject::random()],
@@ -257,7 +257,7 @@ pub async fn test_insert_large_batch_tx_indices() -> Result<(), IndexerError> {
     let (_, pg_store, _, _database) = set_up(Arc::new(sim), data_ingestion_path).await;
 
     let mut v = Vec::new();
-    for _ in 0..1000 {
+    for _ in 0 .. 1000 {
         v.push(TxIndex::random());
     }
     pg_store.persist_tx_indices(v).await?;
@@ -275,7 +275,7 @@ pub async fn test_insert_large_batch_event_indices() -> Result<(), IndexerError>
     let (_, pg_store, _, _database) = set_up(Arc::new(sim), data_ingestion_path).await;
 
     let mut v = Vec::new();
-    for _ in 0..1000 {
+    for _ in 0 .. 1000 {
         v.push(EventIndex::random());
     }
     pg_store.persist_event_indices(v).await?;
@@ -324,7 +324,7 @@ pub async fn test_mvr_mode() -> Result<(), IndexerError> {
     sim.set_data_ingestion_path(data_ingestion_path.clone());
 
     // Create 3 checkpoints and epochs of sequence number 0 through 2 inclusive
-    for _ in 0..=2 {
+    for _ in 0 ..= 2 {
         let transfer_recipient = SuiAddress::random_for_testing_only();
         let (transaction, _) = sim.transfer_txn(transfer_recipient);
         let (_, err) = sim.execute_transaction(transaction.clone()).unwrap();

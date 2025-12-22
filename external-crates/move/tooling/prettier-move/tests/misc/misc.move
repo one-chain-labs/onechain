@@ -10,7 +10,7 @@
  *
  * @dev We do not provide a function to read the data inside the {Timelock<T>} to prevent capabilities from being used.
  */
-module suitears::timelock {
+module octtears::timelock {
 
     use std::{string::String, type_name::{Self, TypeName}};
     use one::{
@@ -23,6 +23,7 @@ module suitears::timelock {
 
     fun calculate_pending_rewards<StakeCoin, RewardCoin>(
         acc: &Account<StakeCoin, RewardCoin>,
+        an_acc: &mut Account<StakeCoin, RewardCoin>,
         stake_factor: u64,
         accrued_rewards_per_share: u256,
     ): u64 {

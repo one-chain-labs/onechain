@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use parking_lot::Mutex;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 use tokio::sync::{OwnedRwLockWriteGuard, RwLock};
 
 /// This structure contains a cell for a single value.

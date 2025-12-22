@@ -3,6 +3,8 @@
 
 use std::time::{Duration, SystemTime};
 
+use axum::extract::{Query, State};
+
 use crate::{Result, RpcService};
 
 impl RpcService {
@@ -30,5 +32,25 @@ impl RpcService {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Threshold {
+    /// The threshold, or delta, between the server's system time and the timestamp in the most
+    /// recently executed checkpoint for which the server is considered to be healthy.
+    ///
+    /// If not provided, the server will be considered healthy if it can simply fetch the latest
+    /// checkpoint from its store.
+    pub threshold_seconds: Option<u32>,
+}
+
+pub async fn health(
+    Query(Threshold { threshold_seconds }): Query<Threshold>,
+    State(state): State<RpcService>,
+) -> impl axum::response::IntoResponse {
+    match state.health_check(threshold_seconds) {
+        Ok(()) => (axum::http::StatusCode::OK, "up"),
+        Err(_) => (axum::http::StatusCode::SERVICE_UNAVAILABLE, "down"),
     }
 }

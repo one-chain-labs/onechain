@@ -1,21 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    replay::{ExecutionSandboxState, LocalExec},
-    types::ReplayEngineError,
-};
-use futures::{future::join_all, FutureExt};
-use parking_lot::Mutex;
 use std::{
     collections::VecDeque,
     path::PathBuf,
     sync::{atomic::AtomicUsize, Arc},
 };
+
+use futures::{future::join_all, FutureExt};
+use parking_lot::Mutex;
 use sui_config::node::ExpensiveSafetyCheckConfig;
 use sui_types::base_types::TransactionDigest;
 use tokio::time::Instant;
 use tracing::{error, info};
+
+use crate::{
+    replay::{ExecutionSandboxState, LocalExec},
+    types::ReplayEngineError,
+};
 
 /// Given a list of transaction digests, replay them in parallel using `num_tasks` tasks.
 /// If `terminate_early` is true, the replay will terminate early if any transaction fails;
@@ -33,7 +35,7 @@ pub async fn batch_replay(
     let cancel = tokio_util::sync::CancellationToken::new();
     let mut tasks = vec![];
     let cur_time = Instant::now();
-    for _ in 0..num_tasks {
+    for _ in 0 .. num_tasks {
         let provider = provider.clone();
         let expensive_safety_check_config = expensive_safety_check_config.clone();
         let rpc_url_ref = rpc_url.as_ref();

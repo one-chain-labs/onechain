@@ -1,60 +1,45 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
-use crate::authority::authority_store::LockDetailsWrapperDeprecated;
-use serde::{Deserialize, Serialize};
 use std::path::Path;
+
+use serde::{Deserialize, Serialize};
 use sui_types::{
     accumulator::Accumulator,
     base_types::SequenceNumber,
     digests::TransactionEventsDigest,
     effects::TransactionEffects,
-    storage::MarkerValue,
+    storage::{FullObjectKey, MarkerValue},
 };
+use tracing::error;
 use typed_store::{
     metrics::SamplingInterval,
-    rocks::{
-        default_db_options,
-        read_size_from_env,
-        util::{empty_compaction_filter, reference_count_merge_operator},
-        DBBatch,
-        DBMap,
-        DBMapTableConfigMap,
-        DBOptions,
-        MetricConf,
-    },
+    rocks::{default_db_options, read_size_from_env, DBBatch, DBMap, DBMapTableConfigMap, DBOptions, MetricConf},
+    rocksdb::compaction_filter::Decision,
     traits::{Map, TableSummary, TypedStoreDebug},
+    DBMapUtils,
 };
 
+use super::*;
 use crate::authority::{
-    authority_store_types::{
-        get_store_object_pair,
-        try_construct_object,
-        ObjectContentDigest,
-        StoreData,
-        StoreMoveObjectWrapper,
-        StoreObject,
-        StoreObjectPair,
-        StoreObjectValue,
-        StoreObjectWrapper,
-    },
+    authority_store::LockDetailsWrapperDeprecated,
+    authority_store_pruner::ObjectsCompactionFilter,
+    authority_store_types::{get_store_object, try_construct_object, StoreObject, StoreObjectValue, StoreObjectWrapper},
     epoch_start_configuration::EpochStartConfiguration,
 };
-use typed_store::DBMapUtils;
 
 const ENV_VAR_OBJECTS_BLOCK_CACHE_SIZE: &str = "OBJECTS_BLOCK_CACHE_MB";
 pub(crate) const ENV_VAR_LOCKS_BLOCK_CACHE_SIZE: &str = "LOCKS_BLOCK_CACHE_MB";
 const ENV_VAR_TRANSACTIONS_BLOCK_CACHE_SIZE: &str = "TRANSACTIONS_BLOCK_CACHE_MB";
 const ENV_VAR_EFFECTS_BLOCK_CACHE_SIZE: &str = "EFFECTS_BLOCK_CACHE_MB";
 const ENV_VAR_EVENTS_BLOCK_CACHE_SIZE: &str = "EVENTS_BLOCK_CACHE_MB";
-const ENV_VAR_INDIRECT_OBJECTS_BLOCK_CACHE_SIZE: &str = "INDIRECT_OBJECTS_BLOCK_CACHE_MB";
 
 /// Options to apply to every column family of the `perpetual` DB.
 #[derive(Default)]
 pub struct AuthorityPerpetualTablesOptions {
     /// Whether to enable write stalling on all column families.
     pub enable_write_stall: bool,
+    pub compaction_filter: Option<ObjectsCompactionFilter>,
 }
 
 impl AuthorityPerpetualTablesOptions {
@@ -71,8 +56,7 @@ impl AuthorityPerpetualTablesOptions {
 pub struct AuthorityPerpetualTables {
     /// This is a map between the object (ID, version) and the latest state of the object, namely the
     /// state that is needed to process new transactions.
-    /// State is represented by `StoreObject` enum, which is either a move module, a move object, or
-    /// a pointer to an object stored in the `indirect_move_objects` table.
+    /// State is represented by `StoreObject` enum, which is either a move module or a move object.
     ///
     /// Note that while this map can store all versions of an object, we will eventually
     /// prune old object versions from the db.
@@ -83,8 +67,6 @@ pub struct AuthorityPerpetualTables {
     /// been written out, and which must be retried. But, they cannot be retried unless their input
     /// objects are still accessible!
     pub(crate) objects: DBMap<ObjectKey, StoreObjectWrapper>,
-
-    pub(crate) indirect_move_objects: DBMap<ObjectContentDigest, StoreMoveObjectWrapper>,
 
     /// This is a map between object references of currently active objects that can be mutated.
     ///
@@ -153,6 +135,27 @@ pub struct AuthorityPerpetualTables {
     /// objects that have been deleted. This table is meant to be pruned per-epoch, and all
     /// previous epochs other than the current epoch may be pruned safely.
     pub(crate) object_per_epoch_marker_table: DBMap<(EpochId, ObjectKey), MarkerValue>,
+    pub(crate) object_per_epoch_marker_table_v2: DBMap<(EpochId, FullObjectKey), MarkerValue>,
+}
+
+#[derive(DBMapUtils)]
+pub struct AuthorityPrunerTables {
+    pub(crate) object_tombstones: DBMap<ObjectID, SequenceNumber>,
+}
+
+impl AuthorityPrunerTables {
+    pub fn path(parent_path: &Path) -> PathBuf {
+        parent_path.join("pruner")
+    }
+
+    pub fn open(parent_path: &Path) -> Self {
+        Self::open_tables_read_write(
+            Self::path(parent_path),
+            MetricConf::new("pruner").with_sampling(SamplingInterval::new(Duration::from_secs(60), 0)),
+            None,
+            None,
+        )
+    }
 }
 
 impl AuthorityPerpetualTables {
@@ -164,8 +167,7 @@ impl AuthorityPerpetualTables {
         let db_options_override = db_options_override.unwrap_or_default();
         let db_options = db_options_override.apply_to(default_db_options().optimize_db_for_write_throughput(4));
         let table_options = DBMapTableConfigMap::new(BTreeMap::from([
-            ("objects".to_string(), objects_table_config(db_options.clone())),
-            ("indirect_move_objects".to_string(), indirect_move_objects_table_config(db_options.clone())),
+            ("objects".to_string(), objects_table_config(db_options.clone(), db_options_override.compaction_filter)),
             (
                 "owned_object_transaction_locks".to_string(),
                 owned_object_transaction_locks_table_config(db_options.clone()),
@@ -194,11 +196,11 @@ impl AuthorityPerpetualTables {
         object_id: ObjectID,
         version: SequenceNumber,
     ) -> SuiResult<Option<Object>> {
-        let iter = self
-            .objects
-            .safe_range_iter(ObjectKey::min_for_id(&object_id)..=ObjectKey::max_for_id(&object_id))
-            .skip_prior_to(&ObjectKey(object_id, version))?;
-        match iter.reverse().next() {
+        let mut iter = self.objects.reversed_safe_iter_with_bounds(
+            Some(ObjectKey::min_for_id(&object_id)),
+            Some(ObjectKey(object_id, version)),
+        )?;
+        match iter.next() {
             Some(Ok((key, o))) => self.object(&key, o),
             Some(Err(e)) => Err(e.into()),
             None => Ok(None),
@@ -206,13 +208,7 @@ impl AuthorityPerpetualTables {
     }
 
     fn construct_object(&self, object_key: &ObjectKey, store_object: StoreObjectValue) -> Result<Object, SuiError> {
-        let indirect_object = match store_object.data {
-            StoreData::IndirectObject(ref metadata) => {
-                self.indirect_move_objects.get(&metadata.digest)?.map(|o| o.migrate().into_inner())
-            }
-            _ => None,
-        };
-        try_construct_object(object_key, store_object, indirect_object)
+        try_construct_object(object_key, store_object)
     }
 
     // Constructs `sui_types::object::Object` from `StoreObjectWrapper`.
@@ -251,9 +247,12 @@ impl AuthorityPerpetualTables {
     }
 
     pub fn get_latest_object_ref_or_tombstone(&self, object_id: ObjectID) -> Result<Option<ObjectRef>, SuiError> {
-        let mut iterator = self.objects.unbounded_iter().skip_prior_to(&ObjectKey::max_for_id(&object_id))?;
+        let mut iterator = self.objects.reversed_safe_iter_with_bounds(
+            Some(ObjectKey::min_for_id(&object_id)),
+            Some(ObjectKey::max_for_id(&object_id)),
+        )?;
 
-        if let Some((object_key, value)) = iterator.next() {
+        if let Some(Ok((object_key, value))) = iterator.next() {
             if object_key.0 == object_id {
                 return Ok(Some(self.object_reference(&object_key, value)?));
             }
@@ -265,9 +264,12 @@ impl AuthorityPerpetualTables {
         &self,
         object_id: ObjectID,
     ) -> Result<Option<(ObjectKey, StoreObjectWrapper)>, SuiError> {
-        let mut iterator = self.objects.unbounded_iter().skip_prior_to(&ObjectKey::max_for_id(&object_id))?;
+        let mut iterator = self.objects.reversed_safe_iter_with_bounds(
+            Some(ObjectKey::min_for_id(&object_id)),
+            Some(ObjectKey::max_for_id(&object_id)),
+        )?;
 
-        if let Some((object_key, value)) = iterator.next() {
+        if let Some(Ok((object_key, value))) = iterator.next() {
             if object_key.0 == object_id {
                 return Ok(Some((object_key, value)));
             }
@@ -342,7 +344,7 @@ impl AuthorityPerpetualTables {
     }
 
     pub fn database_is_empty(&self) -> SuiResult<bool> {
-        Ok(self.objects.unbounded_iter().skip_to(&ObjectKey::ZERO)?.next().is_none())
+        Ok(self.objects.unbounded_iter().next().is_none())
     }
 
     pub fn iter_live_object_set(&self, include_wrapped_object: bool) -> LiveSetIter<'_> {
@@ -374,7 +376,6 @@ impl AuthorityPerpetualTables {
     pub fn reset_db_for_execution_since_genesis(&self) -> SuiResult {
         // TODO: Add new tables that get added to the db automatically
         self.objects.unsafe_clear()?;
-        self.indirect_move_objects.unsafe_clear()?;
         self.live_owned_object_markers.unsafe_clear()?;
         self.executed_effects.unsafe_clear()?;
         self.events.unsafe_clear()?;
@@ -385,6 +386,7 @@ impl AuthorityPerpetualTables {
         self.expected_network_sui_amount.unsafe_clear()?;
         self.expected_storage_fund_imbalance.unsafe_clear()?;
         self.object_per_epoch_marker_table.unsafe_clear()?;
+        self.object_per_epoch_marker_table_v2.unsafe_clear()?;
         self.objects.rocksdb.flush()?;
         Ok(())
     }
@@ -405,18 +407,19 @@ impl AuthorityPerpetualTables {
 
     pub fn insert_object_test_only(&self, object: Object) -> SuiResult {
         let object_reference = object.compute_object_reference();
-        let StoreObjectPair(wrapper, _indirect_object) = get_store_object_pair(object, usize::MAX);
+        let wrapper = get_store_object(object);
         let mut wb = self.objects.batch();
         wb.insert_batch(&self.objects, std::iter::once((ObjectKey::from(object_reference), wrapper)))?;
         wb.write()?;
         Ok(())
     }
 
-    // fallible get object methods for one-tool, which may need to attempt to read a corrupted database
+    // fallible get object methods for sui-tool, which may need to attempt to read a corrupted database
     pub fn get_object_fallible(&self, object_id: &ObjectID) -> SuiResult<Option<Object>> {
-        let obj_entry = self.objects.unbounded_iter().skip_prior_to(&ObjectKey::max_for_id(object_id))?.next();
+        let obj_entry =
+            self.objects.reversed_safe_iter_with_bounds(None, Some(ObjectKey::max_for_id(object_id)))?.next();
 
-        match obj_entry {
+        match obj_entry.transpose()? {
             Some((ObjectKey(obj_id, version), obj)) if obj_id == *object_id => {
                 Ok(self.object(&ObjectKey(obj_id, version), obj)?)
             }
@@ -555,7 +558,18 @@ fn owned_object_transaction_locks_table_config(db_options: DBOptions) -> DBOptio
     }
 }
 
-fn objects_table_config(db_options: DBOptions) -> DBOptions {
+fn objects_table_config(mut db_options: DBOptions, compaction_filter: Option<ObjectsCompactionFilter>) -> DBOptions {
+    if let Some(mut compaction_filter) = compaction_filter {
+        db_options.options.set_compaction_filter("objects", move |_, key, value| {
+            match compaction_filter.filter(key, value) {
+                Ok(decision) => decision,
+                Err(err) => {
+                    error!("Compaction error: {:?}", err);
+                    Decision::Keep
+                }
+            }
+        });
+    }
     db_options
         .optimize_for_write_throughput()
         .optimize_for_read(read_size_from_env(ENV_VAR_OBJECTS_BLOCK_CACHE_SIZE).unwrap_or(5 * 1024))
@@ -577,17 +591,4 @@ fn events_table_config(db_options: DBOptions) -> DBOptions {
     db_options
         .optimize_for_write_throughput()
         .optimize_for_read(read_size_from_env(ENV_VAR_EVENTS_BLOCK_CACHE_SIZE).unwrap_or(1024))
-}
-
-fn indirect_move_objects_table_config(mut db_options: DBOptions) -> DBOptions {
-    db_options = db_options
-        .optimize_for_write_throughput()
-        .optimize_for_point_lookup(read_size_from_env(ENV_VAR_INDIRECT_OBJECTS_BLOCK_CACHE_SIZE).unwrap_or(512));
-    db_options.options.set_merge_operator(
-        "refcount operator",
-        reference_count_merge_operator,
-        reference_count_merge_operator,
-    );
-    db_options.options.set_compaction_filter("empty filter", empty_compaction_filter);
-    db_options
 }

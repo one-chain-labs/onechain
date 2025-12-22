@@ -39,7 +39,9 @@ struct BlockInvariant<State> {
 /// A map from block id's to the pre/post of each block after a fixed point is reached.
 type InvariantMap<State> = BTreeMap<Label, BlockInvariant<State>>;
 
-fn collect_states_and_diagnostics<State>(map: InvariantMap<State>) -> (BTreeMap<Label, State>, Diagnostics) {
+fn collect_states_and_diagnostics<State>(
+    map: InvariantMap<State>,
+) -> (BTreeMap<Label, State>, Diagnostics) {
     let mut diags = Diagnostics::new();
     let final_states = map
         .into_iter()
@@ -68,7 +70,13 @@ pub trait TransferFunctions {
     /// The last instruction index in the current block is local@last_index. Knowing this
     /// information allows clients to detect the end of a basic block and special-case appropriately
     /// (e.g., normalizing the abstract state before a join).
-    fn execute(&mut self, pre: &mut Self::State, lbl: Label, idx: usize, command: &Command) -> Diagnostics;
+    fn execute(
+        &mut self,
+        pre: &mut Self::State,
+        lbl: Label,
+        idx: usize,
+        command: &Command,
+    ) -> Diagnostics;
 }
 
 pub trait AbstractInterpreter: TransferFunctions {
@@ -85,11 +93,17 @@ pub trait AbstractInterpreter: TransferFunctions {
         while let Some(block_label) = next_block {
             let block_invariant = inv_map
                 .entry(block_label)
-                .or_insert_with(|| BlockInvariant { pre: initial_state.clone(), post: BlockPostcondition::Unprocessed });
+                .or_insert_with(|| BlockInvariant {
+                    pre: initial_state.clone(),
+                    post: BlockPostcondition::Unprocessed,
+                });
 
             let (post_state, errors) = self.execute_block(cfg, &block_invariant.pre, block_label);
-            block_invariant.post =
-                if errors.is_empty() { BlockPostcondition::Success } else { BlockPostcondition::Error(errors) };
+            block_invariant.post = if errors.is_empty() {
+                BlockPostcondition::Success
+            } else {
+                BlockPostcondition::Error(errors)
+            };
 
             // propagate postcondition of this block to successor blocks
             let mut next_block_candidate = cfg.next_block(block_label);
@@ -120,10 +134,13 @@ pub trait AbstractInterpreter: TransferFunctions {
                     None => {
                         // Haven't visited the next block yet. Use the post of the current block as
                         // its pre
-                        inv_map.insert(*next_block_id, BlockInvariant {
-                            pre: post_state.clone(),
-                            post: BlockPostcondition::Success,
-                        });
+                        inv_map.insert(
+                            *next_block_id,
+                            BlockInvariant {
+                                pre: post_state.clone(),
+                                post: BlockPostcondition::Success,
+                            },
+                        );
                     }
                 }
             }
@@ -132,7 +149,12 @@ pub trait AbstractInterpreter: TransferFunctions {
         collect_states_and_diagnostics(inv_map)
     }
 
-    fn execute_block(&mut self, cfg: &dyn CFG, pre_state: &Self::State, block_lbl: Label) -> (Self::State, Diagnostics) {
+    fn execute_block(
+        &mut self,
+        cfg: &dyn CFG,
+        pre_state: &Self::State,
+        block_lbl: Label,
+    ) -> (Self::State, Diagnostics) {
         let mut state = pre_state.clone();
         let mut diags = Diagnostics::new();
         for (idx, cmd) in cfg.commands(block_lbl) {

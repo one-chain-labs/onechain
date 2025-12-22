@@ -147,7 +147,7 @@ impl SurfStrategy {
         if total_matching_count == 0 {
             return None;
         }
-        let mut n = state.rng.gen_range(0..total_matching_count);
+        let mut n = state.rng.gen_range(0 .. total_matching_count);
         if n < owned {
             let obj_ref = state.choose_nth_owned_object(&type_tag, n);
             chosen_owned_objects.push((type_tag, obj_ref));

@@ -1,13 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use prometheus::Registry;
 use std::{
     net::{IpAddr, SocketAddr},
     sync::{Arc, Weak},
 };
+
+use one_node::{SuiNode, SuiNodeHandle};
+use prometheus::Registry;
 use sui_config::NodeConfig;
-use sui_node::{SuiNode, SuiNodeHandle};
 use sui_types::base_types::ConciseableName;
 use tokio::sync::watch;
 use tracing::{info, trace};

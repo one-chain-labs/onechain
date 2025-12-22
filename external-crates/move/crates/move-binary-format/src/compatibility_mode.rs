@@ -1,12 +1,8 @@
-use crate::{
-    compatibility::Compatibility,
-    file_format::Visibility,
-    normalized::{Enum, Function, Struct},
-};
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-};
+use crate::compatibility::Compatibility;
+use crate::file_format::Visibility;
+use crate::normalized::{Enum, Function, Struct};
+use move_core_types::account_address::AccountAddress;
+use move_core_types::identifier::{IdentStr, Identifier};
 
 /// A trait which will allow accumulating the information necessary for checking upgrade compatibility between two modules,
 /// while allowing flexibility in the error type that is returned.
@@ -30,13 +26,28 @@ pub trait CompatibilityMode: Default {
 
     /// The struct ability mismatch error occurs when the abilities of a struct are outside of the
     /// allowed new abilities. Adding an ability is fine as long as it's not in the disallowed_new_abilities set.
-    fn struct_ability_mismatch(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct);
+    fn struct_ability_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_struct: &Struct,
+        new_struct: &Struct,
+    );
 
     /// Struct type parameters mismatch error occurs when the type parameters of a struct are not the same.
-    fn struct_type_param_mismatch(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct);
+    fn struct_type_param_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_struct: &Struct,
+        new_struct: &Struct,
+    );
 
     /// Struct field mismatch error occurs when the fields of a struct are not the same.
-    fn struct_field_mismatch(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct);
+    fn struct_field_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_struct: &Struct,
+        new_struct: &Struct,
+    );
 
     /// Enum missing error occurs when an enum is present in the old module but not in the new module.
     fn enum_missing(&mut self, name: &Identifier, old_enum: &Enum);
@@ -55,7 +66,13 @@ pub trait CompatibilityMode: Default {
     fn enum_variant_missing(&mut self, name: &Identifier, old_enum: &Enum, tag: usize);
 
     /// Enum variant mismatch error occurs when a variant is present in the old enum but not in the new enum.
-    fn enum_variant_mismatch(&mut self, name: &Identifier, old_enum: &Enum, new_enum: &Enum, tag: usize);
+    fn enum_variant_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_enum: &Enum,
+        new_enum: &Enum,
+        tag: usize,
+    );
 
     /// Function missing public error occurs when a public function is present in the old module but not in the new module.
     fn function_missing_public(&mut self, name: &Identifier, old_func: &Function);
@@ -64,13 +81,23 @@ pub trait CompatibilityMode: Default {
     fn function_missing_entry(&mut self, name: &Identifier, old_func: &Function);
 
     /// Function signature mismatch error occurs when the signature of a function changes.
-    fn function_signature_mismatch(&mut self, name: &Identifier, old_func: &Function, new_func: &Function);
+    fn function_signature_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_func: &Function,
+        new_func: &Function,
+    );
 
     /// Function lost public visibility error occurs when a function loses its public visibility.
     fn function_lost_public_visibility(&mut self, name: &Identifier, old_func: &Function);
 
     /// Function entry compatibility error occurs when an entry function is not compatible.
-    fn function_entry_compatibility(&mut self, name: &Identifier, old_func: &Function, new_func: &Function);
+    fn function_entry_compatibility(
+        &mut self,
+        name: &Identifier,
+        old_func: &Function,
+        new_func: &Function,
+    );
 
     /// Finish the compatibility check and return the error if one has been accumulated from individual errors.
     fn finish(self, _: &Compatibility) -> Result<(), Self::Error>;
@@ -89,7 +116,12 @@ pub struct ExecutionCompatibilityMode {
 
 impl Default for ExecutionCompatibilityMode {
     fn default() -> Self {
-        Self { datatype_and_function_linking: true, datatype_layout: true, entry_linking: true, no_new_variants: true }
+        Self {
+            datatype_and_function_linking: true,
+            datatype_layout: true,
+            entry_linking: true,
+            no_new_variants: true,
+        }
     }
 }
 
@@ -113,15 +145,30 @@ impl CompatibilityMode for ExecutionCompatibilityMode {
         self.datatype_layout = false;
     }
 
-    fn struct_ability_mismatch(&mut self, _name: &Identifier, _old_struct: &Struct, _new_struct: &Struct) {
+    fn struct_ability_mismatch(
+        &mut self,
+        _name: &Identifier,
+        _old_struct: &Struct,
+        _new_struct: &Struct,
+    ) {
         self.datatype_and_function_linking = false;
     }
 
-    fn struct_type_param_mismatch(&mut self, _name: &Identifier, _old_struct: &Struct, _new_struct: &Struct) {
+    fn struct_type_param_mismatch(
+        &mut self,
+        _name: &Identifier,
+        _old_struct: &Struct,
+        _new_struct: &Struct,
+    ) {
         self.datatype_and_function_linking = false;
     }
 
-    fn struct_field_mismatch(&mut self, _name: &Identifier, _old_struct: &Struct, _new_struct: &Struct) {
+    fn struct_field_mismatch(
+        &mut self,
+        _name: &Identifier,
+        _old_struct: &Struct,
+        _new_struct: &Struct,
+    ) {
         self.datatype_layout = false;
     }
 
@@ -146,7 +193,13 @@ impl CompatibilityMode for ExecutionCompatibilityMode {
         self.datatype_layout = false;
     }
 
-    fn enum_variant_mismatch(&mut self, _name: &Identifier, _old_enum: &Enum, _new_enum: &Enum, _tag: usize) {
+    fn enum_variant_mismatch(
+        &mut self,
+        _name: &Identifier,
+        _old_enum: &Enum,
+        _new_enum: &Enum,
+        _tag: usize,
+    ) {
         self.datatype_layout = false;
     }
 
@@ -158,7 +211,12 @@ impl CompatibilityMode for ExecutionCompatibilityMode {
         self.entry_linking = false;
     }
 
-    fn function_signature_mismatch(&mut self, _name: &Identifier, old_func: &Function, _new_func: &Function) {
+    fn function_signature_mismatch(
+        &mut self,
+        _name: &Identifier,
+        old_func: &Function,
+        _new_func: &Function,
+    ) {
         if old_func.visibility == Visibility::Public {
             self.datatype_and_function_linking = false;
         }
@@ -172,7 +230,12 @@ impl CompatibilityMode for ExecutionCompatibilityMode {
         self.datatype_and_function_linking = false;
     }
 
-    fn function_entry_compatibility(&mut self, _name: &Identifier, _old_func: &Function, _new_func: &Function) {
+    fn function_entry_compatibility(
+        &mut self,
+        _name: &Identifier,
+        _old_func: &Function,
+        _new_func: &Function,
+    ) {
         self.entry_linking = false;
     }
 

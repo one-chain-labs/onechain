@@ -33,15 +33,21 @@ macro_rules! var {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{admin::Labels, histogram_relay::HistogramRelay, prom_to_mimir::tests::*};
+    use std::{net::TcpListener, time::Duration};
 
-    use crate::{admin::CertKeyPair, config::RemoteWriteConfig, peers::SuiNodeProvider};
     use axum::{http::StatusCode, routing::post, Router};
     use prometheus::{Encoder, PROTOBUF_FORMAT};
     use protobuf::RepeatedField;
-    use std::{net::TcpListener, time::Duration};
     use sui_tls::{ClientCertVerifier, TlsAcceptor};
+
+    use super::*;
+    use crate::{
+        admin::{CertKeyPair, Labels},
+        config::RemoteWriteConfig,
+        histogram_relay::HistogramRelay,
+        peers::SuiNodeProvider,
+        prom_to_mimir::tests::*,
+    };
 
     async fn run_dummy_remote_write(listener: TcpListener) {
         /// i accept everything, send me the trash

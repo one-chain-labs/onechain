@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, sync::Arc, time::Duration};
+
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
-use std::{path::PathBuf, sync::Arc, time::Duration};
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
 use surf_strategy::SurfStrategy;
 use test_cluster::{TestCluster, TestClusterBuilder};

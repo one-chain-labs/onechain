@@ -1,6 +1,24 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
+};
+
+use fastcrypto::{encoding::Base64, hash::HashFunction};
+use move_core_types::{
+    annotated_value::{MoveStruct, MoveValue},
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{StructTag, TypeTag},
+};
+use schemars::JsonSchema;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value;
+use serde_with::{serde_as, DisplayFromStr};
+use shared_crypto::intent::HashingIntentScope;
+
 use crate::{
     base_types::{ObjectDigest, SuiAddress},
     crypto::DefaultHash,
@@ -14,22 +32,6 @@ use crate::{
     SequenceNumber,
     SUI_FRAMEWORK_ADDRESS,
 };
-use fastcrypto::{encoding::Base64, hash::HashFunction};
-use move_core_types::{
-    annotated_value::{MoveStruct, MoveValue},
-    ident_str,
-    identifier::IdentStr,
-    language_storage::{StructTag, TypeTag},
-};
-use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
-use serde_with::{serde_as, DisplayFromStr};
-use shared_crypto::intent::HashingIntentScope;
-use std::{
-    fmt,
-    fmt::{Display, Formatter},
-};
 
 pub mod visitor;
 
@@ -39,7 +41,7 @@ const DYNAMIC_FIELD_FIELD_STRUCT_NAME: &IdentStr = ident_str!("Field");
 const DYNAMIC_OBJECT_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_object_field");
 const DYNAMIC_OBJECT_FIELD_WRAPPER_STRUCT_NAME: &IdentStr = ident_str!("Wrapper");
 
-/// Rust version of the Move sui::dynamic_field::Field type
+/// Rust version of the Move one::dynamic_field::Field type
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Field<N, V> {
     pub id: UID,
@@ -47,7 +49,7 @@ pub struct Field<N, V> {
     pub value: V,
 }
 
-/// Rust version of the Move sui::dynamic_object_field::Wrapper type
+/// Rust version of the Move one::dynamic_object_field::Wrapper type
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct DOFWrapper<N> {
     pub name: N,
@@ -171,12 +173,12 @@ impl DynamicFieldInfo {
     pub fn parse_move_object(move_struct: &MoveStruct) -> SuiResult<(MoveValue, DynamicFieldType, ObjectID)> {
         let name =
             extract_field_from_move_struct(move_struct, "name").ok_or_else(|| SuiError::ObjectDeserializationError {
-                error: "Cannot extract [name] field from sui::dynamic_field::Field".to_string(),
+                error: "Cannot extract [name] field from one::dynamic_field::Field".to_string(),
             })?;
 
         let value = extract_field_from_move_struct(move_struct, "value").ok_or_else(|| {
             SuiError::ObjectDeserializationError {
-                error: "Cannot extract [value] field from sui::dynamic_field::Field".to_string(),
+                error: "Cannot extract [value] field from one::dynamic_field::Field".to_string(),
             }
         })?;
 
@@ -186,13 +188,13 @@ impl DynamicFieldInfo {
                 _ => None,
             }
             .ok_or_else(|| SuiError::ObjectDeserializationError {
-                error: "Cannot extract [name] field from sui::dynamic_object_field::Wrapper.".to_string(),
+                error: "Cannot extract [name] field from one::dynamic_object_field::Wrapper.".to_string(),
             })?;
             // ID extracted from the wrapper object
             let object_id = extract_id_value(value).ok_or_else(|| SuiError::ObjectDeserializationError {
                 error: format!(
                     "Cannot extract dynamic object's object id from \
-                        sui::dynamic_field::Field, {value:?}"
+                        one::dynamic_field::Field, {value:?}"
                 ),
             })?;
             (name.clone(), DynamicFieldType::DynamicObject, object_id)
@@ -201,7 +203,7 @@ impl DynamicFieldInfo {
             let object_id = extract_object_id(move_struct).ok_or_else(|| SuiError::ObjectDeserializationError {
                 error: format!(
                     "Cannot extract dynamic object's object id from \
-                        sui::dynamic_field::Field, {move_struct:?}",
+                        one::dynamic_field::Field, {move_struct:?}",
                 ),
             })?;
             (name.clone(), DynamicFieldType::DynamicField, object_id)
@@ -269,7 +271,7 @@ where
 
     // truncate into an ObjectID and return
     // OK to access slice because digest should never be shorter than ObjectID::LENGTH.
-    let id = ObjectID::try_from(&hash.as_ref()[0..ObjectID::LENGTH]).unwrap();
+    let id = ObjectID::try_from(&hash.as_ref()[0 .. ObjectID::LENGTH]).unwrap();
     tracing::trace!("derive_dynamic_field_id result: {:?}", id);
     Ok(id)
 }

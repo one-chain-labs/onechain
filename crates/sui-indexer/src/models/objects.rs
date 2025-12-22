@@ -4,9 +4,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use diesel::prelude::*;
-use serde::de::DeserializeOwned;
-
 use move_core_types::annotated_value::MoveTypeLayout;
+use serde::de::DeserializeOwned;
 use sui_json_rpc::coin_api::parse_to_struct_tag;
 use sui_json_rpc_types::{Balance, Coin as SuiCoin};
 use sui_package_resolver::{PackageStore, Resolver};

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod utils;
-use crate::utils::request_tokens_from_faucet;
 use anyhow::anyhow;
 use fastcrypto::{
     ed25519::Ed25519KeyPair,
@@ -25,11 +24,13 @@ use sui_types::{
     signature::GenericSignature,
 };
 
+use crate::utils::request_tokens_from_faucet;
+
 /// This example walks through the Rust SDK use case described in
 /// https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/sui-101/sign-and-send-txn.mdx
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // set up OneChain client for the desired network.
+    // set up sui client for the desired network.
     let sui_client = SuiClientBuilder::default().build_testnet().await?;
 
     // deterministically generate a keypair, testing only, do not use for mainnet,

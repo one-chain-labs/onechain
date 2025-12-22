@@ -1,14 +1,11 @@
 // Copyright (c) 2021, Facebook, Inc. and its affiliates
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    base_types::{EpochId, SuiAddress},
-    crypto::{DefaultHash, PublicKey, Signature, SignatureScheme, SuiSignature},
-    digests::ZKLoginInputsDigest,
-    error::{SuiError, SuiResult},
-    signature::{AuthenticatorTrait, VerifyParams},
-    signature_verification::VerifiedDigestCache,
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
 };
+
 use fastcrypto::{error::FastCryptoError, traits::ToFromBytes};
 use fastcrypto_zkp::bn254::{
     zk_login::{JwkId, OIDCProvider, ZkLoginInputs, JWK},
@@ -18,9 +15,14 @@ use once_cell::sync::OnceCell;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::IntentMessage;
-use std::{
-    hash::{Hash, Hasher},
-    sync::Arc,
+
+use crate::{
+    base_types::{EpochId, SuiAddress},
+    crypto::{DefaultHash, PublicKey, Signature, SignatureScheme, SuiSignature},
+    digests::ZKLoginInputsDigest,
+    error::{SuiError, SuiResult},
+    signature::{AuthenticatorTrait, VerifyParams},
+    signature_verification::VerifiedDigestCache,
 };
 #[cfg(test)]
 #[path = "unit_tests/zk_login_authenticator_test.rs"]
@@ -215,7 +217,7 @@ impl ToFromBytes for ZkLoginAuthenticator {
             return Err(FastCryptoError::InvalidInput);
         }
         let mut zk_login: ZkLoginAuthenticator =
-            bcs::from_bytes(&bytes[1..]).map_err(|_| FastCryptoError::InvalidSignature)?;
+            bcs::from_bytes(&bytes[1 ..]).map_err(|_| FastCryptoError::InvalidSignature)?;
         zk_login.inputs.init()?;
         Ok(zk_login)
     }
@@ -243,12 +245,12 @@ impl AddressSeed {
         let mut buf = self.0.as_slice();
 
         while !buf.is_empty() && buf[0] == 0 {
-            buf = &buf[1..];
+            buf = &buf[1 ..];
         }
 
         // If the value is '0' then just return a slice of length 1 of the final byte
         if buf.is_empty() {
-            &self.0[31..]
+            &self.0[31 ..]
         } else {
             buf
         }
@@ -288,7 +290,7 @@ impl std::str::FromStr for AddressSeed {
             return Err(AddressSeedParseError::TooBig);
         }
 
-        buf[32 - len..].copy_from_slice(&be_bytes);
+        buf[32 - len ..].copy_from_slice(&be_bytes);
         Ok(Self(buf))
     }
 }
@@ -317,9 +319,10 @@ impl<'de> Deserialize<'de> for AddressSeed {
 mod test {
     use std::str::FromStr;
 
-    use super::AddressSeed;
     use num_bigint::BigUint;
     use proptest::prelude::*;
+
+    use super::AddressSeed;
 
     #[test]
     fn unpadded_slice() {

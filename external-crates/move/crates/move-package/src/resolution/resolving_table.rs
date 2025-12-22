@@ -39,11 +39,17 @@ impl Default for ResolvingTable {
 impl ResolvingTable {
     /// A fresh `ResolvingTable` with no bindings.
     pub fn new() -> ResolvingTable {
-        ResolvingTable { assignments: Vec::new(), redirection: BTreeMap::new() }
+        ResolvingTable {
+            assignments: Vec::new(),
+            redirection: BTreeMap::new(),
+        }
     }
 
     /// Iterates over the bindings in this table that are within `pkg`'s scope.
-    pub fn bindings(&self, pkg: PackageName) -> impl Iterator<Item = (NamedAddress, &Option<AccountAddress>)> {
+    pub fn bindings(
+        &self,
+        pkg: PackageName,
+    ) -> impl Iterator<Item = (NamedAddress, &Option<AccountAddress>)> {
         let start = (pkg, NamedAddress::from(""));
         self.redirection
             .range(start..)

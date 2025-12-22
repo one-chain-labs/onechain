@@ -1,9 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::HashMap, time::Duration};
+
 use mysten_metrics::spawn_monitored_task;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
 use strum_macros;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -162,7 +163,7 @@ impl Pruner {
                         );
                     }
 
-                    for epoch in *min_partition..last_seen_max_epoch.saturating_sub(epochs_to_keep - 1) {
+                    for epoch in *min_partition .. last_seen_max_epoch.saturating_sub(epochs_to_keep - 1) {
                         if cancel.is_cancelled() {
                             info!("Pruner task cancelled.");
                             return Ok(());
@@ -179,7 +180,7 @@ impl Pruner {
             // epoch-partitioned tables right now.
             let prune_to_epoch = last_seen_max_epoch.saturating_sub(self.epochs_to_keep - 1);
             let prune_start_epoch = next_prune_epoch.unwrap_or(min_epoch);
-            for epoch in prune_start_epoch..prune_to_epoch {
+            for epoch in prune_start_epoch .. prune_to_epoch {
                 if cancel.is_cancelled() {
                     info!("Pruner task cancelled.");
                     return Ok(());

@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, sync::Arc};
+
 use futures::future;
 use jsonrpsee::{core::client::ClientT, rpc_params};
 use move_core_types::{annotated_value::MoveStructLayout, ident_str};
-use one_chain::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
+use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use one_node::SuiNodeHandle;
 use one_tool::restore_from_db_checkpoint;
 use rand::rngs::OsRng;
-use std::{path::PathBuf, sync::Arc};
 use sui_config::node::RunWithRange;
 use sui_json_rpc_types::{
     EventFilter,
@@ -448,7 +449,7 @@ async fn do_test_full_node_sync_flood() {
     let context = Arc::new(Mutex::new(context));
 
     // Start up 5 different tasks that all spam txs at the authorities.
-    for _i in 0..5 {
+    for _i in 0 .. 5 {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let context = context.clone();
         tokio::task::spawn(async move {
@@ -466,7 +467,7 @@ async fn do_test_full_node_sync_flood() {
             let mut owned_tx_digest = None;
             let mut shared_tx_digest = None;
             let gas_object_id = gas_obj.0;
-            for _ in 0..10 {
+            for _ in 0 .. 10 {
                 let res = {
                     let context = &mut context.lock().await;
                     SuiClientCommands::SplitCoin {

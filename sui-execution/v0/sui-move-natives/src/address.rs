@@ -1,13 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::NativesCostTable;
+use std::collections::VecDeque;
+
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas, u256::U256};
 use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeContext};
 use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
 use smallvec::smallvec;
-use std::collections::VecDeque;
+
+use crate::NativesCostTable;
 
 const E_ADDRESS_PARSE_ERROR: u64 = 0;
 #[derive(Clone)]

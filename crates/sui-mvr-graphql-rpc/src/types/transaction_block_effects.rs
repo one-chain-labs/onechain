@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{consistency::ConsistentIndexCursor, data::package_resolver::PackageResolver, error::Error};
 use async_graphql::{
     connection::{Connection, ConnectionNameType, CursorType, Edge, EdgeNameType, EmptyFields},
     *,
@@ -43,6 +42,7 @@ use super::{
     uint53::UInt53,
     unchanged_shared_object::UnchangedSharedObject,
 };
+use crate::{consistency::ConsistentIndexCursor, data::package_resolver::PackageResolver, error::Error};
 
 /// Wraps the actual transaction block effects data with the checkpoint sequence number at which the
 /// data was viewed, for consistent results on paginating through and resolving nested types.
@@ -209,7 +209,7 @@ impl TransactionBlockEffects {
 
         let transactions = TransactionBlock::multi_query(
             ctx,
-            dependencies[fst.ix..=lst.ix].iter().map(|d| Digest::from(*d)).collect(),
+            dependencies[fst.ix ..= lst.ix].iter().map(|d| Digest::from(*d)).collect(),
             fst.c, // Each element's cursor has the same checkpoint sequence number set
         )
         .await

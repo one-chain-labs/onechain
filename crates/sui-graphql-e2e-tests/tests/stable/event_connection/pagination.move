@@ -127,7 +127,7 @@ module Test::M1 {
         }
         sender {
           address
-        }
+        }        
         contents {
           type {
             repr

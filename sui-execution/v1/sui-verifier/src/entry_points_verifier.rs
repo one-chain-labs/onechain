@@ -151,7 +151,7 @@ fn verify_entry_function_impl(module: &CompiledModule, func_def: &FunctionDefini
 
     let all_non_ctx_params = match params.0.last() {
         Some(last_param) if TxContext::kind(module, last_param) != TxContextKind::None => {
-            &params.0[0..params.0.len() - 1]
+            &params.0[0 .. params.0.len() - 1]
         }
         _ => &params.0,
     };
@@ -192,7 +192,7 @@ fn verify_param_type(
     function_type_args: &[AbilitySet],
     param: &SignatureToken,
 ) -> Result<(), String> {
-    // Only `one::one_system` is allowed to expose entry functions that accept a mutable clock
+    // Only `one::sui_system` is allowed to expose entry functions that accept a mutable clock
     // parameter.
     if Clock::is_mutable(view, param) {
         return Err(format!(

@@ -1,47 +1,27 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    checkpoints::CheckpointStore,
-    execution_cache::{ObjectCacheRead, TransactionCacheRead},
-};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::Path};
+
 use sui_storage::blob::{Blob, BlobEncoding};
 use sui_types::{
-    digests::TransactionDigest,
     effects::TransactionEffectsAPI,
     error::{SuiError, SuiResult, UserInputError},
     full_checkpoint_content::{CheckpointData, CheckpointTransaction},
-    messages_checkpoint::VerifiedCheckpoint,
     storage::ObjectKey,
 };
 
+use crate::{
+    checkpoints::checkpoint_executor::CheckpointExecutionData,
+    execution_cache::{ObjectCacheRead, TransactionCacheRead},
+};
+
 pub(crate) fn load_checkpoint_data(
-    checkpoint: VerifiedCheckpoint,
+    ckpt: &CheckpointExecutionData,
     object_cache_reader: &dyn ObjectCacheRead,
     transaction_cache_reader: &dyn TransactionCacheRead,
-    checkpoint_store: Arc<CheckpointStore>,
-    transaction_digests: &[TransactionDigest],
 ) -> SuiResult<CheckpointData> {
-    let checkpoint_contents = checkpoint_store
-        .get_checkpoint_contents(&checkpoint.content_digest)?
-        .expect("checkpoint content has to be stored");
-
-    let transactions = transaction_cache_reader
-        .multi_get_transaction_blocks(transaction_digests)
-        .into_iter()
-        .zip(transaction_digests)
-        .map(|(tx, digest)| tx.ok_or(SuiError::TransactionNotFound { digest: *digest }))
-        .collect::<SuiResult<Vec<_>>>()?;
-
-    let effects = transaction_cache_reader
-        .multi_get_executed_effects(transaction_digests)
-        .into_iter()
-        .zip(transaction_digests)
-        .map(|(effects, &digest)| effects.ok_or(SuiError::TransactionNotFound { digest }))
-        .collect::<SuiResult<Vec<_>>>()?;
-
-    let event_digests = effects.iter().flat_map(|fx| fx.events_digest().copied()).collect::<Vec<_>>();
+    let event_digests = ckpt.effects.iter().flat_map(|fx| fx.events_digest().copied()).collect::<Vec<_>>();
 
     let events = transaction_cache_reader
         .multi_get_events(&event_digests)
@@ -51,8 +31,8 @@ pub(crate) fn load_checkpoint_data(
         .collect::<SuiResult<Vec<_>>>()?;
 
     let events: HashMap<_, _> = event_digests.into_iter().zip(events).collect();
-    let mut full_transactions = Vec::with_capacity(transactions.len());
-    for (tx, fx) in transactions.into_iter().zip(effects) {
+    let mut full_transactions = Vec::with_capacity(ckpt.transactions.len());
+    for (tx, fx) in ckpt.transactions.iter().zip(ckpt.effects.iter()) {
         let events = fx
             .events_digest()
             .map(|event_digest| events.get(event_digest).cloned().expect("event was already checked to be present"));
@@ -92,23 +72,27 @@ pub(crate) fn load_checkpoint_data(
             .collect::<SuiResult<Vec<_>>>()?;
 
         let full_transaction = CheckpointTransaction {
-            transaction: (*tx).clone().into(),
-            effects: fx,
+            transaction: (*tx).clone().into_unsigned().into(),
+            effects: fx.clone(),
             events,
             input_objects,
             output_objects,
         };
         full_transactions.push(full_transaction);
     }
-    let checkpoint_data =
-        CheckpointData { checkpoint_summary: checkpoint.into(), checkpoint_contents, transactions: full_transactions };
+    let checkpoint_data = CheckpointData {
+        checkpoint_summary: ckpt.checkpoint.clone().into(),
+        checkpoint_contents: ckpt.checkpoint_contents.clone(),
+        transactions: full_transactions,
+    };
     Ok(checkpoint_data)
 }
 
-pub(crate) fn store_checkpoint_locally(path: PathBuf, checkpoint_data: &CheckpointData) -> SuiResult {
+pub(crate) fn store_checkpoint_locally(path: impl AsRef<Path>, checkpoint_data: &CheckpointData) -> SuiResult {
+    let path = path.as_ref();
     let file_name = format!("{}.chk", checkpoint_data.checkpoint_summary.sequence_number);
 
-    std::fs::create_dir_all(&path)
+    std::fs::create_dir_all(path)
         .map_err(|err| SuiError::FileIOError(format!("failed to save full checkpoint content locally {:?}", err)))?;
 
     Blob::encode(&checkpoint_data, BlobEncoding::Bcs)

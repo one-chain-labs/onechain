@@ -10,7 +10,8 @@ pub async fn server_timing_middleware(request: Request, next: Next) -> Response 
         let mut response = next.run(request).await;
         add_server_timing("finish_request");
 
-        if let Ok(header_value) = get_server_timing().expect("server timing not set").lock().header_value().try_into() {
+        if let Ok(header_value) = get_server_timing().expect("server timing is not set").lock().header_value().try_into()
+        {
             response.headers_mut().insert(Timer::header_key(), header_value);
         }
         response

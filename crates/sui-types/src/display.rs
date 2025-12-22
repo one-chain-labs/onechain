@@ -1,21 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use serde::Deserialize;
+
 use crate::{
     collection_types::VecMap,
     event::Event,
     id::{ID, UID},
     SUI_FRAMEWORK_ADDRESS,
 };
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
-use serde::Deserialize;
 
 pub const DISPLAY_MODULE_NAME: &IdentStr = ident_str!("display");
 pub const DISPLAY_CREATED_EVENT_NAME: &IdentStr = ident_str!("DisplayCreated");
 pub const DISPLAY_VERSION_UPDATED_EVENT_NAME: &IdentStr = ident_str!("VersionUpdated");
 
 // TODO: add tests to keep in sync
-/// Rust version of the Move sui::display::Display type
+/// Rust version of the Move one::display::Display type
 #[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
 pub struct DisplayObject {
     pub id: UID,

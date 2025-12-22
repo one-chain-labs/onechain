@@ -4,6 +4,7 @@
 //! This module contains the public APIs supported by the bytecode verifier.
 
 use move_binary_format::file_format::CompiledModule;
+use move_bytecode_verifier_meter::{dummy::DummyMeter, Meter};
 use sui_types::{error::ExecutionError, move_package::FnInfoMap};
 
 use crate::{
@@ -14,7 +15,6 @@ use crate::{
     private_generics,
     struct_with_key_verifier,
 };
-use move_bytecode_verifier_meter::{dummy::DummyMeter, Meter};
 
 /// Helper for a "canonical" verification of a module.
 pub fn sui_verify_module_metered(

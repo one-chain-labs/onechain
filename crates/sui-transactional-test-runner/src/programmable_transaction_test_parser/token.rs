@@ -177,7 +177,7 @@ fn parse_sub_token_string(mut s: &str, start: &str, end: &str) -> anyhow::Result
             next
         } else {
             len += 1;
-            &s[1..]
+            &s[1 ..]
         }
     }
     Ok(len)

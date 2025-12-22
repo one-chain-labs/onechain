@@ -43,7 +43,7 @@ pub const TRANSFER_IMPL_FUNCTIONS: &[&IdentStr] = &[
 /// - `T` must be a type declared in the current module
 pub fn verify_module(module: &CompiledModule, verifier_config: &VerifierConfig) -> Result<(), ExecutionError> {
     if *module.address() == SUI_FRAMEWORK_ADDRESS && module.name() == IdentStr::new(TEST_SCENARIO_MODULE_NAME).unwrap() {
-        // exclude test_module which is a test-only module in the OneChain framework which "emulates"
+        // exclude test_module which is a test-only module in the Sui framework which "emulates"
         // transactional execution and needs to allow test code to bypass private generics
         return Ok(());
     }
@@ -99,7 +99,7 @@ fn verify_private_transfer(
         PUBLIC_TRANSFER_FUNCTIONS
     } else {
         // Before protocol version 33, the `receiving_object_id` function was not public
-        &PUBLIC_TRANSFER_FUNCTIONS[..PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
+        &PUBLIC_TRANSFER_FUNCTIONS[.. PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
     };
     let self_handle = view.module_handle_at(view.self_handle_idx());
     if addr_module(view, self_handle) == (SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) {

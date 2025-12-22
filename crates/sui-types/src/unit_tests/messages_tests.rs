@@ -2,6 +2,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{hash_map::DefaultHasher, BTreeMap},
+    hash::Hasher,
+};
+
+use fastcrypto::traits::{AggregateAuthenticator, KeyPair};
+use move_core_types::language_storage::StructTag;
+use roaring::RoaringBitmap;
+
 use super::*;
 use crate::{
     base_types::random_object_ref,
@@ -25,13 +34,6 @@ use crate::{
     execution_status::ExecutionStatus,
     gas::GasCostSummary,
     object::Owner,
-};
-use fastcrypto::traits::{AggregateAuthenticator, KeyPair};
-use move_core_types::language_storage::StructTag;
-use roaring::RoaringBitmap;
-use std::{
-    collections::{hash_map::DefaultHasher, BTreeMap},
-    hash::Hasher,
 };
 
 #[test]
@@ -171,7 +173,7 @@ fn test_new_with_signatures() {
     let mut signatures: Vec<AuthoritySignInfo> = Vec::new();
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
 
-    for _ in 0..5 {
+    for _ in 0 .. 5 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name = AuthorityPublicKeyBytes::from(sec.public());
         signatures.push(AuthoritySignInfo::new(
@@ -208,7 +210,7 @@ fn test_handle_reject_malicious_signature() {
     let mut signatures: Vec<AuthoritySignInfo> = Vec::new();
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
 
-    for i in 0..5 {
+    for i in 0 .. 5 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name = AuthorityPublicKeyBytes::from(sec.public());
         authorities.insert(name, 1);
@@ -282,7 +284,7 @@ fn test_bitmap_out_of_range() {
     let message: Foo = Foo("some data".to_string());
     let mut signatures: Vec<AuthoritySignInfo> = Vec::new();
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
-    for _ in 0..5 {
+    for _ in 0 .. 5 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name = AuthorityPublicKeyBytes::from(sec.public());
         authorities.insert(name, 1);
@@ -311,7 +313,7 @@ fn test_reject_extra_public_key() {
     let mut signatures: Vec<AuthoritySignInfo> = Vec::new();
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
     // TODO: quite duplicated code in this file (4 times).
-    for _ in 0..5 {
+    for _ in 0 .. 5 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name = AuthorityPublicKeyBytes::from(sec.public());
         authorities.insert(name, 1);
@@ -343,7 +345,7 @@ fn test_reject_reuse_signatures() {
     let message: Foo = Foo("some data".to_string());
     let mut signatures: Vec<AuthoritySignInfo> = Vec::new();
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
-    for _ in 0..5 {
+    for _ in 0 .. 5 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name = AuthorityPublicKeyBytes::from(sec.public());
         authorities.insert(name, 1);
@@ -371,7 +373,7 @@ fn test_empty_bitmap() {
     let message: Foo = Foo("some data".to_string());
     let mut signatures: Vec<AuthoritySignInfo> = Vec::new();
     let mut authorities: BTreeMap<AuthorityPublicKeyBytes, u64> = BTreeMap::new();
-    for _ in 0..5 {
+    for _ in 0 .. 5 {
         let (_, sec): (_, AuthorityKeyPair) = get_key_pair();
         let name = AuthorityPublicKeyBytes::from(sec.public());
         authorities.insert(name, 1);
@@ -737,7 +739,7 @@ fn test_sponsored_transaction_validity_check() {
         .validity_check(&ProtocolConfig::get_for_max_version_UNSAFE())
         .unwrap();
 
-    // TransferSui
+    // TransferOct
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
         builder.transfer_oct(SuiAddress::random_for_testing_only(), Some(50000));
@@ -748,7 +750,7 @@ fn test_sponsored_transaction_validity_check() {
         .validity_check(&ProtocolConfig::get_for_max_version_UNSAFE())
         .unwrap();
 
-    // PaySui
+    // PayOct
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
         builder.pay_oct(vec![], vec![]).unwrap();
@@ -759,7 +761,7 @@ fn test_sponsored_transaction_validity_check() {
         .validity_check(&ProtocolConfig::get_for_max_version_UNSAFE())
         .unwrap();
 
-    // PayAllSui
+    // PayAllOct
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
         builder.pay_all_oct(SuiAddress::random_for_testing_only());
@@ -922,8 +924,13 @@ fn test_consensus_commit_prologue_v2_transaction() {
 
 #[test]
 fn test_consensus_commit_prologue_v3_transaction() {
-    let tx =
-        VerifiedTransaction::new_consensus_commit_prologue_v3(0, 0, 42, ConsensusCommitDigest::default(), Vec::new());
+    let tx = VerifiedTransaction::new_consensus_commit_prologue_v3(
+        0,
+        0,
+        42,
+        ConsensusCommitDigest::default(),
+        ConsensusDeterminedVersionAssignments::empty_for_testing(),
+    );
     assert!(tx.contains_shared_object());
     assert_eq!(tx.shared_input_objects().next().unwrap(), SharedInputObject {
         id: SUI_CLOCK_OBJECT_ID,
@@ -1162,6 +1169,8 @@ fn test_certificate_digest() {
 // If this test fails, the value of the constant must be increased
 #[test]
 fn check_approx_effects_components_size() {
+    use std::mem::size_of;
+
     use crate::effects::{
         APPROX_SIZE_OF_EPOCH_ID,
         APPROX_SIZE_OF_EXECUTION_STATUS,
@@ -1171,7 +1180,6 @@ fn check_approx_effects_components_size() {
         APPROX_SIZE_OF_OWNER,
         APPROX_SIZE_OF_TX_DIGEST,
     };
-    use std::mem::size_of;
 
     assert!(
         size_of::<GasCostSummary>() < APPROX_SIZE_OF_GAS_COST_SUMMARY,

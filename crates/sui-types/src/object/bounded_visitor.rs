@@ -242,10 +242,10 @@ impl Default for BoundedVisitor {
 pub(crate) mod tests {
     use std::str::FromStr;
 
-    use super::*;
-
     use expect_test::expect;
     use move_core_types::{identifier::Identifier, language_storage::StructTag};
+
+    use super::*;
 
     #[test]
     fn test_success() {
@@ -325,7 +325,7 @@ pub(crate) mod tests {
         let mut value = V::U64(42);
 
         const DEPTH: usize = 10;
-        for _ in 0..DEPTH {
+        for _ in 0 .. DEPTH {
             layout = layout_("0x0::foo::Bar", vec![("f", layout)]);
             value = value_("0x0::foo::Bar", vec![("f", value)]);
         }
@@ -353,7 +353,7 @@ pub(crate) mod tests {
         let mut fields = vec![];
         let mut values = vec![];
 
-        for i in 0..WIDTH {
+        for i in 0 .. WIDTH {
             idents.push(format!("f{}", i));
         }
 
@@ -430,7 +430,7 @@ pub(crate) mod tests {
         let type_ = StructTag::from_str(rep).unwrap();
         let fields = fields.into_iter().map(|(name, layout)| A::MoveFieldLayout::new(ident_(name), layout)).collect();
 
-        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields: Box::new(fields) }))
+        A::MoveTypeLayout::Struct(Box::new(A::MoveStructLayout { type_, fields }))
     }
 
     /// Create a variant value for test purposes.

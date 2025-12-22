@@ -1,15 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityMetrics, AuthorityState},
-    checkpoints::CheckpointServiceNoop,
-    consensus_adapter::{BlockStatusReceiver, ConsensusClient, SubmitToConsensus},
-    consensus_handler::SequencedConsensusTransaction,
-};
+use std::sync::{Arc, Weak};
+
 use consensus_core::BlockRef;
 use prometheus::Registry;
-use std::sync::{Arc, Weak};
 use sui_types::{
     error::{SuiError, SuiResult},
     executable_transaction::VerifiedExecutableTransaction,
@@ -21,6 +16,13 @@ use tokio::{
     task::JoinHandle,
 };
 use tracing::debug;
+
+use crate::{
+    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityMetrics, AuthorityState},
+    checkpoints::CheckpointServiceNoop,
+    consensus_adapter::{BlockStatusReceiver, ConsensusClient, SubmitToConsensus},
+    consensus_handler::SequencedConsensusTransaction,
+};
 
 pub struct MockConsensusClient {
     tx_sender: mpsc::Sender<ConsensusTransaction>,
@@ -70,6 +72,7 @@ impl MockConsensusClient {
                             vec![SequencedConsensusTransaction::new_test(tx.clone())],
                             &checkpoint_service,
                             validator.get_object_cache_reader().as_ref(),
+                            validator.get_transaction_cache_reader().as_ref(),
                             &authority_metrics,
                             true,
                         )
@@ -98,16 +101,25 @@ impl MockConsensusClient {
             }
         }
     }
+
+    fn submit_impl(&self, transactions: &[ConsensusTransaction]) -> SuiResult<BlockStatusReceiver> {
+        // TODO: maybe support multi-transactions and remove this check
+        assert!(transactions.len() == 1);
+        let transaction = &transactions[0];
+        self.tx_sender
+            .try_send(transaction.clone())
+            .map_err(|_| SuiError::from("MockConsensusClient channel overflowed"))?;
+        Ok(with_block_status(consensus_core::BlockStatus::Sequenced(BlockRef::MIN)))
+    }
 }
 
-#[async_trait::async_trait]
 impl SubmitToConsensus for MockConsensusClient {
-    async fn submit_to_consensus(
+    fn submit_to_consensus(
         &self,
         transactions: &[ConsensusTransaction],
-        epoch_store: &Arc<AuthorityPerEpochStore>,
+        _epoch_store: &Arc<AuthorityPerEpochStore>,
     ) -> SuiResult {
-        self.submit(transactions, epoch_store).await.map(|_response| ())
+        self.submit_impl(transactions).map(|_response| ())
     }
 }
 
@@ -118,11 +130,7 @@ impl ConsensusClient for MockConsensusClient {
         transactions: &[ConsensusTransaction],
         _epoch_store: &Arc<AuthorityPerEpochStore>,
     ) -> SuiResult<BlockStatusReceiver> {
-        // TODO: maybe support multi-transactions and remove this check
-        assert!(transactions.len() == 1);
-        let transaction = &transactions[0];
-        self.tx_sender.send(transaction.clone()).await.map_err(|e| SuiError::Unknown(e.to_string()))?;
-        Ok(with_block_status(consensus_core::BlockStatus::Sequenced(BlockRef::MIN)))
+        self.submit_impl(transactions)
     }
 }
 

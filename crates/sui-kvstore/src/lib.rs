@@ -3,7 +3,7 @@
 mod bigtable;
 use anyhow::Result;
 use async_trait::async_trait;
-pub use bigtable::{client::BigTableClient, worker::KvWorker};
+pub use bigtable::{client::BigTableClient, progress_store::BigTableProgressStore, worker::KvWorker};
 use sui_types::{
     base_types::ObjectID,
     crypto::AuthorityStrongQuorumSignInfo,
@@ -31,6 +31,7 @@ pub trait KeyValueStoreWriter {
     async fn save_objects(&mut self, objects: &[&Object]) -> Result<()>;
     async fn save_transactions(&mut self, transactions: &[TransactionData]) -> Result<()>;
     async fn save_checkpoint(&mut self, checkpoint: &CheckpointData) -> Result<()>;
+    async fn save_watermark(&mut self, watermark: CheckpointSequenceNumber) -> Result<()>;
 }
 
 #[derive(Clone, Debug)]

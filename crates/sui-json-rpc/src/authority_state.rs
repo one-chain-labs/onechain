@@ -1,14 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
-use arc_swap::Guard;
-use async_trait::async_trait;
-use move_core_types::language_storage::TypeTag;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
+
+use arc_swap::Guard;
+use async_trait::async_trait;
+#[cfg(test)]
+use mockall::automock;
+use move_core_types::language_storage::TypeTag;
 use sui_core::{
     authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
     execution_cache::ObjectCacheRead,
@@ -29,7 +31,7 @@ use sui_types::{
     base_types::{MoveObjectType, ObjectID, ObjectInfo, ObjectRef, SequenceNumber, SuiAddress},
     bridge::Bridge,
     committee::{Committee, EpochId},
-    digests::{ChainIdentifier, TransactionDigest, TransactionEventsDigest},
+    digests::{ChainIdentifier, TransactionDigest},
     dynamic_field::DynamicFieldInfo,
     effects::TransactionEffects,
     error::{SuiError, UserInputError},
@@ -51,9 +53,6 @@ use sui_types::{
 use thiserror::Error;
 use tokio::task::JoinError;
 
-#[cfg(test)]
-use mockall::automock;
-
 use crate::ObjectProvider;
 
 pub type StateReadResult<T = ()> = Result<T, StateReadError>;
@@ -66,7 +65,6 @@ pub trait StateRead: Send + Sync {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
     ) -> StateReadResult<KVStoreTransactionData>;
 
     fn get_object_read(&self, object_id: &ObjectID) -> StateReadResult<ObjectRead>;
@@ -228,9 +226,8 @@ impl StateRead for AuthorityState {
         &self,
         transactions: &[TransactionDigest],
         effects: &[TransactionDigest],
-        events: &[TransactionEventsDigest],
     ) -> StateReadResult<KVStoreTransactionData> {
-        Ok(<AuthorityState as TransactionKeyValueStoreTrait>::multi_get(self, transactions, effects, events).await?)
+        Ok(<AuthorityState as TransactionKeyValueStoreTrait>::multi_get(self, transactions, effects).await?)
     }
 
     fn get_object_read(&self, object_id: &ObjectID) -> StateReadResult<ObjectRead> {
@@ -414,11 +411,11 @@ impl StateRead for AuthorityState {
     }
 
     async fn get_balance(&self, owner: SuiAddress, coin_type: TypeTag) -> StateReadResult<TotalBalance> {
-        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_balance(owner, coin_type).await?)
+        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_balance(owner, coin_type)?)
     }
 
     async fn get_all_balance(&self, owner: SuiAddress) -> StateReadResult<Arc<HashMap<TypeTag, TotalBalance>>> {
-        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_all_balance(owner).await?)
+        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_all_balance(owner)?)
     }
 
     fn get_verified_checkpoint_by_sequence_number(
@@ -476,7 +473,7 @@ impl StateRead for AuthorityState {
     }
 
     fn get_chain_identifier(&self) -> StateReadResult<ChainIdentifier> {
-        Ok(self.get_chain_identifier().ok_or(anyhow!("Chain identifier not found"))?)
+        Ok(self.get_chain_identifier())
     }
 }
 

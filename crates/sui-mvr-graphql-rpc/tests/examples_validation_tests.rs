@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Context, Result};
 use std::{cmp::max, collections::BTreeMap, fs, path::PathBuf};
+
+use anyhow::{anyhow, Context, Result};
 use sui_mvr_graphql_rpc::{
     config::Limits,
     test_infra::cluster::{prep_executor_cluster, ExecutorCluster},

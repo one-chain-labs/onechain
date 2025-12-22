@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{path::PathBuf, str::FromStr, sync::Arc};
+
 use anyhow::anyhow;
 use clap::*;
 use ethers::{
@@ -15,7 +17,6 @@ use move_core_types::ident_str;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use shared_crypto::intent::{Intent, IntentMessage};
-use std::{path::PathBuf, str::FromStr, sync::Arc};
 use sui_bridge::{
     abi::{eth_sui_bridge, EthBridgeCommittee, EthSuiBridge},
     crypto::BridgeAuthorityPublicKeyBytes,
@@ -306,11 +307,11 @@ pub fn make_action(chain_id: BridgeChainId, cmd: &GovernanceClientCommands) -> B
 fn encode_call_data(function_selector: &str, params: &[String]) -> Vec<u8> {
     let left = function_selector.find('(').expect("Invalid function selector, no left parentheses");
     let right = function_selector.find(')').expect("Invalid function selector, no right parentheses");
-    let param_types = function_selector[left + 1..right].split(',').map(|x| x.trim()).collect::<Vec<&str>>();
+    let param_types = function_selector[left + 1 .. right].split(',').map(|x| x.trim()).collect::<Vec<&str>>();
 
     assert_eq!(param_types.len(), params.len(), "Invalid number of params");
 
-    let mut call_data = Keccak256::digest(function_selector).digest[0..4].to_vec();
+    let mut call_data = Keccak256::digest(function_selector).digest[0 .. 4].to_vec();
     let mut tokens = vec![];
     for (param, param_type) in params.iter().zip(param_types.iter()) {
         match param_type.to_lowercase().as_str() {
@@ -436,7 +437,7 @@ impl LoadedBridgeCliConfig {
         let eth_address = eth_signer.address();
         let eth_chain_id = provider.get_chainid().await?;
         let sui_address = SuiAddress::from(&sui_key.public());
-        println!("Using OneChain address: {:?}", sui_address);
+        println!("Using Sui address: {:?}", sui_address);
         println!("Using Eth address: {:?}", eth_address);
         println!("Using Eth chain: {:?}", eth_chain_id);
 
@@ -658,7 +659,7 @@ mod tests {
             .expect("Function not found");
 
         // Decode the data excluding the selector
-        let tokens = function.decode_input(&call_data[4..]).unwrap();
+        let tokens = function.decode_input(&call_data[4 ..]).unwrap();
         assert_eq!(tokens, vec![
             ethers::abi::Token::Uint(ethers::types::U256::from_dec_str("420").unwrap()),
             ethers::abi::Token::Bool(false),

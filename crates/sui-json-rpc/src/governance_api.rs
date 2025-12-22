@@ -7,8 +7,6 @@ use async_trait::async_trait;
 use cached::{proc_macro::cached, SizedCache};
 use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use tracing::{info, instrument};
-
 use mysten_metrics::spawn_monitored_task;
 use sui_core::authority::AuthorityState;
 use sui_json_rpc_api::{GovernanceReadApiOpenRpc, GovernanceReadApiServer, JsonRpcMetrics};
@@ -31,6 +29,7 @@ use sui_types::{
         SuiSystemStateTrait,
     },
 };
+use tracing::{info, instrument};
 
 use crate::{
     authority_state::StateRead,
@@ -224,7 +223,7 @@ impl GovernanceReadApiServer for GovernanceReadApi {
         info!("get_validator_apy");
         let system_state_summary: SuiSystemStateSummary = self.get_latest_sui_system_state().await?;
 
-        let exchange_rate_table = exchange_rates(&self.state, system_state_summary.epoch).await.map_err(Error::from)?;
+        let exchange_rate_table = exchange_rates(&self.state, system_state_summary.epoch).await?;
 
         let apys = calculate_apys(system_state_summary.stake_subsidy_start_epoch, exchange_rate_table);
 
@@ -396,7 +395,7 @@ fn backfill_rates(rates: Vec<(EpochId, PoolTokenExchangeRate)>) -> Vec<(EpochId,
     let mut filled_rates = Vec::new();
     let mut prev_rate = None;
 
-    for epoch in min_epoch..=max_epoch {
+    for epoch in min_epoch ..= max_epoch {
         match rates.iter().find(|(e, _)| *e == epoch) {
             Some((e, rate)) => {
                 prev_rate = Some(rate.clone());
@@ -425,8 +424,9 @@ impl SuiRpcModule for GovernanceReadApi {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sui_types::sui_system_state::PoolTokenExchangeRate;
+
+    use super::*;
 
     #[test]
     fn test_backfill_rates_empty() {

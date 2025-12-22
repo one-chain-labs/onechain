@@ -42,9 +42,11 @@
 //!
 //! We can't prevent this completely, but we can at least make the right way the easy way.
 
-use super::SuiNode;
 use std::{future::Future, sync::Arc};
+
 use sui_core::authority::AuthorityState;
+
+use super::SuiNode;
 
 /// Wrap SuiNode to allow correct access to SuiNode in simulator tests.
 pub struct SuiNodeHandle {

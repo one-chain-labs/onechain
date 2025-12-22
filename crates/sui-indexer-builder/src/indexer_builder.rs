@@ -6,12 +6,12 @@ use std::{cmp::min, sync::Arc};
 use anyhow::Error;
 use async_trait::async_trait;
 use futures::StreamExt;
+use mysten_metrics::{metered_channel, spawn_monitored_task};
 use prometheus::{IntGauge, IntGaugeVec};
+use tap::tap::TapFallible;
 use tokio::task::JoinHandle;
 
 use crate::{metrics::IndexerMetricProvider, Task, Tasks};
-use mysten_metrics::{metered_channel, spawn_monitored_task};
-use tap::tap::TapFallible;
 
 type CheckpointData<T> = (u64, Vec<T>);
 pub type DataSender<T> = metered_channel::Sender<CheckpointData<T>>;

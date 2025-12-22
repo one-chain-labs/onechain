@@ -3,14 +3,14 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use crate::{
-    connection::ScanConnection,
-    consistency::Checkpointed,
-    context_data::db_data_provider::{convert_to_validators, PgManager},
-    data::{self, DataLoader, Db, DbConnection, QueryExecutor},
-    error::Error,
-    server::watermark_task::Watermark,
-};
+use async_graphql::{connection::Connection, dataloader::Loader, *};
+use connection::{CursorType, Edge};
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
+use diesel_async::scoped_futures::ScopedFutureExt;
+use fastcrypto::encoding::{Base58, Encoding};
+use serde::{Deserialize, Serialize};
+use sui_indexer::{models::epoch::QueryableEpochInfo, schema::epochs};
+use sui_types::messages_checkpoint::CheckpointCommitment as EpochCommitment;
 
 use super::{
     big_int::BigInt,
@@ -23,14 +23,14 @@ use super::{
     uint53::UInt53,
     validator_set::ValidatorSet,
 };
-use async_graphql::{connection::Connection, dataloader::Loader, *};
-use connection::{CursorType, Edge};
-use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, SelectableHelper};
-use diesel_async::scoped_futures::ScopedFutureExt;
-use fastcrypto::encoding::{Base58, Encoding};
-use serde::{Deserialize, Serialize};
-use sui_indexer::{models::epoch::QueryableEpochInfo, schema::epochs};
-use sui_types::messages_checkpoint::CheckpointCommitment as EpochCommitment;
+use crate::{
+    connection::ScanConnection,
+    consistency::Checkpointed,
+    context_data::db_data_provider::{convert_to_validators, PgManager},
+    data::{self, DataLoader, Db, DbConnection, QueryExecutor},
+    error::Error,
+    server::watermark_task::Watermark,
+};
 
 #[derive(Clone)]
 pub(crate) struct Epoch {

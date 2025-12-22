@@ -4,7 +4,8 @@
 //! BridgeActionExecutor receives BridgeActions (from BridgeOrchestrator),
 //! collects bridge authority signatures and submit signatures on chain.
 
-use crate::{retry_with_max_elapsed_time, types::IsBridgePaused};
+use std::{collections::HashMap, sync::Arc};
+
 use arc_swap::ArcSwap;
 use mysten_metrics::spawn_logged_monitored_task;
 use shared_crypto::intent::{Intent, IntentMessage};
@@ -18,20 +19,20 @@ use sui_types::{
     transaction::{ObjectArg, Transaction},
     TypeTag,
 };
+use tokio::{sync::Semaphore, time::Duration};
+use tracing::{error, info, instrument, warn, Instrument};
 
 use crate::{
     client::bridge_authority_aggregator::BridgeAuthorityAggregator,
     error::BridgeError,
     events::{TokenTransferAlreadyApproved, TokenTransferAlreadyClaimed, TokenTransferApproved, TokenTransferClaimed},
     metrics::BridgeMetrics,
+    retry_with_max_elapsed_time,
     storage::BridgeOrchestratorTables,
     sui_client::{SuiClient, SuiClientInner},
     sui_transaction_builder::build_sui_transaction,
-    types::{BridgeAction, BridgeActionStatus, VerifiedCertifiedBridgeAction},
+    types::{BridgeAction, BridgeActionStatus, IsBridgePaused, VerifiedCertifiedBridgeAction},
 };
-use std::{collections::HashMap, sync::Arc};
-use tokio::{sync::Semaphore, time::Duration};
-use tracing::{error, info, instrument, warn, Instrument};
 
 pub const CHANNEL_SIZE: usize = 1000;
 pub const SIGNING_CONCURRENCY: usize = 10;
@@ -487,19 +488,47 @@ where
         match status {
             SuiExecutionStatus::Success => {
                 let events = response.events.expect("We requested events but got None.");
-                // If the transaction is successful, there must be either
-                // TokenTransferAlreadyClaimed or TokenTransferClaimed event.
-                assert!(events
+                let relevant_events = events
                     .data
                     .iter()
-                    .any(|e| e.type_ == *TokenTransferAlreadyClaimed.get().unwrap()
-                        || e.type_ == *TokenTransferClaimed.get().unwrap()
-                        || e.type_ == *TokenTransferApproved.get().unwrap()
-                        || e.type_ == *TokenTransferAlreadyApproved.get().unwrap()),
-                    "Expected TokenTransferAlreadyClaimed, TokenTransferClaimed, TokenTransferApproved or TokenTransferAlreadyApproved event but got: {:?}",
-                    events,
-                    );
+                    .filter(|e| {
+                        e.type_ == *TokenTransferAlreadyClaimed.get().unwrap()
+                            || e.type_ == *TokenTransferClaimed.get().unwrap()
+                            || e.type_ == *TokenTransferApproved.get().unwrap()
+                            || e.type_ == *TokenTransferAlreadyApproved.get().unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                assert!(
+                    !relevant_events.is_empty(),
+                    "Expected TokenTransferAlreadyClaimed, TokenTransferClaimed, TokenTransferApproved \
+                    or TokenTransferAlreadyApproved event but got: {:?}",
+                    events
+                );
                 info!(?tx_digest, "Sui transaction executed successfully");
+                // track successful approval and claim events
+                relevant_events.iter().for_each(|e| {
+                    if e.type_ == *TokenTransferClaimed.get().unwrap() {
+                        match action {
+                            BridgeAction::EthToSuiBridgeAction(_) => {
+                                metrics.eth_sui_token_transfer_claimed.inc();
+                            }
+                            BridgeAction::SuiToEthBridgeAction(_) => {
+                                metrics.sui_eth_token_transfer_claimed.inc();
+                            }
+                            _ => error!("Unexpected action type for claimed event: {:?}", action),
+                        }
+                    } else if e.type_ == *TokenTransferApproved.get().unwrap() {
+                        match action {
+                            BridgeAction::EthToSuiBridgeAction(_) => {
+                                metrics.eth_sui_token_transfer_approved.inc();
+                            }
+                            BridgeAction::SuiToEthBridgeAction(_) => {
+                                metrics.sui_eth_token_transfer_approved.inc();
+                            }
+                            _ => error!("Unexpected action type for approved event: {:?}", action),
+                        }
+                    }
+                });
                 store.remove_pending_actions(&[action.digest()]).unwrap_or_else(|e| {
                     panic!("Write to DB should not fail: {:?}", e);
                 })
@@ -550,13 +579,13 @@ pub async fn submit_to_executor(
 
 #[cfg(test)]
 mod tests {
-    use crate::{events::init_all_struct_tags, test_utils::DUMMY_MUTALBE_BRIDGE_OBJECT_ARG, types::BRIDGE_PAUSED};
-    use fastcrypto::traits::KeyPair;
-    use prometheus::Registry;
     use std::{
         collections::{BTreeMap, HashMap},
         str::FromStr,
     };
+
+    use fastcrypto::traits::KeyPair;
+    use prometheus::Registry;
     use sui_json_rpc_types::{
         SuiEvent,
         SuiTransactionBlockEffects,
@@ -571,8 +600,10 @@ mod tests {
         TypeTag,
     };
 
+    use super::*;
     use crate::{
         crypto::{BridgeAuthorityKeyPair, BridgeAuthorityPublicKeyBytes, BridgeAuthorityRecoverableSignature},
+        events::init_all_struct_tags,
         server::mock_handler::BridgeRequestMockHandler,
         sui_mock_client::SuiMockClient,
         test_utils::{
@@ -580,11 +611,10 @@ mod tests {
             get_test_eth_to_sui_bridge_action,
             get_test_sui_to_eth_bridge_action,
             sign_action_with_key,
+            DUMMY_MUTALBE_BRIDGE_OBJECT_ARG,
         },
-        types::{BridgeCommittee, BridgeCommitteeValiditySignInfo, CertifiedBridgeAction},
+        types::{BridgeCommittee, BridgeCommitteeValiditySignInfo, CertifiedBridgeAction, BRIDGE_PAUSED},
     };
-
-    use super::*;
 
     #[tokio::test]
     async fn test_onchain_execution_loop() {

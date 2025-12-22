@@ -25,7 +25,12 @@ struct Context<'env> {
 impl<'env> Context<'env> {
     fn new(env: &'env CompilationEnv) -> Self {
         let reporter = env.diagnostic_reporter_at_top_level();
-        Self { env, reporter, is_source_def: false, current_package: None }
+        Self {
+            env,
+            reporter,
+            is_source_def: false,
+            current_package: None,
+        }
     }
 }
 
@@ -55,14 +60,16 @@ impl FilterContext for Context<'_> {
         // expansion
         // Ideally we would just have a warning filter scope here
         // (but again, need expansion for that)
-        let silence_warning = !self.is_source_def || self.env.package_config(self.current_package).is_dependency;
+        let silence_warning =
+            !self.is_source_def || self.env.package_config(self.current_package).is_dependency;
         if !silence_warning {
             if let Some(loc) = is_verify_only_loc {
                 let msg = format!(
                     "The '{}' attribute has been deprecated along with specification blocks",
                     VerificationAttribute::VERIFY_ONLY
                 );
-                self.reporter.add_diag(diag!(Uncategorized::DeprecatedWillBeRemoved, (*loc, msg)));
+                self.reporter
+                    .add_diag(diag!(Uncategorized::DeprecatedWillBeRemoved, (*loc, msg)));
             }
         }
         should_remove
@@ -81,14 +88,18 @@ pub fn program(compilation_env: &CompilationEnv, prog: P::Program) -> P::Program
     filter_program(&mut context, prog)
 }
 
-fn verification_attributes(attrs: &P::Attributes) -> Vec<(Loc, known_attributes::VerificationAttribute)> {
+fn verification_attributes(
+    attrs: &P::Attributes,
+) -> Vec<(Loc, known_attributes::VerificationAttribute)> {
     use known_attributes::KnownAttribute;
     attrs
         .value
         .iter()
-        .filter_map(|attr| match KnownAttribute::resolve(attr.value.attribute_name().value)? {
-            KnownAttribute::Verification(verify_attr) => Some((attr.loc, verify_attr)),
-            _ => None,
-        })
+        .filter_map(
+            |attr| match KnownAttribute::resolve(attr.value.attribute_name().value)? {
+                KnownAttribute::Verification(verify_attr) => Some((attr.loc, verify_attr)),
+                _ => None,
+            },
+        )
         .collect()
 }

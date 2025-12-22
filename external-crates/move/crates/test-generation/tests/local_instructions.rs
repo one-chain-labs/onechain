@@ -11,7 +11,11 @@ mod common;
 #[test]
 fn bytecode_copyloc() {
     let mut state1 = AbstractState::new();
-    state1.local_insert(0, AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available);
+    state1.local_insert(
+        0,
+        AbstractValue::new_primitive(SignatureToken::U64),
+        BorrowState::Available,
+    );
     let (state2, _) = common::run_instruction(Bytecode::CopyLoc(0), state1);
     assert_eq!(
         state2.stack_peek(0),
@@ -20,7 +24,10 @@ fn bytecode_copyloc() {
     );
     assert_eq!(
         state2.local_get(0),
-        Some(&(AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available)),
+        Some(&(
+            AbstractValue::new_primitive(SignatureToken::U64),
+            BorrowState::Available
+        )),
         "locals signature postcondition not met"
     );
 }
@@ -36,14 +43,22 @@ fn bytecode_copyloc_no_local() {
 #[should_panic]
 fn bytecode_copyloc_local_unavailable() {
     let mut state1 = AbstractState::new();
-    state1.local_insert(0, AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Unavailable);
+    state1.local_insert(
+        0,
+        AbstractValue::new_primitive(SignatureToken::U64),
+        BorrowState::Unavailable,
+    );
     common::run_instruction(Bytecode::CopyLoc(0), state1);
 }
 
 #[test]
 fn bytecode_moveloc() {
     let mut state1 = AbstractState::new();
-    state1.local_insert(0, AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available);
+    state1.local_insert(
+        0,
+        AbstractValue::new_primitive(SignatureToken::U64),
+        BorrowState::Available,
+    );
     let (state2, _) = common::run_instruction(Bytecode::MoveLoc(0), state1);
     assert_eq!(
         state2.stack_peek(0),
@@ -52,7 +67,10 @@ fn bytecode_moveloc() {
     );
     assert_eq!(
         state2.local_get(0),
-        Some(&(AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Unavailable)),
+        Some(&(
+            AbstractValue::new_primitive(SignatureToken::U64),
+            BorrowState::Unavailable
+        )),
         "locals signature postcondition not met"
     );
 }
@@ -68,14 +86,22 @@ fn bytecode_moveloc_no_local() {
 #[should_panic]
 fn bytecode_moveloc_local_unavailable() {
     let mut state1 = AbstractState::new();
-    state1.local_insert(0, AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Unavailable);
+    state1.local_insert(
+        0,
+        AbstractValue::new_primitive(SignatureToken::U64),
+        BorrowState::Unavailable,
+    );
     common::run_instruction(Bytecode::MoveLoc(0), state1);
 }
 
 #[test]
 fn bytecode_mutborrowloc() {
     let mut state1 = AbstractState::new();
-    state1.local_insert(0, AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available);
+    state1.local_insert(
+        0,
+        AbstractValue::new_primitive(SignatureToken::U64),
+        BorrowState::Available,
+    );
     let (state2, _) = common::run_instruction(Bytecode::MutBorrowLoc(0), state1);
     assert_eq!(
         state2.stack_peek(0),
@@ -87,7 +113,10 @@ fn bytecode_mutborrowloc() {
     );
     assert_eq!(
         state2.local_get(0),
-        Some(&(AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available)),
+        Some(&(
+            AbstractValue::new_primitive(SignatureToken::U64),
+            BorrowState::Available
+        )),
         "locals signature postcondition not met"
     );
 }
@@ -95,7 +124,11 @@ fn bytecode_mutborrowloc() {
 #[test]
 fn bytecode_immborrowloc() {
     let mut state1 = AbstractState::new();
-    state1.local_insert(0, AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available);
+    state1.local_insert(
+        0,
+        AbstractValue::new_primitive(SignatureToken::U64),
+        BorrowState::Available,
+    );
     let (state2, _) = common::run_instruction(Bytecode::ImmBorrowLoc(0), state1);
     assert_eq!(
         state2.stack_peek(0),
@@ -107,7 +140,10 @@ fn bytecode_immborrowloc() {
     );
     assert_eq!(
         state2.local_get(0),
-        Some(&(AbstractValue::new_primitive(SignatureToken::U64), BorrowState::Available)),
+        Some(&(
+            AbstractValue::new_primitive(SignatureToken::U64),
+            BorrowState::Available
+        )),
         "locals signature postcondition not met"
     );
 }

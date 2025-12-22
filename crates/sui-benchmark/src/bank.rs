@@ -1,6 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
+
+use anyhow::{Error, Result};
+use itertools::Itertools;
+use sui_core::test_utils::{make_pay_oct_transaction, make_transfer_oct_transaction};
+use sui_types::{base_types::SuiAddress, crypto::AccountKeyPair};
+use tracing::info;
+
 use crate::{
     util::UpdatedAndNewlyMintedGasCoins,
     workloads::{
@@ -11,15 +22,6 @@ use crate::{
     },
     ValidatorProxy,
 };
-use anyhow::{Error, Result};
-use itertools::Itertools;
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
-use sui_core::test_utils::{make_pay_sui_transaction, make_transfer_sui_transaction};
-use sui_types::{base_types::SuiAddress, crypto::AccountKeyPair};
-use tracing::info;
 
 /// Bank is used for generating gas for running the benchmark.
 #[derive(Clone)]
@@ -62,7 +64,7 @@ impl BenchmarkBank {
 
         info!("Number of gas requests = {}", chunked_coin_configs.len());
         for chunk in chunked_coin_configs {
-            let gas_coins = self.pay_sui(chunk, &mut init_coin, gas_price).await?;
+            let gas_coins = self.pay_oct(chunk, &mut init_coin, gas_price).await?;
             new_gas_coins.extend(gas_coins);
         }
         let mut workloads = vec![];
@@ -88,7 +90,7 @@ impl BenchmarkBank {
         Ok(workloads)
     }
 
-    async fn pay_sui(
+    async fn pay_oct(
         &mut self,
         coin_configs: &[GasCoinConfig],
         init_coin: &mut Gas,
@@ -99,7 +101,7 @@ impl BenchmarkBank {
 
         info!("Creating {} coin(s) of balance {}...", amounts.len(), amounts[0],);
 
-        let tx = make_pay_sui_transaction(
+        let tx = make_pay_oct_transaction(
             init_coin.0,
             vec![],
             recipient_addresses,
@@ -148,7 +150,7 @@ impl BenchmarkBank {
     async fn create_init_coin(&mut self, amount: u64, gas_price: u64) -> Result<Gas> {
         info!("Creating initilization coin of value {amount}...");
 
-        let tx = make_transfer_sui_transaction(
+        let tx = make_transfer_oct_transaction(
             self.primary_coin.0,
             self.primary_coin.1,
             Some(amount),

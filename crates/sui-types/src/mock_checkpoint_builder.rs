@@ -1,6 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::mem;
+
+use fastcrypto::traits::Signer;
+
 use crate::{
     base_types::{AuthorityName, VerifiedExecutionData},
     committee::Committee,
@@ -19,8 +23,6 @@ use crate::{
     },
     transaction::VerifiedTransaction,
 };
-use fastcrypto::traits::Signer;
-use std::mem;
 
 pub trait ValidatorKeypairProvider {
     fn get_validator_key(&self, name: &AuthorityName) -> &dyn Signer<AuthoritySignature>;

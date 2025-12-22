@@ -1,23 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    operations::Operations,
-    types::{ConstructionMetadata, OperationStatus, OperationType},
-    CoinMetadataCache,
-};
-use anyhow::anyhow;
-use move_core_types::{identifier::Identifier, language_storage::StructTag};
-use rand::seq::{IteratorRandom, SliceRandom};
-use serde_json::json;
-use shared_crypto::intent::Intent;
-use signature::rand_core::OsRng;
 use std::{
     collections::{BTreeMap, HashMap},
     num::NonZeroUsize,
     path::PathBuf,
     str::FromStr,
 };
+
+use anyhow::anyhow;
+use move_core_types::{identifier::Identifier, language_storage::StructTag};
+use rand::seq::{IteratorRandom, SliceRandom};
+use serde_json::json;
+use shared_crypto::intent::Intent;
+use signature::rand_core::OsRng;
 use sui_json_rpc_types::{
     ObjectChange,
     SuiObjectDataOptions,
@@ -61,8 +57,14 @@ use sui_types::{
 };
 use test_cluster::TestClusterBuilder;
 
+use crate::{
+    operations::Operations,
+    types::{ConstructionMetadata, OperationStatus, OperationType},
+    CoinMetadataCache,
+};
+
 #[tokio::test]
-async fn test_transfer_sui() {
+async fn test_transfer_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -92,7 +94,7 @@ async fn test_transfer_sui() {
 }
 
 #[tokio::test]
-async fn test_transfer_sui_whole_coin() {
+async fn test_transfer_oct_whole_coin() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -333,7 +335,7 @@ async fn test_pay_multiple_coin_multiple_recipient() {
 }
 
 #[tokio::test]
-async fn test_pay_sui_multiple_coin_same_recipient() {
+async fn test_pay_oct_multiple_coin_same_recipient() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -365,7 +367,7 @@ async fn test_pay_sui_multiple_coin_same_recipient() {
 }
 
 #[tokio::test]
-async fn test_pay_sui() {
+async fn test_pay_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -398,7 +400,7 @@ async fn test_pay_sui() {
 }
 
 #[tokio::test]
-async fn test_failed_pay_sui() {
+async fn test_failed_pay_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -472,7 +474,7 @@ async fn test_stake_sui_with_none_amount() {
 }
 
 #[tokio::test]
-async fn test_pay_all_sui() {
+async fn test_pay_all_oct() {
     let network = TestClusterBuilder::new().build().await;
     let client = network.wallet.get_client().await.unwrap();
     let keystore = &network.wallet.config.keystore;
@@ -640,7 +642,7 @@ fn extract_balance_changes_from_ops(ops: Operations) -> HashMap<SuiAddress, i128
             match op.type_ {
                 OperationType::SuiBalanceChange
                 | OperationType::Gas
-                | OperationType::PaySui
+                | OperationType::PayOct
                 | OperationType::PayCoin
                 | OperationType::StakeReward
                 | OperationType::StakePrinciple

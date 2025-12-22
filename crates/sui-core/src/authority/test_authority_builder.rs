@@ -1,26 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    authority::{
-        authority_per_epoch_store::AuthorityPerEpochStore,
-        authority_store_tables::AuthorityPerpetualTables,
-        epoch_start_configuration::EpochStartConfiguration,
-        AuthorityState,
-        AuthorityStore,
-    },
-    checkpoints::CheckpointStore,
-    epoch::{committee_store::CommitteeStore, epoch_metrics::EpochMetrics, randomness::RandomnessManager},
-    execution_cache::build_execution_cache,
-    jsonrpc_index::IndexStore,
-    mock_consensus::{ConsensusMode, MockConsensusClient},
-    module_cache_metrics::ResolverMetrics,
-    rpc_index::RpcIndexStore,
-    signature_verifier::SignatureVerifierMetrics,
-};
+use std::{path::PathBuf, sync::Arc};
+
 use fastcrypto::traits::KeyPair;
 use prometheus::Registry;
-use std::{path::PathBuf, sync::Arc};
 use sui_archival::reader::ArchiveReaderBalancer;
 use sui_config::{
     certificate_deny_config::CertificateDenyConfig,
@@ -44,7 +28,24 @@ use sui_types::{
     transaction::VerifiedTransaction,
 };
 
-use super::epoch_start_configuration::EpochFlag;
+use super::{backpressure::BackpressureManager, epoch_start_configuration::EpochFlag};
+use crate::{
+    authority::{
+        authority_per_epoch_store::AuthorityPerEpochStore,
+        authority_store_tables::AuthorityPerpetualTables,
+        epoch_start_configuration::EpochStartConfiguration,
+        AuthorityState,
+        AuthorityStore,
+    },
+    checkpoints::CheckpointStore,
+    epoch::{committee_store::CommitteeStore, epoch_metrics::EpochMetrics, randomness::RandomnessManager},
+    execution_cache::build_execution_cache,
+    jsonrpc_index::IndexStore,
+    mock_consensus::{ConsensusMode, MockConsensusClient},
+    module_cache_metrics::ResolverMetrics,
+    rpc_index::RpcIndexStore,
+    signature_verifier::SignatureVerifierMetrics,
+};
 
 #[derive(Default, Clone)]
 pub struct TestAuthorityBuilder<'a> {
@@ -177,7 +178,7 @@ impl<'a> TestAuthorityBuilder<'a> {
             None => {
                 let perpetual_tables = Arc::new(AuthorityPerpetualTables::open(&path.join("store"), None));
                 // unwrap ok - for testing only.
-                AuthorityStore::open_with_committee_for_testing(perpetual_tables, &genesis_committee, genesis, 0)
+                AuthorityStore::open_with_committee_for_testing(perpetual_tables, &genesis_committee, genesis)
                     .await
                     .unwrap()
             }
@@ -208,8 +209,13 @@ impl<'a> TestAuthorityBuilder<'a> {
         .unwrap();
         let expensive_safety_checks = self.expensive_safety_checks.unwrap_or_default();
 
+        let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
+        let backpressure_manager = BackpressureManager::new_from_checkpoint_store(&checkpoint_store);
+        let highest_executed_checkpoint =
+            checkpoint_store.get_highest_executed_checkpoint_seq_number().expect("db error").unwrap_or_default();
+
         let cache_traits =
-            build_execution_cache(&Default::default(), &epoch_start_configuration, &registry, &authority_store);
+            build_execution_cache(&Default::default(), &registry, &authority_store, backpressure_manager.clone());
 
         let epoch_store = AuthorityPerEpochStore::new(
             name,
@@ -224,10 +230,10 @@ impl<'a> TestAuthorityBuilder<'a> {
             signature_verifier_metrics,
             &expensive_safety_checks,
             ChainIdentifier::from(*genesis.checkpoint().digest()),
+            highest_executed_checkpoint,
         );
         let committee_store = Arc::new(CommitteeStore::new(path.join("epochs"), &genesis_committee, None));
 
-        let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
         if self.insert_genesis_checkpoint {
             checkpoint_store.insert_genesis_checkpoint(
                 genesis.checkpoint(),
@@ -272,6 +278,8 @@ impl<'a> TestAuthorityBuilder<'a> {
         config.authority_overload_config = authority_overload_config;
         config.authority_store_pruning_config = pruning_config;
 
+        let chain_identifier = ChainIdentifier::from(*genesis.checkpoint().digest());
+
         let state = AuthorityState::new(
             name,
             secret,
@@ -287,8 +295,9 @@ impl<'a> TestAuthorityBuilder<'a> {
             genesis.objects(),
             &DBCheckpointConfig::default(),
             config.clone(),
-            usize::MAX,
             ArchiveReaderBalancer::default(),
+            None,
+            chain_identifier,
             None,
         )
         .await;
@@ -327,10 +336,11 @@ impl<'a> TestAuthorityBuilder<'a> {
             .await
             .unwrap();
 
-        state
-            .get_cache_commit()
-            .commit_transaction_outputs(epoch_store.epoch(), &[*genesis.transaction().digest()])
-            .await;
+        state.get_cache_commit().commit_transaction_outputs(
+            epoch_store.epoch(),
+            &[*genesis.transaction().digest()],
+            epoch_store.protocol_config().use_object_per_epoch_marker_table_v2_as_option().unwrap_or(false),
+        );
 
         // We want to insert these objects directly instead of relying on genesis because
         // genesis process would set the previous transaction field for these objects, which would

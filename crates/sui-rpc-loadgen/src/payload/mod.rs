@@ -8,26 +8,29 @@ mod get_object;
 mod get_reference_gas_price;
 mod multi_get_objects;
 mod multi_get_transaction_blocks;
-mod pay_sui;
+mod pay_oct;
 mod query_transactions;
 mod rpc_command_processor;
 mod validation;
-use strum_macros::EnumString;
+use core::default::Default;
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use core::default::Default;
-use std::time::Duration;
-use sui_types::{base_types::SuiAddress, digests::TransactionDigest, messages_checkpoint::CheckpointSequenceNumber};
-
-use crate::load_test::LoadTestConfig;
 pub use rpc_command_processor::{
     load_addresses_from_file,
     load_digests_from_file,
     load_objects_from_file,
     RpcCommandProcessor,
 };
-use sui_types::base_types::ObjectID;
+use strum_macros::EnumString;
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    digests::TransactionDigest,
+    messages_checkpoint::CheckpointSequenceNumber,
+};
+
+use crate::load_test::LoadTestConfig;
 
 #[derive(Default, Clone)]
 pub struct SignerInfo {

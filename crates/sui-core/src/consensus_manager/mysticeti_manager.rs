@@ -131,8 +131,12 @@ impl ConsensusManagerTrait for MysticetiManager {
         let registry = Registry::new_custom(Some("consensus".to_string()), None).unwrap();
 
         let consensus_handler = consensus_handler_initializer.new_consensus_handler();
-        let (commit_consumer, commit_receiver, transaction_receiver) =
-            CommitConsumer::new(consensus_handler.last_processed_subdag_index() as CommitIndex);
+
+        let num_prior_commits = protocol_config.consensus_num_requested_prior_commits_at_startup();
+        let last_processed_commit = consensus_handler.last_processed_subdag_index() as CommitIndex;
+        let starting_commit = last_processed_commit.saturating_sub(num_prior_commits);
+
+        let (commit_consumer, commit_receiver, transaction_receiver) = CommitConsumer::new(starting_commit);
         let monitor = commit_consumer.monitor();
 
         // If there is a previous consumer monitor, it indicates that the consensus engine has been restarted, due to an epoch change. However, that on its
@@ -153,7 +157,10 @@ impl ConsensusManagerTrait for MysticetiManager {
         if participated_on_previous_run {
             *boot_counter += 1;
         } else {
-            info!("Node has not participated in previous run. Boot counter will not increment {}", *boot_counter);
+            info!(
+                "Node has not participated in previous epoch consensus. Boot counter ({}) will not increment.",
+                *boot_counter
+            );
         }
 
         let authority = ConsensusAuthority::start(
@@ -184,9 +191,11 @@ impl ConsensusManagerTrait for MysticetiManager {
         let consensus_transaction_handler = ConsensusTransactionHandler::new(
             epoch_store.clone(),
             consensus_handler.transaction_manager_sender().clone(),
+            consensus_handler_initializer.backpressure_subscriber(),
             consensus_handler_initializer.metrics().clone(),
         );
         let handler = MysticetiConsensusHandler::new(
+            last_processed_commit,
             consensus_handler,
             consensus_transaction_handler,
             commit_receiver,
@@ -198,7 +207,9 @@ impl ConsensusManagerTrait for MysticetiManager {
         *consensus_handler = Some(handler);
 
         // Wait until all locally available commits have been processed
+        info!("replaying commits at startup");
         registered_authority.0.replay_complete().await;
+        info!("Startup commit replay complete");
     }
 
     async fn shutdown(&self) {

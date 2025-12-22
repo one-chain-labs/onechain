@@ -2,37 +2,41 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::BTreeMap, net::SocketAddr, time::Duration};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
 use mysten_network::config::Config;
-use std::{collections::BTreeMap, net::SocketAddr, time::Duration};
-use sui_network::{api::ValidatorClient, tonic};
+use sui_network::{
+    api::ValidatorClient,
+    tonic,
+    tonic::{metadata::KeyAndValueRef, transport::Channel},
+};
 use sui_types::{
     base_types::AuthorityName,
     committee::CommitteeWithNetworkMetadata,
     crypto::NetworkPublicKey,
     error::{SuiError, SuiResult},
     messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
+    messages_grpc::{
+        HandleCertificateRequestV3,
+        HandleCertificateResponseV2,
+        HandleCertificateResponseV3,
+        HandleSoftBundleCertificatesRequestV3,
+        HandleSoftBundleCertificatesResponseV3,
+        HandleTransactionResponse,
+        ObjectInfoRequest,
+        ObjectInfoResponse,
+        SystemStateRequest,
+        TransactionInfoRequest,
+        TransactionInfoResponse,
+    },
     multiaddr::Multiaddr,
     sui_system_state::SuiSystemState,
     transaction::*,
 };
 
 use crate::authority_client::tonic::IntoRequest;
-use sui_network::tonic::{metadata::KeyAndValueRef, transport::Channel};
-use sui_types::messages_grpc::{
-    HandleCertificateRequestV3,
-    HandleCertificateResponseV2,
-    HandleCertificateResponseV3,
-    HandleSoftBundleCertificatesRequestV3,
-    HandleSoftBundleCertificatesResponseV3,
-    HandleTransactionResponse,
-    ObjectInfoRequest,
-    ObjectInfoResponse,
-    SystemStateRequest,
-    TransactionInfoRequest,
-    TransactionInfoResponse,
-};
 
 #[async_trait]
 pub trait AuthorityAPI {

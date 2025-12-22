@@ -1,6 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use rand::seq::IteratorRandom;
+use sui_core::test_utils::make_transfer_oct_transaction;
+use sui_test_transaction_builder::TestTransactionBuilder;
+use sui_types::{
+    base_types::{ObjectRef, SuiAddress},
+    crypto::{get_key_pair, AccountKeyPair},
+    gas_coin::MIST_PER_OCT,
+    transaction::Transaction,
+};
+use tracing::error;
+
 use crate::{
     drivers::Interval,
     system_state_observer::SystemStateObserver,
@@ -22,18 +36,6 @@ use crate::{
     ExecutionEffects,
     ValidatorProxy,
 };
-use async_trait::async_trait;
-use rand::seq::IteratorRandom;
-use std::sync::Arc;
-use sui_core::test_utils::make_transfer_sui_transaction;
-use sui_test_transaction_builder::TestTransactionBuilder;
-use sui_types::{
-    base_types::{ObjectRef, SuiAddress},
-    crypto::{get_key_pair, AccountKeyPair},
-    gas_coin::MIST_PER_OCT,
-    transaction::Transaction,
-};
-use tracing::error;
 
 #[derive(Debug)]
 pub struct DelegationTestPayload {
@@ -78,7 +80,7 @@ impl Payload for DelegationTestPayload {
             )
             .call_staking(coin, self.validator)
             .build_and_sign(self.keypair.as_ref()),
-            None => make_transfer_sui_transaction(
+            None => make_transfer_oct_transaction(
                 self.gas,
                 self.sender,
                 Some(MIST_PER_OCT),
@@ -108,7 +110,7 @@ impl DelegationWorkloadBuilder {
         duration: Interval,
         group: u32,
     ) -> Option<WorkloadBuilderInfo> {
-        let target_qps = (workload_weight * target_qps as f32) as u64;
+        let target_qps = (workload_weight * target_qps as f32).ceil() as u64;
         let num_workers = (workload_weight * num_workers as f32).ceil() as u64;
         let max_ops = target_qps * in_flight_ratio;
         if max_ops == 0 || num_workers == 0 {
@@ -131,7 +133,7 @@ impl WorkloadBuilder<dyn Payload> for DelegationWorkloadBuilder {
 
     async fn generate_coin_config_for_payloads(&self) -> Vec<GasCoinConfig> {
         let amount = MAX_GAS_FOR_TESTING + ESTIMATED_COMPUTATION_COST + STORAGE_COST_PER_COIN;
-        (0..self.count)
+        (0 .. self.count)
             .map(|_| {
                 let (address, keypair) = get_key_pair();
                 GasCoinConfig { amount, address, keypair: Arc::new(keypair) }

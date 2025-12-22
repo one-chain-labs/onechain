@@ -1,6 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fmt::{Debug, Formatter},
+    future::Future,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use futures::{
@@ -24,29 +35,6 @@ use prometheus::{
     Registry,
 };
 use rand::seq::SliceRandom;
-use tokio::sync::{
-    mpsc::{channel, Sender},
-    OnceCell,
-};
-use tokio_util::sync::CancellationToken;
-
-use crate::{
-    drivers::{driver::Driver, HistogramWrapper},
-    system_state_observer::SystemStateObserver,
-    workloads::{payload::Payload, GroupID, WorkloadInfo},
-    ExecutionEffects,
-    ValidatorProxy,
-};
-use std::{
-    collections::{BTreeMap, VecDeque},
-    fmt::{Debug, Formatter},
-    future::Future,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
 use sui_types::{
     committee::Committee,
     quorum_driver_types::QuorumDriverError,
@@ -54,14 +42,26 @@ use sui_types::{
 };
 use sysinfo::{CpuExt, System, SystemExt};
 use tokio::{
-    sync::Barrier,
+    sync::{
+        mpsc::{channel, Sender},
+        Barrier,
+        OnceCell,
+    },
     task::{JoinHandle, JoinSet},
     time,
     time::Instant,
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use super::{BenchmarkStats, Interval, StressStats};
+use crate::{
+    drivers::{driver::Driver, HistogramWrapper},
+    system_state_observer::SystemStateObserver,
+    workloads::{payload::Payload, workload::ExpectedFailureType, GroupID, WorkloadInfo},
+    ExecutionEffects,
+    ValidatorProxy,
+};
 pub struct BenchMetrics {
     pub benchmark_duration: IntGauge,
     pub num_success: IntCounterVec,
@@ -722,7 +722,10 @@ async fn run_bench_worker(
      -> NextOp {
         match result {
             Ok(effects) => {
-                assert!(payload.get_failure_type().is_none());
+                assert!(
+                    payload.get_failure_type().is_none()
+                        || payload.get_failure_type() == Some(ExpectedFailureType::NoFailure)
+                );
                 let latency = start.elapsed();
                 let time_from_start = total_benchmark_start_time.elapsed();
 
@@ -755,8 +758,15 @@ async fn run_bench_worker(
                 NextOp::Response { latency, num_commands, payload, gas_used: effects.gas_used() }
             }
             Err(err) => {
-                error!("{}", err);
+                tracing::error!(
+                    "Transaction execution got error: {}. Transaction digest: {:?}",
+                    err,
+                    transaction.digest()
+                );
                 match payload.get_failure_type() {
+                    Some(ExpectedFailureType::NoFailure) => {
+                        panic!("Transaction failed unexpectedly");
+                    }
                     Some(_) => {
                         metrics_cloned.num_expected_error.with_label_values(&[&payload.to_string()]).inc();
                         NextOp::Retry(Box::new((transaction, payload)))
@@ -867,10 +877,10 @@ async fn run_bench_worker(
                 if let Some(b) = retry_queue.pop_front() {
                     let tx = b.0;
                     let payload = b.1;
-                    if payload.get_failure_type().is_some() {
-                        num_expected_error_txes += 1;
-                    } else {
-                        num_error_txes += 1;
+                    match payload.get_failure_type() {
+                        Some(ExpectedFailureType::NoFailure) => num_error_txes += 1,
+                        Some(_) => num_expected_error_txes += 1,
+                        None => num_error_txes += 1,
                     }
                     num_submitted += 1;
                     metrics_cloned.num_submitted.with_label_values(&[&payload.to_string()]).inc();

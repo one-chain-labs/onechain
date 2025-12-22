@@ -4,14 +4,13 @@
 use async_graphql::*;
 use sui_package_resolver::{DataDef, MoveData, VariantDef};
 
-use crate::error::Error;
-
 use super::{
     move_module::MoveModule,
     move_struct::{MoveField, MoveStructTypeParameter},
     open_move_type::{abilities, MoveAbility},
     sui_address::SuiAddress,
 };
+use crate::error::Error;
 
 pub(crate) struct MoveEnum {
     defining_id: SuiAddress,

@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
             run_migrations(pool.dedicated_connection().await?).await?;
         }
         Command::RunBackFill { start, end, runner_kind, backfill_config } => {
-            let total_range = start..=end;
+            let total_range = start ..= end;
             BackfillRunner::run(runner_kind, pool, backfill_config, total_range).await;
         }
         Command::Restore(restore_config) => {

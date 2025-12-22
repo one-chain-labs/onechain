@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use miette::{miette, LabeledSpan, Severity};
 use std::fmt;
+
+use miette::{miette, LabeledSpan, Severity};
 use thiserror::Error;
 
 pub type PTBResult<T> = Result<T, PTBError>;
@@ -142,7 +143,7 @@ impl<T: Copy> Copy for Spanned<T> {}
 fn build_error_report(file_string: &str, error: PTBError) -> miette::Report {
     let PTBError { span, message, help, severity } = error;
     let clamp = |x: usize| x.min(file_string.len() - 1);
-    let label = LabeledSpan::at(clamp(span.start)..clamp(span.end), message.clone());
+    let label = LabeledSpan::at(clamp(span.start) .. clamp(span.end), message.clone());
     let error_string = match severity {
         Severity::Advice => "Advice found when processing PTB".to_string(),
         Severity::Warning => "Warning when processing PTB".to_string(),

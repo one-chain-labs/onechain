@@ -47,7 +47,7 @@ module fungible_tokens::managed {
             i = i + 1;
         }
     }
-
+    
     public entry fun add_to_envelope(
         red_envelopes: &mut PublicRedEnvelope, coin: Coin<MANAGED>,
     ) {
@@ -62,8 +62,8 @@ module fungible_tokens::managed {
     }
 
     public entry fun take_from_envelope_and_burn(
-        treasury_cap: &mut TreasuryCap<MANAGED>,
-        red_envelopes: &mut PublicRedEnvelope,
+        treasury_cap: &mut TreasuryCap<MANAGED>, 
+        red_envelopes: &mut PublicRedEnvelope, 
     ) {
         let coin = table_vec::pop_back(&mut red_envelopes.coins);
         coin::burn(treasury_cap, coin);

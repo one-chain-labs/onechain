@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::errors::{PartialVMResult, VMResult};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+};
 
 /// Provide an implementation for bytecodes related to data with a given data store.
 ///
@@ -23,7 +25,11 @@ pub trait DataStore {
 
     /// Translate the runtime fully-qualified struct name to the on-chain `ModuleId` that originally
     /// defined that type.
-    fn defining_module(&self, module_id: &ModuleId, struct_: &IdentStr) -> PartialVMResult<ModuleId>;
+    fn defining_module(
+        &self,
+        module_id: &ModuleId,
+        struct_: &IdentStr,
+    ) -> PartialVMResult<ModuleId>;
 
     /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
     fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>>;

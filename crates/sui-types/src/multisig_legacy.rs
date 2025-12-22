@@ -1,14 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    crypto::{CompressedSignature, SignatureScheme},
-    digests::ZKLoginInputsDigest,
-    multisig::{MultiSig, MultiSigPublicKey},
-    signature::{AuthenticatorTrait, GenericSignature, VerifyParams},
-    signature_verification::VerifiedDigestCache,
-    sui_serde::SuiBitmap,
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
 };
+
 pub use enum_dispatch::enum_dispatch;
 use fastcrypto::{
     encoding::Base64,
@@ -21,15 +18,16 @@ use schemars::JsonSchema;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
 use shared_crypto::intent::IntentMessage;
-use std::{
-    hash::{Hash, Hasher},
-    sync::Arc,
-};
 
 use crate::{
     base_types::{EpochId, SuiAddress},
-    crypto::PublicKey,
+    crypto::{CompressedSignature, PublicKey, SignatureScheme},
+    digests::ZKLoginInputsDigest,
     error::SuiError,
+    multisig::{MultiSig, MultiSigPublicKey},
+    signature::{AuthenticatorTrait, GenericSignature, VerifyParams},
+    signature_verification::VerifiedDigestCache,
+    sui_serde::SuiBitmap,
 };
 
 pub type WeightUnit = u8;
@@ -174,7 +172,7 @@ impl MultiSigLegacy {
                     .ok_or(SuiError::IncorrectSigner { error: format!("pk does not exist: {:?}", pk) })?,
             );
             if !inserted {
-                return Err(SuiError::InvalidSignature { error: "Duplicate sigature".to_string() });
+                return Err(SuiError::InvalidSignature { error: "Duplicate signature".to_string() });
             }
             sigs.push(s.to_compressed()?);
         }
@@ -211,7 +209,7 @@ impl ToFromBytes for MultiSigLegacy {
         if bytes.first().ok_or(FastCryptoError::InvalidInput)? != &SignatureScheme::MultiSig.flag() {
             return Err(FastCryptoError::InvalidInput);
         }
-        let multisig: MultiSigLegacy = bcs::from_bytes(&bytes[1..]).map_err(|_| FastCryptoError::InvalidInput)?;
+        let multisig: MultiSigLegacy = bcs::from_bytes(&bytes[1 ..]).map_err(|_| FastCryptoError::InvalidInput)?;
         multisig.validate()?;
         Ok(multisig)
     }

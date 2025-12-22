@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{workloads::Gas, ValidatorProxy};
-use anyhow::Result;
 use std::{path::PathBuf, sync::Arc};
+
+use anyhow::Result;
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore};
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
@@ -13,6 +13,8 @@ use sui_types::{
     transaction::{Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_TRANSFER},
     utils::to_sender_signed_transaction,
 };
+
+use crate::{workloads::Gas, ValidatorProxy};
 
 // This is the maximum gas we will transfer from primary coin into any gas coin
 // for running the benchmark

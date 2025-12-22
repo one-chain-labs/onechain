@@ -1,5 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+use std::collections::VecDeque;
+
 use fastcrypto::{
     bls12381::{min_pk, min_sig},
     traits::{ToFromBytes, VerifyingKey},
@@ -14,7 +16,6 @@ use move_vm_types::{
     values::{Value, VectorRef},
 };
 use smallvec::smallvec;
-use std::collections::VecDeque;
 
 use crate::NativesCostTable;
 
@@ -69,7 +70,7 @@ pub fn bls12381_min_sig_verify(
         bls12381_bls12381_min_sig_verify_cost_params.bls12381_bls12381_min_sig_verify_msg_cost_per_byte
             * (msg_ref.len() as u64).into()
             + bls12381_bls12381_min_sig_verify_cost_params.bls12381_bls12381_min_sig_verify_msg_cost_per_block
-                * (((msg_ref.len() + BLS12381_BLOCK_SIZE - 1) / BLS12381_BLOCK_SIZE) as u64).into()
+                * (msg_ref.len().div_ceil(BLS12381_BLOCK_SIZE) as u64).into()
     );
 
     let cost = context.gas_used();
@@ -139,7 +140,7 @@ pub fn bls12381_min_pk_verify(
         bls12381_bls12381_min_pk_verify_cost_params.bls12381_bls12381_min_pk_verify_msg_cost_per_byte
             * (msg_ref.len() as u64).into()
             + bls12381_bls12381_min_pk_verify_cost_params.bls12381_bls12381_min_pk_verify_msg_cost_per_block
-                * (((msg_ref.len() + BLS12381_BLOCK_SIZE - 1) / BLS12381_BLOCK_SIZE) as u64).into()
+                * (msg_ref.len().div_ceil(BLS12381_BLOCK_SIZE) as u64).into()
     );
 
     let cost = context.gas_used();

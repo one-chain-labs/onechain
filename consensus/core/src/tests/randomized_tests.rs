@@ -32,9 +32,9 @@ const NUM_ROUNDS: u32 = 200;
 async fn test_randomized_dag_all_direct_commit() {
     let mut random_test_setup = random_test_setup();
 
-    for _ in 0..NUM_RUNS {
-        let seed = random_test_setup.seeded_rng.gen_range(0..10000);
-        let num_authorities = random_test_setup.seeded_rng.gen_range(4..10);
+    for _ in 0 .. NUM_RUNS {
+        let seed = random_test_setup.seeded_rng.gen_range(0 .. 10000);
+        let num_authorities = random_test_setup.seeded_rng.gen_range(4 .. 10);
         let authority = authority_setup(num_authorities, 0);
 
         let include_leader_percentage = 100;
@@ -77,9 +77,9 @@ async fn test_randomized_dag_all_direct_commit() {
 async fn test_randomized_dag_and_decision_sequence() {
     let mut random_test_setup = random_test_setup();
 
-    for _ in 0..NUM_RUNS {
-        let seed = random_test_setup.seeded_rng.gen_range(0..10000);
-        let num_authorities = random_test_setup.seeded_rng.gen_range(4..10);
+    for _ in 0 .. NUM_RUNS {
+        let seed = random_test_setup.seeded_rng.gen_range(0 .. 10000);
+        let num_authorities = random_test_setup.seeded_rng.gen_range(4 .. 10);
 
         // Setup for Authority 1
         let mut authority_1 = authority_setup(num_authorities, 1);
@@ -96,8 +96,8 @@ async fn test_randomized_dag_and_decision_sequence() {
         let mut last_decided = Slot::new_for_test(0, 0);
         let mut i = 0;
         while i < all_blocks.len() {
-            let chunk_size = random_test_setup.seeded_rng.gen_range(1..=(all_blocks.len() - i));
-            let chunk = &all_blocks[i..i + chunk_size];
+            let chunk_size = random_test_setup.seeded_rng.gen_range(1 ..= (all_blocks.len() - i));
+            let chunk = &all_blocks[i .. i + chunk_size];
 
             let _ = authority_1.block_manager.try_accept_blocks(chunk.to_vec());
             let sequence = authority_1.committer.try_decide(last_decided);
@@ -123,8 +123,8 @@ async fn test_randomized_dag_and_decision_sequence() {
         let mut last_decided = Slot::new_for_test(0, 0);
         let mut i = 0;
         while i < all_blocks.len() {
-            let chunk_size = random_test_setup.seeded_rng.gen_range(1..=(all_blocks.len() - i));
-            let chunk = &all_blocks[i..i + chunk_size];
+            let chunk_size = random_test_setup.seeded_rng.gen_range(1 ..= (all_blocks.len() - i));
+            let chunk = &all_blocks[i .. i + chunk_size];
 
             let _ = authority_2.block_manager.try_accept_blocks(chunk.to_vec());
             let sequence = authority_2.committer.try_decide(last_decided);
@@ -182,10 +182,10 @@ fn random_test_setup() -> RandomTestFixture {
                 seed
             } else {
                 tracing::warn!("Invalid DAG_TEST_SEED format. Using random seed.");
-                rng.gen_range(0..10000)
+                rng.gen_range(0 .. 10000)
             }
         }
-        Err(_) => rng.gen_range(0..10000),
+        Err(_) => rng.gen_range(0 .. 10000),
     };
     tracing::warn!("Using Random Seed: {seed}");
 

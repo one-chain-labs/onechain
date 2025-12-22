@@ -2,13 +2,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::base_types::*;
-use crate::{
-    crypto::{random_committee_key_pairs_of_size, AuthorityKeyPair, AuthorityPublicKey, NetworkPublicKey},
-    error::{SuiError, SuiResult},
-    multiaddr::Multiaddr,
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::{Display, Formatter, Write},
+    hash::{Hash, Hasher},
 };
+
 use fastcrypto::traits::KeyPair;
+use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use rand::{
     rngs::{StdRng, ThreadRng},
@@ -17,12 +18,14 @@ use rand::{
     SeedableRng,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    fmt::{Display, Formatter, Write},
-    hash::{Hash, Hasher},
-};
 pub use sui_protocol_config::ProtocolVersion;
+
+use super::base_types::*;
+use crate::{
+    crypto::{random_committee_key_pairs_of_size, AuthorityKeyPair, AuthorityPublicKey, NetworkPublicKey},
+    error::{SuiError, SuiResult},
+    multiaddr::Multiaddr,
+};
 
 pub type EpochId = u64;
 
@@ -118,6 +121,10 @@ impl Committee {
 
     pub fn authority_by_index(&self, index: u32) -> Option<&AuthorityName> {
         self.voting_rights.get(index as usize).map(|(name, _)| name)
+    }
+
+    pub fn stake_by_index(&self, index: u32) -> Option<StakeUnit> {
+        self.voting_rights.get(index as usize).map(|(_, stake)| *stake)
     }
 
     pub fn epoch(&self) -> EpochId {
@@ -221,6 +228,24 @@ impl Committee {
                 .map(|key| {
                     (AuthorityName::from(key.public()), /* voting right */ 1)
                 })
+                .collect(),
+        );
+        (committee, key_pairs)
+    }
+
+    pub fn new_simple_test_committee_with_normalized_voting_power(
+        voting_weights: Vec<StakeUnit>,
+    ) -> (Self, Vec<AuthorityKeyPair>) {
+        let key_pairs: Vec<_> = random_committee_key_pairs_of_size(voting_weights.len())
+            .into_iter()
+            .sorted_by_key(|key| key.public().clone())
+            .collect();
+        let committee = Self::new_for_testing_with_normalized_voting_power(
+            0,
+            voting_weights
+                .iter()
+                .enumerate()
+                .map(|(idx, weight)| (AuthorityName::from(key_pairs[idx].public()), *weight))
                 .collect(),
         );
         (committee, key_pairs)
@@ -355,9 +380,10 @@ impl Display for CommitteeWithNetworkMetadata {
 
 #[cfg(test)]
 mod test {
+    use fastcrypto::traits::KeyPair;
+
     use super::*;
     use crate::crypto::{get_key_pair, AuthorityKeyPair};
-    use fastcrypto::traits::KeyPair;
 
     #[test]
     fn test_shuffle_by_weight() {
@@ -381,14 +407,14 @@ mod test {
         pref.insert(a2);
 
         // preference always comes first
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             assert_eq!(a2, *committee.shuffle_by_stake(Some(&pref), None).first().unwrap());
         }
 
         let mut restrict = BTreeSet::new();
         restrict.insert(a2);
 
-        for _ in 0..100 {
+        for _ in 0 .. 100 {
             let res = committee.shuffle_by_stake(None, Some(&restrict));
             assert_eq!(1, res.len());
             assert_eq!(a2, res[0]);

@@ -5,7 +5,6 @@ use async_graphql::{
     connection::{Connection, CursorType, Edge},
     *,
 };
-
 use sui_types::{
     authenticator_state::ActiveJwk as NativeActiveJwk,
     transaction::AuthenticatorStateUpdate as NativeAuthenticatorStateUpdateTransaction,

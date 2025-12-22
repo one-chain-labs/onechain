@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context, Result};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     env,
@@ -9,6 +8,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+
+use anyhow::{bail, Context, Result};
 use thiserror::Error;
 use toml::value::Value;
 use toml_edit::{self, Document, Item};
@@ -195,7 +196,7 @@ impl CutPlan {
 
             // Check whether any parent directories need to be made as part of this iteration of the
             // cut.
-            let fresh_parent = shortest_new_prefix(&dst_path).map_or(false, |pfx| {
+            let fresh_parent = shortest_new_prefix(&dst_path).is_some_and(|pfx| {
                 walker.make_directories.insert(pfx);
                 true
             });
@@ -607,13 +608,13 @@ fn package_name<P: AsRef<Path>>(path: P) -> Result<Option<String>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::args::Directory;
-
-    use super::*;
+    use std::{fmt, fs, path::PathBuf};
 
     use expect_test::expect;
-    use std::{fmt, fs, path::PathBuf};
     use tempfile::tempdir;
+
+    use super::*;
+    use crate::args::Directory;
 
     #[test]
     fn test_discover_root() {

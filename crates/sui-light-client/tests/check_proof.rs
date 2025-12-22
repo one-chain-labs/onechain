@@ -1,20 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
+use std::{fs, io::Read, path::PathBuf};
 
+use anyhow::anyhow;
 use sui_light_client::{
     construct::construct_proof,
     proof::{verify_proof, Proof, ProofTarget},
 };
-
-use sui_types::event::{Event, EventID};
-
-use sui_types::{committee::Committee, effects::TransactionEffectsAPI, object::Object};
-
-use sui_rpc_api::CheckpointData;
-
-use std::{fs, io::Read, path::PathBuf};
+use sui_types::{
+    committee::Committee,
+    effects::TransactionEffectsAPI,
+    event::{Event, EventID},
+    full_checkpoint_content::CheckpointData,
+    object::Object,
+};
 
 async fn read_full_checkpoint(checkpoint_path: &PathBuf) -> anyhow::Result<CheckpointData> {
     println!("Reading checkpoint from {:?}", checkpoint_path);
