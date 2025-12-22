@@ -6,8 +6,8 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::anyhow;
 use arc_swap::Guard;
+use anyhow::anyhow;
 use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
@@ -35,7 +35,7 @@ use sui_types::{
     digests::{ChainIdentifier, TransactionDigest},
     dynamic_field::DynamicFieldInfo,
     effects::TransactionEffects,
-    error::{SuiError, UserInputError},
+    error::{SuiError, SuiErrorKind, UserInputError},
     event::EventID,
     governance::StakedOct,
     messages_checkpoint::{
@@ -53,6 +53,7 @@ use sui_types::{
 };
 use thiserror::Error;
 use tokio::task::JoinError;
+use typed_store_error::TypedStoreError;
 
 use crate::ObjectProvider;
 
@@ -400,7 +401,7 @@ impl StateRead for AuthorityState {
                 balance: coin.balance,
                 previous_transaction: coin.previous_transaction,
             })
-            .collect::<Vec<_>>())
+            .collect())
     }
 
     async fn get_executed_transaction_and_effects(
@@ -412,11 +413,21 @@ impl StateRead for AuthorityState {
     }
 
     async fn get_balance(&self, owner: SuiAddress, coin_type: TypeTag) -> StateReadResult<TotalBalance> {
-        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_balance(owner, coin_type)?)
+        let indexes = self.indexes.clone();
+        Ok(tokio::task::spawn_blocking(move || {
+            indexes.as_ref().ok_or(SuiErrorKind::IndexStoreNotAvailable)?.get_balance(owner, coin_type)
+        })
+        .await
+        .map_err(|e: JoinError| SuiError(Box::new(SuiErrorKind::ExecutionError(e.to_string()))))??)
     }
 
     async fn get_all_balance(&self, owner: SuiAddress) -> StateReadResult<Arc<HashMap<TypeTag, TotalBalance>>> {
-        Ok(self.indexes.as_ref().ok_or(SuiError::IndexStoreNotAvailable)?.get_all_balance(owner)?)
+        let indexes = self.indexes.clone();
+        Ok(tokio::task::spawn_blocking(move || {
+            indexes.as_ref().ok_or(SuiErrorKind::IndexStoreNotAvailable)?.get_all_balance(owner)
+        })
+        .await
+        .map_err(|e: JoinError| SuiError(Box::new(SuiErrorKind::ExecutionError(e.to_string()))))??)
     }
 
     fn get_verified_checkpoint_by_sequence_number(
@@ -474,7 +485,7 @@ impl StateRead for AuthorityState {
     }
 
     fn get_chain_identifier(&self) -> StateReadResult<ChainIdentifier> {
-        Ok(self.get_chain_identifier().ok_or(anyhow!("Chain identifier not found"))?)
+        Ok(self.state.get_chain_identifier().ok_or(anyhow!("Chain identifier not found"))?)
     }
 }
 
@@ -533,12 +544,24 @@ pub enum StateReadInternalError {
     Anyhow(#[from] anyhow::Error),
 }
 
+impl From<SuiErrorKind> for StateReadInternalError {
+    fn from(e: SuiErrorKind) -> Self {
+        StateReadInternalError::SuiError(SuiError::from(e))
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum StateReadClientError {
     #[error(transparent)]
     SuiError(#[from] SuiError),
     #[error(transparent)]
     UserInputError(#[from] UserInputError),
+}
+
+impl From<SuiErrorKind> for StateReadClientError {
+    fn from(e: SuiErrorKind) -> Self {
+        StateReadClientError::SuiError(SuiError::from(e))
+    }
 }
 
 /// `StateReadError` is the error type for callers to work with.
@@ -556,16 +579,22 @@ pub enum StateReadError {
     Client(#[from] StateReadClientError),
 }
 
-impl From<SuiError> for StateReadError {
-    fn from(e: SuiError) -> Self {
+impl From<SuiErrorKind> for StateReadError {
+    fn from(e: SuiErrorKind) -> Self {
         match e {
-            SuiError::IndexStoreNotAvailable
-            | SuiError::TransactionNotFound { .. }
-            | SuiError::UnsupportedFeatureError { .. }
-            | SuiError::UserInputError { .. }
-            | SuiError::WrongMessageVersion { .. } => StateReadError::Client(e.into()),
+            SuiErrorKind::IndexStoreNotAvailable
+            | SuiErrorKind::TransactionNotFound { .. }
+            | SuiErrorKind::UnsupportedFeatureError { .. }
+            | SuiErrorKind::UserInputError { .. }
+            | SuiErrorKind::WrongMessageVersion { .. } => StateReadError::Client(e.into()),
             _ => StateReadError::Internal(e.into()),
         }
+    }
+}
+
+impl From<SuiError> for StateReadError {
+    fn from(e: SuiError) -> Self {
+        e.into_inner().into()
     }
 }
 
@@ -584,5 +613,12 @@ impl From<JoinError> for StateReadError {
 impl From<anyhow::Error> for StateReadError {
     fn from(e: anyhow::Error) -> Self {
         StateReadError::Internal(e.into())
+    }
+}
+
+impl From<TypedStoreError> for StateReadError {
+    fn from(e: TypedStoreError) -> Self {
+        let error: SuiError = e.into();
+        StateReadError::Internal(error.into())
     }
 }

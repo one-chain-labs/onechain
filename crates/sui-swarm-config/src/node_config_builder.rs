@@ -12,8 +12,6 @@ use sui_config::{
     node::{
         default_enable_index_processing,
         default_end_of_epoch_broadcast_channel_capacity,
-        default_local_execution_time_cache_size,
-        default_local_execution_time_channel_capacity,
         default_zklogin_oauth_providers,
         AuthorityKeyPairWithPath,
         AuthorityOverloadConfig,
@@ -21,12 +19,13 @@ use sui_config::{
         CheckpointExecutorConfig,
         DBCheckpointConfig,
         ExecutionCacheConfig,
+        ExecutionTimeObserverConfig,
         ExpensiveSafetyCheckConfig,
         Genesis,
         KeyPairWithPath,
         RunWithRange,
-        StateArchiveConfig,
         StateSnapshotConfig,
+        TransactionDriverConfig,
         DEFAULT_GRPC_CONCURRENCY_LIMIT,
     },
     p2p::{P2pConfig, SeedPeer, StateSyncConfig},
@@ -37,6 +36,7 @@ use sui_config::{
     CONSENSUS_DB_NAME,
     FULL_NODE_DB_PATH,
 };
+use sui_protocol_config::Chain;
 use sui_types::{
     crypto::{AuthorityKeyPair, AuthorityPublicKeyBytes, NetworkKeyPair, SuiKeyPair},
     multiaddr::Multiaddr,
@@ -64,12 +64,20 @@ pub struct ValidatorConfigBuilder {
     firewall_config: Option<RemoteFirewallConfig>,
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
-    state_accumulator_v2: bool,
+    global_state_hash_v2: bool,
+    execution_time_observer_config: Option<ExecutionTimeObserverConfig>,
+    chain_override: Option<Chain>,
 }
 
 impl ValidatorConfigBuilder {
     pub fn new() -> Self {
-        Self { state_accumulator_v2: true, ..Default::default() }
+        Self { global_state_hash_v2: true, ..Default::default() }
+    }
+
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        assert!(self.chain_override.is_none(), "Chain override already set");
+        self.chain_override = Some(chain);
+        self
     }
 
     pub fn with_config_directory(mut self, config_directory: PathBuf) -> Self {
@@ -129,14 +137,19 @@ impl ValidatorConfigBuilder {
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled(mut self, enabled: bool) -> Self {
-        self.state_accumulator_v2 = enabled;
+    pub fn with_global_state_hash_v2_enabled(mut self, enabled: bool) -> Self {
+        self.global_state_hash_v2 = enabled;
+        self
+    }
+
+    pub fn with_execution_time_observer_config(mut self, config: ExecutionTimeObserverConfig) -> Self {
+        self.execution_time_observer_config = Some(config);
         self
     }
 
     pub fn build(self, validator: ValidatorGenesisConfig, genesis: sui_config::genesis::Genesis) -> NodeConfig {
         let key_path = get_key_path(&validator.key_pair);
-        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().into_path());
+        let config_directory = self.config_directory.unwrap_or_else(|| mysten_common::tempdir().unwrap().keep());
         let db_path = config_directory.join(AUTHORITIES_DB_NAME).join(key_path.clone());
 
         let network_address = validator.network_address;
@@ -194,7 +207,6 @@ impl ValidatorConfigBuilder {
             metrics: None,
             supported_protocol_versions: self.supported_protocol_versions,
             db_checkpoint_config: Default::default(),
-            indirect_objects_threshold: usize::MAX,
             // By default, expensive checks will be enabled in debug build, but not in release build.
             expensive_safety_check_config: ExpensiveSafetyCheckConfig::default(),
             name_service_package_address: None,
@@ -203,7 +215,6 @@ impl ValidatorConfigBuilder {
             transaction_deny_config: Default::default(),
             certificate_deny_config: Default::default(),
             state_debug_dump_config: Default::default(),
-            state_archive_write_config: StateArchiveConfig::default(),
             state_archive_read_config: vec![],
             state_snapshot_write_config: StateSnapshotConfig::default(),
             indexer_max_subscriptions: Default::default(),
@@ -218,13 +229,16 @@ impl ValidatorConfigBuilder {
             jsonrpc_server_type: None,
             policy_config: self.policy_config,
             firewall_config: self.firewall_config,
-            state_accumulator_v2: self.state_accumulator_v2,
+            state_accumulator_v2: self.global_state_hash_v2,
             enable_soft_bundle: true,
             enable_validator_tx_finalizer: true,
             verifier_signing_config: VerifierSigningConfig::default(),
             enable_db_write_stall: None,
-            local_execution_time_channel_capacity: default_local_execution_time_channel_capacity(),
-            local_execution_time_cache_size: default_local_execution_time_cache_size(),
+            execution_time_observer_config: self.execution_time_observer_config,
+            chain_override_for_testing: self.chain_override,
+            validator_client_monitor_config: None,
+            fork_recovery: None,
+            transaction_driver_config: Some(TransactionDriverConfig::default()),
         }
     }
 
@@ -261,11 +275,20 @@ pub struct FullnodeConfigBuilder {
     fw_config: Option<RemoteFirewallConfig>,
     data_ingestion_dir: Option<PathBuf>,
     disable_pruning: bool,
+    chain_override: Option<Chain>,
+    transaction_driver_config: Option<TransactionDriverConfig>,
+    rpc_config: Option<sui_config::RpcConfig>,
 }
 
 impl FullnodeConfigBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        assert!(self.chain_override.is_none(), "Chain override already set");
+        self.chain_override = Some(chain);
+        self
     }
 
     pub fn with_config_directory(mut self, config_directory: PathBuf) -> Self {
@@ -282,6 +305,11 @@ impl FullnodeConfigBuilder {
     pub fn with_rpc_addr(mut self, addr: SocketAddr) -> Self {
         assert!(self.rpc_addr.is_none() && self.rpc_port.is_none());
         self.rpc_addr = Some(addr);
+        self
+    }
+
+    pub fn with_rpc_config(mut self, rpc_config: sui_config::RpcConfig) -> Self {
+        self.rpc_config = Some(rpc_config);
         self
     }
 
@@ -377,6 +405,11 @@ impl FullnodeConfigBuilder {
         self
     }
 
+    pub fn with_transaction_driver_config(mut self, config: Option<TransactionDriverConfig>) -> Self {
+        self.transaction_driver_config = config;
+        self
+    }
+
     pub fn build<R: rand::RngCore + rand::CryptoRng>(self, rng: &mut R, network_config: &NetworkConfig) -> NodeConfig {
         // Take advantage of ValidatorGenesisConfigBuilder to build the keypairs and addresses,
         // even though this is a fullnode.
@@ -384,7 +417,7 @@ impl FullnodeConfigBuilder {
         let ip = validator_config.network_address.to_socket_addr().unwrap().ip().to_string();
 
         let key_path = get_key_path(&validator_config.key_pair);
-        let config_directory = self.config_directory.unwrap_or_else(|| tempfile::tempdir().unwrap().into_path());
+        let config_directory = self.config_directory.unwrap_or_else(|| mysten_common::tempdir().unwrap().keep());
 
         let p2p_config = {
             let seed_peers = network_config
@@ -451,7 +484,6 @@ impl FullnodeConfigBuilder {
             metrics: None,
             supported_protocol_versions: self.supported_protocol_versions,
             db_checkpoint_config: self.db_checkpoint_config.unwrap_or_default(),
-            indirect_objects_threshold: usize::MAX,
             expensive_safety_check_config: self
                 .expensive_safety_check_config
                 .unwrap_or_else(ExpensiveSafetyCheckConfig::new_enable_all),
@@ -461,13 +493,14 @@ impl FullnodeConfigBuilder {
             transaction_deny_config: Default::default(),
             certificate_deny_config: Default::default(),
             state_debug_dump_config: Default::default(),
-            state_archive_write_config: StateArchiveConfig::default(),
             state_archive_read_config: vec![],
             state_snapshot_write_config: StateSnapshotConfig::default(),
             indexer_max_subscriptions: Default::default(),
             transaction_kv_store_read_config: Default::default(),
             transaction_kv_store_write_config: Default::default(),
-            rpc: Some(sui_rpc_api::Config { enable_indexing: Some(true), ..Default::default() }),
+            rpc: self
+                .rpc_config
+                .or_else(|| Some(sui_rpc_api::Config { enable_indexing: Some(true), ..Default::default() })),
             // note: not used by fullnodes.
             jwk_fetch_interval_seconds: 3600,
             zklogin_oauth_providers: default_zklogin_oauth_providers(),
@@ -483,8 +516,11 @@ impl FullnodeConfigBuilder {
             enable_validator_tx_finalizer: false,
             verifier_signing_config: VerifierSigningConfig::default(),
             enable_db_write_stall: None,
-            local_execution_time_channel_capacity: default_local_execution_time_channel_capacity(),
-            local_execution_time_cache_size: default_local_execution_time_cache_size(),
+            execution_time_observer_config: None,
+            chain_override_for_testing: self.chain_override,
+            validator_client_monitor_config: None,
+            fork_recovery: None,
+            transaction_driver_config: self.transaction_driver_config.or(Some(TransactionDriverConfig::default())),
         }
     }
 }
