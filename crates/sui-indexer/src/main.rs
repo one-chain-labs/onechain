@@ -4,7 +4,7 @@
 use clap::Parser;
 use sui_indexer::{
     backfill::backfill_runner::BackfillRunner,
-    config::{Command, RetentionConfig, UploadOptions},
+    config::Command,
     database::ConnectionPool,
     db::{
         check_db_migration_consistency,
@@ -15,7 +15,6 @@ use sui_indexer::{
     },
     indexer::Indexer,
     metrics::{spawn_connection_pool_metric_collector, start_prometheus_server, IndexerMetrics},
-    restorer::formal_snapshot::IndexerFormalSnapshotRestorer,
     store::PgIndexerStore,
 };
 use tokio_util::sync::CancellationToken;
@@ -39,19 +38,12 @@ async fn main() -> anyhow::Result<()> {
     spawn_connection_pool_metric_collector(indexer_metrics.clone(), pool.clone());
 
     match opts.command {
-        Command::Indexer { ingestion_config, snapshot_config, pruning_options, upload_options, mvr_mode } => {
+        Command::Indexer { ingestion_config, snapshot_config, pruning_options, upload_options } => {
             // Make sure to run all migrations on startup, and also serve as a compatibility check.
             run_migrations(pool.dedicated_connection().await?).await?;
 
-            let retention_config = if mvr_mode {
-                warn!("Indexer in MVR mode is configured to prune `objects_history` to 2 epochs. The other tables have a 2000 epoch retention.");
-                Some(RetentionConfig {
-                    epochs_to_keep: 2000, // epochs, roughly 5+ years. We really just care about pruning `objects_history` per the default 2 epochs.
-                    overrides: Default::default(),
-                })
-            } else {
-                pruning_options.load_from_file()
-            };
+            let retention_config = pruning_options.load_from_file();
+
             if retention_config.is_some() {
                 check_prunable_tables_valid(&mut pool.get().await?).await?;
             }
@@ -65,7 +57,6 @@ async fn main() -> anyhow::Result<()> {
                 snapshot_config,
                 retention_config,
                 CancellationToken::new(),
-                mvr_mode,
             )
             .await?;
         }
@@ -91,11 +82,6 @@ async fn main() -> anyhow::Result<()> {
         Command::RunBackFill { start, end, runner_kind, backfill_config } => {
             let total_range = start ..= end;
             BackfillRunner::run(runner_kind, pool, backfill_config, total_range).await;
-        }
-        Command::Restore(restore_config) => {
-            let store = PgIndexerStore::new(pool, UploadOptions::default(), indexer_metrics.clone());
-            let mut formal_restorer = IndexerFormalSnapshotRestorer::new(store, restore_config).await?;
-            formal_restorer.restore().await?;
         }
     }
 

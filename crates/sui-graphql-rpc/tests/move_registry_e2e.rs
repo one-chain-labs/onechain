@@ -23,8 +23,7 @@ use sui_types::{
     digests::ObjectDigest,
     move_package::UpgradePolicy,
     object::Owner,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, ObjectArg},
+    transaction::{CallArg, ObjectArg, SharedObjectMutability},
     Identifier,
     SUI_FRAMEWORK_PACKAGE_ID,
 };
@@ -225,7 +224,7 @@ async fn register_pkg(
         CallArg::Object(ObjectArg::SharedObject {
             id: registry_id.0,
             initial_shared_version: registry_id.1,
-            mutable: true,
+            mutability: SharedObjectMutability::Mutable,
         }),
         CallArg::from(&app.as_bytes().to_vec()),
         CallArg::from(&org.as_bytes().to_vec()),
@@ -296,38 +295,41 @@ async fn upgrade_pkg(
     current_package_object_id: ObjectID,
 ) -> (ObjectID, UpgradeCap) {
     // build the package upgrade to V2.
-    let mut builder = ProgrammableTransactionBuilder::new();
-
     let compiled_package = BuildConfig::new_for_testing().build(&PathBuf::from(package_path)).unwrap();
     let digest = compiled_package.get_package_digest(false);
     let modules = compiled_package.get_package_bytes(false);
     let dependencies = compiled_package.get_dependency_storage_package_ids();
 
-    let cap = builder.obj(ObjectArg::ImmOrOwnedObject((upgrade_cap.0, upgrade_cap.1, upgrade_cap.2))).unwrap();
+    let mut tx_builder = cluster.validator_fullnode_handle.test_transaction_builder().await;
+    let tx = {
+        let builder = tx_builder.ptb_builder_mut();
 
-    let policy = builder.pure(UpgradePolicy::Compatible as u8).unwrap();
+        let cap = builder.obj(ObjectArg::ImmOrOwnedObject((upgrade_cap.0, upgrade_cap.1, upgrade_cap.2))).unwrap();
 
-    let digest = builder.pure(digest.to_vec()).unwrap();
+        let policy = builder.pure(UpgradePolicy::Compatible as u8).unwrap();
 
-    let ticket = builder.programmable_move_call(
-        SUI_FRAMEWORK_PACKAGE_ID,
-        Identifier::new("package").unwrap(),
-        Identifier::new("authorize_upgrade").unwrap(),
-        vec![],
-        vec![cap, policy, digest],
-    );
+        let digest = builder.pure(digest.to_vec()).unwrap();
 
-    let receipt = builder.upgrade(current_package_object_id, ticket, dependencies, modules);
+        let ticket = builder.programmable_move_call(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            Identifier::new("package").unwrap(),
+            Identifier::new("authorize_upgrade").unwrap(),
+            vec![],
+            vec![cap, policy, digest],
+        );
 
-    builder.programmable_move_call(
-        SUI_FRAMEWORK_PACKAGE_ID,
-        Identifier::new("package").unwrap(),
-        Identifier::new("commit_upgrade").unwrap(),
-        vec![],
-        vec![cap, receipt],
-    );
+        let receipt = builder.upgrade(current_package_object_id, ticket, dependencies, modules);
 
-    let tx = cluster.validator_fullnode_handle.test_transaction_builder().await.programmable(builder.finish()).build();
+        builder.programmable_move_call(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            Identifier::new("package").unwrap(),
+            Identifier::new("commit_upgrade").unwrap(),
+            vec![],
+            vec![cap, receipt],
+        );
+
+        tx_builder.build()
+    };
 
     let upgraded = cluster.validator_fullnode_handle.sign_and_execute_transaction(&tx).await;
 
@@ -368,7 +370,7 @@ async fn publish_move_registry_package(cluster: &NetworkCluster) -> (ObjectID, (
     let package_path = PathBuf::from(DOT_MOVE_PKG);
     let tx = cluster.validator_fullnode_handle.test_transaction_builder().await.publish(package_path).build();
 
-    let sig = cluster.validator_fullnode_handle.wallet.sign_transaction(&tx);
+    let sig = cluster.validator_fullnode_handle.wallet.sign_transaction(&tx).await;
 
     let executed = cluster.validator_fullnode_handle.execute_transaction(sig).await;
 

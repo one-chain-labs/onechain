@@ -43,7 +43,7 @@ pub const MAX_SIGNING_ATTEMPTS: u64 = 16;
 pub const MAX_EXECUTION_ATTEMPTS: u64 = 16;
 
 async fn delay(attempt_times: u64) {
-    let delay_ms = 100 * (2 ^ attempt_times);
+    let delay_ms = 100 * 2_u64.pow(attempt_times as u32);
     tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
 }
 
@@ -295,7 +295,9 @@ where
 
         // Only token transfer action should reach here
         match &action {
-            BridgeAction::SuiToEthBridgeAction(_) | BridgeAction::EthToSuiBridgeAction(_) => (),
+            BridgeAction::SuiToEthBridgeAction(_)
+            | BridgeAction::SuiToEthTokenTransfer(_)
+            | BridgeAction::EthToSuiBridgeAction(_) => (),
             _ => unreachable!("Non token transfer action should not reach here"),
         };
 
@@ -319,7 +321,10 @@ where
                 // TODO: spawn a task for this
                 if attempt_times >= MAX_SIGNING_ATTEMPTS {
                     metrics.err_signature_aggregation_too_many_failures.inc();
-                    error!("Manual intervention is required. Failed to collect sigs for bridge action after {MAX_SIGNING_ATTEMPTS} attempts: {:?}", e);
+                    error!(
+                        "Manual intervention is required. Failed to collect sigs for bridge action after {MAX_SIGNING_ATTEMPTS} attempts: {:?}",
+                        e
+                    );
                     return;
                 }
                 delay(attempt_times).await;
@@ -665,7 +670,7 @@ mod tests {
         let events = vec![event];
         mock_transaction_response(&sui_client_mock, tx_digest, SuiExecutionStatus::Success, Some(events), true);
 
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it
@@ -708,7 +713,7 @@ mod tests {
             true,
         );
 
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it
@@ -744,7 +749,7 @@ mod tests {
         let tx_digest = get_tx_digest(tx_data, &dummy_sui_key);
         mock_transaction_error(&sui_client_mock, tx_digest, BridgeError::Generic("some random error".to_string()), true);
 
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it
@@ -803,7 +808,7 @@ mod tests {
 
         let gas_coin = GasCoin::new_for_testing(1_000_000_000_000); // dummy gas coin
         sui_client_mock.add_gas_object_info(gas_coin, gas_object_ref, Owner::AddressOwner(sui_address));
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it
@@ -886,7 +891,7 @@ mod tests {
             None,
         );
         mock_bridge_authority_signing_errors(vec![&mock0, &mock1, &mock2, &mock3], sui_tx_digest, sui_tx_event_index);
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it
@@ -953,7 +958,7 @@ mod tests {
 
         sui_client_mock.set_action_onchain_status(&action, BridgeActionStatus::Pending);
 
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it (send to the execution queue, skipping the signing queue)
@@ -1020,7 +1025,7 @@ mod tests {
         // assert bridge is unpaused now
         assert!(!*bridge_pause_tx.borrow());
 
-        store.insert_pending_actions(&[action.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action)).unwrap();
         assert_eq!(store.get_all_pending_actions()[&action.digest()], action.clone());
 
         // Kick it (send to the execution queue, skipping the signing queue)

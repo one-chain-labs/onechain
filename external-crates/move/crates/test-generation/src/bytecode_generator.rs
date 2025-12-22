@@ -18,7 +18,7 @@ use move_binary_format::file_format::{
     StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation, TableIndex,
 };
 use move_core_types::u256::U256;
-use rand::{rngs::StdRng, Rng};
+use rand::{Rng, rngs::StdRng};
 use tracing::{debug, error, warn};
 
 /// This type represents bytecode instructions that take a `LocalIndex`
@@ -319,10 +319,9 @@ impl<'a> BytecodeGenerator<'a> {
         if let Some(call_size) = state
             .call_graph
             .call_depth(fn_context.function_handle_index, call)
+            && call_size + fn_context.starting_call_height <= CALL_STACK_LIMIT
         {
-            if call_size + fn_context.starting_call_height <= CALL_STACK_LIMIT {
-                return Some(call);
-            }
+            return Some(call);
         }
         None
     }

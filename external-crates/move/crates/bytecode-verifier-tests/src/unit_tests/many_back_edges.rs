@@ -3,9 +3,8 @@
 
 use crate::unit_tests::production_config;
 use move_binary_format::file_format::{
-    empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
-    IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
-    Visibility::Public,
+    Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility::Public, empty_module,
 };
 use move_bytecode_verifier_meter::bound::BoundMeter;
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -21,9 +20,7 @@ fn many_backedges() {
 
     // signature of locals in f1..f<NUM_FUNCTIONS>
     m.signatures.push(Signature(
-        std::iter::repeat(SignatureToken::U8)
-            .take(MAX_LOCALS as usize)
-            .collect(),
+        std::iter::repeat_n(SignatureToken::U8, MAX_LOCALS as usize).collect(),
     ));
 
     // create returns_bool_and_u64

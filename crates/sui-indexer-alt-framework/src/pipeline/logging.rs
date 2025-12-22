@@ -6,7 +6,7 @@ use std::time::Instant;
 use tracing::{debug, info};
 
 use super::Processor;
-use crate::models::watermarks::{CommitterWatermark, PrunerWatermark};
+use crate::store::CommitterWatermark;
 
 /// Tracing message for the watermark update will be logged at info level at least this many
 /// checkpoints.
@@ -21,12 +21,12 @@ pub(crate) struct LoggerWatermark {
 pub(crate) struct WatermarkLogger {
     name: &'static str,
     timer: Instant,
-    prev_watermark: LoggerWatermark,
+    prev_watermark: Option<LoggerWatermark>,
 }
 
 impl WatermarkLogger {
-    pub fn new(name: &'static str, init_watermark: impl Into<LoggerWatermark>) -> Self {
-        Self { name, timer: Instant::now(), prev_watermark: init_watermark.into() }
+    pub fn new(name: &'static str) -> Self {
+        Self { name, timer: Instant::now(), prev_watermark: None }
     }
 
     /// Log the watermark update.
@@ -39,14 +39,21 @@ impl WatermarkLogger {
     /// the log message will be at debug level. Otherwise, it will be at info level.
     pub fn log<H: Processor>(&mut self, watermark: impl Into<LoggerWatermark>, watermark_update_latency: f64) {
         let watermark: LoggerWatermark = watermark.into();
+        // If we didn't set a watermark previously, set it and calculate metrics on the next update.
+        let Some(prev_watermark) = &self.prev_watermark else {
+            self.prev_watermark = Some(watermark);
+            self.timer = Instant::now();
+            return;
+        };
+
         let logger_timer_elapsed = self.timer.elapsed().as_secs_f64();
-        let realtime_average_tps = match (self.prev_watermark.transaction, watermark.transaction) {
+        let realtime_average_tps = match (prev_watermark.transaction, watermark.transaction) {
             (Some(prev), Some(curr)) => Some((curr - prev) as f64 / logger_timer_elapsed),
             _ => None,
         };
-        let realtime_average_cps = (watermark.checkpoint - self.prev_watermark.checkpoint) as f64 / logger_timer_elapsed;
+        let realtime_average_cps = (watermark.checkpoint - prev_watermark.checkpoint) as f64 / logger_timer_elapsed;
 
-        if watermark.checkpoint < self.prev_watermark.checkpoint + LOUD_WATERMARK_UPDATE_INTERVAL {
+        if watermark.checkpoint < prev_watermark.checkpoint + LOUD_WATERMARK_UPDATE_INTERVAL {
             debug!(
                 logger = self.name,
                 pipeline = H::NAME,
@@ -70,19 +77,19 @@ impl WatermarkLogger {
             elapsed_ms = format!("{:.3}", watermark_update_latency * 1000.0),
             "Updated watermark",
         );
-        self.prev_watermark = watermark;
+        self.prev_watermark = Some(watermark);
         self.timer = Instant::now();
     }
 }
 
-impl From<&CommitterWatermark<'_>> for LoggerWatermark {
+impl From<&CommitterWatermark> for LoggerWatermark {
     fn from(watermark: &CommitterWatermark) -> Self {
-        Self { checkpoint: watermark.checkpoint_hi_inclusive, transaction: Some(watermark.tx_hi) }
+        Self { checkpoint: watermark.checkpoint_hi_inclusive as i64, transaction: Some(watermark.tx_hi as i64) }
     }
 }
 
-impl From<&PrunerWatermark<'_>> for LoggerWatermark {
-    fn from(watermark: &PrunerWatermark) -> Self {
-        Self { checkpoint: watermark.pruner_hi, transaction: None }
+impl LoggerWatermark {
+    pub fn checkpoint(checkpoint: u64) -> Self {
+        Self { checkpoint: checkpoint as i64, transaction: None }
     }
 }

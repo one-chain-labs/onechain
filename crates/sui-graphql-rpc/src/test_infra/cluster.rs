@@ -4,7 +4,7 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use rand::{rngs::StdRng, SeedableRng};
-use simulacrum::Simulacrum;
+use simulacrum::{AdvanceEpochConfig, Simulacrum};
 use sui_graphql_rpc_client::simple_client::SimpleClient;
 pub use sui_indexer::config::{RetentionConfig, SnapshotLagConfig};
 use sui_indexer::{errors::IndexerError, store::PgIndexerStore, test_utils::start_indexer_writer_for_testing};
@@ -158,7 +158,7 @@ pub async fn serve_executor(
     info!("Starting executor server on {}", executor_server_url);
 
     let executor_server_handle = tokio::spawn(async move {
-        sui_rpc_api::RpcService::new_without_version(executor).start_service(executor_server_url).await;
+        sui_rpc_api::RpcService::new(executor).start_service(executor_server_url).await;
     });
 
     info!("spawned executor server");
@@ -213,7 +213,7 @@ pub async fn prep_executor_cluster() -> ExecutorCluster {
     sim.create_checkpoint();
     sim.create_checkpoint();
     sim.create_checkpoint();
-    sim.advance_epoch(true);
+    sim.advance_epoch(AdvanceEpochConfig { create_random_state: true, ..Default::default() });
     sim.create_checkpoint();
     sim.advance_clock(std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap());
     sim.create_checkpoint();

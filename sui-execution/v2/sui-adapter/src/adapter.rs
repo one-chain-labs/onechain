@@ -4,15 +4,13 @@
 pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+    use std::{collections::BTreeMap, sync::Arc};
 
     use anyhow::Result;
     use move_binary_format::file_format::CompiledModule;
     use move_bytecode_verifier::verify_module_with_config_metered;
     use move_bytecode_verifier_meter::Meter;
     use move_core_types::account_address::AccountAddress;
-    #[cfg(feature = "tracing")]
-    use move_vm_config::runtime::VMProfilerConfig;
     use move_vm_config::{
         runtime::{VMConfig, VMRuntimeLimitsConfig},
         verifier::VerifierConfig,
@@ -26,27 +24,14 @@ mod checked {
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::*,
-        error::{ExecutionError, ExecutionErrorKind, SuiError},
-        execution_config_utils::to_binary_config,
+        error::{ExecutionError, ExecutionErrorKind, SuiError, SuiErrorKind},
         metrics::{BytecodeVerifierMetrics, LimitsMetrics},
         storage::ChildObjectResolver,
     };
     use sui_verifier::{check_for_verifier_timeout, verifier::sui_verify_module_metered_check_timeout_only};
     use tracing::instrument;
 
-    pub fn new_move_vm(
-        natives: NativeFunctionTable,
-        protocol_config: &ProtocolConfig,
-        _enable_profiler: Option<PathBuf>,
-    ) -> Result<MoveVM, SuiError> {
-        #[cfg(not(feature = "tracing"))]
-        let vm_profiler_config = None;
-        #[cfg(feature = "tracing")]
-        let vm_profiler_config = _enable_profiler.clone().map(|path| VMProfilerConfig {
-            full_path: path,
-            track_bytecode_instructions: false,
-            use_long_function_name: false,
-        });
+    pub fn new_move_vm(natives: NativeFunctionTable, protocol_config: &ProtocolConfig) -> Result<MoveVM, SuiError> {
         MoveVM::new_with_config(natives, VMConfig {
             verifier: protocol_config.verifier_config(/* signing_limits */ None),
             max_binary_format_version: protocol_config.move_binary_format_version(),
@@ -58,15 +43,16 @@ mod checked {
             enable_invariant_violation_check_in_swap_loc: !protocol_config
                 .disable_invariant_violation_check_in_swap_loc(),
             check_no_extraneous_bytes_during_deserialization: protocol_config.no_extraneous_module_bytes(),
-            profiler_config: vm_profiler_config,
             // Don't augment errors with execution state on-chain
             error_execution_state: false,
-            binary_config: to_binary_config(protocol_config),
+            binary_config: protocol_config.binary_config(None),
             rethrow_serialization_type_layout_errors: protocol_config.rethrow_serialization_type_layout_errors(),
             max_type_to_layout_nodes: protocol_config.max_type_to_layout_nodes_as_option(),
             variant_nodes: protocol_config.variant_nodes(),
+            deprecate_global_storage_ops_during_deserialization: protocol_config
+                .deprecate_global_storage_ops_during_deserialization(),
         })
-        .map_err(|_| SuiError::ExecutionInvariantViolation)
+        .map_err(|_| SuiErrorKind::ExecutionInvariantViolation.into())
     }
 
     pub fn new_native_extensions<'r>(
@@ -156,7 +142,10 @@ mod checked {
                             BytecodeVerifierMetrics::TIMEOUT_TAG,
                         ])
                         .inc();
-                    return Err(SuiError::ModuleVerificationFailure { error: format!("Verification timedout: {}", e) });
+                    return Err(SuiErrorKind::ModuleVerificationFailure {
+                        error: format!("Verification timedout: {}", e),
+                    }
+                    .into());
                 };
             } else if let Err(err) =
                 sui_verify_module_metered_check_timeout_only(module, &BTreeMap::new(), meter, verifier_config)

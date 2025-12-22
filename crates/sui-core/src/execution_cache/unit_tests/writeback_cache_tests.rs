@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     future::Future,
     path::PathBuf,
     sync::{
@@ -17,7 +17,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use sui_framework::BuiltInFramework;
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
-    base_types::{random_object_ref, SuiAddress},
+    base_types::{random_object_ref, FullObjectRef, SuiAddress},
     crypto::{deterministic_random_account_key, get_key_pair_from_rng, AccountKeyPair},
     effects::{TestEffectsBuilder, TransactionEffectsAPI},
     event::Event,
@@ -102,11 +102,11 @@ impl Scenario {
 
     fn count_action(&mut self) {
         let prev = self.action_count.fetch_add(1, Ordering::Relaxed);
-        if let Some((count, _)) = &self.do_after {
-            if prev == *count {
-                let (_, f) = self.do_after.take().unwrap();
-                f(self);
-            }
+        if let Some((count, _)) = &self.do_after
+            && prev == *count
+        {
+            let (_, f) = self.do_after.take().unwrap();
+            f(self);
         }
     }
 
@@ -146,24 +146,27 @@ impl Scenario {
         // Tx is opaque to the cache, so we just build a dummy tx. The only requirement is
         // that it has a unique digest every time.
         let tx = TestTransactionBuilder::new(sender, random_object_ref(), 100)
-            .transfer(random_object_ref(), receiver)
+            .transfer(FullObjectRef::from_fastpath_ref(random_object_ref()), receiver)
             .build_and_sign(&keypair);
 
         let tx = VerifiedTransaction::new_unchecked(tx);
         let events: TransactionEvents = Default::default();
 
-        let effects = TestEffectsBuilder::new(tx.inner()).with_events_digest(events.digest()).build();
+        let effects = TestEffectsBuilder::new(tx.inner()).build();
 
         TransactionOutputs {
             transaction: Arc::new(tx),
             effects,
             events,
+            unchanged_loaded_runtime_objects: Default::default(),
+            accumulator_events: Default::default(),
             markers: Default::default(),
             wrapped: Default::default(),
             deleted: Default::default(),
             locks_to_delete: Default::default(),
             new_locks_to_init: Default::default(),
             written: Default::default(),
+            output_keys: Default::default(),
         }
     }
 
@@ -324,7 +327,7 @@ impl Scenario {
         let tx = *outputs.transaction.digest();
         assert!(self.transactions.insert(tx), "transaction is not unique");
 
-        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone(), true);
+        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone());
 
         self.count_action();
         tx
@@ -332,7 +335,8 @@ impl Scenario {
 
     // commit a transaction to the database
     pub async fn commit(&mut self, tx: TransactionDigest) -> SuiResult {
-        self.cache().commit_transaction_outputs(1, &[tx], true);
+        let batch = self.cache().build_db_batch(1, &[tx]);
+        self.cache().commit_transaction_outputs(1, batch, &[tx]);
         self.count_action();
         Ok(())
     }
@@ -439,11 +443,9 @@ impl Scenario {
             let id = self.id_map.get(short_id).expect("no such object");
             let object = self.objects.get(id).expect("no such object");
             assert_eq!(self.cache().get_object_by_key(id, object.version()).unwrap(), *object);
-            assert!(self.cache().have_received_object_at_version(
-                FullObjectKey::new(object.full_id(), object.version()),
-                1,
-                true
-            ));
+            assert!(self
+                .cache()
+                .have_received_object_at_version(FullObjectKey::new(object.full_id(), object.version()), 1,));
         }
     }
 
@@ -500,7 +502,8 @@ async fn test_committed() {
 
         s.assert_live(&[1, 2]);
         s.assert_dirty(&[1, 2]);
-        s.cache().commit_transaction_outputs(1, &[tx], true);
+        let batch = s.cache().build_db_batch(1, &[tx]);
+        s.cache().commit_transaction_outputs(1, batch, &[tx]);
         s.assert_not_dirty(&[1, 2]);
         s.assert_cached(&[1, 2]);
 
@@ -587,35 +590,35 @@ async fn test_extra_outputs() {
 
         s.cache.get_transaction_block(&tx).unwrap();
         let fx = s.cache.get_executed_effects(&tx).unwrap();
-        let events_digest = fx.events_digest().unwrap();
-        s.cache.get_events(events_digest).unwrap();
+        let _events_digest = fx.events_digest().unwrap();
+        s.cache.get_events(&tx).unwrap();
 
         s.commit(tx).await.unwrap();
 
         s.cache.get_transaction_block(&tx).unwrap();
         s.cache.get_executed_effects(&tx).unwrap();
-        s.cache.get_events(events_digest).unwrap();
+        s.cache.get_events(&tx).unwrap();
 
         // clear cache
         s.reset_cache();
 
         s.cache.get_transaction_block(&tx).unwrap();
         s.cache.get_executed_effects(&tx).unwrap();
-        s.cache.get_events(events_digest).unwrap();
+        s.cache.get_events(&tx).unwrap();
 
         s.with_created(&[3]);
         let tx = s.do_tx().await;
 
         // when Events is empty, it should be treated as None
         let fx = s.cache.get_executed_effects(&tx).unwrap();
-        let events_digest = fx.events_digest().unwrap();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(fx.events_digest().is_none());
+        assert!(s.cache.get_events(&tx).is_none(), "empty events should be none");
 
         s.commit(tx).await.unwrap();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(s.cache.get_events(&tx).is_none(), "empty events should be none");
 
         s.reset_cache();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(s.cache.get_events(&tx).is_none(), "empty events should be none");
     })
     .await;
 }
@@ -696,13 +699,13 @@ async fn test_lt_or_eq_caching() {
         };
 
         // latest object not yet cached
-        assert!(!s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
+        assert!(!s.cache.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version <= 0 does not exist
         assert!(s.cache().find_object_lt_or_eq_version(s.obj_id(1), 0.into()).is_none());
 
         // query above populates cache
-        assert_eq!(s.cache.cached.object_by_id_cache.get(&s.obj_id(1)).unwrap().lock().version().unwrap().value(), 5);
+        assert_eq!(s.cache.object_by_id_cache.get(&s.obj_id(1)).unwrap().lock().version().unwrap().value(), 5);
 
         // all queries get correct answer with a populated cache
         check_version(1, 1);
@@ -739,13 +742,13 @@ async fn test_lt_or_eq_with_cached_tombstone() {
         };
 
         // latest object not yet cached
-        assert!(!s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
+        assert!(!s.cache.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version 2 is deleted
         check_version(2, None);
 
         // checking the version pulled the tombstone into the cache
-        assert!(s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
+        assert!(s.cache.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version 1 is still found, tombstone in cache is ignored
         check_version(1, Some(1));
@@ -767,8 +770,7 @@ async fn test_write_transaction_outputs_is_sync() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "should be empty due to revert_state_update")]
-async fn test_missing_reverts_panic() {
+async fn test_revert_unnecessary() {
     telemetry_subscribers::init_for_testing();
     Scenario::iterate(|mut s| async move {
         s.with_created(&[1]);
@@ -779,43 +781,14 @@ async fn test_missing_reverts_panic() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "attempt to revert committed transaction")]
-async fn test_revert_committed_tx_panics() {
-    telemetry_subscribers::init_for_testing();
-    Scenario::iterate(|mut s| async move {
-        s.with_created(&[1]);
-        let tx1 = s.do_tx().await;
-        s.commit(tx1).await.unwrap();
-        s.cache().revert_state_update(&tx1);
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn test_revert_unexecuted_tx() {
-    telemetry_subscribers::init_for_testing();
-    Scenario::iterate(|mut s| async move {
-        s.with_created(&[1]);
-        let tx1 = s.do_tx().await;
-        s.commit(tx1).await.unwrap();
-        let random_digest = TransactionDigest::random();
-        // must not panic - pending_consensus_transactions is a super set of
-        // executed but un-checkpointed transactions
-        s.cache().revert_state_update(&random_digest);
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn test_revert_state_update_created() {
+async fn test_clear_state_update_created() {
     telemetry_subscribers::init_for_testing();
     Scenario::iterate(|mut s| async move {
         // newly created object
         s.with_created(&[1]);
-        let tx1 = s.do_tx().await;
+        s.do_tx().await;
         s.assert_live(&[1]);
 
-        s.cache().revert_state_update(&tx1);
         s.clear_state_end_of_epoch();
 
         s.assert_not_exists(&[1]);
@@ -824,7 +797,7 @@ async fn test_revert_state_update_created() {
 }
 
 #[tokio::test]
-async fn test_revert_state_update_mutated() {
+async fn test_clear_state_update_mutated() {
     telemetry_subscribers::init_for_testing();
     Scenario::iterate(|mut s| async move {
         let v1 = {
@@ -835,29 +808,27 @@ async fn test_revert_state_update_mutated() {
         };
 
         s.with_mutated(&[1]);
-        let tx = s.do_tx().await;
+        s.do_tx().await;
 
-        s.cache().revert_state_update(&tx);
         s.clear_state_end_of_epoch();
 
-        let version_after_revert = s.cache().get_object(&s.obj_id(1)).unwrap().version();
-        assert_eq!(v1, version_after_revert);
+        let version_after_clear = s.cache().get_object(&s.obj_id(1)).unwrap().version();
+        assert_eq!(v1, version_after_clear);
     })
     .await;
 }
 
 #[tokio::test]
-async fn test_invalidate_package_cache_on_revert() {
+async fn test_invalidate_package_cache_on_clear() {
     telemetry_subscribers::init_for_testing();
     Scenario::iterate(|mut s| async move {
         s.with_created(&[1]);
         s.with_packages(&[2]);
-        let tx1 = s.do_tx().await;
+        s.do_tx().await;
 
         s.assert_live(&[1]);
         s.assert_packages(&[2]);
 
-        s.cache().revert_state_update(&tx1);
         s.clear_state_end_of_epoch();
 
         assert!(s.cache().get_package_object(&s.obj_id(2)).unwrap().is_none());
@@ -1137,7 +1108,7 @@ async fn latest_object_cache_race_test() {
             while start.elapsed() < Duration::from_secs(2) {
                 // If you move the get_ticket_for_read to after we get the latest version,
                 // the test will fail! (this is good, it means the test is doing something)
-                let ticket = cache.cached.object_by_id_cache.get_ticket_for_read(&object_id);
+                let ticket = cache.object_by_id_cache.get_ticket_for_read(&object_id);
 
                 // get the latest version, but then let it become stale
                 let Some(latest_version) =
@@ -1171,7 +1142,7 @@ async fn latest_object_cache_race_test() {
         let start = Instant::now();
         std::thread::spawn(move || {
             while start.elapsed() < Duration::from_secs(2) {
-                cache.cached.object_by_id_cache.invalidate(&object_id);
+                cache.object_by_id_cache.invalidate(&object_id);
                 // sleep for 1 to 10µs
                 std::thread::sleep(Duration::from_micros(rand::thread_rng().gen_range(1 .. 10)));
             }
@@ -1186,7 +1157,7 @@ async fn latest_object_cache_race_test() {
             let mut latest = OBJECT_START_VERSION;
 
             while start.elapsed() < Duration::from_secs(2) {
-                let Some(cur) = cache.cached.object_by_id_cache.get(&object_id).and_then(|e| e.lock().version()) else {
+                let Some(cur) = cache.object_by_id_cache.get(&object_id).and_then(|e| e.lock().version()) else {
                     continue;
                 };
 

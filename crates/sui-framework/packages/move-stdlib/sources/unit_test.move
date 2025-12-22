@@ -5,9 +5,6 @@
 /// Module providing testing functionality. Only included for tests.
 module std::unit_test;
 
-/// DEPRECATED
-public native fun create_signers_for_testing(num_signers: u64): vector<signer>;
-
 /// This function is used to poison modules compiled in `test` mode.
 /// This will cause a linking failure if an attempt is made to publish a
 /// test module in a VM that isn't in unit test mode.
@@ -31,3 +28,17 @@ public macro fun assert_ref_eq<$T>($t1: &$T, $t2: &$T) {
         assert!(false);
     }
 }
+
+/// Black hole function to destroy any value in `test` mode.
+///
+/// ```move
+/// use std::unit_test;
+///
+/// public struct NonDroppable {}
+///
+/// fun test_destroy() {
+///     let x = NonDroppable {};
+///     unit_test::destroy(x);
+/// }
+/// ```
+public native fun destroy<T>(v: T);

@@ -184,7 +184,7 @@ where
                 }
             }
             Err(err) => {
-                error!(?tx_digest, ?err, "Failed to finalize transaction");
+                debug!(?tx_digest, "Failed to finalize transaction: {err}");
             }
         }
     }
@@ -204,7 +204,10 @@ where
             _ = tokio::time::sleep(tx_finalization_delay) => {
                 trace!(?tx_digest, "Waking up to finalize transaction");
             }
-            _ = cache_read.notify_read_executed_effects_digests(&digests) => {
+            _ = cache_read.notify_read_executed_effects_digests(
+                "ValidatorTxFinalizer::notify_read_executed_effects_digests",
+                &digests,
+            ) => {
                 trace!(?tx_digest, "Transaction already finalized");
                 return Ok(false);
             }
@@ -273,7 +276,7 @@ mod tests {
         committee::{CommitteeTrait, StakeUnit},
         crypto::{get_account_key_pair, AccountKeyPair},
         effects::{TransactionEffectsAPI, TransactionEvents},
-        error::SuiError,
+        error::{SuiError, SuiErrorKind},
         executable_transaction::VerifiedExecutableTransaction,
         messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
         messages_grpc::{
@@ -285,9 +288,15 @@ mod tests {
             HandleTransactionResponse,
             ObjectInfoRequest,
             ObjectInfoResponse,
+            SubmitTxRequest,
+            SubmitTxResponse,
             SystemStateRequest,
             TransactionInfoRequest,
             TransactionInfoResponse,
+            ValidatorHealthRequest,
+            ValidatorHealthResponse,
+            WaitForEffectsRequest,
+            WaitForEffectsResponse,
         },
         object::Object,
         sui_system_state::SuiSystemState,
@@ -303,9 +312,10 @@ mod tests {
     };
 
     use crate::{
-        authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState},
+        authority::{test_authority_builder::TestAuthorityBuilder, AuthorityState, ExecutionEnv},
         authority_aggregator::{AuthorityAggregator, AuthorityAggregatorBuilder},
         authority_client::AuthorityAPI,
+        execution_scheduler::SchedulingSource,
         validator_tx_finalizer::ValidatorTxFinalizer,
     };
 
@@ -317,13 +327,29 @@ mod tests {
 
     #[async_trait]
     impl AuthorityAPI for MockAuthorityClient {
+        async fn submit_transaction(
+            &self,
+            _request: SubmitTxRequest,
+            _client_addr: Option<SocketAddr>,
+        ) -> Result<SubmitTxResponse, SuiError> {
+            unimplemented!();
+        }
+
+        async fn wait_for_effects(
+            &self,
+            _request: WaitForEffectsRequest,
+            _client_addr: Option<SocketAddr>,
+        ) -> Result<WaitForEffectsResponse, SuiError> {
+            unimplemented!()
+        }
+
         async fn handle_transaction(
             &self,
             transaction: Transaction,
             _client_addr: Option<SocketAddr>,
         ) -> Result<HandleTransactionResponse, SuiError> {
             if self.inject_fault.load(Relaxed) {
-                return Err(SuiError::TimeoutError);
+                return Err(SuiErrorKind::TimeoutError.into());
             }
             let epoch_store = self.authority.epoch_store_for_testing();
             self.authority.handle_transaction(&epoch_store, VerifiedTransaction::new_unchecked(transaction)).await
@@ -341,13 +367,15 @@ mod tests {
                     &VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(
                         certificate,
                     )),
-                    None,
+                    ExecutionEnv::new().with_scheduling_source(SchedulingSource::NonFastPath),
                     &epoch_store,
                 )
-                .await?;
-            let events = match effects.events_digest() {
-                None => TransactionEvents::default(),
-                Some(digest) => self.authority.get_transaction_events(digest)?,
+                .await
+                .unwrap();
+            let events = if effects.events_digest().is_some() {
+                self.authority.get_transaction_events(effects.transaction_digest())?
+            } else {
+                TransactionEvents::default()
             };
             let signed_effects = self.authority.sign_effects(effects, &epoch_store)?.into_inner();
             Ok(HandleCertificateResponseV2 { signed_effects, events, fastpath_input_objects: vec![] })
@@ -390,6 +418,14 @@ mod tests {
 
         async fn handle_system_state_object(&self, _request: SystemStateRequest) -> Result<SuiSystemState, SuiError> {
             unimplemented!()
+        }
+
+        async fn validator_health(&self, _request: ValidatorHealthRequest) -> Result<ValidatorHealthResponse, SuiError> {
+            Ok(ValidatorHealthResponse {
+                last_committed_leader_round: 1000,
+                last_locally_built_checkpoint: 500,
+                ..Default::default()
+            })
         }
     }
 

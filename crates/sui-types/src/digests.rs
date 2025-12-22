@@ -3,7 +3,10 @@
 
 use std::{env, fmt};
 
-use fastcrypto::encoding::{Base58, Encoding, Hex};
+use fastcrypto::{
+    encoding::{Base58, Encoding, Hex},
+    hash::{Blake2b256, HashFunction},
+};
 use once_cell::sync::{Lazy, OnceCell};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -11,7 +14,10 @@ use serde_with::{serde_as, Bytes};
 use sui_protocol_config::Chain;
 use tracing::info;
 
-use crate::{error::SuiError, sui_serde::Readable};
+use crate::{
+    error::{SuiError, SuiErrorKind, SuiResult},
+    sui_serde::Readable,
+};
 
 /// A representation of a 32 byte digest
 #[serde_as]
@@ -85,7 +91,7 @@ impl TryFrom<Vec<u8>> for Digest {
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, SuiError> {
         let bytes: [u8; 32] = <[u8; 32]>::try_from(&bytes[..])
-            .map_err(|_| SuiError::InvalidDigestLength { expected: 32, actual: bytes.len() })?;
+            .map_err(|_| SuiErrorKind::InvalidDigestLength { expected: 32, actual: bytes.len() })?;
 
         Ok(Self::from(bytes))
     }
@@ -144,7 +150,7 @@ pub static TESTNET_CHAIN_IDENTIFIER: OnceCell<ChainIdentifier> = OnceCell::new()
 
 /// For testing purposes or bootstrapping regenesis chain configuration, you can set
 /// this environment variable to force protocol config to use a specific Chain.
-const SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE_ENV_VAR_NAME: &str = "SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE";
+pub const SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE_ENV_VAR_NAME: &str = "SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE";
 
 static SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE: Lazy<Option<Chain>> = Lazy::new(|| {
     if let Ok(s) = env::var(SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE_ENV_VAR_NAME) {
@@ -595,7 +601,7 @@ impl TryFrom<&[u8]> for TransactionDigest {
     type Error = crate::error::SuiError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, crate::error::SuiError> {
-        let arr: [u8; 32] = bytes.try_into().map_err(|_| crate::error::SuiError::InvalidTransactionDigest)?;
+        let arr: [u8; 32] = bytes.try_into().map_err(|_| crate::error::SuiErrorKind::InvalidTransactionDigest)?;
         Ok(Self::new(arr))
     }
 }
@@ -713,6 +719,20 @@ impl fmt::UpperHex for TransactionEffectsDigest {
     }
 }
 
+impl std::str::FromStr for TransactionEffectsDigest {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut result = [0; 32];
+        let buffer = Base58::decode(s).map_err(|e| anyhow::anyhow!(e))?;
+        if buffer.len() != 32 {
+            return Err(anyhow::anyhow!("Invalid digest length. Expected 32 bytes"));
+        }
+        result.copy_from_slice(&buffer);
+        Ok(TransactionEffectsDigest::new(result))
+    }
+}
+
 #[serde_as]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct TransactionEventsDigest(Digest);
@@ -734,6 +754,16 @@ impl TransactionEventsDigest {
 
     pub fn into_inner(self) -> [u8; 32] {
         self.0.into_inner()
+    }
+
+    pub fn base58_encode(&self) -> String {
+        Base58::encode(self.0)
+    }
+}
+
+impl fmt::Display for TransactionEventsDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -798,6 +828,12 @@ impl EffectsAuxDataDigest {
 
     pub fn into_inner(self) -> [u8; 32] {
         self.0.into_inner()
+    }
+}
+
+impl fmt::Display for EffectsAuxDataDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -938,7 +974,7 @@ impl TryFrom<&[u8]> for ObjectDigest {
     type Error = crate::error::SuiError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, crate::error::SuiError> {
-        let arr: [u8; 32] = bytes.try_into().map_err(|_| crate::error::SuiError::InvalidTransactionDigest)?;
+        let arr: [u8; 32] = bytes.try_into().map_err(|_| crate::error::SuiErrorKind::InvalidTransactionDigest)?;
         Ok(Self::new(arr))
     }
 }
@@ -1024,6 +1060,8 @@ impl fmt::Debug for ConsensusCommitDigest {
 pub struct AdditionalConsensusStateDigest(Digest);
 
 impl AdditionalConsensusStateDigest {
+    pub const ZERO: Self = Self(Digest::ZERO);
+
     pub const fn new(digest: [u8; 32]) -> Self {
         Self(Digest::new(digest))
     }
@@ -1041,24 +1079,76 @@ impl fmt::Debug for AdditionalConsensusStateDigest {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct CheckpointArtifactsDigest(Digest);
+
+impl CheckpointArtifactsDigest {
+    pub const fn new(digest: [u8; 32]) -> Self {
+        Self(Digest::new(digest))
+    }
+
+    pub const fn inner(&self) -> &[u8; 32] {
+        self.0.inner()
+    }
+
+    pub const fn into_inner(self) -> [u8; 32] {
+        self.0.into_inner()
+    }
+
+    pub fn base58_encode(&self) -> String {
+        Base58::encode(self.0)
+    }
+
+    pub fn from_artifact_digests(digests: Vec<Digest>) -> SuiResult<Self> {
+        let bytes = bcs::to_bytes(&digests).map_err(|e| SuiError::from(format!("BCS error: {}", e)))?;
+        Ok(Self(Digest::new(Blake2b256::digest(&bytes).into())))
+    }
+}
+
+impl From<[u8; 32]> for CheckpointArtifactsDigest {
+    fn from(digest: [u8; 32]) -> Self {
+        Self(Digest::new(digest))
+    }
+}
+
+impl fmt::Display for CheckpointArtifactsDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(test)]
 mod test {
-    #[allow(unused_imports)]
-    use crate::digests::ChainIdentifier;
+    use crate::digests::{ChainIdentifier, SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE};
+
+    fn has_env_override() -> bool {
+        SUI_PROTOCOL_CONFIG_CHAIN_OVERRIDE.is_some()
+    }
+
     // check that the chain id returns mainnet
     #[test]
     fn test_chain_id_mainnet() {
+        if has_env_override() {
+            return;
+        }
         let chain_id = ChainIdentifier::from_chain_short_id(&String::from("35834a8a"));
         assert_eq!(chain_id.unwrap().chain(), sui_protocol_config::Chain::Mainnet);
     }
 
     #[test]
     fn test_chain_id_testnet() {
+        if has_env_override() {
+            return;
+        }
         let chain_id = ChainIdentifier::from_chain_short_id(&String::from("4c78adac"));
         assert_eq!(chain_id.unwrap().chain(), sui_protocol_config::Chain::Testnet);
     }
 
     #[test]
     fn test_chain_id_unknown() {
+        if has_env_override() {
+            return;
+        }
         let chain_id = ChainIdentifier::from_chain_short_id(&String::from("unknown"));
         assert_eq!(chain_id, None);
     }

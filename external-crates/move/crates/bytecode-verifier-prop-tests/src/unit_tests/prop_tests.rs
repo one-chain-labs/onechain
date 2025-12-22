@@ -13,14 +13,15 @@ use move_binary_format::{
     proptest_types::CompiledModuleStrategyGen,
 };
 use move_bytecode_verifier::{
+    DuplicationChecker, InstructionConsistency, RecursiveDataDefChecker, SignatureChecker,
     ability_cache::AbilityCache, ability_field_requirements, constants,
-    instantiation_loops::InstantiationLoopChecker, DuplicationChecker, InstructionConsistency,
-    RecursiveDataDefChecker, SignatureChecker,
+    instantiation_loops::InstantiationLoopChecker,
 };
 use move_bytecode_verifier_meter::dummy::DummyMeter;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
 };
+use move_vm_config::verifier::VerifierConfig;
 use proptest::{collection::vec, prelude::*, sample::Index as PropIndex};
 
 proptest! {
@@ -50,7 +51,7 @@ proptest! {
             oob_context.apply()
         };
 
-        let actual_violations = BoundsChecker::verify_module(&module);
+        let actual_violations = BoundsChecker::verify_module(&module, /* deprecate_global_storage_ops */ true);
         prop_assert_eq!(expected_violations.is_empty(), actual_violations.is_ok());
     }
 
@@ -64,7 +65,7 @@ proptest! {
             context.apply()
         };
 
-        let actual_violations = BoundsChecker::verify_module(&module);
+        let actual_violations = BoundsChecker::verify_module(&module, /* deprecate_global_storage_ops */ true);
         prop_assert_eq!(expected_violations.is_empty(), actual_violations.is_ok());
     }
 
@@ -82,7 +83,7 @@ proptest! {
         };
 
         prop_assert_eq!(
-            BoundsChecker::verify_module(&module).map_err(|e| e.major_status()),
+            BoundsChecker::verify_module(&module, /* deprecate_global_storage_ops */ true).map_err(|e| e.major_status()),
             Err(StatusCode::NO_MODULE_HANDLES)
         );
     }
@@ -90,7 +91,7 @@ proptest! {
     /// Make sure that garbage inputs don't crash the bounds checker.
     #[test]
     fn garbage_inputs(module in any_with::<CompiledModule>(16)) {
-        let _ = BoundsChecker::verify_module(&module);
+        let _ = BoundsChecker::verify_module(&module, /* deprecate_global_storage_ops */ true);
     }
 
     #[test]
@@ -105,11 +106,12 @@ proptest! {
 
     #[test]
     fn check_verifier_passes(module in CompiledModule::valid_strategy(20)) {
+        let config = &VerifierConfig::default();
         let module = &module;
         let ability_cache = &mut AbilityCache::new(module);
         DuplicationChecker::verify_module(module).expect("DuplicationChecker failure");
         SignatureChecker::verify_module(module, ability_cache, &mut DummyMeter).expect("SignatureChecker failure");
-        InstructionConsistency::verify_module(module).expect("InstructionConsistency failure");
+        InstructionConsistency::verify_module(config, module).expect("InstructionConsistency failure");
         constants::verify_module(module).expect("constants failure");
         ability_field_requirements::verify_module(module, ability_cache, &mut DummyMeter).expect("ability_field_requirements failure");
         RecursiveDataDefChecker::verify_module(module).expect("RecursiveDataDefChecker failure");
@@ -165,9 +167,9 @@ proptest! {
 /// There are some potentially tricky edge cases around ranges that are captured here.
 #[test]
 fn valid_bounds_no_members() {
-    let mut gen = CompiledModuleStrategyGen::new(20);
-    gen.zeros_all();
-    proptest!(|(_module in gen.generate())| {
+    let mut rng = CompiledModuleStrategyGen::new(20);
+    rng.zeros_all();
+    proptest!(|(_module in rng.generate())| {
         // gen.generate() will panic if there are any bounds check issues.
     });
 }

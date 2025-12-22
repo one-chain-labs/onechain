@@ -7,14 +7,14 @@ use clap::{Parser, ValueEnum};
 use pretty_assertions::assert_str_eq;
 //temporarily remove api ref content for indexer methods
 //use sui_json_rpc::api::ExtendedApiOpenRpc;
-use sui_json_rpc::coin_api::CoinReadApi;
+use sui_json_rpc::SuiRpcModule;
 use sui_json_rpc::{
+    coin_api::CoinReadApi,
     governance_api::GovernanceReadApi,
     read_api::ReadApi,
     sui_rpc_doc,
     transaction_builder_api::TransactionBuilderApi,
     transaction_execution_api::TransactionExecutionApi,
-    SuiRpcModule,
 };
 use sui_json_rpc_api::{IndexerApiOpenRpc, MoveUtilsOpenRpc};
 

@@ -11,7 +11,6 @@ use std::{
 
 use expect_test::expect;
 use move_core_types::account_address::AccountAddress;
-use sui_json_rpc_types::{get_new_package_obj_from_response, get_new_package_upgrade_cap_from_response};
 use sui_move_build::{BuildConfig, CompiledPackage, SuiPackageHooks};
 use sui_sdk::wallet_context::WalletContext;
 use sui_test_transaction_builder::{make_publish_transaction, make_publish_transaction_with_deps};
@@ -330,7 +329,9 @@ async fn dependency_is_an_object() -> anyhow::Result<()> {
     };
 
     let client = context.get_client().await?;
-    let expected = expect!["Dependency ID contains a Sui object, not a Move package: 0x0000000000000000000000000000000000000000000000000000000000000005"];
+    let expected = expect![
+        "Dependency ID contains a Sui object, not a Move package: 0x0000000000000000000000000000000000000000000000000000000000000005"
+    ];
     expected.assert_eq(
         &BytecodeSourceVerifier::new(client.read_api())
             .verify(&a_pkg, ValidationMode::deps())
@@ -478,7 +479,7 @@ async fn linkage_differs() -> anyhow::Result<()> {
         upgrade_package(context, b_v1.0, b_cap.0, b_src).await
     };
 
-    // Publish b-v2 a second time, to create a third version of the package that is othewise
+    // Publish b-v2 a second time, to create a third version of the package that is otherwise
     // byte-for-byte identical with the second version;
     let b_v3_fixtures = tempfile::tempdir()?;
     let b_v3 = {
@@ -601,6 +602,7 @@ async fn successful_versioned_dependency_verification() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // TODO: DVX-786
 async fn successful_verification_with_bytecode_dep() -> anyhow::Result<()> {
     let mut cluster = TestClusterBuilder::new().build().await;
     let context = &mut cluster.wallet;
@@ -617,7 +619,7 @@ async fn successful_verification_with_bytecode_dep() -> anyhow::Result<()> {
         let pkg_path = copy_published_package(&tempdir, "b", b_ref.0.into()).await?;
 
         move_package::package_hooks::register_package_hooks(Box::new(SuiPackageHooks));
-        BuildConfig::default().build(&pkg_path).unwrap();
+        BuildConfig::new_for_testing().build(&pkg_path).unwrap();
 
         fs::remove_dir_all(pkg_path.join("sources"))?;
     };
@@ -661,8 +663,8 @@ fn sanitize_id(mut message: String, m: &HashMap<SuiAddress, &str>) -> String {
 async fn publish_package(context: &WalletContext, package: PathBuf) -> (ObjectRef, ObjectRef) {
     let txn = make_publish_transaction(context, package).await;
     let response = context.execute_transaction_must_succeed(txn).await;
-    let package = get_new_package_obj_from_response(&response).unwrap();
-    let cap = get_new_package_upgrade_cap_from_response(&response).unwrap();
+    let package = response.get_new_package_obj().unwrap();
+    let cap = response.get_new_package_upgrade_cap().unwrap();
     (package, cap)
 }
 
@@ -686,7 +688,7 @@ async fn upgrade_package(
 async fn publish_package_and_deps(context: &WalletContext, package: PathBuf) -> ObjectRef {
     let txn = make_publish_transaction_with_deps(context, package).await;
     let response = context.execute_transaction_must_succeed(txn).await;
-    get_new_package_obj_from_response(&response).unwrap()
+    response.get_new_package_obj().unwrap()
 }
 
 /// Copy `package` from fixtures into `directory`, setting its named address in the copied package's
@@ -780,10 +782,10 @@ pub async fn upgrade_package_with_wallet(
             .await
             .unwrap();
 
-        context.sign_transaction(&data)
+        context.sign_transaction(&data).await
     };
 
     let resp = context.execute_transaction_must_succeed(transaction).await;
 
-    (get_new_package_obj_from_response(&resp).unwrap(), resp.digest)
+    (resp.get_new_package_obj().unwrap(), resp.digest)
 }

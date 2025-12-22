@@ -180,7 +180,7 @@ pub async fn exchange_rates(
         .await?
     {
         let pool_id: sui_types::id::ID = bcs::from_bytes(&df.bcs_name)
-            .map_err(|e| sui_types::error::SuiError::ObjectDeserializationError { error: e.to_string() })?;
+            .map_err(|e| sui_types::error::SuiErrorKind::ObjectDeserializationError { error: e.to_string() })?;
         let inactive_pools_id = system_state_summary.inactive_pools_id;
         let validator = state.inner.get_validator_from_table(inactive_pools_id, pool_id).await?;
         tables.push((
@@ -198,7 +198,9 @@ pub async fn exchange_rates(
         let mut rates = vec![];
         for df in state.inner.get_dynamic_fields_raw(exchange_rates_id, None, exchange_rates_size as usize).await? {
             let dynamic_field = df.to_dynamic_field::<EpochId, PoolTokenExchangeRate>().ok_or_else(|| {
-                sui_types::error::SuiError::ObjectDeserializationError { error: "dynamic field malformed".to_owned() }
+                sui_types::error::SuiErrorKind::ObjectDeserializationError {
+                    error: "dynamic field malformed".to_owned(),
+                }
             })?;
 
             rates.push((dynamic_field.name, dynamic_field.value));

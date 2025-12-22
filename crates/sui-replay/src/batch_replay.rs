@@ -109,11 +109,11 @@ async fn run_task(
         }
         info!("[{}/{}] Replaying transaction {:?}...", index, total_count, digest);
         let sandbox_persist_path = persist_path.map(|path| path.join(format!("{}.json", digest,)));
-        if let Some(p) = sandbox_persist_path.as_ref() {
-            if p.exists() {
-                info!("Skipping transaction {:?} as it has been replayed before", digest);
-                continue;
-            }
+        if let Some(p) = sandbox_persist_path.as_ref()
+            && p.exists()
+        {
+            info!("Skipping transaction {:?} as it has been replayed before", digest);
+            continue;
         }
         let async_func =
             execute_transaction(&mut executor, &digest, expensive_safety_check_config.clone(), use_authority).fuse();
@@ -161,7 +161,7 @@ async fn execute_transaction(
     };
     let sandbox_state = loop {
         let result = executor
-            .execute_transaction(digest, expensive_safety_check_config.clone(), use_authority, None, None, None, None)
+            .execute_transaction(digest, expensive_safety_check_config.clone(), use_authority, None, None, None)
             .await;
         match result {
             Ok(sandbox_state) => break sandbox_state,

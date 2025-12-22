@@ -46,7 +46,7 @@ pub enum Error {
 impl FieldVisitor {
     /// Deserialize the top-level structure from a dynamic field's `0x2::dynamic_field::Field`
     /// without having to fully deserialize its name or value.
-    pub fn deserialize<'b, 'l>(bytes: &'b [u8], layout: &'l A::MoveTypeLayout) -> anyhow::Result<Field<'b, 'l>> {
+    pub fn deserialize<'b, 'l>(bytes: &'b [u8], layout: &'l A::MoveTypeLayout) -> Result<Field<'b, 'l>, Error> {
         A::MoveValue::visit_deserialize(bytes, layout, &mut FieldVisitor)
     }
 }

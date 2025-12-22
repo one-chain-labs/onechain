@@ -1,0 +1,9 @@
+[package]
+name = "tto"
+edition = "2024.beta"
+
+[dependencies]
+One = { local = "../../../../../sui-framework/packages/one-framework" }
+
+[addresses]
+tto = "0x0"

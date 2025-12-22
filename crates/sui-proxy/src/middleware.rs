@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use axum::{
-    async_trait,
     body::{Body, Bytes},
     extract::{Extension, FromRequest},
     http::{Request, StatusCode},
@@ -31,20 +30,12 @@ static MIDDLEWARE_OPS: Lazy<CounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-static MIDDLEWARE_HEADERS: Lazy<CounterVec> = Lazy::new(|| {
-    register_counter_vec!("middleware_headers", "Operations counters and status for axum middleware.", &[
-        "header", "value"
-    ])
-    .unwrap()
-});
-
 /// we expect sui-node to send us an http header content-length encoding.
 pub async fn expect_content_length(
-    TypedHeader(content_length): TypedHeader<ContentLength>,
+    TypedHeader(_content_length): TypedHeader<ContentLength>,
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, (StatusCode, &'static str)> {
-    MIDDLEWARE_HEADERS.with_label_values(&["content-length", &format!("{}", content_length.0)]);
     Ok(next.run(request).await)
 }
 
@@ -90,7 +81,6 @@ pub async fn expect_valid_public_key(
 #[derive(Debug)]
 pub struct LenDelimProtobuf(pub Vec<MetricFamily>);
 
-#[async_trait]
 impl<S> FromRequest<S> for LenDelimProtobuf
 where
     S: Send + Sync,

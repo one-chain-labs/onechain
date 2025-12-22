@@ -8,17 +8,11 @@ use std::{
 };
 
 use consensus_config::{AuthorityIndex, Stake};
+use consensus_types::block::Round;
 use parking_lot::RwLock;
 use rand::{prelude::SliceRandom, rngs::StdRng, SeedableRng};
 
-use crate::{
-    commit::CommitRange,
-    context::Context,
-    dag_state::DagState,
-    leader_scoring::ReputationScores,
-    CommitIndex,
-    Round,
-};
+use crate::{commit::CommitRange, context::Context, dag_state::DagState, leader_scoring::ReputationScores, CommitIndex};
 
 /// The `LeaderSchedule` is responsible for producing the leader schedule across
 /// an epoch. The leader schedule is subject to change periodically based on
@@ -161,15 +155,13 @@ impl LeaderSchedule {
             .map(|(index, authority)| (index, authority.stake as f32))
             .collect::<Vec<_>>();
 
-        let leader_index = *choices
+        *choices
             .choose_multiple_weighted(&mut rng, self.context.committee.size(), |item| item.1)
             .expect("Weighted choice error: stake values incorrect!")
             .skip(offset as usize)
             .map(|(index, _)| index)
             .next()
-            .unwrap();
-
-        leader_index
+            .unwrap()
     }
 
     /// Atomically updates the `LeaderSwapTable` with the new provided one. Any
@@ -186,7 +178,8 @@ impl LeaderSchedule {
         // preceding commit range of the old swap table.
         if *old_commit_range != CommitRange::default() {
             assert!(
-                old_commit_range.is_next_range(new_commit_range) && old_commit_range.is_equal_size(new_commit_range),
+                old_commit_range.is_next_range(new_commit_range)
+                    && old_commit_range.is_equal_size(new_commit_range),
                 "The new LeaderSwapTable has an invalid CommitRange. Old LeaderSwapTable {old_commit_range:?} vs new LeaderSwapTable {new_commit_range:?}",
             );
         }
@@ -382,10 +375,11 @@ impl Debug for LeaderSwapTable {
 
 #[cfg(test)]
 mod tests {
+    use consensus_types::block::{BlockDigest, BlockRef, BlockTimestampMs};
 
     use super::*;
     use crate::{
-        block::{BlockDigest, BlockRef, BlockTimestampMs, TestBlock, VerifiedBlock},
+        block::{TestBlock, VerifiedBlock},
         commit::{CommitDigest, CommitInfo, CommitRef, CommittedSubDag, TrustedCommit},
         storage::{mem_store::MemStore, Store, WriteBatch},
         test_dag_builder::DagBuilder,
@@ -563,10 +557,8 @@ mod tests {
         let unscored_subdags = vec![CommittedSubDag::new(
             BlockRef::new(1, AuthorityIndex::ZERO, BlockDigest::MIN),
             vec![],
-            vec![],
             context.clock.timestamp_utc_ms(),
             CommitRef::new(1, CommitDigest::MIN),
-            vec![],
         )];
         dag_state.write().add_scoring_subdags(unscored_subdags);
 
@@ -637,7 +629,6 @@ mod tests {
         let leader_block = leader.unwrap();
         let leader_ref = leader_block.reference();
         let commit_index = 1;
-        let rejected_transactions = vec![vec![]; blocks.len()];
 
         let last_commit = TrustedCommit::new_for_test(
             commit_index,
@@ -647,14 +638,8 @@ mod tests {
             blocks.iter().map(|block| block.reference()).collect::<Vec<_>>(),
         );
 
-        let unscored_subdags = vec![CommittedSubDag::new(
-            leader_ref,
-            blocks,
-            rejected_transactions,
-            context.clock.timestamp_utc_ms(),
-            last_commit.reference(),
-            vec![],
-        )];
+        let unscored_subdags =
+            vec![CommittedSubDag::new(leader_ref, blocks, context.clock.timestamp_utc_ms(), last_commit.reference())];
 
         let mut dag_state_write = dag_state.write();
         dag_state_write.set_last_commit(last_commit);

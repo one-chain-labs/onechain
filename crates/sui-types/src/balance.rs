@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::{
+    account_address::AccountAddress,
     annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     ident_str,
     identifier::IdentStr,
@@ -16,11 +17,17 @@ use crate::{
     sui_serde::{BigInt, Readable},
     SUI_FRAMEWORK_ADDRESS,
 };
+
+pub const SUI_MODULE_NAME: &IdentStr = ident_str!("oct");
 pub const BALANCE_MODULE_NAME: &IdentStr = ident_str!("balance");
 pub const BALANCE_STRUCT_NAME: &IdentStr = ident_str!("Balance");
+pub const RESOLVED_BALANCE_STRUCT: (&AccountAddress, &IdentStr, &IdentStr) =
+    (&SUI_FRAMEWORK_ADDRESS, BALANCE_MODULE_NAME, BALANCE_STRUCT_NAME);
 pub const BALANCE_CREATE_REWARDS_FUNCTION_NAME: &IdentStr = ident_str!("create_staking_rewards");
 pub const BALANCE_DESTROY_REBATES_FUNCTION_NAME: &IdentStr = ident_str!("destroy_storage_rebates");
 
+pub const BALANCE_REDEEM_FUNDS_FUNCTION_NAME: &IdentStr = ident_str!("redeem_funds");
+pub const BALANCE_SEND_FUNDS_FUNCTION_NAME: &IdentStr = ident_str!("send_funds");
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, JsonSchema)]
 pub struct Supply {
@@ -48,10 +55,33 @@ impl Balance {
         }
     }
 
+    pub fn type_tag(type_param: TypeTag) -> TypeTag {
+        TypeTag::Struct(Box::new(Self::type_(type_param)))
+    }
+
     pub fn is_balance(s: &StructTag) -> bool {
         s.address == SUI_FRAMEWORK_ADDRESS
             && s.module.as_ident_str() == BALANCE_MODULE_NAME
             && s.name.as_ident_str() == BALANCE_STRUCT_NAME
+    }
+
+    pub fn is_balance_type(type_param: &TypeTag) -> bool {
+        if let TypeTag::Struct(struct_tag) = type_param {
+            Self::is_balance(struct_tag)
+        } else {
+            false
+        }
+    }
+
+    /// If the given type is `Balance<T>`, return `Some(T)`.
+    pub fn maybe_get_balance_type_param(ty: &TypeTag) -> Option<TypeTag> {
+        if let TypeTag::Struct(struct_tag) = ty
+            && Self::is_balance(struct_tag)
+        {
+            assert_eq!(struct_tag.type_params.len(), 1);
+            return Some(struct_tag.type_params[0].clone());
+        }
+        None
     }
 
     pub fn withdraw(&mut self, amount: u64) -> Result<(), ExecutionError> {
@@ -83,5 +113,36 @@ impl Balance {
             type_: Self::type_(type_param),
             fields: vec![MoveFieldLayout::new(ident_str!("value").to_owned(), MoveTypeLayout::U64)],
         }
+    }
+
+    /// Check if a struct layout represents a `Balance<T>` type with the expected field structure.
+    pub fn is_balance_layout(struct_layout: &MoveStructLayout) -> bool {
+        let ty = &struct_layout.type_;
+
+        if !Self::is_balance(ty) {
+            return false;
+        }
+
+        if ty.type_params.len() != 1 {
+            return false;
+        }
+
+        if struct_layout.fields.len() != 1 {
+            return false;
+        }
+
+        let Some(field) = struct_layout.fields.first() else {
+            return false;
+        };
+
+        if field.name.as_str() != "value" {
+            return false;
+        }
+
+        if !matches!(field.layout, MoveTypeLayout::U64) {
+            return false;
+        }
+
+        true
     }
 }

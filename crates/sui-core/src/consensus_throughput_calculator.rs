@@ -113,7 +113,10 @@ impl ThroughputProfileRanges {
             }
         }
 
-        warn!("Could not resolve throughput profile for throughput {} - we shouldn't end up here. Fallback to lowest profile as default.", current_throughput);
+        warn!(
+            "Could not resolve throughput profile for throughput {} - we shouldn't end up here. Fallback to lowest profile as default.",
+            current_throughput
+        );
 
         // If not found, then we should return the lowest possible profile as default to stay on safe side.
         self.highest_profile()
@@ -367,7 +370,10 @@ impl ConsensusThroughputCalculator {
 
                 self.current_throughput.store(Arc::new((current_throughput, timestamp_secs)));
             } else {
-                warn!("Skip calculating throughput as time period is {}. This is very unlikely to happen, should investigate.", period);
+                warn!(
+                    "Skip calculating throughput as time period is {}. This is very unlikely to happen, should investigate.",
+                    period
+                );
             }
         }
     }

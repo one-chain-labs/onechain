@@ -10,6 +10,7 @@ pub mod discovery;
 pub mod randomness;
 pub mod state_sync;
 pub mod utils;
+pub mod validator;
 
 pub use tonic;
 

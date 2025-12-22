@@ -41,7 +41,7 @@ public fun new_form_balance<T>(
         vesting_internal_release,
     }
 }
-
+#[allow(lint(public_entry))]
 public entry fun release<T>(self: &mut CoinVesting<T>, ctx: &mut TxContext){
     let withdraw = self.release_non_entry(ctx);
     if(withdraw.value() > 0){

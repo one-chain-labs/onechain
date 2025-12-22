@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier_meter::Meter;
@@ -23,6 +23,7 @@ use sui_types::{
     effects::TransactionEffects,
     error::{ExecutionError, SuiError, SuiResult},
     execution::{ExecutionResult, ExecutionTiming, TypeLayoutStore},
+    execution_params::ExecutionOrEarlyError,
     gas::SuiGasStatus,
     inner_temporary_store::InnerTemporaryStore,
     layout_resolver::LayoutResolver,
@@ -42,12 +43,8 @@ pub(crate) struct Verifier<'m> {
 }
 
 impl Executor {
-    pub(crate) fn new(
-        protocol_config: &ProtocolConfig,
-        silent: bool,
-        enable_profiler: Option<PathBuf>,
-    ) -> Result<Self, SuiError> {
-        Ok(Executor(Arc::new(new_move_vm(all_natives(silent), protocol_config, enable_profiler)?)))
+    pub(crate) fn new(protocol_config: &ProtocolConfig, silent: bool) -> Result<Self, SuiError> {
+        Ok(Executor(Arc::new(new_move_vm(all_natives(silent), protocol_config)?)))
     }
 }
 
@@ -64,7 +61,7 @@ impl executor::Executor for Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         input_objects: CheckedInputObjects,
@@ -90,7 +87,7 @@ impl executor::Executor for Executor {
             protocol_config,
             metrics,
             enable_expensive_checks,
-            certificate_deny_set,
+            execution_params,
         );
         // note: old versions do not report timings.
         (inner_temp_store, gas_status, effects, vec![], result)
@@ -102,7 +99,7 @@ impl executor::Executor for Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         input_objects: CheckedInputObjects,
@@ -129,7 +126,7 @@ impl executor::Executor for Executor {
                 protocol_config,
                 metrics,
                 enable_expensive_checks,
-                certificate_deny_set,
+                execution_params,
             )
         } else {
             execute_transaction_to_effects::<execution_mode::DevInspect<false>>(
@@ -146,7 +143,7 @@ impl executor::Executor for Executor {
                 protocol_config,
                 metrics,
                 enable_expensive_checks,
-                certificate_deny_set,
+                execution_params,
             )
         }
     }
@@ -167,10 +164,13 @@ impl executor::Executor for Executor {
             transaction_digest,
             &epoch_id,
             epoch_timestamp_ms,
-            // genesis transaction: RGP: 1, sponsor: None
+            // genesis transaction: RGP: 1, budget: 1M, sponsor: None
             // Those values are unused anyway in execution versions before 3 (or latest)
             1,
+            1,
+            1_000_000,
             None,
+            protocol_config,
         );
         execute_genesis_state_update(store, protocol_config, metrics, &self.0, tx_context, input_objects, pt)
     }
@@ -186,6 +186,10 @@ impl executor::Executor for Executor {
 impl verifier::Verifier for Verifier<'_> {
     fn meter(&self, config: MeterConfig) -> Box<dyn Meter> {
         Box::new(SuiVerifierMeter::new(config))
+    }
+
+    fn override_deprecate_global_storage_ops_during_deserialization(&self) -> Option<bool> {
+        None
     }
 
     fn meter_compiled_modules(

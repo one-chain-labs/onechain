@@ -9,21 +9,22 @@ use crate::{
     },
     command_line as cli,
     diagnostics::{
+        Diagnostic, DiagnosticReporter, Diagnostics, DiagnosticsFormat,
         codes::{DiagnosticsID, Severity},
         warning_filters::{
-            FilterName, FilterPrefix, WarningFilter, WarningFiltersBuilder, WarningFiltersScope,
-            WarningFiltersTable, FILTER_ALL,
+            FILTER_ALL, FilterName, FilterPrefix, WarningFilter, WarningFiltersBuilder,
+            WarningFiltersScope, WarningFiltersTable,
         },
-        DiagnosticReporter, Diagnostics, DiagnosticsFormat,
     },
-    editions::{check_feature_or_error, feature_edition_error_msg, Edition, FeatureGate, Flavor},
-    expansion::ast as E,
+    editions::{Edition, FeatureGate, Flavor, check_feature_or_error, feature_edition_error_msg},
+    expansion::ast::{self as E, ModuleIdent},
     hlir::ast as H,
-    naming::ast as N,
-    parser::ast as P,
+    naming::ast::{self as N, Function, UseFuns},
+    parser::ast::{self as P, FunctionName},
     shared::{
         files::{FileName, MappedFiles},
         ide::IDEInfo,
+        unique_map::UniqueMap,
     },
     sui_mode,
     typing::{
@@ -31,10 +32,12 @@ use crate::{
         visitor::{TypingVisitor, TypingVisitorObj},
     },
 };
+
 use clap::*;
+use known_attributes::ModeAttribute;
 use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
-use move_symbol_pool::Symbol;
+use move_symbol_pool::{Symbol, symbol};
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -42,8 +45,8 @@ use std::{
     hash::Hash,
     path::PathBuf,
     sync::{
-        atomic::{AtomicUsize, Ordering as AtomicOrdering},
         Arc, Mutex, OnceLock, RwLock,
+        atomic::{AtomicUsize, Ordering as AtomicOrdering},
     },
 };
 use vfs::{VfsError, VfsPath};
@@ -55,6 +58,7 @@ pub mod known_attributes;
 pub mod matching;
 pub mod program_info;
 pub mod remembering_unique_map;
+pub mod stdlib_definitions;
 pub mod string_utils;
 pub mod unique_map;
 pub mod unique_set;
@@ -66,8 +70,8 @@ pub use ast_debug::AstDebug;
 //**************************************************************************************************
 
 pub use move_core_types::parsing::parser::{
-    parse_address_number as parse_address, parse_u128, parse_u16, parse_u256, parse_u32, parse_u64,
-    parse_u8, NumberFormat,
+    NumberFormat, parse_address_number as parse_address, parse_u8, parse_u16, parse_u32, parse_u64,
+    parse_u128, parse_u256,
 };
 
 //**************************************************************************************************
@@ -178,7 +182,7 @@ pub type NamedAddressMap = BTreeMap<Symbol, NumericalAddress>;
 pub struct NamedAddressMapIndex(usize);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NamedAddressMaps(Vec<NamedAddressMap>);
+pub struct NamedAddressMaps(Vec<Arc<NamedAddressMap>>);
 
 impl Default for NamedAddressMaps {
     fn default() -> Self {
@@ -193,15 +197,15 @@ impl NamedAddressMaps {
 
     pub fn insert(&mut self, m: NamedAddressMap) -> NamedAddressMapIndex {
         let index = self.0.len();
-        self.0.push(m);
+        self.0.push(Arc::new(m));
         NamedAddressMapIndex(index)
     }
 
-    pub fn get(&self, idx: NamedAddressMapIndex) -> &NamedAddressMap {
-        &self.0[idx.0]
+    pub fn get(&self, idx: NamedAddressMapIndex) -> Arc<NamedAddressMap> {
+        self.0[idx.0].clone()
     }
 
-    pub fn all(&self) -> &[NamedAddressMap] {
+    pub fn all(&self) -> &[Arc<NamedAddressMap>] {
         &self.0
     }
 }
@@ -215,8 +219,9 @@ pub struct PackagePaths<Path: Into<Symbol> = Symbol, NamedAddress: Into<Symbol> 
 
 pub struct CompilationEnv {
     flags: Flags,
+    modes: BTreeSet<Symbol>,
     top_level_warning_filter_scope: Option<&'static WarningFiltersBuilder>,
-    diags: RwLock<Diagnostics>,
+    diags: Arc<RwLock<Diagnostics>>,
     visitors: Visitors,
     package_configs: BTreeMap<Symbol, PackageConfig>,
     /// Config for any package not found in `package_configs`, or for inputs without a package.
@@ -230,7 +235,7 @@ pub struct CompilationEnv {
     // pub counter: u64,
     mapped_files: MappedFiles,
     save_hooks: Vec<SaveHook>,
-    ide_information: RwLock<IDEInfo>,
+    ide_information: Arc<RwLock<IDEInfo>>,
     // Files to fully compile (as opposed to omitting function bodies)
     files_to_compile: Option<BTreeSet<PathBuf>>,
 }
@@ -294,10 +299,14 @@ impl CompilationEnv {
         if flags.json_errors() {
             diags.set_format(DiagnosticsFormat::JSON);
         }
+
+        let modes = Self::compute_modes(&flags);
+
         Self {
             flags,
+            modes,
             top_level_warning_filter_scope,
-            diags: RwLock::new(diags),
+            diags: Arc::new(RwLock::new(diags)),
             visitors: Visitors::new(visitors),
             package_configs,
             default_config: default_config.unwrap_or_default(),
@@ -306,9 +315,27 @@ impl CompilationEnv {
             prim_definers: OnceLock::new(),
             mapped_files: MappedFiles::empty(),
             save_hooks,
-            ide_information: RwLock::new(IDEInfo::new()),
+            ide_information: Arc::new(RwLock::new(IDEInfo::new())),
             files_to_compile,
         }
+    }
+
+    fn compute_modes(flags: &Flags) -> BTreeSet<Symbol> {
+        let mut modes = flags
+            .modes
+            .clone()
+            .into_iter()
+            .collect::<BTreeSet<Symbol>>();
+        if flags.test {
+            modes.insert(ModeAttribute::TEST.into());
+        }
+        if flags.ide_mode {
+            modes.insert(ModeAttribute::IDE.into());
+        }
+        if flags.ide_test_mode {
+            modes.insert(ModeAttribute::IDE_TEST.into());
+        }
+        modes
     }
 
     pub fn add_source_file(
@@ -324,12 +351,20 @@ impl CompilationEnv {
         &self.mapped_files
     }
 
-    pub fn diagnostic_reporter_at_top_level(&self) -> DiagnosticReporter {
+    pub fn diagnostic_reporter_at_top_level(&self) -> DiagnosticReporter<'_> {
         DiagnosticReporter::new(
             &self.flags,
             &self.known_filter_names,
-            &self.diags,
-            &self.ide_information,
+            Arc::clone(&self.diags),
+            Arc::clone(&self.ide_information),
+            WarningFiltersScope::root(self.top_level_warning_filter_scope),
+        )
+    }
+
+    pub fn dummy_diagnostic_reporter(&self) -> DiagnosticReporter<'_> {
+        DiagnosticReporter::dummy_reporter(
+            &self.flags,
+            &self.known_filter_names,
             WarningFiltersScope::root(self.top_level_warning_filter_scope),
         )
     }
@@ -438,10 +473,6 @@ impl CompilationEnv {
         Ok(())
     }
 
-    pub fn flags(&self) -> &Flags {
-        &self.flags
-    }
-
     pub fn visitors(&self) -> &Visitors {
         &self.visitors
     }
@@ -543,11 +574,56 @@ impl CompilationEnv {
         }
     }
 
-    // -- IDE Information --
+    pub fn save_macro_definitions(
+        &self,
+        macro_definitions: &BTreeMap<ModuleIdent, (UseFuns, UniqueMap<FunctionName, Function>)>,
+    ) {
+        for hook in &self.save_hooks {
+            hook.save_macro_definitions(macro_definitions)
+        }
+    }
+
+    // -- Flag Information --
+
+    pub fn sources_shadow_deps(&self) -> bool {
+        self.flags.sources_shadow_deps()
+    }
+
+    pub fn bytecode_version(&self) -> Option<u32> {
+        self.flags.bytecode_version()
+    }
+
+    // -- Mode Information --
 
     pub fn ide_mode(&self) -> bool {
-        self.flags.ide_mode()
+        debug_assert_eq!(
+            self.flags.ide_mode(),
+            self.modes().contains(&ModeAttribute::IDE.into())
+        );
+        self.modes().contains(&ModeAttribute::IDE.into())
     }
+
+    pub fn keep_testing_functions(&self) -> bool {
+        self.flags.keep_testing_functions()
+    }
+
+    pub fn test_mode(&self) -> bool {
+        debug_assert_eq!(
+            self.flags.is_testing(),
+            self.modes().contains(&ModeAttribute::TEST.into())
+        );
+        self.modes().contains(&ModeAttribute::TEST.into())
+    }
+
+    pub fn modes(&self) -> &BTreeSet<Symbol> {
+        &self.modes
+    }
+
+    pub fn publishable(&self) -> bool {
+        self.modes.is_empty()
+    }
+
+    // -- IDE Information --
 
     pub fn ide_information(&self) -> std::sync::RwLockReadGuard<'_, IDEInfo> {
         self.ide_information.read().unwrap()
@@ -651,6 +727,16 @@ pub struct Flags {
     /// If set, we are in IDE mode.
     #[clap(skip = false)]
     ide_mode: bool,
+
+    /// Arbitrary mode -- this will be used to enable or filter user-defined `#[mode(<MODE>)]`
+    /// annotations during compilation.
+    #[arg(
+        long = "mode",
+        value_name = "MODE",
+        value_parser = parse_symbol,
+        action = ArgAction::Append
+    )]
+    modes: Vec<Symbol>,
 }
 
 impl Flags {
@@ -665,6 +751,7 @@ impl Flags {
             keep_testing_functions: false,
             ide_mode: false,
             ide_test_mode: false,
+            modes: vec![],
         }
     }
 
@@ -679,6 +766,7 @@ impl Flags {
             keep_testing_functions: false,
             ide_mode: false,
             ide_test_mode: false,
+            modes: vec![symbol!("test")],
         }
     }
 
@@ -731,12 +819,21 @@ impl Flags {
         }
     }
 
+    pub fn set_modes(self, value: Vec<Symbol>) -> Self {
+        let test = self.test || value.contains(&symbol!("test"));
+        Self {
+            test,
+            modes: value,
+            ..self
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self == &Self::empty()
     }
 
     pub fn is_testing(&self) -> bool {
-        self.test
+        self.test || self.mode(symbol!("test"))
     }
 
     pub fn keep_testing_functions(&self) -> bool {
@@ -770,6 +867,19 @@ impl Flags {
     pub fn ide_mode(&self) -> bool {
         self.ide_mode
     }
+
+    pub fn mode(&self, mode: Symbol) -> bool {
+        self.modes.contains(&mode)
+    }
+
+    pub fn publishable(&self) -> bool {
+        !self.is_testing() && !self.ide_mode() && !self.ide_test_mode() && self.modes.is_empty()
+    }
+}
+
+/// Used by CLAP for parsing modes in fields
+fn parse_symbol(s: &str) -> Result<Symbol, String> {
+    Ok(Symbol::from(s))
 }
 
 //**************************************************************************************************
@@ -853,6 +963,7 @@ pub(crate) struct SavedInfo {
     typing_info: Option<Arc<program_info::TypingProgramInfo>>,
     hlir: Option<H::Program>,
     cfgir: Option<G::Program>,
+    macro_definitions: Option<BTreeMap<ModuleIdent, (UseFuns, UniqueMap<FunctionName, Function>)>>,
 }
 
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
@@ -864,6 +975,10 @@ pub enum SaveFlag {
     TypingInfo,
     HLIR,
     CFGIR,
+    ModuleNameAddresses,
+    ModuleResolvedMembers,
+    MacroDefinitions,
+    ModuleInfo,
 }
 
 impl SaveHook {
@@ -878,6 +993,7 @@ impl SaveHook {
             typing_info: None,
             hlir: None,
             cfgir: None,
+            macro_definitions: None,
         })))
     }
 
@@ -927,6 +1043,16 @@ impl SaveHook {
         let mut r = self.0.lock().unwrap();
         if r.cfgir.is_none() && r.flags.contains(&SaveFlag::CFGIR) {
             r.cfgir = Some(ast.clone())
+        }
+    }
+
+    pub(crate) fn save_macro_definitions(
+        &self,
+        macro_definitions: &BTreeMap<ModuleIdent, (UseFuns, UniqueMap<FunctionName, Function>)>,
+    ) {
+        let mut r = self.0.lock().unwrap();
+        if r.macro_definitions.is_none() && r.flags.contains(&SaveFlag::MacroDefinitions) {
+            r.macro_definitions = Some(macro_definitions.clone());
         }
     }
 
@@ -992,6 +1118,17 @@ impl SaveHook {
         );
         r.cfgir.take().unwrap()
     }
+
+    pub fn take_macro_definitions(
+        &self,
+    ) -> BTreeMap<ModuleIdent, (UseFuns, UniqueMap<FunctionName, Function>)> {
+        let mut r = self.0.lock().unwrap();
+        assert!(
+            r.flags.contains(&SaveFlag::MacroDefinitions),
+            "Macro definitions not saved. Please set the flag when creating the SaveHook"
+        );
+        r.macro_definitions.take().unwrap()
+    }
 }
 
 //**************************************************************************************************
@@ -1018,11 +1155,11 @@ impl SaveHook {
 ///
 /// * `$e` - The initial expression to start processing.
 /// * `$work_pat` - The pattern used to disassemble entries in the work queue. Note that the work
-///    queue may contain any arbitrary type (such as a tuple of a block and expression), so the
-///    work pattern is used to disassemble and bind component parts.
+///   queue may contain any arbitrary type (such as a tuple of a block and expression), so the
+///   work pattern is used to disassemble and bind component parts.
 /// * `$work_exp` - The actual expression to match on, as defined in the `$work_pat`.
 /// * `$binop_pat` - This is a pattern matched against the `$work_exp` that matches if and only if
-///    the `$work_exp` is in fact a binary operation expression.
+///   the `$work_exp` is in fact a binary operation expression.
 /// * `$bind_rhs` - This block is executed when `$work_exp` matches `$binop_pat`, with any pattern
 ///   binders from `$binop_pat` in scope. This block must return a 3-tuple consisting of the
 ///   left-hand side work queue entry, the `$optype` entry for the operand, and the right-hand side
@@ -1137,3 +1274,89 @@ impl IndexedPhysicalPackagePath {
         })
     }
 }
+
+//**************************************************************************************************
+// Levenshtein Candidate Suggestions
+//**************************************************************************************************
+
+const MAX_EDIT_DISTANCE: usize = 3;
+
+/// Computes the Levenshtein distance between two strings, but stops and returns None if the
+/// distance exceeds the given threshold.
+fn levenshtein_distance_with_threshold(a: &str, b: &str, threshold: usize) -> Option<usize> {
+    if a.len() > b.len() + threshold || b.len() > a.len() + threshold {
+        return None;
+    }
+
+    let mut cost = 0;
+    let mut a = a.chars();
+    let mut b = b.chars();
+    while let (Some(a_head), Some(b_head)) = (a.next(), b.next()) {
+        if a_head != b_head {
+            cost += 1;
+            if cost > threshold {
+                return None;
+            }
+        }
+    }
+    cost = cost + a.count() + b.count();
+    if cost > threshold { None } else { Some(cost) }
+}
+
+/// Suggests a candidate from the given candidates based on Levenshtein distance to the given name.
+/// The `to_string` function is used to convert each candidate to a string for comparison.
+/// Uses MAX_EDIT_DISTANCE as the threshold for suggestions, meaning that only candidates within
+/// that distance will be returned.
+pub(crate) fn suggest_levenshtein_candidate<F>(
+    candidates: impl IntoIterator<Item = F>,
+    name_str: &str,
+    to_string: impl Fn(&F) -> &str,
+) -> Option<F> {
+    let mut cur_candidate = None;
+    for candidate in candidates {
+        let candidate_str = to_string(&candidate);
+        if let Some(dist) =
+            levenshtein_distance_with_threshold(name_str, candidate_str, MAX_EDIT_DISTANCE)
+        {
+            if let Some((best_dist, _)) = &cur_candidate {
+                if dist < *best_dist {
+                    cur_candidate = Some((dist, candidate));
+                }
+            } else {
+                cur_candidate = Some((dist, candidate));
+            }
+        }
+    }
+    cur_candidate.map(|(_, candidate)| candidate)
+}
+
+/// Adds a suggestion to the given diagnostic at the given location, with an optional definition
+/// location.
+/// # Arguments
+/// * `diag` - The diagnostic to add the suggestion to.
+/// * `loc` - The location to add the suggestion at.
+/// * `suggestion` - The name of the suggestion to add.
+/// * `defn_loc` - An optional location of the definition of the suggested item, which will be
+///   indicated in the diagnostic if provided.
+pub(crate) fn add_suggestion(
+    diag: &mut Diagnostic,
+    loc: Loc,
+    suggestion: impl fmt::Display,
+    defn_loc: Option<Loc>,
+) {
+    let msg = format!("Did you mean: '{suggestion}'");
+    diag.add_secondary_label((loc, msg));
+    if let Some(loc) = defn_loc {
+        diag.add_secondary_label((loc, "Similarly named defintion found here"));
+    }
+}
+
+pub(crate) const UPPERCASE_LETTERS: [char; 26] = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+    'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+];
+
+pub(crate) const LOWERCASE_LETTERS: [char; 26] = [
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+    't', 'u', 'v', 'w', 'x', 'y', 'z',
+];

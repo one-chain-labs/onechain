@@ -1,19 +1,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::parser::lexer::{Tok, TOK_COUNT};
-
-use move_symbol_pool::Symbol;
+use crate::parser::lexer::{TOK_COUNT, Tok};
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-use super::ast::{ENTRY_MODIFIER, MACRO_MODIFIER, NATIVE_MODIFIER};
+use super::ast::{ENTRY_MODIFIER, EXTEND_MODIFIER, MACRO_MODIFIER, NATIVE_MODIFIER};
 
 #[derive(Clone, Debug)]
 pub struct TokenSet {
     tokens: [u8; TOK_COUNT],
-    identifiers: HashMap<Symbol, u8>,
+    identifiers: HashMap<&'static str, u8>,
 }
 
 //**************************************************************************************************
@@ -36,6 +34,20 @@ const MEMBER_VISIBILITY_TOKENS: &[Tok] = &[Tok::Public];
 
 const MEMBER_MODIFIER_TOKENS: &[Tok] = &[Tok::Native];
 
+pub static MODULE_START_SET: Lazy<TokenSet> = Lazy::new(|| {
+    let mut token_set = TokenSet::new();
+    token_set.add_identifier(EXTEND_MODIFIER);
+    token_set.add(Tok::Module);
+    token_set.add(Tok::Spec);
+    token_set
+});
+
+pub static SEMICOLON_SET: Lazy<TokenSet> = Lazy::new(|| {
+    let mut token_set = TokenSet::new();
+    token_set.add(Tok::Semicolon);
+    token_set
+});
+
 pub static MODULE_MEMBER_OR_MODULE_START_SET: Lazy<TokenSet> = Lazy::new(|| {
     let mut token_set = TokenSet::new();
     token_set.add_all(MODULE_MEMBER_TOKENS);
@@ -44,7 +56,8 @@ pub static MODULE_MEMBER_OR_MODULE_START_SET: Lazy<TokenSet> = Lazy::new(|| {
     token_set.add_identifier(MACRO_MODIFIER);
     token_set.add_identifier(ENTRY_MODIFIER);
     token_set.add_identifier(NATIVE_MODIFIER);
-    token_set.add(Tok::Module);
+    // Add module starts
+    token_set.union(&MODULE_START_SET);
     // both a member and module can be annotated
     token_set.add(Tok::NumSign);
     token_set
@@ -69,7 +82,7 @@ pub static MIGRATION_PARAM_START_SET: Lazy<TokenSet> = Lazy::new(|| {
 const EXP_STARTS: &[Tok] = &[
     Tok::NumValue,
     Tok::NumTypedValue,
-    Tok::ByteStringValue,
+    Tok::StringValue,
     Tok::Identifier,
     Tok::SyntaxIdentifier,
     Tok::RestrictedIdentifier,
@@ -169,7 +182,7 @@ const VALUE_STARTS: &[Tok] = &[
     Tok::False,
     Tok::NumValue,
     Tok::NumTypedValue,
-    Tok::ByteStringValue,
+    Tok::StringValue,
 ];
 
 pub static VALUE_START_SET: Lazy<TokenSet> = Lazy::new(|| TokenSet::from(VALUE_STARTS));
@@ -205,14 +218,14 @@ impl TokenSet {
         }
     }
 
-    pub fn add_identifier(&mut self, identifier: &str) {
-        *self.identifiers.entry(identifier.into()).or_default() += 1;
+    pub fn add_identifier(&mut self, identifier: &'static str) {
+        *self.identifiers.entry(identifier).or_default() += 1;
     }
 
     pub fn remove_identifier(&mut self, identifier: impl AsRef<str>) {
-        if let Some(entry) = self.identifiers.get_mut(&identifier.as_ref().into()) {
+        if let Some(entry) = self.identifiers.get_mut(identifier.as_ref()) {
             if *entry < 2 {
-                self.identifiers.remove(&identifier.as_ref().into());
+                self.identifiers.remove(identifier.as_ref());
             } else {
                 *entry -= 1;
             }
@@ -236,7 +249,7 @@ impl TokenSet {
             || (tok == Tok::Identifier
                 || tok == Tok::RestrictedIdentifier
                 || tok == Tok::SyntaxIdentifier)
-                && self.identifiers.contains_key(&tok_contents.as_ref().into())
+                && self.identifiers.contains_key(tok_contents.as_ref())
     }
 
     pub fn contains_any(&self, toks: &[Tok], tok_contents: impl AsRef<str>) -> bool {

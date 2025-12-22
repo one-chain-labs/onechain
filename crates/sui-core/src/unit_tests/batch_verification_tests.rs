@@ -56,6 +56,7 @@ fn gen_ckpts(committee: &Committee, key_pairs: &[AuthorityKeyPair], count: usize
                     None,
                     0,
                     Vec::new(),
+                    Vec::new(),
                 ),
                 k,
                 name,
@@ -132,6 +133,7 @@ async fn test_async_verifier() {
         true,
         true,
         Some(30),
+        true,
     ));
 
     let tasks: Vec<_> = (0 .. 32)

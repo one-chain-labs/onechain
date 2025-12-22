@@ -6,12 +6,11 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use fastcrypto::{encoding::Base64, traits::ToFromBytes};
 use jsonrpsee::{core::RpcResult, RpcModule};
-use mysten_metrics::spawn_monitored_task;
 use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVersion};
 use sui_core::{
     authority::AuthorityState,
     authority_client::NetworkAuthorityClient,
-    transaction_orchestrator::TransactiondOrchestrator,
+    transaction_orchestrator::TransactionOrchestrator,
 };
 use sui_json_rpc_api::{JsonRpcMetrics, WriteApiOpenRpc, WriteApiServer};
 use sui_json_rpc_types::{
@@ -49,14 +48,14 @@ use crate::{
 
 pub struct TransactionExecutionApi {
     state: Arc<dyn StateRead>,
-    transaction_orchestrator: Arc<TransactiondOrchestrator<NetworkAuthorityClient>>,
+    transaction_orchestrator: Arc<TransactionOrchestrator<NetworkAuthorityClient>>,
     metrics: Arc<JsonRpcMetrics>,
 }
 
 impl TransactionExecutionApi {
     pub fn new(
         state: Arc<AuthorityState>,
-        transaction_orchestrator: Arc<TransactiondOrchestrator<NetworkAuthorityClient>>,
+        transaction_orchestrator: Arc<TransactionOrchestrator<NetworkAuthorityClient>>,
         metrics: Arc<JsonRpcMetrics>,
     ) -> Self {
         Self { state, transaction_orchestrator, metrics }
@@ -132,10 +131,10 @@ impl TransactionExecutionApi {
 
         let transaction_orchestrator = self.transaction_orchestrator.clone();
         let orch_timer = self.metrics.orchestrator_latency_ms.start_timer();
-        let (response, is_executed_locally) =
-            spawn_monitored_task!(transaction_orchestrator.execute_transaction_block(request, request_type, None))
-                .await?
-                .map_err(Error::from)?;
+        let (response, is_executed_locally) = transaction_orchestrator
+            .execute_transaction_block(request, request_type, None)
+            .await
+            .map_err(Error::from)?;
         drop(orch_timer);
 
         self.handle_post_orchestration(
@@ -269,13 +268,15 @@ impl TransactionExecutionApi {
             object_changes,
             balance_changes,
             input: resp.input,
+            execution_error_source: resp.execution_error_source,
+            suggested_gas_price: resp.suggested_gas_price,
         })
     }
 }
 
 #[async_trait]
 impl WriteApiServer for TransactionExecutionApi {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn execute_transaction_block(
         &self,
         tx_bytes: Base64,

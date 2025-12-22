@@ -6,7 +6,7 @@ use mysten_common::*;
 use sui_types::{
     base_types::{ObjectID, ObjectRef},
     digests::TransactionDigest,
-    error::{SuiError, SuiResult, UserInputError},
+    error::{SuiErrorKind, SuiResult, UserInputError},
     object::Object,
     storage::ObjectStore,
     transaction::VerifiedSignedTransaction,
@@ -96,7 +96,7 @@ impl ObjectLocks {
 
         if prev_lock != new_lock {
             debug!("lock conflict detected for {:?}: {:?} != {:?}", obj_ref, prev_lock, new_lock);
-            Err(SuiError::ObjectLockConflict { obj_ref: *obj_ref, pending_transaction: prev_lock })
+            Err(SuiErrorKind::ObjectLockConflict { obj_ref: *obj_ref, pending_transaction: prev_lock }.into())
         } else {
             Ok(())
         }
@@ -111,19 +111,21 @@ impl ObjectLocks {
         debug_assert_eq!(obj_ref.0, live_object.id());
         if obj_ref.1 != live_object.version() {
             debug!("object version unavailable for consumption: {:?} (current: {})", obj_ref, live_object.version());
-            return Err(SuiError::UserInputError {
+            return Err(SuiErrorKind::UserInputError {
                 error: UserInputError::ObjectVersionUnavailableForConsumption {
                     provided_obj_ref: *obj_ref,
                     current_version: live_object.version(),
                 },
-            });
+            }
+            .into());
         }
 
         let live_digest = live_object.digest();
         if obj_ref.2 != live_digest {
-            return Err(SuiError::UserInputError {
+            return Err(SuiErrorKind::UserInputError {
                 error: UserInputError::InvalidObjectDigest { object_id: obj_ref.0, expected_digest: live_digest },
-            });
+            }
+            .into());
         }
 
         Ok(())
@@ -162,9 +164,10 @@ impl ObjectLocks {
             if let Some(object) = object {
                 result.push(object);
             } else {
-                return Err(SuiError::UserInputError {
+                return Err(SuiErrorKind::UserInputError {
                     error: UserInputError::ObjectNotFound { object_id: object_ids[i], version: None },
-                });
+                }
+                .into());
             }
         }
         Ok(result)

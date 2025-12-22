@@ -15,21 +15,27 @@ use crate::{verification_failure, TEST_SCENARIO_MODULE_NAME};
 pub const TRANSFER_MODULE: &IdentStr = ident_str!("transfer");
 pub const EVENT_MODULE: &IdentStr = ident_str!("event");
 pub const EVENT_FUNCTION: &IdentStr = ident_str!("emit");
+pub const EMIT_AUTHENTICATED_FUNCTION: &IdentStr = ident_str!("emit_authenticated");
+pub const EMIT_AUTHENTICATED_IMPL_FUNCTION: &IdentStr = ident_str!("emit_authenticated_impl");
+
+pub const PRIVATE_EVENT_FUNCTIONS: &[&IdentStr] = &[EVENT_FUNCTION, EMIT_AUTHENTICATED_FUNCTION];
 pub const GET_EVENTS_TEST_FUNCTION: &IdentStr = ident_str!("events_by_type");
+pub const COIN_REGISTRY_MODULE: &IdentStr = ident_str!("coin_registry");
+pub const DYNAMIC_COIN_CREATION_FUNCTION: &IdentStr = ident_str!("new_currency");
 pub const PUBLIC_TRANSFER_FUNCTIONS: &[&IdentStr] = &[
     ident_str!("public_transfer"),
     ident_str!("public_freeze_object"),
     ident_str!("public_share_object"),
     ident_str!("public_receive"),
     ident_str!("receiving_object_id"),
+    ident_str!("public_party_transfer"),
 ];
-pub const PRIVATE_TRANSFER_FUNCTIONS: &[&IdentStr] =
-    &[ident_str!("transfer"), ident_str!("freeze_object"), ident_str!("share_object"), ident_str!("receive")];
-pub const TRANSFER_IMPL_FUNCTIONS: &[&IdentStr] = &[
-    ident_str!("transfer_impl"),
-    ident_str!("freeze_object_impl"),
-    ident_str!("share_object_impl"),
-    ident_str!("receive_impl"),
+pub const PRIVATE_TRANSFER_FUNCTIONS: &[&IdentStr] = &[
+    ident_str!("transfer"),
+    ident_str!("freeze_object"),
+    ident_str!("share_object"),
+    ident_str!("receive"),
+    ident_str!("party_transfer"),
 ];
 
 /// All transfer functions (the functions in `one::transfer`) are "private" in that they are
@@ -84,6 +90,8 @@ fn verify_function(
                 verify_private_transfer(view, fhandle, type_arguments, allow_receiving_object_id)?
             } else if ident == (SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
                 verify_private_event_emit(view, fhandle, type_arguments)?
+            } else if ident == (SUI_FRAMEWORK_ADDRESS, COIN_REGISTRY_MODULE) {
+                verify_dynamic_coin_creation(view, fhandle, type_arguments)?
             }
         }
     }
@@ -100,7 +108,7 @@ fn verify_private_transfer(
         PUBLIC_TRANSFER_FUNCTIONS
     } else {
         // Before protocol version 33, the `receiving_object_id` function was not public
-        &PUBLIC_TRANSFER_FUNCTIONS[.. PUBLIC_TRANSFER_FUNCTIONS.len() - 1]
+        &PUBLIC_TRANSFER_FUNCTIONS[.. 4]
     };
     let self_handle = view.module_handle_at(view.self_handle_idx());
     if addr_module(view, self_handle) == (SUI_FRAMEWORK_ADDRESS, TRANSFER_MODULE) {
@@ -145,10 +153,28 @@ fn verify_private_event_emit(
 ) -> Result<(), String> {
     let fident = view.identifier_at(fhandle.name);
     if fident == GET_EVENTS_TEST_FUNCTION {
-        // test-only function witn no params--no need to verify
+        // test-only function with no params--no need to verify
         return Ok(());
     }
-    if fident != EVENT_FUNCTION {
+
+    if fident == EMIT_AUTHENTICATED_IMPL_FUNCTION {
+        let module_id = view.self_id();
+        if (module_id.address(), module_id.name()) != (&SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
+            debug_assert!(
+                false,
+                "Calling {} outside of {} module this shouldn't happen",
+                EMIT_AUTHENTICATED_IMPL_FUNCTION, EVENT_MODULE
+            );
+            return Err(format!(
+                "Calling {} outside of {} which is impossible",
+                EMIT_AUTHENTICATED_IMPL_FUNCTION, EVENT_MODULE
+            ));
+        } else {
+            return Ok(());
+        }
+    }
+
+    if !PRIVATE_EVENT_FUNCTIONS.contains(&fident) {
         debug_assert!(false, "unknown event function {}", fident);
         return Err(format!("Calling unknown event function, {}", fident));
     };
@@ -163,6 +189,41 @@ fn verify_private_event_emit(
         return Err(format!(
             "Invalid call to '{}::event::{}' with an event type '{}'. \
                 The event's type must be defined in the current module",
+            SUI_FRAMEWORK_ADDRESS,
+            fident,
+            format_signature_token(view, type_arg),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Coin creation using `key` (non OTW coin creation) is only possible with
+/// internal types.
+fn verify_dynamic_coin_creation(
+    view: &CompiledModule,
+    fhandle: &FunctionHandle,
+    type_arguments: &[SignatureToken],
+) -> Result<(), String> {
+    let fident = view.identifier_at(fhandle.name);
+
+    // If we are calling anything besides `coin::new_currency`,
+    // we don't need this check.
+    if fident != DYNAMIC_COIN_CREATION_FUNCTION {
+        return Ok(());
+    }
+
+    // We expect a single type argument (`T: key`)
+    if type_arguments.len() != 1 {
+        debug_assert!(false, "Expected 1 type argument for {}", fident);
+        return Err(format!("Expected 1 type argument for {}", fident));
+    }
+
+    let type_arg = &type_arguments[0];
+    if !is_defined_in_current_module(view, type_arg) {
+        return Err(format!(
+            "Invalid call to '{}::coin_registry::{}' with type '{}'. \
+                The coin's type must be defined in the current module",
             SUI_FRAMEWORK_ADDRESS,
             fident,
             format_signature_token(view, type_arg),

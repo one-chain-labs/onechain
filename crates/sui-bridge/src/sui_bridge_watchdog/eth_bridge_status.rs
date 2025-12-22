@@ -11,15 +11,15 @@ use prometheus::IntGauge;
 use tokio::time::Duration;
 use tracing::{error, info};
 
-use crate::{abi::EthSuiBridge, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
+use crate::{abi::EthSuiBridge, metered_eth_provider::MeteredEthHttpProvider, sui_bridge_watchdog::Observable};
 
 pub struct EthBridgeStatus {
-    bridge_contract: EthSuiBridge<Provider<MeteredEthHttpProvier>>,
+    bridge_contract: EthSuiBridge<Provider<MeteredEthHttpProvider>>,
     metric: IntGauge,
 }
 
 impl EthBridgeStatus {
-    pub fn new(provider: Arc<Provider<MeteredEthHttpProvier>>, bridge_address: EthAddress, metric: IntGauge) -> Self {
+    pub fn new(provider: Arc<Provider<MeteredEthHttpProvider>>, bridge_address: EthAddress, metric: IntGauge) -> Self {
         let bridge_contract = EthSuiBridge::new(bridge_address, provider.clone());
         Self { bridge_contract, metric }
     }

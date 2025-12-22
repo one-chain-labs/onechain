@@ -6,6 +6,11 @@ use std::str::FromStr;
 use anyhow::Context as _;
 use futures::future::OptionFuture;
 use move_core_types::annotated_value::{MoveDatatypeLayout, MoveTypeLayout};
+use sui_indexer_alt_reader::{
+    kv_loader::TransactionContents,
+    objects::VersionedObjectKey,
+    tx_balance_changes::TxBalanceChangeKey,
+};
 use sui_indexer_alt_schema::transactions::{BalanceChange, StoredTxBalanceChange};
 use sui_json_rpc_types::{
     BalanceChange as SuiBalanceChange,
@@ -33,7 +38,6 @@ use tokio::join;
 use super::error::Error;
 use crate::{
     context::Context,
-    data::{kv_loader::TransactionContents, objects::VersionedObjectKey, tx_balance_changes::TxBalanceChangeKey},
     error::{invalid_params, rpc_bail, RpcError},
 };
 
@@ -56,7 +60,7 @@ pub(super) async fn transaction(
     // Balance changes might not be present because of pruning, in which case we return
     // nothing, even if the changes were requested.
     let stored_bc = match stored_bc.transpose().context("Failed to fetch balance changes from store")? {
-        Some(None) => return Err(invalid_params(Error::PrunedBalanceChanges(digest))),
+        Some(None) => return Err(invalid_params(Error::BalanceChangesNotFound(digest))),
         Some(changes) => changes,
         None => None,
     };
@@ -64,6 +68,9 @@ pub(super) async fn transaction(
     let digest = tx.digest()?;
 
     let mut response = SuiTransactionBlockResponse::new(digest);
+
+    response.timestamp_ms = tx.timestamp_ms();
+    response.checkpoint = tx.cp_sequence_number();
 
     if options.show_input {
         response.transaction = Some(input(ctx, &tx).await?);
@@ -136,7 +143,7 @@ async fn events(
             ),
         };
 
-        let sui_event = SuiEvent::try_from(event, digest, ix as u64, Some(tx.timestamp_ms()), layout)
+        let sui_event = SuiEvent::try_from(event, digest, ix as u64, tx.timestamp_ms(), layout)
             .with_context(|| format!("Failed to convert Event {ix} into response"))?;
 
         sui_events.push(sui_event)

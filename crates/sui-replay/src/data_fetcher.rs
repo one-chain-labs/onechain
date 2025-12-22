@@ -82,6 +82,7 @@ pub(crate) trait DataFetcher {
 }
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Fetchers {
     Remote(RemoteFetcher),
     NodeStateDump(NodeStateDumpFetcher),
@@ -595,10 +596,10 @@ impl From<NodeStateDump> for NodeStateDumpFetcher {
             object_ref_pool.insert((current_obj.id, current_obj.version), current_obj.object.clone());
 
             // Only most recent
-            if let Some(last_seen_obj) = latest_object_version_pool.get(&current_obj.id) {
-                if current_obj.version <= last_seen_obj.version() {
-                    return;
-                }
+            if let Some(last_seen_obj) = latest_object_version_pool.get(&current_obj.id)
+                && current_obj.version <= last_seen_obj.version()
+            {
+                return;
             };
             latest_object_version_pool.insert(current_obj.id, current_obj.object.clone());
         });

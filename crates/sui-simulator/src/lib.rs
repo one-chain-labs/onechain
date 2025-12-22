@@ -134,6 +134,12 @@ pub fn current_simnode_id() -> msim::task::NodeId {
     msim::runtime::NodeHandle::current().id()
 }
 
+pub fn has_mainnet_protocol_config_override() -> bool {
+    use sui_types::{digests::ChainIdentifier, supported_protocol_versions::Chain};
+
+    ChainIdentifier::default().chain() == Chain::Mainnet
+}
+
 #[cfg(msim)]
 pub mod random {
     use std::{cell::RefCell, collections::HashSet, hash::Hash};
@@ -149,7 +155,7 @@ pub mod random {
         thread_local! {
             // a random seed that is shared by the whole test process, so that equal `value`
             // inputs produce different outputs when the test seed changes
-            static SEED: u64 = thread_rng().gen();
+            static SEED: u64 = thread_rng().r#gen();
         }
 
         chance

@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
+#[allow(deprecated_usage)] // TODO: update tests to not use deprecated governance
 module locked_stake::locked_stake_tests;
 
-use locked_stake::{epoch_time_lock, locked_stake as ls};
-use one::{balance, coin, test_scenario, test_utils::{assert_eq, destroy}, vec_map};
-use one_system::{
-    governance_test_utils::{advance_epoch, set_up_sui_system_state},
-    one_system::{Self, SuiSystemState}
-};
+use locked_stake::epoch_time_lock;
+use locked_stake::locked_stake as ls;
+use std::unit_test::{assert_eq, destroy};
+use one::balance;
+use one::coin;
+use one::test_scenario;
+use one::vec_map;
+use one_system::governance_test_utils::{advance_epoch, set_up_sui_system_state};
+use one_system::one_system::{Self, SuiSystemState};
 
 const MIST_PER_OCT: u64 = 1_000_000_000;
 
@@ -25,7 +29,7 @@ fun test_incorrect_creation() {
     advance_epoch(scenario);
     advance_epoch(scenario);
     let ctx = test_scenario::ctx(scenario);
-    assert_eq(tx_context::epoch(ctx), 2);
+    assert_eq!(tx_context::epoch(ctx), 2);
 
     // Create a locked stake with epoch 1. Should fail here.
     let ls = ls::new(1, ctx);
@@ -46,7 +50,7 @@ fun test_deposit_stake_unstake() {
     // Deposit 100 SUI.
     ls::deposit_sui(&mut ls, balance::create_for_testing(100 * MIST_PER_OCT));
 
-    assert_eq(ls::sui_balance(&ls), 100 * MIST_PER_OCT);
+    assert_eq!(ls::sui_balance(&ls), 100 * MIST_PER_OCT);
 
     test_scenario::next_tx(scenario, @0x1);
     let mut system_state = test_scenario::take_shared<SuiSystemState>(scenario);
@@ -55,8 +59,8 @@ fun test_deposit_stake_unstake() {
     ls::stake(&mut ls, &mut system_state, 10 * MIST_PER_OCT, @0x1, test_scenario::ctx(scenario));
     test_scenario::return_shared(system_state);
 
-    assert_eq(ls::sui_balance(&ls), 90 * MIST_PER_OCT);
-    assert_eq(vec_map::size(ls::staked_oct(&ls)), 1);
+    assert_eq!(ls::sui_balance(&ls), 90 * MIST_PER_OCT);
+    assert_eq!(vec_map::length(ls::staked_oct(&ls)), 1);
 
     test_scenario::next_tx(scenario, @0x1);
     let mut system_state = test_scenario::take_shared<SuiSystemState>(scenario);
@@ -72,8 +76,8 @@ fun test_deposit_stake_unstake() {
     test_scenario::return_shared(system_state);
 
     ls::deposit_staked_oct(&mut ls, staked_oct);
-    assert_eq(ls::sui_balance(&ls), 90 * MIST_PER_OCT);
-    assert_eq(vec_map::size(ls::staked_oct(&ls)), 2);
+    assert_eq!(ls::sui_balance(&ls), 90 * MIST_PER_OCT);
+    assert_eq!(vec_map::length(ls::staked_oct(&ls)), 2);
     advance_epoch(scenario);
 
     test_scenario::next_tx(scenario, @0x1);
@@ -83,16 +87,16 @@ fun test_deposit_stake_unstake() {
     // Unstake both stake objects
     ls::unstake(&mut ls, &mut system_state, *staked_oct_id, test_scenario::ctx(scenario));
     test_scenario::return_shared(system_state);
-    assert_eq(ls::sui_balance(&ls), 100 * MIST_PER_OCT);
-    assert_eq(vec_map::size(ls::staked_oct(&ls)), 1);
+    assert_eq!(ls::sui_balance(&ls), 100 * MIST_PER_OCT);
+    assert_eq!(vec_map::length(ls::staked_oct(&ls)), 1);
 
     test_scenario::next_tx(scenario, @0x1);
     let (staked_oct_id, _) = vec_map::get_entry_by_idx(ls::staked_oct(&ls), 0);
     let mut system_state = test_scenario::take_shared<SuiSystemState>(scenario);
     ls::unstake(&mut ls, &mut system_state, *staked_oct_id, test_scenario::ctx(scenario));
     test_scenario::return_shared(system_state);
-    assert_eq(ls::sui_balance(&ls), 120 * MIST_PER_OCT);
-    assert_eq(vec_map::size(ls::staked_oct(&ls)), 0);
+    assert_eq!(ls::sui_balance(&ls), 120 * MIST_PER_OCT);
+    assert_eq!(vec_map::length(ls::staked_oct(&ls)), 0);
 
     destroy(ls);
     test_scenario::end(scenario_val);
@@ -109,7 +113,7 @@ fun test_unlock_correct_epoch() {
 
     ls::deposit_sui(&mut ls, balance::create_for_testing(100 * MIST_PER_OCT));
 
-    assert_eq(ls::sui_balance(&ls), 100 * MIST_PER_OCT);
+    assert_eq!(ls::sui_balance(&ls), 100 * MIST_PER_OCT);
 
     test_scenario::next_tx(scenario, @0x1);
     let mut system_state = test_scenario::take_shared<SuiSystemState>(scenario);
@@ -122,8 +126,8 @@ fun test_unlock_correct_epoch() {
     advance_epoch(scenario);
 
     let (staked_oct, sui_balance) = ls::unlock(ls, test_scenario::ctx(scenario));
-    assert_eq(balance::value(&sui_balance), 90 * MIST_PER_OCT);
-    assert_eq(vec_map::size(&staked_oct), 1);
+    assert_eq!(balance::value(&sui_balance), 90 * MIST_PER_OCT);
+    assert_eq!(vec_map::length(&staked_oct), 1);
 
     destroy(staked_oct);
     destroy(sui_balance);

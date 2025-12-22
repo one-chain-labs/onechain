@@ -8,7 +8,7 @@ use crate::{
     ice,
     naming::ast::{self as N, Type, Var},
     parser::ast::{BinOp_, ConstantName, Field, VariantName},
-    shared::{program_info::ProgramInfo, unique_map::UniqueMap, CompilationEnv},
+    shared::{CompilationEnv, program_info::ProgramInfo, unique_map::UniqueMap},
     typing::ast::{self as T, MatchArm_, MatchPattern, UnannotatedPat_ as TP},
 };
 use move_ir_types::location::*;
@@ -67,7 +67,7 @@ pub struct ArmResult {
 /// compilation in HLIR lowering.
 pub trait MatchContext<const AFTER_TYPING: bool> {
     fn env(&self) -> &CompilationEnv;
-    fn reporter(&self) -> &DiagnosticReporter;
+    fn reporter(&self) -> &DiagnosticReporter<'_>;
     fn new_match_var(&mut self, name: String, loc: Loc) -> N::Var;
     fn program_info(&self) -> &ProgramInfo<AFTER_TYPING>;
 

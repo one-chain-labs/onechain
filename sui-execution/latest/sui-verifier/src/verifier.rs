@@ -14,6 +14,7 @@ use crate::{
     id_leak_verifier,
     one_time_witness_verifier,
     private_generics,
+    private_generics_verifier_v2,
     struct_with_key_verifier,
 };
 
@@ -27,7 +28,11 @@ pub fn sui_verify_module_metered(
     struct_with_key_verifier::verify_module(module)?;
     global_storage_access_verifier::verify_module(module)?;
     id_leak_verifier::verify_module(module, meter)?;
-    private_generics::verify_module(module, verifier_config)?;
+    if verifier_config.private_generics_verifier_v2 {
+        private_generics_verifier_v2::verify_module(module, verifier_config)?;
+    } else {
+        private_generics::verify_module(module, verifier_config)?;
+    }
     entry_points_verifier::verify_module(module, fn_info_map, verifier_config)?;
     one_time_witness_verifier::verify_module(module, fn_info_map)
 }
@@ -42,10 +47,10 @@ pub fn sui_verify_module_metered_check_timeout_only(
     verifier_config: &VerifierConfig,
 ) -> Result<(), ExecutionError> {
     // Checks if the error counts as a Sui verifier timeout
-    if let Err(error) = sui_verify_module_metered(module, fn_info_map, meter, verifier_config) {
-        if matches!(error.kind(), sui_types::execution_status::ExecutionFailureStatus::SuiMoveVerificationTimedout) {
-            return Err(error);
-        }
+    if let Err(error) = sui_verify_module_metered(module, fn_info_map, meter, verifier_config)
+        && matches!(error.kind(), sui_types::execution_status::ExecutionFailureStatus::SuiMoveVerificationTimedout)
+    {
+        return Err(error);
     }
     // Any other scenario, including a non-timeout error counts as Ok
     Ok(())

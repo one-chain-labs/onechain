@@ -9,12 +9,12 @@ use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_macros::sim_test;
 use sui_types::{
     base_types::{EpochId, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, ObjectArg, TransactionData},
+    transaction::{CallArg, ObjectArg, SharedObjectMutability, TransactionData},
     SUI_DENY_LIST_OBJECT_ID,
     SUI_FRAMEWORK_PACKAGE_ID,
 };
 use test_cluster::{TestCluster, TestClusterBuilder};
+use tracing::info;
 
 const DENY_ADDRESS: SuiAddress = SuiAddress::ZERO;
 
@@ -28,16 +28,17 @@ async fn per_epoch_config_stress_test() {
     let gas2 = gas_objects.pop().unwrap();
     let handle1 = {
         let test_env = test_env.clone();
-        tokio::spawn(async move { run_thread(test_env, target_epoch, gas1.0, create_transfer_tx, true).await })
+        tokio::spawn(async move { run_thread(1, test_env, target_epoch, gas1.0, create_transfer_tx, true).await })
     };
     let handle2 = {
         let test_env = test_env.clone();
-        tokio::spawn(async move { run_thread(test_env, target_epoch, gas2.0, create_deny_tx, false).await })
+        tokio::spawn(async move { run_thread(2, test_env, target_epoch, gas2.0, create_deny_tx, false).await })
     };
     tokio::time::timeout(Duration::from_secs(600), async { tokio::try_join!(handle1, handle2) }).await.unwrap().unwrap();
 }
 
 async fn run_thread<F, Fut>(
+    thread_id: u64,
     test_env: Arc<TestEnv>,
     target_epoch: EpochId,
     gas_id: ObjectID,
@@ -47,12 +48,15 @@ async fn run_thread<F, Fut>(
     F: Fn(Arc<TestEnv>, ObjectRef) -> Fut,
     Fut: Future<Output = TransactionData>,
 {
+    info!(?thread_id, "Thread started");
     let mut num_tx_succeeded = 0;
     let mut num_tx_failed = 0;
     loop {
         let gas = test_env.get_latest_object_ref(&gas_id).await;
         let tx_data = tx_creation_func(test_env.clone(), gas).await;
-        let tx = test_env.test_cluster.sign_transaction(&tx_data);
+        let tx = test_env.test_cluster.sign_transaction(&tx_data).await;
+        let tx_digest = *tx.digest();
+        info!(?thread_id, ?tx_digest, "Sending transaction");
         let Ok(effects) =
             test_env.test_cluster.wallet.execute_transaction_may_fail(tx).await.map(|r| r.effects.unwrap())
         else {
@@ -61,19 +65,29 @@ async fn run_thread<F, Fut>(
             continue;
         };
         if effects.status().is_ok() {
+            info!(?thread_id, ?tx_digest, "Transaction succeeded");
             num_tx_succeeded += 1;
         } else {
+            info!(?thread_id, ?tx_digest, "Transaction failed");
             num_tx_failed += 1;
         }
         let executed_epoch = effects.executed_epoch();
         if executed_epoch >= target_epoch {
+            info!(?thread_id, "Reached target epoch {target_epoch}. Current {executed_epoch}.");
             break;
         }
     }
     if !tx_may_fail {
         assert_eq!(num_tx_failed, 0);
     }
-    assert!(num_tx_succeeded + num_tx_failed > 5);
+    assert!(
+        num_tx_succeeded + num_tx_failed > 5,
+        "Thread {thread_id} succeeded {num_tx_succeeded} transactions and failed {num_tx_failed} transactions"
+    );
+    info!(
+        ?thread_id,
+        "Thread {thread_id} finished. Succeeded {num_tx_succeeded} transactions and failed {num_tx_failed} transactions."
+    );
 }
 
 async fn create_deny_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> TransactionData {
@@ -82,15 +96,16 @@ async fn create_deny_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> TransactionDa
         .test_cluster
         .test_transaction_builder_with_gas_object(test_env.regulated_coin_owner, gas)
         .await
-        .move_call(
+        .move_call_with_type_args(
             SUI_FRAMEWORK_PACKAGE_ID,
             "coin",
             if deny { "deny_list_v2_add" } else { "deny_list_v2_remove" },
+            vec![test_env.regulated_coin_type.clone()],
             vec![
                 CallArg::Object(ObjectArg::SharedObject {
                     id: SUI_DENY_LIST_OBJECT_ID,
                     initial_shared_version: test_env.deny_list_object_init_version,
-                    mutable: true,
+                    mutability: SharedObjectMutability::Mutable,
                 }),
                 CallArg::Object(ObjectArg::ImmOrOwnedObject(
                     test_env.get_latest_object_ref(&test_env.deny_cap_id).await,
@@ -98,7 +113,6 @@ async fn create_deny_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> TransactionDa
                 CallArg::Pure(bcs::to_bytes(&DENY_ADDRESS).unwrap()),
             ],
         )
-        .with_type_args(vec![test_env.regulated_coin_type.clone()])
         .build()
 }
 
@@ -116,38 +130,41 @@ async fn create_move_transfer_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> Tran
         .test_cluster
         .test_transaction_builder_with_gas_object(test_env.regulated_coin_owner, gas)
         .await
-        .move_call(SUI_FRAMEWORK_PACKAGE_ID, "pay", "split_and_transfer", vec![
-            CallArg::Object(ObjectArg::ImmOrOwnedObject(
-                test_env.get_latest_object_ref(&test_env.regulated_coin_id).await,
-            )),
-            CallArg::Pure(bcs::to_bytes(&1u64).unwrap()),
-            CallArg::Pure(bcs::to_bytes(&DENY_ADDRESS).unwrap()),
-        ])
-        .with_type_args(vec![test_env.regulated_coin_type.clone()])
+        .move_call_with_type_args(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            "pay",
+            "split_and_transfer",
+            vec![test_env.regulated_coin_type.clone()],
+            vec![
+                CallArg::Object(ObjectArg::ImmOrOwnedObject(
+                    test_env.get_latest_object_ref(&test_env.regulated_coin_id).await,
+                )),
+                CallArg::Pure(bcs::to_bytes(&1u64).unwrap()),
+                CallArg::Pure(bcs::to_bytes(&DENY_ADDRESS).unwrap()),
+            ],
+        )
         .build()
 }
 
 async fn create_native_transfer_tx(test_env: Arc<TestEnv>, gas: ObjectRef) -> TransactionData {
-    let mut pt_builder = ProgrammableTransactionBuilder::new();
-    let coin_input = pt_builder
-        .obj(ObjectArg::ImmOrOwnedObject(test_env.get_latest_object_ref(&test_env.regulated_coin_id).await))
-        .unwrap();
-    let amount_input = pt_builder.pure(1u64).unwrap();
-    let split_coin = pt_builder.programmable_move_call(
-        SUI_FRAMEWORK_PACKAGE_ID,
-        ident_str!("coin").to_owned(),
-        ident_str!("split").to_owned(),
-        vec![test_env.regulated_coin_type.clone()],
-        vec![coin_input, amount_input],
-    );
-    pt_builder.transfer_arg(DENY_ADDRESS, split_coin);
-    let pt = pt_builder.finish();
-    test_env
-        .test_cluster
-        .test_transaction_builder_with_gas_object(test_env.regulated_coin_owner, gas)
-        .await
-        .programmable(pt)
-        .build()
+    let mut tx_builder =
+        test_env.test_cluster.test_transaction_builder_with_gas_object(test_env.regulated_coin_owner, gas).await;
+    {
+        let pt_builder = tx_builder.ptb_builder_mut();
+        let coin_input = pt_builder
+            .obj(ObjectArg::ImmOrOwnedObject(test_env.get_latest_object_ref(&test_env.regulated_coin_id).await))
+            .unwrap();
+        let amount_input = pt_builder.pure(1u64).unwrap();
+        let split_coin = pt_builder.programmable_move_call(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            ident_str!("coin").to_owned(),
+            ident_str!("split").to_owned(),
+            vec![test_env.regulated_coin_type.clone()],
+            vec![coin_input, amount_input],
+        );
+        pt_builder.transfer_arg(DENY_ADDRESS, split_coin);
+    }
+    tx_builder.build()
 }
 
 struct TestEnv {

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use async_trait::async_trait;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use move_binary_format::normalized::Module as NormalizedModule;
+use move_binary_format::normalized;
 use sui_json_rpc::{error::SuiRpcInputError, SuiRpcModule};
 use sui_json_rpc_api::MoveUtilsServer;
 use sui_json_rpc_types::{
@@ -38,9 +38,13 @@ impl MoveUtilsServer for MoveUtilsApi {
         package_id: ObjectID,
     ) -> RpcResult<BTreeMap<String, SuiMoveNormalizedModule>> {
         let resolver_modules = self.inner.get_package(package_id).await?.modules().clone();
+        let pool = &mut normalized::RcPool::new();
         let sui_normalized_modules = resolver_modules
             .into_iter()
-            .map(|(k, v)| (k, NormalizedModule::new(v.bytecode()).into()))
+            .map(|(k, v)| {
+                let m = &normalized::Module::new(pool, v.bytecode(), /* include code */ false);
+                (k, m.into())
+            })
             .collect::<BTreeMap<String, SuiMoveNormalizedModule>>();
         Ok(sui_normalized_modules)
     }

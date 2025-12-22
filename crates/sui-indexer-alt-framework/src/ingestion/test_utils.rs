@@ -3,7 +3,8 @@
 
 use rand::{prelude::StdRng, SeedableRng};
 use sui_storage::blob::{Blob, BlobEncoding};
-use sui_types::{
+
+use crate::types::{
     crypto::KeypairTraits,
     full_checkpoint_content::CheckpointData,
     gas::GasCostSummary,
@@ -31,6 +32,7 @@ pub(crate) fn test_checkpoint_data(cp: u64) -> Vec<u8> {
         GasCostSummary::default(),
         None,
         0,
+        Vec::new(),
         Vec::new(),
     );
 

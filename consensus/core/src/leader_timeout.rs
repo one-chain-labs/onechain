@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{sync::Arc, time::Duration};
 
+use consensus_types::block::Round;
 use tokio::{
     sync::{
         oneshot::{Receiver, Sender},
@@ -12,7 +13,7 @@ use tokio::{
 };
 use tracing::{debug, warn};
 
-use crate::{block::Round, context::Context, core::CoreSignalsReceivers, core_thread::CoreThreadDispatcher};
+use crate::{context::Context, core::CoreSignalsReceivers, core_thread::CoreThreadDispatcher};
 
 pub(crate) struct LeaderTimeoutTaskHandle {
     handle: JoinHandle<()>,
@@ -122,17 +123,17 @@ mod tests {
 
     use async_trait::async_trait;
     use consensus_config::Parameters;
+    use consensus_types::block::{BlockRef, Round};
     use parking_lot::Mutex;
     use tokio::time::{sleep, Instant};
 
     use crate::{
-        block::{BlockRef, Round, VerifiedBlock},
+        block::VerifiedBlock,
         commit::CertifiedCommits,
         context::Context,
         core::CoreSignals,
         core_thread::{CoreError, CoreThreadDispatcher},
         leader_timeout::LeaderTimeoutTask,
-        round_prober::QuorumRound,
     };
 
     #[derive(Clone, Default)]
@@ -171,16 +172,7 @@ mod tests {
             todo!()
         }
 
-        fn set_subscriber_exists(&self, _exists: bool) -> Result<(), CoreError> {
-            todo!()
-        }
-
-        fn set_propagation_delay_and_quorum_rounds(
-            &self,
-            _delay: Round,
-            _received_quorum_rounds: Vec<QuorumRound>,
-            _accepted_quorum_rounds: Vec<QuorumRound>,
-        ) -> Result<(), CoreError> {
+        fn set_propagation_delay(&self, _propagation_delay: Round) -> Result<(), CoreError> {
             todo!()
         }
 

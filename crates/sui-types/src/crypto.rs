@@ -72,7 +72,7 @@ use tracing::{instrument, warn};
 use crate::{
     base_types::{AuthorityName, ConciseableName, SuiAddress},
     committee::{Committee, CommitteeTrait, EpochId, StakeUnit},
-    error::{SuiError, SuiResult},
+    error::{SuiError, SuiErrorKind, SuiResult},
     signature::GenericSignature,
     sui_serde::{Readable, SuiBitmap},
 };
@@ -133,7 +133,7 @@ pub fn verify_proof_of_possession(
 ) -> Result<(), SuiError> {
     protocol_pubkey
         .validate()
-        .map_err(|_| SuiError::InvalidSignature { error: "Fail to validate pubkey".to_string() })?;
+        .map_err(|_| SuiErrorKind::InvalidSignature { error: "Fail to validate pubkey".to_string() })?;
     let mut msg = protocol_pubkey.as_bytes().to_vec();
     msg.extend_from_slice(sui_address.as_ref());
     pop.verify_secure(
@@ -557,10 +557,13 @@ impl SuiAuthoritySignature for AuthoritySignature {
         epoch.write(&mut message);
 
         let public_key = AuthorityPublicKey::try_from(author).map_err(|_| {
-            SuiError::KeyConversionError("Failed to serialize public key bytes to valid public key".to_string())
+            SuiErrorKind::KeyConversionError("Failed to serialize public key bytes to valid public key".to_string())
         })?;
-        public_key.verify(&message[..], self).map_err(|e| SuiError::InvalidSignature {
-            error: format!("Fail to verify auth sig {} epoch: {} author: {}", e, epoch, author.concise()),
+        public_key.verify(&message[..], self).map_err(|e| {
+            SuiErrorKind::InvalidSignature {
+                error: format!("Fail to verify auth sig {} epoch: {} author: {}", e, epoch, author.concise()),
+            }
+            .into()
         })
     }
 }
@@ -624,14 +627,16 @@ where
     let priv_length = <KP as KeypairTraits>::PrivKey::LENGTH;
     let pub_key_length = <KP as KeypairTraits>::PubKey::LENGTH;
     if bytes.len() != priv_length + pub_key_length {
-        return Err(SuiError::KeyConversionError(format!(
+        return Err(SuiErrorKind::KeyConversionError(format!(
             "Invalid input byte length, expected {}: {}",
             priv_length,
             bytes.len()
-        )));
+        ))
+        .into());
     }
-    let sk = <KP as KeypairTraits>::PrivKey::from_bytes(bytes.get(.. priv_length).ok_or(SuiError::InvalidPrivateKey)?)
-        .map_err(|_| SuiError::InvalidPrivateKey)?;
+    let sk =
+        <KP as KeypairTraits>::PrivKey::from_bytes(bytes.get(.. priv_length).ok_or(SuiErrorKind::InvalidPrivateKey)?)
+            .map_err(|_| SuiErrorKind::InvalidPrivateKey)?;
     let kp: KP = sk.into();
     Ok((kp.public().into(), kp))
 }
@@ -899,11 +904,11 @@ pub trait SuiSignatureInner: Sized + ToFromBytes + PartialEq + Eq + Hash {
     /// Returns the deserialized signature and deserialized pubkey.
     fn get_verification_inputs(&self) -> SuiResult<(Self::Sig, Self::PubKey)> {
         let pk = Self::PubKey::from_bytes(self.public_key_bytes())
-            .map_err(|_| SuiError::KeyConversionError("Invalid public key".to_string()))?;
+            .map_err(|_| SuiErrorKind::KeyConversionError("Invalid public key".to_string()))?;
 
         // deserialize the signature
         let signature = Self::Sig::from_bytes(self.signature_bytes())
-            .map_err(|_| SuiError::InvalidSignature { error: "Fail to get pubkey and sig".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature { error: "Fail to get pubkey and sig".to_string() })?;
 
         Ok((signature, pk))
     }
@@ -970,15 +975,16 @@ impl<S: SuiSignatureInner + Sized> SuiSignature for S {
             _ => {
                 let address = SuiAddress::from(pk);
                 if author != address {
-                    return Err(SuiError::IncorrectSigner {
+                    return Err(SuiErrorKind::IncorrectSigner {
                         error: format!("Incorrect signer, expected {:?}, got {:?}", author, address),
-                    });
+                    }
+                    .into());
                 }
             }
         }
 
         pk.verify(&digest, sig)
-            .map_err(|e| SuiError::InvalidSignature { error: format!("Fail to verify user sig {}", e) })
+            .map_err(|e| SuiErrorKind::InvalidSignature { error: format!("Fail to verify user sig {}", e) }.into())
     }
 }
 
@@ -1037,28 +1043,32 @@ impl AuthoritySignInfoTrait for AuthoritySignInfo {
         obligation: &mut VerificationObligation<'a>,
         message_index: usize,
     ) -> SuiResult<()> {
-        fp_ensure!(self.epoch == committee.epoch(), SuiError::WrongEpoch {
-            expected_epoch: committee.epoch(),
-            actual_epoch: self.epoch,
-        });
+        fp_ensure!(
+            self.epoch == committee.epoch(),
+            SuiErrorKind::WrongEpoch { expected_epoch: committee.epoch(), actual_epoch: self.epoch }.into()
+        );
         let weight = committee.weight(&self.authority);
-        fp_ensure!(weight > 0, SuiError::UnknownSigner {
-            signer: Some(self.authority.concise().to_string()),
-            index: None,
-            committee: Box::new(committee.clone())
-        });
+        fp_ensure!(
+            weight > 0,
+            SuiErrorKind::UnknownSigner {
+                signer: Some(self.authority.concise().to_string()),
+                index: None,
+                committee: Box::new(committee.clone())
+            }
+            .into()
+        );
 
         obligation
             .public_keys
             .get_mut(message_index)
-            .ok_or(SuiError::InvalidAddress)?
+            .ok_or(SuiErrorKind::InvalidAddress)?
             .push(committee.public_key(&self.authority)?);
         obligation
             .signatures
             .get_mut(message_index)
-            .ok_or(SuiError::InvalidAddress)?
+            .ok_or(SuiErrorKind::InvalidAddress)?
             .add_signature(self.signature.clone())
-            .map_err(|_| SuiError::InvalidSignature { error: "Fail to aggregator auth sig".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature { error: "Fail to aggregator auth sig".to_string() })?;
         Ok(())
     }
 }
@@ -1176,10 +1186,10 @@ impl<const STRONG_THRESHOLD: bool> AuthoritySignInfoTrait for AuthorityQuorumSig
         message_index: usize,
     ) -> SuiResult<()> {
         // Check epoch
-        fp_ensure!(self.epoch == committee.epoch(), SuiError::WrongEpoch {
-            expected_epoch: committee.epoch(),
-            actual_epoch: self.epoch,
-        });
+        fp_ensure!(
+            self.epoch == committee.epoch(),
+            SuiErrorKind::WrongEpoch { expected_epoch: committee.epoch(), actual_epoch: self.epoch }.into()
+        );
 
         let mut weight = 0;
 
@@ -1187,33 +1197,42 @@ impl<const STRONG_THRESHOLD: bool> AuthoritySignInfoTrait for AuthorityQuorumSig
         obligation
             .signatures
             .get_mut(message_index)
-            .ok_or(SuiError::InvalidAuthenticator)?
+            .ok_or(SuiErrorKind::InvalidAuthenticator)?
             .add_aggregate(self.signature.clone())
-            .map_err(|_| SuiError::InvalidSignature { error: "Signature Aggregation failed".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature { error: "Signature Aggregation failed".to_string() })?;
 
         let selected_public_keys =
-            obligation.public_keys.get_mut(message_index).ok_or(SuiError::InvalidAuthenticator)?;
+            obligation.public_keys.get_mut(message_index).ok_or(SuiErrorKind::InvalidAuthenticator)?;
 
+        let mut seen = std::collections::BTreeSet::new();
         for authority_index in self.signers_map.iter() {
-            let authority = committee.authority_by_index(authority_index).ok_or_else(|| SuiError::UnknownSigner {
-                signer: None,
-                index: Some(authority_index),
-                committee: Box::new(committee.clone()),
-            })?;
+            if !seen.insert(authority_index) {
+                continue;
+            }
 
-            // Update weight.
+            // Update weight when seeing the authority for the first time.
+            let authority =
+                committee.authority_by_index(authority_index).ok_or_else(|| SuiErrorKind::UnknownSigner {
+                    signer: None,
+                    index: Some(authority_index),
+                    committee: Box::new(committee.clone()),
+                })?;
             let voting_rights = committee.weight(authority);
-            fp_ensure!(voting_rights > 0, SuiError::UnknownSigner {
-                signer: Some(authority.concise().to_string()),
-                index: Some(authority_index),
-                committee: Box::new(committee.clone()),
-            });
+            fp_ensure!(
+                voting_rights > 0,
+                SuiErrorKind::UnknownSigner {
+                    signer: Some(authority.concise().to_string()),
+                    index: Some(authority_index),
+                    committee: Box::new(committee.clone()),
+                }
+                .into()
+            );
             weight += voting_rights;
 
             selected_public_keys.push(committee.public_key(authority)?);
         }
 
-        fp_ensure!(weight >= Self::quorum_threshold(committee), SuiError::CertificateRequiresQuorum);
+        fp_ensure!(weight >= Self::quorum_threshold(committee), SuiErrorKind::CertificateRequiresQuorum.into());
 
         Ok(())
     }
@@ -1221,18 +1240,24 @@ impl<const STRONG_THRESHOLD: bool> AuthoritySignInfoTrait for AuthorityQuorumSig
 
 impl<const STRONG_THRESHOLD: bool> AuthorityQuorumSignInfo<STRONG_THRESHOLD> {
     pub fn new_from_auth_sign_infos(auth_sign_infos: Vec<AuthoritySignInfo>, committee: &Committee) -> SuiResult<Self> {
-        fp_ensure!(auth_sign_infos.iter().all(|a| a.epoch == committee.epoch), SuiError::InvalidSignature {
-            error: "All signatures must be from the same epoch as the committee".to_string()
-        });
+        fp_ensure!(
+            auth_sign_infos.iter().all(|a| a.epoch == committee.epoch),
+            SuiErrorKind::InvalidSignature {
+                error: "All signatures must be from the same epoch as the committee".to_string()
+            }
+            .into()
+        );
         let total_stake: StakeUnit = auth_sign_infos.iter().map(|a| committee.weight(&a.authority)).sum();
-        fp_ensure!(total_stake >= Self::quorum_threshold(committee), SuiError::InvalidSignature {
-            error: "Signatures don't have enough stake to form a quorum".to_string()
-        });
+        fp_ensure!(
+            total_stake >= Self::quorum_threshold(committee),
+            SuiErrorKind::InvalidSignature { error: "Signatures don't have enough stake to form a quorum".to_string() }
+                .into()
+        );
 
         let signatures: BTreeMap<_, _> = auth_sign_infos.into_iter().map(|a| (a.authority, a.signature)).collect();
         let mut map = RoaringBitmap::new();
         for pk in signatures.keys() {
-            map.insert(committee.authority_index(pk).ok_or_else(|| SuiError::UnknownSigner {
+            map.insert(committee.authority_index(pk).ok_or_else(|| SuiErrorKind::UnknownSigner {
                 signer: Some(pk.concise().to_string()),
                 index: None,
                 committee: Box::new(committee.clone()),
@@ -1243,13 +1268,13 @@ impl<const STRONG_THRESHOLD: bool> AuthorityQuorumSignInfo<STRONG_THRESHOLD> {
         Ok(AuthorityQuorumSignInfo {
             epoch: committee.epoch,
             signature: AggregateAuthoritySignature::aggregate(&sigs)
-                .map_err(|e| SuiError::InvalidSignature { error: e.to_string() })?,
+                .map_err(|e| SuiErrorKind::InvalidSignature { error: e.to_string() })?,
             signers_map: map,
         })
     }
 
     pub fn authorities<'a>(&'a self, committee: &'a Committee) -> impl Iterator<Item = SuiResult<&'a AuthorityName>> {
-        self.signers_map.iter().map(|i| committee.authority_by_index(i).ok_or(SuiError::InvalidAuthenticator))
+        self.signers_map.iter().map(|i| committee.authority_by_index(i).ok_or(SuiErrorKind::InvalidAuthenticator.into()))
     }
 
     pub fn quorum_threshold(committee: &Committee) -> StakeUnit {
@@ -1320,7 +1345,7 @@ mod bcs_signable {
     impl BcsSignable for crate::transaction::SenderSignedData {}
     impl BcsSignable for crate::object::ObjectInner {}
 
-    impl BcsSignable for crate::accumulator::Accumulator {}
+    impl BcsSignable for crate::global_state_hash::GlobalStateHash {}
 
     impl BcsSignable for super::bcs_signable_test::Foo {}
     #[cfg(test)]
@@ -1406,12 +1431,14 @@ impl<'a> VerificationObligation<'a> {
         public_key: &'a AuthorityPublicKey,
         idx: usize,
     ) -> SuiResult<()> {
-        self.public_keys.get_mut(idx).ok_or(SuiError::InvalidAuthenticator)?.push(public_key);
+        self.public_keys.get_mut(idx).ok_or(SuiErrorKind::InvalidAuthenticator)?.push(public_key);
         self.signatures
             .get_mut(idx)
-            .ok_or(SuiError::InvalidAuthenticator)?
+            .ok_or(SuiErrorKind::InvalidAuthenticator)?
             .add_signature(signature.clone())
-            .map_err(|_| SuiError::InvalidSignature { error: "Failed to add signature to obligation".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature {
+                error: "Failed to add signature to obligation".to_string(),
+            })?;
         Ok(())
     }
 
@@ -1441,7 +1468,7 @@ impl<'a> VerificationObligation<'a> {
                 warn!("Failed to batch verify aggregated auth sig: {} (chunk {}): {}", e, i, chunk.unwrap());
             }
 
-            SuiError::InvalidSignature { error: format!("Failed to batch verify aggregated auth sig: {}", e) }
+            SuiErrorKind::InvalidSignature { error: format!("Failed to batch verify aggregated auth sig: {}", e) }
         })?;
         Ok(())
     }
@@ -1500,7 +1527,8 @@ impl SignatureScheme {
     }
 
     pub fn from_flag(flag: &str) -> Result<SignatureScheme, SuiError> {
-        let byte_int = flag.parse::<u8>().map_err(|_| SuiError::KeyConversionError("Invalid key scheme".to_string()))?;
+        let byte_int =
+            flag.parse::<u8>().map_err(|_| SuiErrorKind::KeyConversionError("Invalid key scheme".to_string()))?;
         Self::from_flag_byte(&byte_int)
     }
 
@@ -1513,7 +1541,7 @@ impl SignatureScheme {
             0x04 => Ok(SignatureScheme::BLS12381),
             0x05 => Ok(SignatureScheme::ZkLoginAuthenticator),
             0x06 => Ok(SignatureScheme::PasskeyAuthenticator),
-            _ => Err(SuiError::KeyConversionError("Invalid key scheme".to_string())),
+            _ => Err(SuiErrorKind::KeyConversionError("Invalid key scheme".to_string()).into()),
         }
     }
 }

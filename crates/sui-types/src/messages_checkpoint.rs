@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display, Formatter},
     slice::Iter,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::Result;
-use fastcrypto::hash::MultisetHash;
+use fastcrypto::{
+    hash::{Blake2b256, MultisetHash},
+    merkle::MerkleTree,
+};
 use mysten_metrics::histogram::Histogram as MystenHistogram;
 use once_cell::sync::OnceCell;
 use prometheus::Histogram;
@@ -22,8 +26,16 @@ use tracing::warn;
 
 pub use crate::digests::{CheckpointContentsDigest, CheckpointDigest};
 use crate::{
-    accumulator::Accumulator,
-    base_types::{random_object_ref, AuthorityName, ExecutionData, ExecutionDigests, VerifiedExecutionData},
+    base_types::{
+        random_object_ref,
+        AuthorityName,
+        ExecutionData,
+        ExecutionDigests,
+        FullObjectRef,
+        ObjectID,
+        SequenceNumber,
+        VerifiedExecutionData,
+    },
     committee::{Committee, EpochId, ProtocolVersion, StakeUnit},
     crypto::{
         default_hash,
@@ -35,13 +47,14 @@ use crate::{
         AuthorityStrongQuorumSignInfo,
         RandomnessRound,
     },
-    digests::Digest,
-    effects::{TestEffectsBuilder, TransactionEffectsAPI},
-    error::{SuiError, SuiResult},
+    digests::{CheckpointArtifactsDigest, Digest, ObjectDigest},
+    effects::{TestEffectsBuilder, TransactionEffects, TransactionEffectsAPI},
+    error::{SuiErrorKind, SuiResult},
+    full_checkpoint_content::CheckpointData,
     gas::GasCostSummary,
+    global_state_hash::GlobalStateHash,
     message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope},
     signature::GenericSignature,
-    storage::ReadStore,
     sui_serde::{AsProtocolVersion, BigInt, Readable},
     transaction::{Transaction, TransactionData},
 };
@@ -119,19 +132,146 @@ impl From<fastcrypto::hash::Digest<32>> for ECMHLiveObjectSetDigest {
 
 impl Default for ECMHLiveObjectSetDigest {
     fn default() -> Self {
-        Accumulator::default().digest().into()
+        GlobalStateHash::default().digest().into()
+    }
+}
+
+/// CheckpointArtifact is a type that represents various artifacts of a checkpoint.
+/// We hash all the artifacts together to get the checkpoint artifacts digest
+/// that is included in the checkpoint summary.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CheckpointArtifact {
+    /// The post-checkpoint state of all objects modified in the checkpoint.
+    /// It also includes objects that were deleted or wrapped in the checkpoint.
+    ObjectStates(BTreeMap<ObjectID, (SequenceNumber, ObjectDigest)>),
+    // In the future, we can add more artifacts e.g., execution digests, events, etc.
+}
+
+impl CheckpointArtifact {
+    pub fn digest(&self) -> SuiResult<Digest> {
+        match self {
+            Self::ObjectStates(object_states) => {
+                let tree = MerkleTree::<Blake2b256>::build_from_unserialized(
+                    object_states.iter().map(|(id, (seq, digest))| (id, seq, digest)),
+                )
+                .map_err(|e| SuiErrorKind::GenericAuthorityError {
+                    error: format!("Failed to build Merkle tree: {}", e),
+                })?;
+                let root = tree.root().bytes();
+                Ok(Digest::new(root))
+            }
+        }
+    }
+
+    pub fn artifact_type(&self) -> &'static str {
+        match self {
+            Self::ObjectStates(_) => "ObjectStates",
+            // Future variants...
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CheckpointArtifacts {
+    /// An ordered list of artifacts.
+    artifacts: BTreeSet<CheckpointArtifact>,
+}
+
+impl CheckpointArtifacts {
+    pub fn new() -> Self {
+        Self { artifacts: BTreeSet::new() }
+    }
+
+    pub fn add_artifact(&mut self, artifact: CheckpointArtifact) -> SuiResult<()> {
+        if self.artifacts.iter().any(|existing| existing.artifact_type() == artifact.artifact_type()) {
+            return Err(SuiErrorKind::GenericAuthorityError {
+                error: format!("Artifact {} already exists", artifact.artifact_type()),
+            }
+            .into());
+        }
+        self.artifacts.insert(artifact);
+        Ok(())
+    }
+
+    pub fn from_object_states(object_states: BTreeMap<ObjectID, (SequenceNumber, ObjectDigest)>) -> Self {
+        CheckpointArtifacts { artifacts: BTreeSet::from([CheckpointArtifact::ObjectStates(object_states)]) }
+    }
+
+    /// Get the object states if present
+    pub fn object_states(&self) -> SuiResult<&BTreeMap<ObjectID, (SequenceNumber, ObjectDigest)>> {
+        self.artifacts
+            .iter()
+            .find(|artifact| matches!(artifact, CheckpointArtifact::ObjectStates(_)))
+            .map(|artifact| match artifact {
+                CheckpointArtifact::ObjectStates(states) => states,
+            })
+            .ok_or(
+                SuiErrorKind::GenericAuthorityError {
+                    error: "Object states not found in checkpoint artifacts".to_string(),
+                }
+                .into(),
+            )
+    }
+
+    pub fn digest(&self) -> SuiResult<CheckpointArtifactsDigest> {
+        // Already sorted by BTreeSet!
+        let digests = self.artifacts.iter().map(|a| a.digest()).collect::<Result<Vec<_>, _>>()?;
+
+        CheckpointArtifactsDigest::from_artifact_digests(digests)
+    }
+}
+
+impl Default for CheckpointArtifacts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<&[&TransactionEffects]> for CheckpointArtifacts {
+    fn from(effects: &[&TransactionEffects]) -> Self {
+        let mut latest_object_states = BTreeMap::new();
+        for e in effects {
+            for (id, seq, digest) in e.written() {
+                if let Some((old_seq, _)) = latest_object_states.insert(id, (seq, digest)) {
+                    assert!(old_seq < seq, "Object states should be monotonically increasing");
+                }
+            }
+        }
+
+        CheckpointArtifacts::from_object_states(latest_object_states)
+    }
+}
+
+impl From<&[TransactionEffects]> for CheckpointArtifacts {
+    fn from(effects: &[TransactionEffects]) -> Self {
+        let effect_refs: Vec<&TransactionEffects> = effects.iter().collect();
+        Self::from(effect_refs.as_slice())
+    }
+}
+
+impl From<&CheckpointData> for CheckpointArtifacts {
+    fn from(checkpoint_data: &CheckpointData) -> Self {
+        let effects = checkpoint_data.transactions.iter().map(|tx| &tx.effects).collect::<Vec<_>>();
+
+        Self::from(effects.as_slice())
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub enum CheckpointCommitment {
     ECMHLiveObjectSetDigest(ECMHLiveObjectSetDigest),
-    // Other commitment types (e.g. merkle roots) go here.
+    CheckpointArtifactsDigest(CheckpointArtifactsDigest),
 }
 
 impl From<ECMHLiveObjectSetDigest> for CheckpointCommitment {
     fn from(d: ECMHLiveObjectSetDigest) -> Self {
         Self::ECMHLiveObjectSetDigest(d)
+    }
+}
+
+impl From<CheckpointArtifactsDigest> for CheckpointCommitment {
+    fn from(d: CheckpointArtifactsDigest) -> Self {
+        Self::CheckpointArtifactsDigest(d)
     }
 }
 
@@ -216,6 +356,7 @@ impl CheckpointSummary {
         end_of_epoch_data: Option<EndOfEpochData>,
         timestamp_ms: CheckpointTimestamp,
         randomness_rounds: Vec<RandomnessRound>,
+        checkpoint_commitments: Vec<CheckpointCommitment>,
     ) -> CheckpointSummary {
         let content_digest = *transactions.digest();
 
@@ -238,12 +379,15 @@ impl CheckpointSummary {
             end_of_epoch_data,
             timestamp_ms,
             version_specific_data,
-            checkpoint_commitments: Default::default(),
+            checkpoint_commitments,
         }
     }
 
     pub fn verify_epoch(&self, epoch: EpochId) -> SuiResult {
-        fp_ensure!(self.epoch == epoch, SuiError::WrongEpoch { expected_epoch: epoch, actual_epoch: self.epoch });
+        fp_ensure!(
+            self.epoch == epoch,
+            SuiErrorKind::WrongEpoch { expected_epoch: epoch, actual_epoch: self.epoch }.into()
+        );
         Ok(())
     }
 
@@ -280,6 +424,21 @@ impl CheckpointSummary {
             Some(1) => Ok(Some(bcs::from_bytes(&self.version_specific_data)?)),
             _ => unimplemented!("unrecognized version_specific_data version in CheckpointSummary"),
         }
+    }
+
+    pub fn checkpoint_artifacts_digest(&self) -> SuiResult<&CheckpointArtifactsDigest> {
+        self.checkpoint_commitments
+            .iter()
+            .find_map(|c| match c {
+                CheckpointCommitment::CheckpointArtifactsDigest(digest) => Some(digest),
+                _ => None,
+            })
+            .ok_or(
+                SuiErrorKind::GenericAuthorityError {
+                    error: "Checkpoint artifacts digest not found in checkpoint commitments".to_string(),
+                }
+                .into(),
+            )
     }
 }
 
@@ -327,7 +486,7 @@ impl CertifiedCheckpointSummary {
             let content_digest = *contents.digest();
             fp_ensure!(
                 content_digest == self.data().content_digest,
-                SuiError::GenericAuthorityError{error:format!("Checkpoint contents digest mismatch: summary={:?}, received content digest {:?}, received {} transactions", self.data(), content_digest, contents.size())}
+                SuiErrorKind::GenericAuthorityError{error:format!("Checkpoint contents digest mismatch: summary={:?}, received content digest {:?}, received {} transactions", self.data(), content_digest, contents.size())}.into()
             );
         }
 
@@ -517,23 +676,6 @@ impl FullCheckpointContents {
         Self { transactions, user_signatures: contents.into_v1().user_signatures }
     }
 
-    pub fn from_checkpoint_contents<S>(store: S, contents: CheckpointContents) -> Option<Self>
-    where
-        S: ReadStore,
-    {
-        let mut transactions = Vec::with_capacity(contents.size());
-        for tx in contents.iter() {
-            if let (Some(t), Some(e)) =
-                (store.get_transaction(&tx.transaction), store.get_transaction_effects(&tx.transaction))
-            {
-                transactions.push(ExecutionData::new((*t).clone().into_inner(), e))
-            } else {
-                return None;
-            }
-        }
-        Some(Self { transactions, user_signatures: contents.into_v1().user_signatures })
-    }
-
     pub fn iter(&self) -> Iter<'_, ExecutionData> {
         self.transactions.iter()
     }
@@ -582,7 +724,14 @@ impl FullCheckpointContents {
     pub fn random_for_testing() -> Self {
         let (a, key): (_, AccountKeyPair) = get_key_pair();
         let transaction = Transaction::from_data_and_signer(
-            TransactionData::new_transfer(a, random_object_ref(), a, random_object_ref(), 100000000000, 100),
+            TransactionData::new_transfer(
+                a,
+                FullObjectRef::from_fastpath_ref(random_object_ref()),
+                a,
+                random_object_ref(),
+                100000000000,
+                100,
+            ),
             vec![&key],
         );
         let effects = TestEffectsBuilder::new(transaction.data()).build();
@@ -722,6 +871,7 @@ mod tests {
                         None,
                         0,
                         Vec::new(),
+                        Vec::new(),
                     ),
                     k,
                     name,
@@ -752,6 +902,7 @@ mod tests {
             GasCostSummary::default(),
             None,
             0,
+            Vec::new(),
             Vec::new(),
         );
 
@@ -789,6 +940,7 @@ mod tests {
                         None,
                         0,
                         Vec::new(),
+                        Vec::new(),
                     ),
                     k,
                     name,
@@ -821,6 +973,7 @@ mod tests {
             GasCostSummary::default(),
             None,
             100,
+            Vec::new(),
             Vec::new(),
         )
     }
@@ -869,5 +1022,13 @@ mod tests {
             let c2 = generate_test_checkpoint_summary_from_digest(*t2.digest());
             assert_ne!(c1.digest(), c2.digest());
         }
+    }
+
+    #[test]
+    fn test_artifacts() {
+        let mut artifacts = CheckpointArtifacts::new();
+        let o = CheckpointArtifact::ObjectStates(BTreeMap::new());
+        assert!(artifacts.add_artifact(o.clone()).is_ok());
+        assert!(artifacts.add_artifact(o.clone()).is_err());
     }
 }

@@ -99,7 +99,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Deposited,
                     gas_usage: effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     is_finalized: true,
                     data: Some(TokenTransferData {
                         destination_chain: move_event.target_chain,
@@ -124,7 +124,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Approved,
                     gas_usage: effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     data: None,
                     is_finalized: true,
                 }));
@@ -142,7 +142,7 @@ pub fn into_token_transfers(tx: RetrievedTransaction, metrics: &BridgeIndexerMet
                     txn_sender: ev.sender.to_vec(),
                     status: TokenTransferStatus::Claimed,
                     gas_usage: effects.gas_cost_summary().net_gas_usage(),
-                    data_source: BridgeDataSource::Sui,
+                    data_source: BridgeDataSource::SUI,
                     data: None,
                     is_finalized: true,
                 }));

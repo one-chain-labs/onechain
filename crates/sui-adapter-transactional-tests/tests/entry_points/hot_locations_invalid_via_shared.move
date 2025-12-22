@@ -1,0 +1,152 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+// Simple test of hot value rules each location and usage
+
+//# init --addresses test=0x0 a=0x0 --accounts A --allow-references-in-ptbs
+
+//# publish
+
+module test::m;
+
+use one::coin::Coin;
+use one::oct::OCT;
+
+public struct A has key, store { id: UID }
+
+public struct Shared has key { id: UID }
+
+public fun a(ctx: &mut TxContext): A {
+    A { id: object::new(ctx) }
+}
+
+public fun share(ctx: &mut TxContext) {
+    one::transfer::share_object(Shared { id: object::new(ctx) })
+}
+
+public fun id_imm<T>(r: &T): &T {
+    r
+}
+public fun id_mut<T>(r: &mut T): &mut T {
+    r
+}
+
+public fun heat_val<T>(t: T, obj: Shared): T {
+    one::transfer::share_object(obj);
+    t
+}
+public fun heat_imm<T>(_: &T, obj: Shared) {
+    one::transfer::share_object(obj);
+}
+public fun heat_mut<T>(_: &mut T, obj: Shared) {
+    one::transfer::share_object(obj);
+}
+
+entry fun play_a(_: &A) {}
+entry fun play_coin(_: &Coin<OCT>) {}
+entry fun play_u64(_: u64) {}
+entry fun play_receiving(_: one::transfer::Receiving<A>) {}
+
+public fun delete(a: A) {
+    let A { id } = a;
+    object::delete(id);
+}
+
+//# programmable --sender A --inputs @A
+//> test::m::a();
+//> one::transfer::public_transfer<test::m::A>(Result(0), Input(0));
+
+//# set-address a object(2,0)
+
+//# programmable --sender A --inputs @a
+//> test::m::a();
+//> one::transfer::public_transfer<test::m::A>(Result(0), Input(0));
+
+//# programmable --sender A
+//> test::m::share();
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// object input by-ref
+//> 0: test::m::heat_imm<test::m::A>(Input(0), Input(1));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// object input by-mut
+//> 0: test::m::heat_mut<test::m::A>(Input(0), Input(1));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs object(5,0)
+// gas coin by-ref
+//> test::m::heat_imm<one::coin::Coin<one::oct::OCT>>(Gas, Input(0));
+//> test::m::play_coin(Gas);
+
+//# programmable --sender A --inputs object(5,0)
+// gas coin by-mut
+//> test::m::heat_mut<one::coin::Coin<one::oct::OCT>>(Gas, Input(0));
+//> test::m::play_coin(Gas);
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// result ref copy
+//> 0: test::m::id_imm<test::m::A>(Input(0));
+//> 1: test::m::heat_imm<test::m::A>(Result(0), Input(1));
+//> test::m::play_a(Result(0));
+//> test::m::play_a(Result(0));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// result ref move
+//> 0: test::m::id_imm<test::m::A>(Input(0));
+//> 1: test::m::heat_imm<test::m::A>(Result(0), Input(1));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// result mut ref copy
+//> 0: test::m::id_mut<test::m::A>(Input(0));
+//> 1: test::m::heat_mut<test::m::A>(Result(0), Input(1));
+//> test::m::play_a(Result(0));
+//> test::m::play_a(Result(0));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// result mut ref freeze
+//> 0: test::m::id_mut<test::m::A>(Input(0));
+//> 1: test::m::heat_imm<test::m::A>(Result(0), Input(1));
+//> test::m::play_a(Result(0));
+//> test::m::play_a(Result(0));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs object(2,0) object(5,0)
+// result mut ref move
+//> 0: test::m::id_mut<test::m::A>(Input(0));
+//> 1: test::m::heat_mut<test::m::A>(Result(0), Input(1));
+//> test::m::play_a(Input(0));
+
+//# programmable --sender A --inputs 0u64 object(5,0)
+// pure input by-value
+//> 0: test::m::heat_val<u64>(Input(0), Input(1));
+//> test::m::play_u64(Input(0));
+
+//# programmable --sender A --inputs 0u64 object(5,0)
+// pure input by-ref
+//> 0: test::m::heat_imm<u64>(Input(0), Input(1));
+//> test::m::play_u64(Input(0));
+
+//# programmable --sender A --inputs 0u64 object(5,0)
+// pure input by-mut
+//> 0: test::m::heat_mut<u64>(Input(0), Input(1));
+//> test::m::play_u64(Input(0));
+
+//# programmable --sender A --inputs receiving(4,0) object(5,0)
+// receiving input by-ref
+//> 0: test::m::heat_imm<one::transfer::Receiving<test::m::A>>(Input(0), Input(1));
+//> test::m::play_receiving(Input(0));
+
+//# programmable --sender A --inputs receiving(4,0) object(5,0)
+// receiving input by-mut
+//> 0: test::m::heat_mut<one::transfer::Receiving<test::m::A>>(Input(0), Input(1));
+//> test::m::play_receiving(Input(0));
+
+//# programmable --sender A --inputs receiving(4,0) object(5,0)
+// receiving input by-val
+//> 0: test::m::heat_val<one::transfer::Receiving<test::m::A>>(Input(0), Input(1));
+//> test::m::play_receiving(NestedResult(0,0));

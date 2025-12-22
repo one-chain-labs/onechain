@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, SignatureToken, StructFieldInformation, TableIndex},
     IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult, verification_error},
+    file_format::{CompiledModule, SignatureToken, StructFieldInformation, TableIndex},
 };
 use move_core_types::{runtime_value::MoveValue, vm_status::StatusCode};
 use move_vm_config::verifier::VerifierConfig;
@@ -45,17 +45,17 @@ impl<'a> LimitsVerifier<'a> {
 
     fn verify_function_handles(&self, config: &VerifierConfig) -> PartialVMResult<()> {
         for (idx, function_handle) in self.module.function_handles().iter().enumerate() {
-            if let Some(limit) = config.max_generic_instantiation_length {
-                if function_handle.type_parameters.len() > limit {
-                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_PARAMETERS)
-                        .at_index(IndexKind::FunctionHandle, idx as u16));
-                }
+            if let Some(limit) = config.max_generic_instantiation_length
+                && function_handle.type_parameters.len() > limit
+            {
+                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_PARAMETERS)
+                    .at_index(IndexKind::FunctionHandle, idx as u16));
             };
-            if let Some(limit) = config.max_function_parameters {
-                if self.module.signature_at(function_handle.parameters).0.len() > limit {
-                    return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS)
-                        .at_index(IndexKind::FunctionHandle, idx as u16));
-                }
+            if let Some(limit) = config.max_function_parameters
+                && self.module.signature_at(function_handle.parameters).0.len() > limit
+            {
+                return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS)
+                    .at_index(IndexKind::FunctionHandle, idx as u16));
             };
         }
         Ok(())
@@ -121,12 +121,12 @@ impl<'a> LimitsVerifier<'a> {
 
     fn verify_definitions(&self, config: &VerifierConfig) -> PartialVMResult<()> {
         let defs = self.module.function_defs();
-        if let Some(max_function_definitions) = config.max_function_definitions {
-            if defs.len() > max_function_definitions {
-                return Err(PartialVMError::new(
-                    StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
-                ));
-            }
+        if let Some(max_function_definitions) = config.max_function_definitions
+            && defs.len() > max_function_definitions
+        {
+            return Err(PartialVMError::new(
+                StatusCode::MAX_FUNCTION_DEFINITIONS_REACHED,
+            ));
         }
         if let Some(max_data_definitions) = config.max_data_definitions {
             let defs_len = self.module.struct_defs().len() + self.module.enum_defs().len();
@@ -187,11 +187,11 @@ impl<'a> LimitsVerifier<'a> {
                         )
                     })?
                 {
-                    if let Some(lim) = config.max_constant_vector_len {
-                        if cons.len() > lim as usize {
-                            return Err(PartialVMError::new(StatusCode::TOO_MANY_VECTOR_ELEMENTS)
-                                .with_message(format!("vector size limit is {}", lim)));
-                        }
+                    if let Some(lim) = config.max_constant_vector_len
+                        && cons.len() > lim as usize
+                    {
+                        return Err(PartialVMError::new(StatusCode::TOO_MANY_VECTOR_ELEMENTS)
+                            .with_message(format!("vector size limit is {}", lim)));
                     }
                 } else {
                     return Err(verification_error(
@@ -207,17 +207,27 @@ impl<'a> LimitsVerifier<'a> {
 
     /// Verifies the lengths of all identifers are valid
     fn verify_identifiers(&self, config: &VerifierConfig) -> PartialVMResult<()> {
-        if let Some(max_idenfitier_len) = config.max_idenfitier_len {
-            for (idx, identifier) in self.module.identifiers().iter().enumerate() {
-                if identifier.len() > (max_idenfitier_len as usize) {
-                    return Err(verification_error(
-                        StatusCode::IDENTIFIER_TOO_LONG,
-                        IndexKind::Identifier,
-                        idx as TableIndex,
-                    ));
-                }
+        for (idx, identifier) in self.module.identifiers().iter().enumerate() {
+            if config
+                .max_identifier_len
+                .is_some_and(|max_identifier_len| identifier.len() > (max_identifier_len as usize))
+            {
+                return Err(verification_error(
+                    StatusCode::IDENTIFIER_TOO_LONG,
+                    IndexKind::Identifier,
+                    idx as TableIndex,
+                ));
+            }
+
+            if config.disallow_self_identifier && identifier.as_str() == "<SELF>" {
+                return Err(verification_error(
+                    StatusCode::INVALID_IDENTIFIER,
+                    IndexKind::Identifier,
+                    idx as TableIndex,
+                ));
             }
         }
+
         Ok(())
     }
 }

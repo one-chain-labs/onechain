@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+/// Consensus modules.
 mod ancestor;
 mod authority_node;
 mod authority_service;
@@ -8,9 +9,9 @@ mod base_committer;
 mod block;
 mod block_manager;
 mod block_verifier;
-mod broadcaster;
 mod commit;
 mod commit_consumer;
+mod commit_finalizer;
 mod commit_observer;
 mod commit_syncer;
 mod commit_vote_monitor;
@@ -24,47 +25,51 @@ mod leader_scoring;
 mod leader_timeout;
 mod linearizer;
 mod metrics;
-#[cfg(not(msim))]
 mod network;
-#[cfg(msim)]
-pub mod network;
-
+mod proposed_block_handler;
+mod round_prober;
+mod round_tracker;
 mod stake_aggregator;
-mod storage;
+pub mod storage;
 mod subscriber;
 mod synchronizer;
 mod threshold_clock;
-#[cfg(not(msim))]
 mod transaction;
-#[cfg(msim)]
-pub mod transaction;
-
+mod transaction_certifier;
 mod universal_committer;
 
-#[cfg(test)]
-#[path = "tests/randomized_tests.rs"]
-mod randomized_tests;
-
-mod round_prober;
+/// Consensus test utilities.
 #[cfg(test)]
 mod test_dag;
-#[cfg(test)]
 mod test_dag_builder;
 #[cfg(test)]
 mod test_dag_parser;
 
-/// Exported consensus API.
-pub use authority_node::ConsensusAuthority;
-pub use block::{BlockAPI, BlockRef, Round, TransactionIndex};
-/// Exported API for testing.
+/// Randomized integration tests.
+#[cfg(test)]
+#[path = "tests/randomized_tests.rs"]
+mod randomized_tests;
+
+/// Exported Consensus API.
+pub use authority_node::{ConsensusAuthority, NetworkType};
+pub use block::{BlockAPI, CertifiedBlock, CertifiedBlocksOutput};
+/// Exported API for testing and tools.
 pub use block::{TestBlock, Transaction, VerifiedBlock};
-pub use commit::{CommitDigest, CommitIndex, CommitRef, CommittedSubDag};
-pub use commit_consumer::{CommitConsumer, CommitConsumerMonitor};
-pub use network::{
-    connection_monitor::{AnemoConnectionMonitor, ConnectionMonitorHandle, ConnectionStatus},
-    metrics::{MetricsMakeCallbackHandler, NetworkRouteMetrics, QuinnConnectionMetrics},
-    tonic_network::to_socket_addr,
-};
+// Exported API for benchmarking
+pub use block_verifier::{BlockVerifier, NoopBlockVerifier};
+pub use commit::{CommitAPI, CommitDigest, CommitIndex, CommitRange, CommitRef, CommittedSubDag};
+pub use commit_consumer::{CommitConsumerArgs, CommitConsumerMonitor};
+pub use commit_finalizer::CommitFinalizer;
+pub use context::{Clock, Context};
+pub use dag_state::DagState;
+pub use linearizer::Linearizer;
+pub use metrics::Metrics;
+// Exported API for simtests.
+#[cfg(msim)]
+pub use network::tonic_network::to_socket_addr;
+pub use storage::mem_store::MemStore;
+pub use test_dag_builder::DagBuilder;
 #[cfg(msim)]
 pub use transaction::NoopTransactionVerifier;
 pub use transaction::{BlockStatus, ClientError, TransactionClient, TransactionVerifier, ValidationError};
+pub use transaction_certifier::TransactionCertifier;

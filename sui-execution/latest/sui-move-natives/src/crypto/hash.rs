@@ -14,7 +14,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 
-use crate::NativesCostTable;
+use crate::{get_extension, NativesCostTable};
 
 const BLAKE_2B256_BLOCK_SIZE: u16 = 128;
 const KECCAK_256_BLOCK_SIZE: u16 = 136;
@@ -75,7 +75,7 @@ pub fn keccak256(
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let hash_keccak256_cost_params = &context.extensions().get::<NativesCostTable>().hash_keccak256_cost_params.clone();
+    let hash_keccak256_cost_params = get_extension!(context, NativesCostTable)?.hash_keccak256_cost_params.clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(context, hash_keccak256_cost_params.hash_keccak256_cost_base);
 
@@ -111,8 +111,7 @@ pub fn blake2b256(
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let hash_blake2b256_cost_params =
-        &context.extensions().get::<NativesCostTable>().hash_blake2b256_cost_params.clone();
+    let hash_blake2b256_cost_params = get_extension!(context, NativesCostTable)?.hash_blake2b256_cost_params.clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(context, hash_blake2b256_cost_params.hash_blake2b256_cost_base);
 

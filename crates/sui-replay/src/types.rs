@@ -16,7 +16,7 @@ use sui_sdk::error::Error as SuiRpcError;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, VersionNumber},
     digests::{ObjectDigest, TransactionDigest},
-    error::{SuiError, SuiObjectResponseError, SuiResult, UserInputError},
+    error::{SuiError, SuiErrorKind, SuiObjectResponseError, SuiResult, UserInputError},
     object::Object,
     transaction::{InputObjectKind, SenderSignedData, TransactionKind},
 };
@@ -186,7 +186,13 @@ impl From<SuiObjectResponseError> for ReplayEngineError {
 
 impl From<ReplayEngineError> for SuiError {
     fn from(err: ReplayEngineError) -> Self {
-        SuiError::Unknown(format!("{:#?}", err))
+        SuiError::from(SuiErrorKind::from(err))
+    }
+}
+
+impl From<ReplayEngineError> for SuiErrorKind {
+    fn from(err: ReplayEngineError) -> Self {
+        SuiErrorKind::Unknown(format!("{:#?}", err))
     }
 }
 
@@ -195,6 +201,13 @@ impl From<SuiError> for ReplayEngineError {
         ReplayEngineError::SuiError { err }
     }
 }
+
+impl From<SuiErrorKind> for ReplayEngineError {
+    fn from(err: SuiErrorKind) -> Self {
+        SuiError::from(err).into()
+    }
+}
+
 impl From<SuiRpcError> for ReplayEngineError {
     fn from(err: SuiRpcError) -> Self {
         match err {
@@ -218,6 +231,7 @@ impl From<anyhow::Error> for ReplayEngineError {
 
 /// TODO: Limited set but will add more
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ExecutionStoreEvent {
     BackingPackageGetPackageObject {
         package_id: ObjectID,

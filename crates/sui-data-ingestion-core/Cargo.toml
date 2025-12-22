@@ -3,7 +3,7 @@ name = "sui-data-ingestion-core"
 authors = ["Mysten Labs <build@mystenlabs.com>"]
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 version = "0.1.0"
 
 [dependencies]
@@ -28,6 +28,7 @@ tempfile.workspace = true
 tap.workspace = true
 sui-protocol-config.workspace = true
 sui-rpc-api.workspace = true
+once_cell.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

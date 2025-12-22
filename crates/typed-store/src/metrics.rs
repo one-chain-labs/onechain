@@ -1,5 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
 use std::{
     cell::RefCell,
     sync::{
@@ -9,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use mysten_metrics::RegistryService;
 use once_cell::sync::OnceCell;
 use prometheus::{
     register_histogram_vec_with_registry,
@@ -76,7 +78,7 @@ impl SamplingInterval {
 
     pub fn sample(&self) -> bool {
         if self.once_every_duration.is_zero() {
-            self.counter.fetch_add(1, Ordering::Relaxed) % (self.after_num_ops + 1) == 0
+            self.counter.fetch_add(1, Ordering::Relaxed).is_multiple_of(self.after_num_ops + 1)
         } else {
             self.counter.fetch_add(1, Ordering::Relaxed) == 0
         }
@@ -943,33 +945,31 @@ pub struct DBMetrics {
     pub cf_metrics: ColumnFamilyMetrics,
     pub read_perf_ctx_metrics: ReadPerfContextMetrics,
     pub write_perf_ctx_metrics: WritePerfContextMetrics,
+    pub registry_serivce: RegistryService,
 }
 
 static ONCE: OnceCell<Arc<DBMetrics>> = OnceCell::new();
 
 impl DBMetrics {
-    fn new(registry: &Registry) -> Self {
+    fn new(registry_service: RegistryService) -> Self {
+        let registry = registry_service.default_registry();
         DBMetrics {
-            op_metrics: OperationMetrics::new(registry),
-            cf_metrics: ColumnFamilyMetrics::new(registry),
-            read_perf_ctx_metrics: ReadPerfContextMetrics::new(registry),
-            write_perf_ctx_metrics: WritePerfContextMetrics::new(registry),
+            op_metrics: OperationMetrics::new(&registry),
+            cf_metrics: ColumnFamilyMetrics::new(&registry),
+            read_perf_ctx_metrics: ReadPerfContextMetrics::new(&registry),
+            write_perf_ctx_metrics: WritePerfContextMetrics::new(&registry),
+            registry_serivce: registry_service,
         }
     }
 
-    pub fn init(registry: &Registry) -> &'static Arc<DBMetrics> {
+    // TODO: Remove static initialization (init() and get()) by constructing DBMetrics
+    // and accessing it without static variables.
+    pub fn init(registry_service: RegistryService) {
         // Initialize this before creating any instance of DBMap
-        // TODO: Remove static initialization because this basically means we can
-        // only ever initialize db metrics once with a registry whereas
-        // in the code we might want to initialize it with different
-        // registries. The problem is underlying metrics cannot be re-initialized
-        // or prometheus complains. We essentially need to pass in DBMetrics
-        // everywhere we create DBMap as the right fix
         let _ = ONCE
-            .set(Arc::new(DBMetrics::new(registry)))
+            .set(Arc::new(DBMetrics::new(registry_service)))
             // this happens many times during tests
             .tap_err(|_| warn!("DBMetrics registry overwritten"));
-        ONCE.get().unwrap()
     }
 
     pub fn increment_num_active_dbs(&self, db_name: &str) {
@@ -981,6 +981,6 @@ impl DBMetrics {
     }
 
     pub fn get() -> &'static Arc<DBMetrics> {
-        ONCE.get().unwrap_or_else(|| DBMetrics::init(prometheus::default_registry()))
+        ONCE.get_or_init(|| Arc::new(DBMetrics::new(RegistryService::new(prometheus::default_registry().clone()))))
     }
 }

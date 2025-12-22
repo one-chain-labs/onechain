@@ -335,8 +335,7 @@ fn test_move_package_size_for_gas_metering() {
     let package = Object::new_package(
         &[module],
         TransactionDigest::genesis_marker(),
-        config.max_move_package_size(),
-        config.move_binary_format_version(),
+        &config,
         &[], // empty dependencies for empty package (no modules)
     )
     .unwrap();
@@ -395,7 +394,7 @@ fn move_object_type_consistency() {
         assert_eq!(ty.address(), tag.address);
         assert_eq!(ty.module(), tag.module.as_ident_str());
         assert_eq!(ty.name(), tag.name.as_ident_str());
-        assert_eq!(&ty.type_params(), &tag.type_params);
+        assert_eq!(&ty.type_params().into_iter().map(|t| t.into_owned()).collect::<Vec<_>>(), &tag.type_params);
         assert_eq!(ty.module_id(), tag.module_id());
         // sanity check special cases
         assert!(!ty.is_gas_coin() || ty.is_coin());

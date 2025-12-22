@@ -44,6 +44,9 @@ impl Display for Pretty<'_, SuiProgrammableTransactionBlock> {
                     SuiCallArg::Object(SuiObjectArg::Receiving { object_id, .. }) => {
                         builder.push_record(vec![format!("{i:<3} Receiving Object ID: {}", object_id)]);
                     }
+                    SuiCallArg::FundsWithdrawal(arg) => {
+                        builder.push_record(vec![format!("{i:<3} Funds Withdraw: {:?}", arg)]);
+                    }
                 }
             }
 

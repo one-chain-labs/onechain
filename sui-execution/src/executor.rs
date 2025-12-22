@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use move_trace_format::format::MoveTraceBuilder;
 use sui_protocol_config::ProtocolConfig;
@@ -12,6 +12,7 @@ use sui_types::{
     effects::TransactionEffects,
     error::ExecutionError,
     execution::{ExecutionResult, ExecutionTiming, TypeLayoutStore},
+    execution_params::ExecutionOrEarlyError,
     gas::SuiGasStatus,
     inner_temporary_store::InnerTemporaryStore,
     layout_resolver::LayoutResolver,
@@ -29,7 +30,7 @@ pub trait Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         // Epoch
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
@@ -52,7 +53,7 @@ pub trait Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         // Epoch
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,

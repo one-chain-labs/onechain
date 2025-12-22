@@ -19,7 +19,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 
-use crate::NativesCostTable;
+use crate::{get_extension, NativesCostTable};
 
 pub const FAIL_TO_RECOVER_PUBKEY: u64 = 0;
 pub const INVALID_SIGNATURE: u64 = 1;
@@ -69,7 +69,7 @@ pub fn ecrecover(
 
     // Load the cost parameters from the protocol config
     let (ecdsa_r1_ecrecover_cost_params, crypto_invalid_arguments_cost) = {
-        let cost_table = &context.extensions().get::<NativesCostTable>();
+        let cost_table: &NativesCostTable = get_extension!(context)?;
         (cost_table.ecdsa_r1_ecrecover_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
 
@@ -164,7 +164,7 @@ pub fn secp256r1_verify(
     debug_assert!(args.len() == 4);
     // Load the cost parameters from the protocol config
     let (ecdsa_r1_secp256_r1_verify_cost_params, crypto_invalid_arguments_cost) = {
-        let cost_table = &context.extensions().get::<NativesCostTable>();
+        let cost_table: &NativesCostTable = get_extension!(context)?;
         (cost_table.ecdsa_r1_secp256_r1_verify_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
     let hash = pop_arg!(args, u8);

@@ -4,40 +4,39 @@
 use std::{collections::BTreeMap, ops::Range, sync::Arc};
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
 use sui_indexer_alt_framework::{
-    models::cp_sequence_numbers::tx_interval,
-    pipeline::{concurrent::Handler, Processor},
+    pipeline::Processor,
+    postgres::{handler::Handler, Connection},
+    types::{coin::Coin, effects::TransactionEffectsAPI, full_checkpoint_content::Checkpoint, gas_coin::GAS},
 };
 use sui_indexer_alt_schema::{
     schema::tx_balance_changes,
     transactions::{BalanceChange, StoredTxBalanceChange},
 };
-use sui_pg_db as db;
-use sui_types::{
-    coin::Coin,
-    effects::TransactionEffectsAPI,
-    full_checkpoint_content::{CheckpointData, CheckpointTransaction},
-    gas_coin::GAS,
-};
+use sui_types::full_checkpoint_content::ExecutedTransaction;
+
+use crate::handlers::cp_sequence_numbers::tx_interval;
 
 pub(crate) struct TxBalanceChanges;
 
+#[async_trait]
 impl Processor for TxBalanceChanges {
     type Value = StoredTxBalanceChange;
 
     const NAME: &'static str = "tx_balance_changes";
 
-    fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
-        let CheckpointData { transactions, checkpoint_summary, .. } = checkpoint.as_ref();
+    async fn process(&self, checkpoint: &Arc<Checkpoint>) -> Result<Vec<Self::Value>> {
+        let Checkpoint { transactions, summary, .. } = checkpoint.as_ref();
 
         let mut values = Vec::new();
-        let first_tx = checkpoint_summary.network_total_transactions as usize - transactions.len();
+        let first_tx = summary.network_total_transactions as usize - transactions.len();
 
         for (i, tx) in transactions.iter().enumerate() {
             let tx_sequence_number = (first_tx + i) as i64;
-            let balance_changes = balance_changes(tx)
+            let balance_changes = balance_changes(tx, checkpoint)
                 .with_context(|| format!("Calculating balance changes for transaction {tx_sequence_number}"))?;
 
             values.push(StoredTxBalanceChange {
@@ -51,16 +50,16 @@ impl Processor for TxBalanceChanges {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl Handler for TxBalanceChanges {
     const MAX_PENDING_ROWS: usize = 10000;
     const MIN_EAGER_ROWS: usize = 100;
 
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn commit<'a>(values: &[Self::Value], conn: &mut Connection<'a>) -> Result<usize> {
         Ok(diesel::insert_into(tx_balance_changes::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 
-    async fn prune(&self, from: u64, to_exclusive: u64, conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn prune<'a>(&self, from: u64, to_exclusive: u64, conn: &mut Connection<'a>) -> Result<usize> {
         let Range { start: from_tx, end: to_tx } = tx_interval(conn, from .. to_exclusive).await?;
         let filter = tx_balance_changes::table
             .filter(tx_balance_changes::tx_sequence_number.between(from_tx as i64, to_tx as i64 - 1));
@@ -70,7 +69,7 @@ impl Handler for TxBalanceChanges {
 }
 
 /// Calculate balance changes based on the object's input and output objects.
-fn balance_changes(transaction: &CheckpointTransaction) -> Result<Vec<BalanceChange>> {
+fn balance_changes(transaction: &ExecutedTransaction, checkpoint: &Checkpoint) -> Result<Vec<BalanceChange>> {
     // Shortcut if the transaction failed -- we know that only gas was charged.
     if transaction.effects.status().is_err() {
         return Ok(vec![BalanceChange::V1 {
@@ -81,13 +80,14 @@ fn balance_changes(transaction: &CheckpointTransaction) -> Result<Vec<BalanceCha
     }
 
     let mut changes = BTreeMap::new();
-    for object in &transaction.input_objects {
+
+    for object in transaction.input_objects(&checkpoint.object_set) {
         if let Some((type_, balance)) = Coin::extract_balance_if_coin(object)? {
             *changes.entry((object.owner(), type_)).or_insert(0i128) -= balance as i128;
         }
     }
 
-    for object in &transaction.output_objects {
+    for object in transaction.output_objects(&checkpoint.object_set) {
         if let Some((type_, balance)) = Coin::extract_balance_if_coin(object)? {
             *changes.entry((object.owner(), type_)).or_insert(0i128) += balance as i128;
         }
@@ -106,13 +106,13 @@ fn balance_changes(transaction: &CheckpointTransaction) -> Result<Vec<BalanceCha
 #[cfg(test)]
 mod tests {
     use diesel_async::RunQueryDsl;
-    use sui_indexer_alt_framework::{handlers::cp_sequence_numbers::CpSequenceNumbers, Indexer};
+    use sui_indexer_alt_framework::{types::test_checkpoint_data_builder::TestCheckpointBuilder, Indexer};
     use sui_indexer_alt_schema::MIGRATIONS;
-    use sui_types::test_checkpoint_data_builder::TestCheckpointDataBuilder;
 
     use super::*;
+    use crate::handlers::cp_sequence_numbers::CpSequenceNumbers;
 
-    async fn get_all_tx_balance_changes(conn: &mut db::Connection<'_>) -> Result<Vec<i64>> {
+    async fn get_all_tx_balance_changes(conn: &mut Connection<'_>) -> Result<Vec<i64>> {
         Ok(tx_balance_changes::table
             .select(tx_balance_changes::tx_sequence_number)
             .order_by(tx_balance_changes::tx_sequence_number)
@@ -123,7 +123,7 @@ mod tests {
     #[tokio::test]
     async fn test_tx_balance_changes_pruning_complains_if_no_mapping() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
 
         let result = TxBalanceChanges.prune(0, 2, &mut conn).await;
 
@@ -136,22 +136,22 @@ mod tests {
     #[tokio::test]
     async fn test_tx_balance_changes_pruning() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
 
-        let mut builder = TestCheckpointDataBuilder::new(0);
+        let mut builder = TestCheckpointBuilder::new(0);
         builder = builder.start_transaction(0).finish_transaction();
         let checkpoint = Arc::new(builder.build_checkpoint());
-        let values = TxBalanceChanges.process(&checkpoint).unwrap();
+        let values = TxBalanceChanges.process(&checkpoint).await.unwrap();
         TxBalanceChanges::commit(&values, &mut conn).await.unwrap();
-        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        let values = CpSequenceNumbers.process(&checkpoint).await.unwrap();
         CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
 
         builder = builder.start_transaction(0).finish_transaction();
         builder = builder.start_transaction(1).finish_transaction();
         let checkpoint = Arc::new(builder.build_checkpoint());
-        let values = TxBalanceChanges.process(&checkpoint).unwrap();
+        let values = TxBalanceChanges.process(&checkpoint).await.unwrap();
         TxBalanceChanges::commit(&values, &mut conn).await.unwrap();
-        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        let values = CpSequenceNumbers.process(&checkpoint).await.unwrap();
         CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
 
         builder = builder.start_transaction(0).finish_transaction();
@@ -159,9 +159,9 @@ mod tests {
         builder = builder.start_transaction(2).finish_transaction();
         builder = builder.start_transaction(3).finish_transaction();
         let checkpoint = Arc::new(builder.build_checkpoint());
-        let values = TxBalanceChanges.process(&checkpoint).unwrap();
+        let values = TxBalanceChanges.process(&checkpoint).await.unwrap();
         TxBalanceChanges::commit(&values, &mut conn).await.unwrap();
-        let values = CpSequenceNumbers.process(&checkpoint).unwrap();
+        let values = CpSequenceNumbers.process(&checkpoint).await.unwrap();
         CpSequenceNumbers::commit(&values, &mut conn).await.unwrap();
 
         let fetched_results = get_all_tx_balance_changes(&mut conn).await.unwrap();

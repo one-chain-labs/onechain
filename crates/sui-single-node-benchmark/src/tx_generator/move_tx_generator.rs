@@ -6,9 +6,8 @@ use std::collections::HashMap;
 use move_core_types::identifier::Identifier;
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{CallArg, ObjectArg, Transaction, DEFAULT_VALIDATOR_GAS_PRICE},
+    base_types::{FullObjectRef, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
+    transaction::{CallArg, ObjectArg, SharedObjectMutability, Transaction, DEFAULT_VALIDATOR_GAS_PRICE},
 };
 
 use crate::{mock_account::Account, tx_generator::TxGenerator};
@@ -53,14 +52,16 @@ impl MoveTxGenerator {
 
 impl TxGenerator for MoveTxGenerator {
     fn generate_tx(&self, account: Account) -> Transaction {
-        let pt = {
-            let mut builder = ProgrammableTransactionBuilder::new();
+        let mut tx_builder =
+            TestTransactionBuilder::new(account.sender, account.gas_objects[0], DEFAULT_VALIDATOR_GAS_PRICE);
+        {
+            let builder = tx_builder.ptb_builder_mut();
             // Step 1: transfer `num_transfers` objects.
             // First object in the gas_objects is the gas object and we are not transferring it.
             for i in 1 ..= self.num_transfers {
                 let object = account.gas_objects[i as usize];
                 if self.use_native_transfer {
-                    builder.transfer_object(account.sender, object).unwrap();
+                    builder.transfer_object(account.sender, FullObjectRef::from_fastpath_ref(object)).unwrap();
                 } else {
                     builder
                         .move_call(
@@ -83,7 +84,7 @@ impl TxGenerator for MoveTxGenerator {
                         vec![CallArg::Object(ObjectArg::SharedObject {
                             id: shared_object.0,
                             initial_shared_version: shared_object.1,
-                            mutable: true,
+                            mutability: SharedObjectMutability::Mutable,
                         })],
                     )
                     .unwrap();
@@ -148,11 +149,8 @@ impl TxGenerator for MoveTxGenerator {
                     }
                 }
             }
-            builder.finish()
-        };
-        TestTransactionBuilder::new(account.sender, account.gas_objects[0], DEFAULT_VALIDATOR_GAS_PRICE)
-            .programmable(pt)
-            .build_and_sign(account.keypair.as_ref())
+        }
+        tx_builder.build_and_sign(account.keypair.as_ref())
     }
 
     fn name(&self) -> &'static str {

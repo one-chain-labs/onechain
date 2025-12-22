@@ -80,8 +80,8 @@ impl<S: MoveResolver> TransactionDataCache<S> {
 
 // `DataStore` implementation for the `TransactionDataCache`
 impl<S: MoveResolver> DataStore for TransactionDataCache<S> {
-    fn link_context(&self) -> AccountAddress {
-        self.remote.link_context()
+    fn link_context(&self) -> PartialVMResult<AccountAddress> {
+        Ok(self.remote.link_context())
     }
 
     fn relocate(&self, module_id: &ModuleId) -> PartialVMResult<ModuleId> {
@@ -106,10 +106,10 @@ impl<S: MoveResolver> DataStore for TransactionDataCache<S> {
     }
 
     fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
-        if let Some(account_cache) = self.module_map.get(module_id.address()) {
-            if let Some(blob) = account_cache.module_map.get(module_id.name()) {
-                return Ok(blob.clone());
-            }
+        if let Some(account_cache) = self.module_map.get(module_id.address())
+            && let Some(blob) = account_cache.module_map.get(module_id.name())
+        {
+            return Ok(blob.clone());
         }
         match self.remote.get_module(module_id) {
             Ok(Some(bytes)) => Ok(bytes),

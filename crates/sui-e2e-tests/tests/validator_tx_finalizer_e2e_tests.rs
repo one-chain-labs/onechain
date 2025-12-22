@@ -17,7 +17,7 @@ async fn test_validator_tx_finalizer_fastpath_tx() {
         .build()
         .await;
     let tx_data = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(1)).build();
-    let tx = cluster.sign_transaction(&tx_data);
+    let tx = cluster.sign_transaction(&tx_data).await;
     let tx_digest = *tx.digest();
     // Only broadcast to get a certificate, but do not execute it.
     cluster.authority_aggregator().process_transaction(tx, None).await.unwrap();
@@ -27,7 +27,7 @@ async fn test_validator_tx_finalizer_fastpath_tx() {
     tokio::time::timeout(Duration::from_secs(60), async move {
         for node in cluster.all_node_handles() {
             node.with_async(|n| async {
-                n.state().get_transaction_cache_reader().notify_read_executed_effects_digests(&tx_digests).await;
+                n.state().get_transaction_cache_reader().notify_read_executed_effects_digests("", &tx_digests).await;
             })
             .await;
         }
@@ -47,7 +47,7 @@ async fn test_validator_tx_finalizer_consensus_tx() {
     let (package, counter) = publish_basics_package_and_make_counter(&cluster.wallet).await;
     let tx_data =
         cluster.test_transaction_builder().await.call_counter_increment(package.0, counter.0, counter.1).build();
-    let tx = cluster.sign_transaction(&tx_data);
+    let tx = cluster.sign_transaction(&tx_data).await;
     let tx_digest = *tx.digest();
     // Only broadcast to get a certificate, but do not execute it.
     cluster.authority_aggregator().process_transaction(tx, None).await.unwrap();
@@ -55,7 +55,7 @@ async fn test_validator_tx_finalizer_consensus_tx() {
     tokio::time::timeout(Duration::from_secs(60), async move {
         for node in cluster.all_node_handles() {
             node.with_async(|n| async {
-                n.state().get_transaction_cache_reader().notify_read_executed_effects_digests(&tx_digests).await;
+                n.state().get_transaction_cache_reader().notify_read_executed_effects_digests("", &tx_digests).await;
             })
             .await;
         }
@@ -74,9 +74,9 @@ async fn test_validator_tx_finalizer_equivocation() {
         .build()
         .await;
     let tx_data1 = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(1)).build();
-    let tx1 = cluster.sign_transaction(&tx_data1);
+    let tx1 = cluster.sign_transaction(&tx_data1).await;
     let tx_data2 = cluster.test_transaction_builder().await.transfer_oct(None, dbg_addr(2)).build();
-    let tx2 = cluster.sign_transaction(&tx_data2);
+    let tx2 = cluster.sign_transaction(&tx_data2).await;
     let tx_digest1 = *tx1.digest();
     let tx_digest2 = *tx2.digest();
     let auth_agg = cluster.authority_aggregator();

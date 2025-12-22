@@ -13,7 +13,7 @@ verified_operation_cap_address
 new_unverified_validator_operation_cap_and_transfer
 	public(package) fun
 	0x3::validator_cap
-new_from_unverified
+into_verified
 	public(package) fun
 	0x3::validator_cap
 StakingPool
@@ -32,6 +32,9 @@ FungibleStakedOctData
 	public struct
 	0x3::staking_pool
 FungibleStakedOctDataKey
+	public struct
+	0x3::staking_pool
+UnderflowSuiBalance
 	public struct
 	0x3::staking_pool
 new
@@ -91,14 +94,14 @@ fungible_staked_oct_pool_id
 staked_oct_amount
 	public fun
 	0x3::staking_pool
-lock
-	public fun
-	0x3::staking_pool
 stake_activation_epoch
 	public fun
 	0x3::staking_pool
 is_preactive
 	public fun
+	0x3::staking_pool
+activation_epoch
+	public(package) fun
 	0x3::staking_pool
 is_inactive
 	public fun
@@ -157,6 +160,9 @@ initial_exchange_rate
 check_balance_invariants
 	fun
 	0x3::staking_pool
+calculate_rewards
+	public(package) fun
+	0x3::staking_pool
 ValidatorMetadata
 	public struct
 	0x3::validator
@@ -190,13 +196,7 @@ activate
 adjust_stake_and_gas_price
 	public(package) fun
 	0x3::validator
-request_set_revenue_receiving_address
-	public(package) fun
-	0x3::validator
 request_add_stake
-	public(package) fun
-	0x3::validator
-request_add_stake_no_check
 	public(package) fun
 	0x3::validator
 convert_to_fungible_staked_oct
@@ -209,9 +209,6 @@ request_add_stake_at_genesis
 	public(package) fun
 	0x3::validator
 request_withdraw_stake
-	public(package) fun
-	0x3::validator
-set_only_validator_staking
 	public(package) fun
 	0x3::validator
 request_set_gas_price
@@ -316,9 +313,6 @@ stake_amount
 total_stake
 	public fun
 	0x3::validator
-only_validator_staking
-	public fun
-	0x3::validator
 voting_power
 	public fun
 	0x3::validator
@@ -329,9 +323,6 @@ pending_stake_amount
 	public fun
 	0x3::validator
 pending_stake_withdraw_amount
-	public fun
-	0x3::validator
-revenue_receiving_address
 	public fun
 	0x3::validator
 gas_price
@@ -348,12 +339,6 @@ staking_pool_id
 	0x3::validator
 is_duplicate
 	public fun
-	0x3::validator
-is_equal_some_and_value
-	fun
-	0x3::validator
-is_equal_some
-	fun
 	0x3::validator
 new_unverified_validator_operation_cap_and_transfer
 	public(package) fun
@@ -439,8 +424,8 @@ set_voting_power
 init_voting_power_info
 	fun
 	0x3::voting_power
-total_stake
-	fun
+derive_raw_voting_power
+	public(package) fun
 	0x3::voting_power
 insert
 	fun
@@ -481,15 +466,6 @@ version
 ValidatorSet
 	public struct
 	0x3::validator_set
-UpdateOnlyTrustedValidatorAction
-	public struct
-	0x3::validator_set
-UpdateTrustedValidatorsAction
-	public struct
-	0x3::validator_set
-UpdateOnlyValidatorStakingAction
-	public struct
-	0x3::validator_set
 ValidatorEpochInfoEvent
 	public struct
 	0x3::validator_set
@@ -502,25 +478,10 @@ ValidatorJoinEvent
 ValidatorLeaveEvent
 	public struct
 	0x3::validator_set
+VotingPowerAdmissionStartEpochKey
+	public struct
+	0x3::validator_set
 new
-	public(package) fun
-	0x3::validator_set
-create_update_only_trusted_validator_action
-	public(package) fun
-	0x3::validator_set
-execute_update_only_trusted_validator_action
-	public(package) fun
-	0x3::validator_set
-create_update_trusted_validator_action
-	public(package) fun
-	0x3::validator_set
-execute_update_trusted_validators_action
-	public(package) fun
-	0x3::validator_set
-create_update_only_validator_staking_action
-	public(package) fun
-	0x3::validator_set
-execute_update_only_validator_staking_action
 	public(package) fun
 	0x3::validator_set
 request_add_validator_candidate
@@ -532,14 +493,17 @@ request_remove_validator_candidate
 request_add_validator
 	public(package) fun
 	0x3::validator_set
+can_join
+	fun
+	0x3::validator_set
+get_voting_power_thresholds
+	fun
+	0x3::validator_set
 assert_no_pending_or_active_duplicates
 	public(package) fun
 	0x3::validator_set
 request_remove_validator
 	public(package) fun
-	0x3::validator_set
-remove_validator
-	fun
 	0x3::validator_set
 request_add_stake
 	public(package) fun
@@ -559,7 +523,7 @@ request_set_commission_rate
 advance_epoch
 	public(package) fun
 	0x3::validator_set
-update_and_process_low_stake_departures
+update_validator_positions_and_calculate_total_stake
 	fun
 	0x3::validator_set
 effectuate_staged_metadata
@@ -592,6 +556,9 @@ validator_address_by_pool_id
 pool_exchange_rates
 	public(package) fun
 	0x3::validator_set
+validator_by_pool_id
+	public(package) fun
+	0x3::validator_set
 next_epoch_validator_count
 	public(package) fun
 	0x3::validator_set
@@ -605,9 +572,6 @@ is_duplicate_validator
 	public(package) fun
 	0x3::validator_set
 count_duplicates_vec
-	fun
-	0x3::validator_set
-is_trusted_validator
 	fun
 	0x3::validator_set
 is_duplicate_with_pending_validator
@@ -667,9 +631,6 @@ process_validator_departure
 clean_report_records_leaving_validator
 	fun
 	0x3::validator_set
-process_pending_validators
-	fun
-	0x3::validator_set
 sort_removal_list
 	fun
 	0x3::validator_set
@@ -677,7 +638,7 @@ process_pending_stakes_and_withdraws
 	fun
 	0x3::validator_set
 calculate_total_stakes
-	fun
+	public(package) fun
 	0x3::validator_set
 adjust_stake_and_gas_price
 	fun
@@ -709,51 +670,18 @@ active_validators
 is_validator_candidate
 	public fun
 	0x3::validator_set
+is_active_validator
+	public(package) fun
+	0x3::validator_set
 is_inactive_validator
 	public fun
+	0x3::validator_set
+is_at_risk_validator
+	public(package) fun
 	0x3::validator_set
 active_validator_addresses
 	public(package) fun
 	0x3::validator_set
-ActionKey
-	public struct
-	0x3::supper_committee
-SupperCommittee
-	public struct
-	0x3::supper_committee
-Proposal
-	public struct
-	0x3::supper_committee
-CreateProposalEvent
-	public struct
-	0x3::supper_committee
-VoteProposalEvent
-	public struct
-	0x3::supper_committee
-new
-	public(package) fun
-	0x3::supper_committee
-vote_proposal
-	public(package) fun
-	0x3::supper_committee
-proposal_status
-	public fun
-	0x3::supper_committee
-proposal_action_type
-	public fun
-	0x3::supper_committee
-proposal_status_pass
-	public fun
-	0x3::supper_committee
-action
-	public fun
-	0x3::supper_committee
-create_proposal
-	public(package) fun
-	0x3::supper_committee
-get_vote_power
-	fun
-	0x3::supper_committee
 StorageFund
 	public struct
 	0x3::storage_fund
@@ -784,6 +712,9 @@ current_epoch_subsidy_amount
 get_distribution_counter
 	public(package) fun
 	0x3::stake_subsidy
+ExecutionTimeObservationChunkKey
+	public struct
+	0x3::sui_system_state_inner
 SystemParameters
 	public struct
 	0x3::sui_system_state_inner
@@ -829,22 +760,13 @@ set_candidate_validator_gas_price
 request_set_commission_rate
 	public(package) fun
 	0x3::sui_system_state_inner
-request_set_revenue_receiving_address
-	public(package) fun
-	0x3::sui_system_state_inner
 set_candidate_validator_commission_rate
 	public(package) fun
 	0x3::sui_system_state_inner
 request_add_stake
 	public(package) fun
 	0x3::sui_system_state_inner
-request_add_val_stake
-	public(package) fun
-	0x3::sui_system_state_inner
 request_add_stake_mul_coin
-	public(package) fun
-	0x3::sui_system_state_inner
-request_add_val_stake_mul_coin
 	public(package) fun
 	0x3::sui_system_state_inner
 request_withdraw_stake
@@ -867,18 +789,6 @@ report_validator_impl
 	0x3::sui_system_state_inner
 undo_report_validator_impl
 	fun
-	0x3::sui_system_state_inner
-create_update_trusted_validator_proposal
-	public(package) fun
-	0x3::sui_system_state_inner
-create_update_only_trusted_validator_proposal
-	public(package) fun
-	0x3::sui_system_state_inner
-create_update_only_validator_staking_proposal
-	public(package) fun
-	0x3::sui_system_state_inner
-vote_proposal
-	public(package) fun
 	0x3::sui_system_state_inner
 rotate_operation_cap
 	public(package) fun
@@ -991,171 +901,171 @@ extract_coin_balance
 store_execution_time_estimates
 	public(package) fun
 	0x3::sui_system_state_inner
+store_execution_time_estimates_v2
+	public(package) fun
+	0x3::sui_system_state_inner
+validators
+	public(package) fun
+	0x3::sui_system_state_inner
+validators_mut
+	public(package) fun
+	0x3::sui_system_state_inner
 SuiSystemState
 	public struct
-	0x3::one_system
+	0x3::sui_system
 create
 	public(package) fun
-	0x3::one_system
-create_update_trusted_validator_proposal
-	public entry fun
-	0x3::one_system
-create_update_only_trusted_validator_proposal
-	public entry fun
-	0x3::one_system
-create_update_only_validator_staking_proposal
-	public entry fun
-	0x3::one_system
-vote_proposal
-	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_add_validator_candidate
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_remove_validator_candidate
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_add_validator
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_remove_validator
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_set_gas_price
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 set_candidate_validator_gas_price
 	public entry fun
-	0x3::one_system
-request_set_revenue_receiving_address
-	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_set_commission_rate
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 set_candidate_validator_commission_rate
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_add_stake
 	public entry fun
-	0x3::one_system
-request_add_val_stake
-	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_add_stake_non_entry
 	public fun
-	0x3::one_system
-request_add_val_stake_non_entry
-	public fun
-	0x3::one_system
+	0x3::sui_system
 request_add_stake_mul_coin
 	public entry fun
-	0x3::one_system
-request_add_val_stake_mul_coin
-	public entry fun
-	0x3::one_system
+	0x3::sui_system
 request_withdraw_stake
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 convert_to_fungible_staked_oct
 	public fun
-	0x3::one_system
+	0x3::sui_system
 redeem_fungible_staked_oct
 	public fun
-	0x3::one_system
+	0x3::sui_system
 request_withdraw_stake_non_entry
 	public fun
-	0x3::one_system
+	0x3::sui_system
 report_validator
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 undo_report_validator
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 rotate_operation_cap
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_name
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_description
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_image_url
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_project_url
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_network_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_network_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_p2p_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_p2p_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_primary_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_primary_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_worker_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_worker_address
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_protocol_pubkey
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_protocol_pubkey
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_worker_pubkey
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_worker_pubkey
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_validator_next_epoch_network_pubkey
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 update_candidate_validator_network_pubkey
 	public entry fun
-	0x3::one_system
+	0x3::sui_system
 validator_address_by_pool_id
 	public fun
-	0x3::one_system
+	0x3::sui_system
 pool_exchange_rates
 	public fun
-	0x3::one_system
+	0x3::sui_system
 active_validator_addresses
 	public fun
-	0x3::one_system
+	0x3::sui_system
+active_validator_addresses_ref
+	public fun
+	0x3::sui_system
+active_validator_voting_powers
+	public fun
+	0x3::sui_system
+calculate_rewards
+	public(package) fun
+	0x3::sui_system
 advance_epoch
 	fun
-	0x3::one_system
+	0x3::sui_system
 load_system_state
 	fun
-	0x3::one_system
+	0x3::sui_system
 load_system_state_mut
 	fun
-	0x3::one_system
+	0x3::sui_system
+load_system_state_ref
+	fun
+	0x3::sui_system
 load_inner_maybe_upgrade
 	fun
-	0x3::one_system
+	0x3::sui_system
 validator_voting_powers
 	fun
-	0x3::one_system
+	0x3::sui_system
 store_execution_time_estimates
 	fun
-	0x3::one_system
+	0x3::sui_system
+store_execution_time_estimates_v2
+	fun
+	0x3::sui_system
 GenesisValidatorMetadata
 	public struct
 	0x3::genesis
@@ -1172,9 +1082,6 @@ create
 	fun
 	0x3::genesis
 allocate_tokens
-	fun
-	0x3::genesis
-activate_validators
 	fun
 	0x3::genesis
 secp256k1_ecrecover
@@ -1198,12 +1105,9 @@ ecvrf_verify
 ed25519_verify
 	public fun
 	0x2::ed25519
-blake2b256
-	public fun
-	0x2::hash
-keccak256
-	public fun
-	0x2::hash
+is_feature_enabled
+	public(package) fun
+	0x2::protocol_config
 hash_to_input
 	public fun
 	0x2::vdf
@@ -1216,6 +1120,153 @@ vdf_verify
 vdf_verify_internal
 	fun
 	0x2::vdf
+TxContext
+	public struct
+	0x2::tx_context
+sender
+	public fun
+	0x2::tx_context
+native_sender
+	fun
+	0x2::tx_context
+digest
+	public fun
+	0x2::tx_context
+epoch
+	public fun
+	0x2::tx_context
+native_epoch
+	fun
+	0x2::tx_context
+epoch_timestamp_ms
+	public fun
+	0x2::tx_context
+native_epoch_timestamp_ms
+	fun
+	0x2::tx_context
+sponsor
+	public fun
+	0x2::tx_context
+fresh_object_address
+	public fun
+	0x2::tx_context
+fresh_id
+	fun
+	0x2::tx_context
+reference_gas_price
+	public fun
+	0x2::tx_context
+native_rgp
+	fun
+	0x2::tx_context
+gas_price
+	public fun
+	0x2::tx_context
+native_gas_price
+	fun
+	0x2::tx_context
+native_ids_created
+	fun
+	0x2::tx_context
+native_gas_budget
+	fun
+	0x2::tx_context
+option_sponsor
+	fun
+	0x2::tx_context
+native_sponsor
+	fun
+	0x2::tx_context
+derive_id
+	fun
+	0x2::tx_context
+VecMap
+	public struct
+	0x2::vec_map
+Entry
+	public struct
+	0x2::vec_map
+empty
+	public fun
+	0x2::vec_map
+insert
+	public fun
+	0x2::vec_map
+remove
+	public fun
+	0x2::vec_map
+pop
+	public fun
+	0x2::vec_map
+get_mut
+	public fun
+	0x2::vec_map
+get
+	public fun
+	0x2::vec_map
+try_get
+	public fun
+	0x2::vec_map
+contains
+	public fun
+	0x2::vec_map
+length
+	public fun
+	0x2::vec_map
+is_empty
+	public fun
+	0x2::vec_map
+destroy_empty
+	public fun
+	0x2::vec_map
+into_keys_values
+	public fun
+	0x2::vec_map
+from_keys_values
+	public fun
+	0x2::vec_map
+keys
+	public fun
+	0x2::vec_map
+get_idx_opt
+	public fun
+	0x2::vec_map
+get_idx
+	public fun
+	0x2::vec_map
+get_entry_by_idx
+	public fun
+	0x2::vec_map
+get_entry_by_idx_mut
+	public fun
+	0x2::vec_map
+remove_entry_by_idx
+	public fun
+	0x2::vec_map
+size
+	public fun
+	0x2::vec_map
+Party
+	public struct
+	0x2::party
+Permissions
+	public struct
+	0x2::party
+single_owner
+	public fun
+	0x2::party
+empty
+	fun
+	0x2::party
+set_permissions
+	fun
+	0x2::party
+is_single_owner
+	public(package) fun
+	0x2::party
+into_native
+	public(package) fun
+	0x2::party
 encode
 	public fun
 	0x2::hex
@@ -1255,30 +1306,6 @@ length
 max
 	public fun
 	0x2::address
-TxContext
-	public struct
-	0x2::tx_context
-sender
-	public fun
-	0x2::tx_context
-digest
-	public fun
-	0x2::tx_context
-epoch
-	public fun
-	0x2::tx_context
-epoch_timestamp_ms
-	public fun
-	0x2::tx_context
-fresh_object_address
-	public fun
-	0x2::tx_context
-ids_created
-	fun
-	0x2::tx_context
-derive_id
-	fun
-	0x2::tx_context
 ID
 	public struct
 	0x2::object
@@ -1310,6 +1337,18 @@ randomness_state
 	public(package) fun
 	0x2::object
 sui_deny_list_object_id
+	public(package) fun
+	0x2::object
+sui_accumulator_root_object_id
+	public(package) fun
+	0x2::object
+sui_accumulator_root_address
+	public(package) fun
+	0x2::object
+sui_coin_registry_object_id
+	public(package) fun
+	0x2::object
+sui_coin_registry_address
 	public(package) fun
 	0x2::object
 bridge
@@ -1366,6 +1405,12 @@ transfer
 public_transfer
 	public fun
 	0x2::transfer
+party_transfer
+	public fun
+	0x2::transfer
+public_party_transfer
+	public fun
+	0x2::transfer
 freeze_object
 	public fun
 	0x2::transfer
@@ -1391,6 +1436,9 @@ freeze_object_impl
 	public(package) fun
 	0x2::transfer
 share_object_impl
+	public(package) fun
+	0x2::transfer
+party_transfer_impl
 	public(package) fun
 	0x2::transfer
 transfer_impl
@@ -1450,60 +1498,60 @@ has_child_object
 has_child_object_with_ty
 	public(package) fun
 	0x2::dynamic_field
-AuthenticatorState
+AccumulatorRoot
 	public struct
-	0x2::authenticator_state
-AuthenticatorStateInner
+	0x2::accumulator
+U128
 	public struct
-	0x2::authenticator_state
-JWK
+	0x2::accumulator
+Key
 	public struct
-	0x2::authenticator_state
-JwkId
-	public struct
-	0x2::authenticator_state
-ActiveJwk
-	public struct
-	0x2::authenticator_state
-active_jwk_equal
-	fun
-	0x2::authenticator_state
-jwk_equal
-	fun
-	0x2::authenticator_state
-jwk_id_equal
-	fun
-	0x2::authenticator_state
-string_bytes_lt
-	fun
-	0x2::authenticator_state
-jwk_lt
-	fun
-	0x2::authenticator_state
+	0x2::accumulator
 create
 	fun
-	0x2::authenticator_state
-load_inner_mut
-	fun
-	0x2::authenticator_state
-load_inner
-	fun
-	0x2::authenticator_state
-check_sorted
-	fun
-	0x2::authenticator_state
-update_authenticator_state
-	fun
-	0x2::authenticator_state
-deduplicate
-	fun
-	0x2::authenticator_state
-expire_jwks
-	fun
-	0x2::authenticator_state
-get_active_jwks
-	fun
-	0x2::authenticator_state
+	0x2::accumulator
+root_id
+	public(package) fun
+	0x2::accumulator
+root_id_mut
+	public(package) fun
+	0x2::accumulator
+create_u128
+	public(package) fun
+	0x2::accumulator
+destroy_u128
+	public(package) fun
+	0x2::accumulator
+update_u128
+	public(package) fun
+	0x2::accumulator
+is_zero_u128
+	public(package) fun
+	0x2::accumulator
+accumulator_key
+	public(package) fun
+	0x2::accumulator
+accumulator_address
+	public(package) fun
+	0x2::accumulator
+root_has_accumulator
+	public(package) fun
+	0x2::accumulator
+root_add_accumulator
+	public(package) fun
+	0x2::accumulator
+root_borrow_accumulator_mut
+	public(package) fun
+	0x2::accumulator
+root_remove_accumulator
+	public(package) fun
+	0x2::accumulator
+emit_deposit_event
+	public(package) fun
+	0x2::accumulator
+emit_withdraw_event
+	public(package) fun
+	0x2::accumulator
 Bag
 	public struct
 	0x2::bag
@@ -1537,51 +1585,51 @@ is_empty
 destroy_empty
 	public fun
 	0x2::bag
-Supply
+OwnerKey
 	public struct
-	0x2::balance
-Balance
+	0x2::accumulator_metadata
+Owner
 	public struct
-	0x2::balance
-value
-	public fun
-	0x2::balance
-supply_value
-	public fun
-	0x2::balance
-create_supply
-	public fun
-	0x2::balance
-increase_supply
-	public fun
-	0x2::balance
-decrease_supply
-	public fun
-	0x2::balance
-zero
-	public fun
-	0x2::balance
-join
-	public fun
-	0x2::balance
-split
-	public fun
-	0x2::balance
-withdraw_all
-	public fun
-	0x2::balance
-destroy_zero
-	public fun
-	0x2::balance
-create_staking_rewards
+	0x2::accumulator_metadata
+MetadataKey
+	public struct
+	0x2::accumulator_metadata
+Metadata
+	public struct
+	0x2::accumulator_metadata
+accumulator_root_owner_exists
 	fun
-	0x2::balance
-destroy_storage_rebates
+	0x2::accumulator_metadata
+accumulator_root_borrow_owner_mut
 	fun
-	0x2::balance
-destroy_supply
+	0x2::accumulator_metadata
+accumulator_root_attach_owner
+	fun
+	0x2::accumulator_metadata
+accumulator_root_detach_owner
+	fun
+	0x2::accumulator_metadata
+create_accumulator_metadata
 	public(package) fun
-	0x2::balance
+	0x2::accumulator_metadata
+remove_accumulator_metadata
+	public(package) fun
+	0x2::accumulator_metadata
+accumulator_owner_attach_metadata
+	fun
+	0x2::accumulator_metadata
+accumulator_owner_detach_metadata
+	fun
+	0x2::accumulator_metadata
+accumulator_owner_destroy
+	fun
+	0x2::accumulator_metadata
+blake2b256
+	public fun
+	0x2::hash
+keccak256
+	public fun
+	0x2::hash
 BCS
 	public struct
 	0x2::bcs
@@ -1675,6 +1723,180 @@ peel_option_u128
 peel_option_u256
 	public fun
 	0x2::bcs
+EventStreamHead
+	public struct
+	0x2::accumulator_settlement
+settlement_prologue
+	fun
+	0x2::accumulator_settlement
+settle_u128
+	fun
+	0x2::accumulator_settlement
+record_settlement_sui_conservation
+	fun
+	0x2::accumulator_settlement
+add_to_mmr
+	fun
+	0x2::accumulator_settlement
+u256_from_bytes
+	fun
+	0x2::accumulator_settlement
+hash_two_to_one_u256
+	fun
+	0x2::accumulator_settlement
+new_stream_head
+	fun
+	0x2::accumulator_settlement
+settle_events
+	fun
+	0x2::accumulator_settlement
+AuthenticatorState
+	public struct
+	0x2::authenticator_state
+AuthenticatorStateInner
+	public struct
+	0x2::authenticator_state
+JWK
+	public struct
+	0x2::authenticator_state
+JwkId
+	public struct
+	0x2::authenticator_state
+ActiveJwk
+	public struct
+	0x2::authenticator_state
+active_jwk_equal
+	fun
+	0x2::authenticator_state
+jwk_equal
+	fun
+	0x2::authenticator_state
+jwk_id_equal
+	fun
+	0x2::authenticator_state
+string_bytes_lt
+	fun
+	0x2::authenticator_state
+jwk_lt
+	fun
+	0x2::authenticator_state
+create
+	fun
+	0x2::authenticator_state
+load_inner_mut
+	fun
+	0x2::authenticator_state
+load_inner
+	fun
+	0x2::authenticator_state
+check_sorted
+	fun
+	0x2::authenticator_state
+update_authenticator_state
+	fun
+	0x2::authenticator_state
+deduplicate
+	fun
+	0x2::authenticator_state
+expire_jwks
+	fun
+	0x2::authenticator_state
+get_active_jwks
+	fun
+	0x2::authenticator_state
+Withdrawal
+	public struct
+	0x2::funds_accumulator
+withdrawal_owner
+	public fun
+	0x2::funds_accumulator
+withdrawal_limit
+	public fun
+	0x2::funds_accumulator
+withdrawal_split
+	public fun
+	0x2::funds_accumulator
+withdrawal_join
+	public fun
+	0x2::funds_accumulator
+redeem
+	public(package) fun
+	0x2::funds_accumulator
+withdraw_from_object
+	public(package) fun
+	0x2::funds_accumulator
+add_impl
+	public(package) fun
+	0x2::funds_accumulator
+withdraw_impl
+	fun
+	0x2::funds_accumulator
+add_to_accumulator_address
+	fun
+	0x2::funds_accumulator
+withdraw_from_accumulator_address
+	fun
+	0x2::funds_accumulator
+create_withdrawal
+	public(package) fun
+	0x2::funds_accumulator
+Supply
+	public struct
+	0x2::balance
+Balance
+	public struct
+	0x2::balance
+value
+	public fun
+	0x2::balance
+supply_value
+	public fun
+	0x2::balance
+create_supply
+	public fun
+	0x2::balance
+increase_supply
+	public fun
+	0x2::balance
+decrease_supply
+	public fun
+	0x2::balance
+zero
+	public fun
+	0x2::balance
+join
+	public fun
+	0x2::balance
+split
+	public fun
+	0x2::balance
+withdraw_all
+	public fun
+	0x2::balance
+destroy_zero
+	public fun
+	0x2::balance
+send_funds
+	public fun
+	0x2::balance
+redeem_funds
+	public fun
+	0x2::balance
+withdraw_funds_from_object
+	public(package) fun
+	0x2::balance
+create_supply_internal
+	public(package) fun
+	0x2::balance
+create_staking_rewards
+	fun
+	0x2::balance
+destroy_storage_rebates
+	fun
+	0x2::balance
+destroy_supply
+	public(package) fun
+	0x2::balance
 Element
 	public struct
 	0x2::group_ops
@@ -1957,7 +2179,7 @@ remove
 contains
 	public fun
 	0x2::vec_set
-size
+length
 	public fun
 	0x2::vec_set
 is_empty
@@ -1972,11 +2194,8 @@ from_keys
 keys
 	public fun
 	0x2::vec_set
-get_idx_opt
-	fun
-	0x2::vec_set
-get_idx
-	fun
+size
+	public fun
 	0x2::vec_set
 Table
 	public struct
@@ -2013,6 +2232,12 @@ drop
 	0x2::table
 emit
 	public fun
+	0x2::event
+emit_authenticated
+	public fun
+	0x2::event
+emit_authenticated_impl
+	fun
 	0x2::event
 Wrapper
 	public struct
@@ -2233,6 +2458,12 @@ take
 put
 	public fun
 	0x2::coin
+redeem_funds
+	public fun
+	0x2::coin
+send_funds
+	public fun
+	0x2::coin
 join
 	public entry fun
 	0x2::coin
@@ -2320,6 +2551,27 @@ get_description
 get_icon_url
 	public fun
 	0x2::coin
+destroy_metadata
+	public(package) fun
+	0x2::coin
+deny_cap_id
+	public(package) fun
+	0x2::coin
+new_deny_cap_v2
+	public(package) fun
+	0x2::coin
+new_treasury_cap
+	public(package) fun
+	0x2::coin
+allow_global_pause
+	public(package) fun
+	0x2::coin
+new_coin_metadata
+	public(package) fun
+	0x2::coin
+update_coin_metadata
+	public(package) fun
+	0x2::coin
 supply
 	public fun
 	0x2::coin
@@ -2335,84 +2587,186 @@ deny_list_remove
 deny_list_contains
 	public fun
 	0x2::coin
-CoinVesting
+Claimed
 	public struct
-	0x2::coin_vesting
-new_form_balance
-	public fun
-	0x2::coin_vesting
-release
-	public entry fun
-	0x2::coin_vesting
-release_non_entry
-	public fun
-	0x2::coin_vesting
-destroy_zero
-	public fun
-	0x2::coin_vesting
-VecMap
+	0x2::derived_object
+DerivedObjectKey
 	public struct
-	0x2::vec_map
-Entry
+	0x2::derived_object
+ClaimedStatus
+	public enum
+	0x2::derived_object
+claim
+	public fun
+	0x2::derived_object
+exists
+	public fun
+	0x2::derived_object
+derive_address
+	public fun
+	0x2::derived_object
+CoinRegistry
 	public struct
-	0x2::vec_map
-empty
+	0x2::coin_registry
+ExtraField
+	public struct
+	0x2::coin_registry
+CurrencyKey
+	public struct
+	0x2::coin_registry
+LegacyMetadataKey
+	public struct
+	0x2::coin_registry
+MetadataCap
+	public struct
+	0x2::coin_registry
+Borrow
+	public struct
+	0x2::coin_registry
+Currency
+	public struct
+	0x2::coin_registry
+CurrencyInitializer
+	public struct
+	0x2::coin_registry
+SupplyState
+	public enum
+	0x2::coin_registry
+RegulatedState
+	public enum
+	0x2::coin_registry
+MetadataCapState
+	public enum
+	0x2::coin_registry
+new_currency
 	public fun
-	0x2::vec_map
-insert
+	0x2::coin_registry
+new_currency_with_otw
 	public fun
-	0x2::vec_map
-remove
+	0x2::coin_registry
+claim_metadata_cap
 	public fun
-	0x2::vec_map
-pop
+	0x2::coin_registry
+make_regulated
 	public fun
-	0x2::vec_map
-get_mut
+	0x2::coin_registry
+make_supply_fixed_init
 	public fun
-	0x2::vec_map
-get
+	0x2::coin_registry
+make_supply_burn_only_init
 	public fun
-	0x2::vec_map
-try_get
+	0x2::coin_registry
+make_supply_fixed
 	public fun
-	0x2::vec_map
-contains
+	0x2::coin_registry
+make_supply_burn_only
 	public fun
-	0x2::vec_map
-size
+	0x2::coin_registry
+finalize
 	public fun
-	0x2::vec_map
-is_empty
+	0x2::coin_registry
+finalize_and_delete_metadata_cap
 	public fun
-	0x2::vec_map
-destroy_empty
+	0x2::coin_registry
+finalize_registration
 	public fun
-	0x2::vec_map
-into_keys_values
+	0x2::coin_registry
+delete_metadata_cap
 	public fun
-	0x2::vec_map
-from_keys_values
+	0x2::coin_registry
+burn
 	public fun
-	0x2::vec_map
-keys
+	0x2::coin_registry
+burn_balance
 	public fun
-	0x2::vec_map
-get_idx_opt
+	0x2::coin_registry
+set_name
 	public fun
-	0x2::vec_map
-get_idx
+	0x2::coin_registry
+set_description
 	public fun
-	0x2::vec_map
-get_entry_by_idx
+	0x2::coin_registry
+set_icon_url
 	public fun
-	0x2::vec_map
-get_entry_by_idx_mut
+	0x2::coin_registry
+set_treasury_cap_id
 	public fun
-	0x2::vec_map
-remove_entry_by_idx
+	0x2::coin_registry
+migrate_legacy_metadata
 	public fun
-	0x2::vec_map
+	0x2::coin_registry
+update_from_legacy_metadata
+	public fun
+	0x2::coin_registry
+delete_migrated_legacy_metadata
+	public fun
+	0x2::coin_registry
+migrate_regulated_state_by_metadata
+	public fun
+	0x2::coin_registry
+migrate_regulated_state_by_cap
+	public fun
+	0x2::coin_registry
+borrow_legacy_metadata
+	public fun
+	0x2::coin_registry
+return_borrowed_legacy_metadata
+	public fun
+	0x2::coin_registry
+decimals
+	public fun
+	0x2::coin_registry
+name
+	public fun
+	0x2::coin_registry
+symbol
+	public fun
+	0x2::coin_registry
+description
+	public fun
+	0x2::coin_registry
+icon_url
+	public fun
+	0x2::coin_registry
+is_metadata_cap_claimed
+	public fun
+	0x2::coin_registry
+is_metadata_cap_deleted
+	public fun
+	0x2::coin_registry
+metadata_cap_id
+	public fun
+	0x2::coin_registry
+treasury_cap_id
+	public fun
+	0x2::coin_registry
+deny_cap_id
+	public fun
+	0x2::coin_registry
+is_supply_fixed
+	public fun
+	0x2::coin_registry
+is_supply_burn_only
+	public fun
+	0x2::coin_registry
+is_regulated
+	public fun
+	0x2::coin_registry
+total_supply
+	public fun
+	0x2::coin_registry
+exists
+	public fun
+	0x2::coin_registry
+is_migrated_from_legacy
+	fun
+	0x2::coin_registry
+to_legacy_metadata
+	fun
+	0x2::coin_registry
+create
+	fun
+	0x2::coin_registry
 Publisher
 	public struct
 	0x2::package
@@ -2587,15 +2941,15 @@ verify_groth16_proof
 verify_groth16_proof_internal
 	fun
 	0x2::groth16
-OCT
+SUI
 	public struct
-	0x2::oct
+	0x2::sui
 new
 	fun
-	0x2::oct
+	0x2::sui
 transfer
 	public entry fun
-	0x2::oct
+	0x2::sui
 TransferRequest
 	public struct
 	0x2::transfer_policy
@@ -3172,14 +3526,8 @@ new_generator
 derive_next_block
 	fun
 	0x2::random
-fill_buffer
-	fun
-	0x2::random
 generate_bytes
 	public fun
-	0x2::random
-u256_from_bytes
-	fun
 	0x2::random
 generate_u256
 	public fun
@@ -3201,9 +3549,6 @@ generate_u8
 	0x2::random
 generate_bool
 	public fun
-	0x2::random
-u128_in_range
-	fun
 	0x2::random
 generate_u128_in_range
 	public fun
@@ -4459,6 +4804,12 @@ sha2_256
 sha3_256
 	public fun
 	0x1::hash
+Permit
+	public struct
+	0x1::internal
+permit
+	public fun
+	0x1::internal
 UQ32_32
 	public struct
 	0x1::uq32_32
@@ -4604,6 +4955,12 @@ insert
 	public fun
 	0x1::vector
 swap_remove
+	public fun
+	0x1::vector
+skip
+	public fun
+	0x1::vector
+take
 	public fun
 	0x1::vector
 flatten
@@ -4822,13 +5179,37 @@ length
 TypeName
 	public struct
 	0x1::type_name
+with_defining_ids
+	public fun
+	0x1::type_name
+with_original_ids
+	public fun
+	0x1::type_name
+defining_id
+	public fun
+	0x1::type_name
+original_id
+	public fun
+	0x1::type_name
+is_primitive
+	public fun
+	0x1::type_name
+as_string
+	public fun
+	0x1::type_name
+address_string
+	public fun
+	0x1::type_name
+module_string
+	public fun
+	0x1::type_name
+into_string
+	public fun
+	0x1::type_name
 get
 	public fun
 	0x1::type_name
 get_with_original_ids
-	public fun
-	0x1::type_name
-is_primitive
 	public fun
 	0x1::type_name
 borrow_string
@@ -4838,9 +5219,6 @@ get_address
 	public fun
 	0x1::type_name
 get_module
-	public fun
-	0x1::type_name
-into_string
 	public fun
 	0x1::type_name
 bitwise_not

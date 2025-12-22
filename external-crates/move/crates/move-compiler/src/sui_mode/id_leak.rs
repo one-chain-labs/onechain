@@ -3,13 +3,13 @@
 
 use crate::{
     cfgir::{
+        CFGContext, MemberName,
         absint::JoinResult,
         cfg::ImmForwardCFG,
         visitor::{
-            cfg_satisfies, LocalState, SimpleAbsInt, SimpleAbsIntConstructor, SimpleDomain,
-            SimpleExecutionContext,
+            LocalState, SimpleAbsInt, SimpleAbsIntConstructor, SimpleDomain,
+            SimpleExecutionContext, cfg_satisfies,
         },
-        CFGContext, MemberName,
     },
     diag,
     diagnostics::{Diagnostic, Diagnostics},
@@ -17,13 +17,15 @@ use crate::{
     expansion::ast::ModuleIdent,
     hlir::ast::{self as H, Exp, Label, ModuleCall, SingleType, Type, Type_, Var},
     parser::ast::{Ability_, TargetKind},
-    shared::{program_info::TypingProgramInfo, Identifier},
+    shared::{Identifier, program_info::TypingProgramInfo},
     sui_mode::{
-        AUTHENTICATOR_STATE_CREATE, AUTHENTICATOR_STATE_MODULE_NAME, BRIDGE_ADDR_VALUE,
-        BRIDGE_CREATE, BRIDGE_MODULE_NAME, CLOCK_MODULE_NAME, DENY_LIST_CREATE,
-        DENY_LIST_MODULE_NAME, ID_LEAK_DIAG, OBJECT_MODULE_NAME, OBJECT_NEW,
-        OBJECT_NEW_UID_FROM_HASH, RANDOMNESS_MODULE_NAME, RANDOMNESS_STATE_CREATE, SUI_ADDR_NAME,
-        SUI_ADDR_VALUE, SUI_CLOCK_CREATE, SUI_SYSTEM_ADDR_VALUE, SUI_SYSTEM_CREATE,
+        ACCUMULATOR_CREATE, ACCUMULATOR_MODULE_NAME, AUTHENTICATOR_STATE_CREATE,
+        AUTHENTICATOR_STATE_MODULE_NAME, BRIDGE_ADDR_VALUE, BRIDGE_CREATE, BRIDGE_MODULE_NAME,
+        CLOCK_MODULE_NAME, COIN_REGISTRY_MODULE_NAME, DENY_LIST_CREATE, DENY_LIST_MODULE_NAME,
+        DERIVED_OBJECT_CLAIM, DERIVED_OBJECT_MODULE_NAME, DISPLAY_REGISTRY_MODULE_NAME,
+        ID_LEAK_DIAG, OBJECT_MODULE_NAME, OBJECT_NEW, OBJECT_NEW_UID_FROM_HASH,
+        RANDOMNESS_MODULE_NAME, RANDOMNESS_STATE_CREATE, REGISTRY_CREATE_FUNCTION_NAME,
+        SUI_ADDR_NAME, SUI_ADDR_VALUE, SUI_CLOCK_CREATE, SUI_SYSTEM_ADDR_VALUE, SUI_SYSTEM_CREATE,
         SUI_SYSTEM_MODULE_NAME, TEST_SCENARIO_MODULE_NAME, TS_NEW_OBJECT, UID_TYPE_NAME,
     },
 };
@@ -35,6 +37,11 @@ use std::collections::BTreeMap;
 pub const FRESH_ID_FUNCTIONS: &[(AccountAddress, Symbol, Symbol)] = &[
     (SUI_ADDR_VALUE, OBJECT_MODULE_NAME, OBJECT_NEW),
     (SUI_ADDR_VALUE, OBJECT_MODULE_NAME, OBJECT_NEW_UID_FROM_HASH),
+    (
+        SUI_ADDR_VALUE,
+        DERIVED_OBJECT_MODULE_NAME,
+        DERIVED_OBJECT_CLAIM,
+    ),
     (SUI_ADDR_VALUE, TEST_SCENARIO_MODULE_NAME, TS_NEW_OBJECT),
 ];
 pub const FUNCTIONS_TO_SKIP: &[(AccountAddress, Symbol, Symbol)] = &[
@@ -56,6 +63,17 @@ pub const FUNCTIONS_TO_SKIP: &[(AccountAddress, Symbol, Symbol)] = &[
     ),
     (SUI_ADDR_VALUE, DENY_LIST_MODULE_NAME, DENY_LIST_CREATE),
     (BRIDGE_ADDR_VALUE, BRIDGE_MODULE_NAME, BRIDGE_CREATE),
+    (SUI_ADDR_VALUE, ACCUMULATOR_MODULE_NAME, ACCUMULATOR_CREATE),
+    (
+        SUI_ADDR_VALUE,
+        COIN_REGISTRY_MODULE_NAME,
+        REGISTRY_CREATE_FUNCTION_NAME,
+    ),
+    (
+        SUI_ADDR_VALUE,
+        DISPLAY_REGISTRY_MODULE_NAME,
+        REGISTRY_CREATE_FUNCTION_NAME,
+    ),
 ];
 
 //**************************************************************************************************
@@ -189,11 +207,13 @@ impl SimpleAbsInt for IDLeakVerifierAI<'_> {
         if !matches!(first_value, Value::FreshID(_)) {
             let msg = "Invalid object creation without a newly created UID.".to_string();
             let uid_msg = format!(
-                "The UID must come directly from {sui}::{object}::{new}. \
-                Or for tests, it can come from {sui}::{ts}::{ts_new}",
+                "The UID must come directly from `{sui}::{object}::{new}`, or `one::{derived}::{claim}`. \
+                For tests, it can come from `{sui}::{ts}::{ts_new}`",
                 sui = SUI_ADDR_NAME,
                 object = OBJECT_MODULE_NAME,
                 new = OBJECT_NEW,
+                derived = DERIVED_OBJECT_MODULE_NAME,
+                claim = DERIVED_OBJECT_CLAIM,
                 ts = TEST_SCENARIO_MODULE_NAME,
                 ts_new = TS_NEW_OBJECT,
             );

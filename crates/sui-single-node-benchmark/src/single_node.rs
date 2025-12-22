@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     sync::Arc,
 };
 
@@ -10,14 +10,18 @@ use sui_core::{
     authority::{
         authority_per_epoch_store::AuthorityPerEpochStore,
         authority_store_tables::LiveObject,
+        shared_object_version_manager::{AssignedTxAndVersions, AssignedVersions, Schedulable},
         test_authority_builder::TestAuthorityBuilder,
         AuthorityState,
+        ExecutionEnv,
     },
     authority_server::{ValidatorService, ValidatorServiceMetrics},
     checkpoints::checkpoint_executor::CheckpointExecutor,
     consensus_adapter::{ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics},
+    execution_scheduler::SchedulingSource,
+    global_state_hasher::GlobalStateHasher,
+    mock_checkpoint_builder::{MockCheckpointBuilder, ValidatorKeypairProvider},
     mock_consensus::{ConsensusMode, MockConsensusClient},
-    state_accumulator::StateAccumulator,
 };
 use sui_test_transaction_builder::{PublishData, TestTransactionBuilder};
 use sui_types::{
@@ -26,9 +30,9 @@ use sui_types::{
     crypto::{AccountKeyPair, AuthoritySignature, Signer},
     effects::{TransactionEffects, TransactionEffectsAPI},
     executable_transaction::VerifiedExecutableTransaction,
+    execution_params::ExecutionOrEarlyError,
     messages_checkpoint::{VerifiedCheckpoint, VerifiedCheckpointContents},
     messages_grpc::HandleTransactionResponse,
-    mock_checkpoint_builder::{MockCheckpointBuilder, ValidatorKeypairProvider},
     object::Object,
     transaction::{
         CertifiedTransaction,
@@ -118,8 +122,16 @@ impl SingleValidator {
     pub async fn execute_raw_transaction(&self, transaction: Transaction) -> TransactionEffects {
         let executable =
             VerifiedExecutableTransaction::new_from_quorum_execution(VerifiedTransaction::new_unchecked(transaction), 0);
-        let effects =
-            self.get_validator().try_execute_immediately(&executable, None, &self.epoch_store).await.unwrap().0;
+        let effects = self
+            .get_validator()
+            .try_execute_immediately(
+                &executable,
+                ExecutionEnv::new().with_scheduling_source(SchedulingSource::NonFastPath),
+                &self.epoch_store,
+            )
+            .await
+            .unwrap()
+            .0;
         assert!(effects.status().is_ok());
         effects
     }
@@ -134,20 +146,39 @@ impl SingleValidator {
         effects
     }
 
-    pub async fn execute_certificate(&self, cert: CertifiedTransaction, component: Component) -> TransactionEffects {
+    pub async fn execute_certificate(
+        &self,
+        cert: CertifiedTransaction,
+        assigned_versions: &AssignedVersions,
+        component: Component,
+    ) -> TransactionEffects {
         let effects = match component {
             Component::Baseline => {
                 let cert = VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(cert));
-                self.get_validator().try_execute_immediately(&cert, None, &self.epoch_store).await.unwrap().0
+                self.get_validator()
+                    .try_execute_immediately(
+                        &cert,
+                        ExecutionEnv::new().with_assigned_versions(assigned_versions.clone()),
+                        &self.epoch_store,
+                    )
+                    .await
+                    .unwrap()
+                    .0
             }
             Component::WithTxManager => {
                 let cert = VerifiedCertificate::new_unchecked(cert);
-                if cert.contains_shared_object() {
+                if cert.is_consensus_tx() {
                     // For shared objects transactions, `execute_certificate` won't enqueue it because
                     // it expects consensus to do so. However we don't have consensus, hence the manual enqueue.
-                    self.get_validator().enqueue_certificates_for_execution(vec![cert.clone()], &self.epoch_store);
+                    self.get_validator().execution_scheduler().enqueue(
+                        vec![(
+                            VerifiedExecutableTransaction::new_from_certificate(cert.clone()).into(),
+                            ExecutionEnv::new().with_assigned_versions(assigned_versions.clone()),
+                        )],
+                        &self.epoch_store,
+                    );
                 }
-                self.get_validator().execute_certificate(&cert, &self.epoch_store).await.unwrap()
+                self.get_validator().wait_for_certificate_execution(&cert, &self.epoch_store).await.unwrap()
             }
             Component::ValidatorWithoutConsensus | Component::ValidatorWithFakeConsensus => {
                 let response = self.validator_service.execute_certificate_for_testing(cert).await.unwrap().into_inner();
@@ -165,9 +196,10 @@ impl SingleValidator {
         &self,
         store: InMemoryObjectStore,
         transaction: CertifiedTransaction,
+        assigned_versions: &AssignedVersions,
     ) -> TransactionEffects {
         let input_objects = transaction.transaction_data().input_objects().unwrap();
-        let objects = store.read_objects_for_execution(&self.epoch_store, &transaction.key(), &input_objects).unwrap();
+        let objects = store.read_objects_for_execution(&transaction.key(), assigned_versions, &input_objects).unwrap();
 
         let executable =
             VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(transaction));
@@ -184,7 +216,7 @@ impl SingleValidator {
             self.epoch_store.protocol_config(),
             self.get_validator().metrics.limits_metrics.clone(),
             false,
-            &HashSet::new(),
+            ExecutionOrEarlyError::Ok(()),
             &self.epoch_store.epoch(),
             0,
             input_objects,
@@ -235,14 +267,14 @@ impl SingleValidator {
             self.epoch_store.clone(),
             validator.get_checkpoint_store().clone(),
             validator.clone(),
-            Arc::new(StateAccumulator::new_for_tests(validator.get_accumulator_store().clone())),
+            Arc::new(GlobalStateHasher::new_for_tests(validator.get_global_state_hash_store().clone())),
         )
     }
 
     pub(crate) fn create_in_memory_store(&self) -> InMemoryObjectStore {
         let objects: HashMap<_, _> = self
             .get_validator()
-            .get_accumulator_store()
+            .get_global_state_hash_store()
             .iter_cached_live_object_set_for_testing(false)
             .map(|o| match o {
                 LiveObject::Normal(object) => (object.id(), object),
@@ -252,19 +284,23 @@ impl SingleValidator {
         InMemoryObjectStore::new(objects)
     }
 
-    pub(crate) async fn assigned_shared_object_versions(&self, transactions: &[CertifiedTransaction]) {
+    pub(crate) async fn assigned_shared_object_versions(
+        &self,
+        transactions: &[CertifiedTransaction],
+    ) -> AssignedTxAndVersions {
         let transactions: Vec<_> = transactions
             .iter()
             .map(|tx| {
                 VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(tx.clone()))
             })
             .collect();
+        let assignables: Vec<_> = transactions.iter().map(Schedulable::Transaction).collect();
         self.epoch_store
             .assign_shared_object_versions_idempotent(
                 self.get_validator().get_object_cache_reader().as_ref(),
-                &transactions,
+                assignables.iter(),
             )
-            .unwrap();
+            .unwrap()
     }
 }
 

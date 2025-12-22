@@ -70,22 +70,22 @@ format.
 ## Constants
 
 
-<a name="std_string_EInvalidIndex"></a>
-
-Index out of range.
-
-
-<pre><code><b>const</b> <a href="../std/string.md#std_string_EInvalidIndex">EInvalidIndex</a>: <a href="../std/u64.md#std_u64">u64</a> = 2;
-</code></pre>
-
-
-
 <a name="std_string_EInvalidUTF8"></a>
 
 An invalid UTF8 encoding.
 
 
 <pre><code><b>const</b> <a href="../std/string.md#std_string_EInvalidUTF8">EInvalidUTF8</a>: <a href="../std/u64.md#std_u64">u64</a> = 1;
+</code></pre>
+
+
+
+<a name="std_string_EInvalidIndex"></a>
+
+Index out of range.
+
+
+<pre><code><b>const</b> <a href="../std/string.md#std_string_EInvalidIndex">EInvalidIndex</a>: <a href="../std/u64.md#std_u64">u64</a> = 2;
 </code></pre>
 
 
@@ -186,8 +186,7 @@ Tries to create a new string from a sequence of bytes.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../std/string.md#std_string_try_utf8">try_utf8</a>(<a href="../std/string.md#std_string_bytes">bytes</a>: <a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;): Option&lt;<a href="../std/string.md#std_string_String">String</a>&gt; {
-    <b>if</b> (<a href="../std/string.md#std_string_internal_check_utf8">internal_check_utf8</a>(&<a href="../std/string.md#std_string_bytes">bytes</a>)) <a href="../std/option.md#std_option_some">option::some</a>(<a href="../std/string.md#std_string_String">String</a> { <a href="../std/string.md#std_string_bytes">bytes</a> })
-    <b>else</b> <a href="../std/option.md#std_option_none">option::none</a>()
+    <b>if</b> (<a href="../std/string.md#std_string_internal_check_utf8">internal_check_utf8</a>(&<a href="../std/string.md#std_string_bytes">bytes</a>)) <a href="../std/option.md#std_option_some">option::some</a>(<a href="../std/string.md#std_string_String">String</a> { <a href="../std/string.md#std_string_bytes">bytes</a> }) <b>else</b> <a href="../std/option.md#std_option_none">option::none</a>()
 }
 </code></pre>
 
@@ -253,7 +252,7 @@ Unpack the <code><a href="../std/string.md#std_string">string</a></code> to get 
 Checks whether this string is empty.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../std/string.md#std_string_is_empty">is_empty</a>(s: &<a href="../std/string.md#std_string_String">std::string::String</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../std/string.md#std_string_is_empty">is_empty</a>(s: &<a href="../std/string.md#std_string_String">std::string::String</a>): <a href="../std/bool.md#std_bool">bool</a>
 </code></pre>
 
 
@@ -262,7 +261,7 @@ Checks whether this string is empty.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../std/string.md#std_string_is_empty">is_empty</a>(s: &<a href="../std/string.md#std_string_String">String</a>): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="../std/string.md#std_string_is_empty">is_empty</a>(s: &<a href="../std/string.md#std_string_String">String</a>): <a href="../std/bool.md#std_bool">bool</a> {
     s.<a href="../std/string.md#std_string_bytes">bytes</a>.<a href="../std/string.md#std_string_is_empty">is_empty</a>()
 }
 </code></pre>
@@ -365,10 +364,7 @@ must be at a valid utf8 char boundary.
 
 <pre><code><b>public</b> <b>fun</b> <a href="../std/string.md#std_string_insert">insert</a>(s: &<b>mut</b> <a href="../std/string.md#std_string_String">String</a>, at: <a href="../std/u64.md#std_u64">u64</a>, o: <a href="../std/string.md#std_string_String">String</a>) {
     <b>let</b> <a href="../std/string.md#std_string_bytes">bytes</a> = &s.<a href="../std/string.md#std_string_bytes">bytes</a>;
-    <b>assert</b>!(
-        at &lt;= <a href="../std/string.md#std_string_bytes">bytes</a>.<a href="../std/string.md#std_string_length">length</a>() && <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, at),
-        <a href="../std/string.md#std_string_EInvalidIndex">EInvalidIndex</a>,
-    );
+    <b>assert</b>!(at &lt;= <a href="../std/string.md#std_string_bytes">bytes</a>.<a href="../std/string.md#std_string_length">length</a>() && <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, at), <a href="../std/string.md#std_string_EInvalidIndex">EInvalidIndex</a>);
     <b>let</b> l = s.<a href="../std/string.md#std_string_length">length</a>();
     <b>let</b> <b>mut</b> front = s.<a href="../std/string.md#std_string_substring">substring</a>(0, at);
     <b>let</b> end = s.<a href="../std/string.md#std_string_substring">substring</a>(at, l);
@@ -406,9 +402,9 @@ guaranteeing that the result is valid utf8.
     <b>let</b> l = <a href="../std/string.md#std_string_bytes">bytes</a>.<a href="../std/string.md#std_string_length">length</a>();
     <b>assert</b>!(
         j &lt;= l &&
-        i &lt;= j &&
-        <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, i) &&
-        <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, j),
+            i &lt;= j &&
+            <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, i) &&
+            <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, j),
         <a href="../std/string.md#std_string_EInvalidIndex">EInvalidIndex</a>,
     );
     <a href="../std/string.md#std_string_String">String</a> { <a href="../std/string.md#std_string_bytes">bytes</a>: <a href="../std/string.md#std_string_internal_sub_string">internal_sub_string</a>(<a href="../std/string.md#std_string_bytes">bytes</a>, i, j) }
@@ -451,7 +447,7 @@ if no occurrence found.
 
 
 
-<pre><code><b>fun</b> <a href="../std/string.md#std_string_internal_check_utf8">internal_check_utf8</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;): bool
+<pre><code><b>fun</b> <a href="../std/string.md#std_string_internal_check_utf8">internal_check_utf8</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;): <a href="../std/bool.md#std_bool">bool</a>
 </code></pre>
 
 
@@ -460,7 +456,7 @@ if no occurrence found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="../std/string.md#std_string_internal_check_utf8">internal_check_utf8</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="../std/string.md#std_string_internal_check_utf8">internal_check_utf8</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;): <a href="../std/bool.md#std_bool">bool</a>;
 </code></pre>
 
 
@@ -473,7 +469,7 @@ if no occurrence found.
 
 
 
-<pre><code><b>fun</b> <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;, i: <a href="../std/u64.md#std_u64">u64</a>): bool
+<pre><code><b>fun</b> <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;, i: <a href="../std/u64.md#std_u64">u64</a>): <a href="../std/bool.md#std_bool">bool</a>
 </code></pre>
 
 
@@ -482,7 +478,7 @@ if no occurrence found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;, i: <a href="../std/u64.md#std_u64">u64</a>): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="../std/string.md#std_string_internal_is_char_boundary">internal_is_char_boundary</a>(v: &<a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/u8.md#std_u8">u8</a>&gt;, i: <a href="../std/u64.md#std_u64">u64</a>): <a href="../std/bool.md#std_bool">bool</a>;
 </code></pre>
 
 

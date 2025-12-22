@@ -157,14 +157,24 @@ impl Display for ObjectChange {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ Recipient: {}\n │ ObjectType: {} \n │ Version: {}\n │ Digest: {}\n └──",
-                    object_id, sender, recipient, object_type, u64::from(*version), digest
+                    object_id,
+                    sender,
+                    recipient,
+                    object_type,
+                    u64::from(*version),
+                    digest
                 )
             }
             ObjectChange::Mutated { sender, owner, object_type, object_id, version, previous_version: _, digest } => {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ Owner: {}\n │ ObjectType: {} \n │ Version: {}\n │ Digest: {}\n └──",
-                    object_id, sender, owner, object_type, u64::from(*version), digest
+                    object_id,
+                    sender,
+                    owner,
+                    object_type,
+                    u64::from(*version),
+                    digest
                 )
             }
             ObjectChange::Deleted { sender, object_type, object_id, version } => {
@@ -191,7 +201,12 @@ impl Display for ObjectChange {
                 write!(
                     f,
                     " ┌──\n │ ObjectID: {}\n │ Sender: {} \n │ Owner: {}\n │ ObjectType: {} \n │ Version: {}\n │ Digest: {}\n └──",
-                    object_id, sender, owner, object_type, u64::from(*version), digest
+                    object_id,
+                    sender,
+                    owner,
+                    object_type,
+                    u64::from(*version),
+                    digest
                 )
             }
         }

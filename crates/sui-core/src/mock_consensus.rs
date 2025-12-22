@@ -1,14 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{Arc, Weak};
+use std::{
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
-use consensus_core::BlockRef;
-use prometheus::Registry;
+use consensus_types::block::BlockRef;
 use sui_types::{
+    committee::EpochId,
     error::{SuiError, SuiResult},
     executable_transaction::VerifiedExecutableTransaction,
-    messages_consensus::{ConsensusTransaction, ConsensusTransactionKind},
+    messages_consensus::{ConsensusPosition, ConsensusTransaction, ConsensusTransactionKind},
     transaction::{VerifiedCertificate, VerifiedTransaction},
 };
 use tokio::{
@@ -18,10 +21,8 @@ use tokio::{
 use tracing::debug;
 
 use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityMetrics, AuthorityState},
-    checkpoints::CheckpointServiceNoop,
+    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState, ExecutionEnv},
     consensus_adapter::{BlockStatusReceiver, ConsensusClient, SubmitToConsensus},
-    consensus_handler::SequencedConsensusTransaction,
 };
 
 pub struct MockConsensusClient {
@@ -56,60 +57,98 @@ impl MockConsensusClient {
         mut tx_receiver: mpsc::Receiver<ConsensusTransaction>,
         consensus_mode: ConsensusMode,
     ) {
-        let checkpoint_service = Arc::new(CheckpointServiceNoop {});
-        let authority_metrics = Arc::new(AuthorityMetrics::new(&Registry::new()));
         while let Some(tx) = tx_receiver.recv().await {
             let Some(validator) = validator.upgrade() else {
                 debug!("validator shut down; exiting MockConsensusClient");
                 return;
             };
             let epoch_store = validator.epoch_store_for_testing();
-            match consensus_mode {
-                ConsensusMode::Noop => {}
+            let env = match consensus_mode {
+                ConsensusMode::Noop => ExecutionEnv::new(),
                 ConsensusMode::DirectSequencing => {
-                    epoch_store
-                        .process_consensus_transactions_for_tests(
-                            vec![SequencedConsensusTransaction::new_test(tx.clone())],
-                            &checkpoint_service,
-                            validator.get_object_cache_reader().as_ref(),
-                            validator.get_transaction_cache_reader().as_ref(),
-                            &authority_metrics,
-                            true,
-                        )
-                        .await
-                        .unwrap();
+                    // Extract the executable transaction from the consensus transaction
+                    let executable_tx = match &tx.kind {
+                        ConsensusTransactionKind::CertifiedTransaction(cert) => {
+                            Some(VerifiedExecutableTransaction::new_from_certificate(
+                                VerifiedCertificate::new_unchecked(*cert.clone()),
+                            ))
+                        }
+                        ConsensusTransactionKind::UserTransaction(tx) => {
+                            Some(VerifiedExecutableTransaction::new_from_consensus(
+                                VerifiedTransaction::new_unchecked(*tx.clone()),
+                                0,
+                            ))
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(exec_tx) = executable_tx {
+                        // Use the simpler assign_shared_object_versions_for_tests API
+                        let assigned_versions = epoch_store
+                            .assign_shared_object_versions_for_tests(
+                                validator.get_object_cache_reader().as_ref(),
+                                &vec![exec_tx.clone()],
+                            )
+                            .unwrap();
+
+                        let assigned_version =
+                            assigned_versions.into_map().into_iter().next().map(|(_, v)| v).unwrap_or_default();
+                        ExecutionEnv::new().with_assigned_versions(assigned_version)
+                    } else {
+                        ExecutionEnv::new()
+                    }
                 }
-            }
-            if let ConsensusTransactionKind::CertifiedTransaction(tx) = &tx.kind {
-                if tx.contains_shared_object() {
-                    validator.enqueue_certificates_for_execution(
-                        vec![VerifiedCertificate::new_unchecked(*tx.clone())],
-                        &epoch_store,
-                    );
+            };
+            match &tx.kind {
+                ConsensusTransactionKind::CertifiedTransaction(tx) => {
+                    if tx.is_consensus_tx() {
+                        validator.execution_scheduler().enqueue(
+                            vec![(
+                                VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(
+                                    *tx.clone(),
+                                ))
+                                .into(),
+                                env,
+                            )],
+                            &epoch_store,
+                        );
+                    }
                 }
-            }
-            if let ConsensusTransactionKind::UserTransaction(tx) = &tx.kind {
-                if tx.contains_shared_object() {
-                    validator.enqueue_transactions_for_execution(
-                        vec![VerifiedExecutableTransaction::new_from_consensus(
-                            VerifiedTransaction::new_unchecked(*tx.clone()),
-                            0,
-                        )],
-                        &epoch_store,
-                    );
+                ConsensusTransactionKind::UserTransaction(tx) => {
+                    if tx.is_consensus_tx() {
+                        validator.execution_scheduler().enqueue(
+                            vec![(
+                                VerifiedExecutableTransaction::new_from_consensus(
+                                    VerifiedTransaction::new_unchecked(*tx.clone()),
+                                    0,
+                                )
+                                .into(),
+                                env,
+                            )],
+                            &epoch_store,
+                        );
+                    }
                 }
+                _ => {}
             }
         }
     }
 
-    fn submit_impl(&self, transactions: &[ConsensusTransaction]) -> SuiResult<BlockStatusReceiver> {
+    fn submit_impl(
+        &self,
+        transactions: &[ConsensusTransaction],
+    ) -> SuiResult<(Vec<ConsensusPosition>, BlockStatusReceiver)> {
         // TODO: maybe support multi-transactions and remove this check
         assert!(transactions.len() == 1);
         let transaction = &transactions[0];
         self.tx_sender
             .try_send(transaction.clone())
             .map_err(|_| SuiError::from("MockConsensusClient channel overflowed"))?;
-        Ok(with_block_status(consensus_core::BlockStatus::Sequenced(BlockRef::MIN)))
+        // TODO(fastpath): Add some way to simulate consensus positions across blocks
+        Ok((
+            vec![ConsensusPosition { epoch: EpochId::MIN, block: BlockRef::MIN, index: 0 }],
+            with_block_status(consensus_core::BlockStatus::Sequenced(BlockRef::MIN)),
+        ))
     }
 }
 
@@ -121,6 +160,15 @@ impl SubmitToConsensus for MockConsensusClient {
     ) -> SuiResult {
         self.submit_impl(transactions).map(|_response| ())
     }
+
+    fn submit_best_effort(
+        &self,
+        transaction: &ConsensusTransaction,
+        _epoch_store: &Arc<AuthorityPerEpochStore>,
+        _timeout: Duration,
+    ) -> SuiResult {
+        self.submit_impl(std::slice::from_ref(transaction)).map(|_response| ())
+    }
 }
 
 #[async_trait::async_trait]
@@ -129,7 +177,7 @@ impl ConsensusClient for MockConsensusClient {
         &self,
         transactions: &[ConsensusTransaction],
         _epoch_store: &Arc<AuthorityPerEpochStore>,
-    ) -> SuiResult<BlockStatusReceiver> {
+    ) -> SuiResult<(Vec<ConsensusPosition>, BlockStatusReceiver)> {
         self.submit_impl(transactions)
     }
 }

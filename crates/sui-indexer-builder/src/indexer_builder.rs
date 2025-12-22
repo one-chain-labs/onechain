@@ -435,11 +435,11 @@ pub trait Datasource<T: Send>: Sync + Send {
                 m.set(std::cmp::max(target_checkpoint as i64 - max_height as i64, 0));
             }
             // If we have reached the target checkpoint, exit proactively
-            if let Some(cp) = last_saved_checkpoint {
-                if cp >= target_checkpoint {
-                    // Task is done
-                    break;
-                }
+            if let Some(cp) = last_saved_checkpoint
+                && cp >= target_checkpoint
+            {
+                // Task is done
+                break;
             }
         }
         if is_live_task {

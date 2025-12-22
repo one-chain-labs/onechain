@@ -4,16 +4,16 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use consensus_config::AuthorityIndex;
+use consensus_types::block::{BlockRef, Round};
 use futures::stream;
 use parking_lot::Mutex;
 
 use super::ExtendedSerializedBlock;
 use crate::{
-    block::{BlockRef, VerifiedBlock},
+    block::VerifiedBlock,
     commit::{CommitRange, TrustedCommit},
     error::ConsensusResult,
     network::{BlockStream, NetworkService},
-    Round,
 };
 
 pub(crate) struct TestService {
@@ -67,6 +67,7 @@ impl NetworkService for Mutex<TestService> {
         peer: AuthorityIndex,
         block_refs: Vec<BlockRef>,
         _highest_accepted_rounds: Vec<Round>,
+        _breadth_first: bool,
     ) -> ConsensusResult<Vec<Bytes>> {
         self.lock().handle_fetch_blocks.push((peer, block_refs));
         Ok(vec![])

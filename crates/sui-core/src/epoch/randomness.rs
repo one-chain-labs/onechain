@@ -17,6 +17,7 @@ use fastcrypto::{
 };
 use fastcrypto_tbls::{dkg_v1, dkg_v1::Output, nodes, nodes::PartyId};
 use futures::{stream::FuturesUnordered, StreamExt};
+use mysten_common::debug_fatal;
 use parking_lot::Mutex;
 use rand::{
     rngs::{OsRng, StdRng},
@@ -29,7 +30,7 @@ use sui_types::{
     base_types::AuthorityName,
     committee::{Committee, EpochId, StakeUnit},
     crypto::{AuthorityKeyPair, RandomnessRound},
-    error::{SuiError, SuiResult},
+    error::{SuiErrorKind, SuiResult},
     messages_consensus::{ConsensusTransaction, Round, TimestampMs, VersionedDkgConfirmation, VersionedDkgMessage},
     sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait,
 };
@@ -122,7 +123,7 @@ impl VersionedUsedProcessedMessages {
 // DKG protocol:
 // 1. This validator sends out a `Message` to all other validators.
 // 2. Once sufficient valid `Message`s are received from other validators via consensus and
-//    procesed, this validator sends out a `Confirmation` to all other validators.
+//    processed, this validator sends out a `Confirmation` to all other validators.
 // 3. Once sufficient `Confirmation`s are received from other validators via consensus and
 //    processed, they are combined to form a public VSS key and local private key shares.
 // 4. Randomness generation begins.
@@ -132,7 +133,7 @@ impl VersionedUsedProcessedMessages {
 // 2. This kicks off a process in RandomnessEventLoop to send partial signatures for the new
 //    round to all other validators.
 // 3. Once enough partial signautres for the round are collected, a RandomnessStateUpdate
-//    transaction is generated and injected into the TransactionManager.
+//    transaction is generated and injected into the ExecutionScheduler.
 // 4. Once the RandomnessStateUpdate transaction is seen in a certified checkpoint,
 //    `notify_randomness_in_checkpoint` is called to complete the round and stop sending
 //    partial signatures for it.
@@ -432,7 +433,9 @@ impl RandomnessManager {
                     let num_shares = output.shares.as_ref().map_or(0, |shares| shares.len());
                     let epoch_elapsed = epoch_store.epoch_open_time.elapsed().as_millis();
                     let elapsed = self.dkg_start_time.get().map(|t| t.elapsed().as_millis());
-                    info!("random beacon: DKG complete in {epoch_elapsed}ms since epoch start, {elapsed:?}ms since DKG start, with {num_shares} shares for this node");
+                    info!(
+                        "random beacon: DKG complete in {epoch_elapsed}ms since epoch start, {elapsed:?}ms since DKG start, with {num_shares} shares for this node"
+                    );
                     epoch_store.metrics.epoch_random_beacon_dkg_num_shares.set(num_shares as i64);
                     epoch_store.metrics.epoch_random_beacon_dkg_epoch_start_completion_time_ms.set(epoch_elapsed as i64);
                     epoch_store.metrics.epoch_random_beacon_dkg_failed.set(0);
@@ -458,7 +461,9 @@ impl RandomnessManager {
         if !self.dkg_output.initialized()
             && round > epoch_store.protocol_config().random_beacon_dkg_timeout_round().into()
         {
-            error!("random beacon: DKG timed out. Randomness disabled for this epoch. All randomness-using transactions will fail.");
+            error!(
+                "random beacon: DKG timed out. Randomness disabled for this epoch. All randomness-using transactions will fail."
+            );
             epoch_store.metrics.epoch_random_beacon_dkg_failed.set(1);
             self.dkg_output.set(None).expect("checked above that `dkg_output` is uninitialized");
         }
@@ -481,7 +486,7 @@ impl RandomnessManager {
             return Ok(());
         }
         let Some((_, party_id)) = self.authority_info.get(authority) else {
-            error!("random beacon: received DKG Message from unknown authority: {authority:?}");
+            debug_fatal!("random beacon: received DKG Message from unknown authority: {authority:?}");
             return Ok(());
         };
         if *party_id != msg.sender() {
@@ -534,7 +539,9 @@ impl RandomnessManager {
             return Ok(());
         };
         if *party_id != conf.sender() {
-            warn!("ignoring equivocating DKG Confirmation from authority {authority:?} pretending to be PartyId {party_id:?}");
+            warn!(
+                "ignoring equivocating DKG Confirmation from authority {authority:?} pretending to be PartyId {party_id:?}"
+            );
             return Ok(());
         }
         self.confirmations.insert(conf.sender(), conf.clone());
@@ -555,12 +562,11 @@ impl RandomnessManager {
 
         let last_round_timestamp = epoch_store.get_randomness_last_round_timestamp().expect("read should not fail");
 
-        if let Some(last_round_timestamp) = last_round_timestamp {
-            if commit_timestamp - last_round_timestamp
+        if let Some(last_round_timestamp) = last_round_timestamp
+            && commit_timestamp - last_round_timestamp
                 < epoch_store.protocol_config().random_beacon_min_round_interval_ms()
-            {
-                return Ok(None);
-            }
+        {
+            return Ok(None);
         }
 
         let randomness_round = self.next_randomness_round;
@@ -596,7 +602,7 @@ impl RandomnessManager {
     }
 
     fn epoch_store(&self) -> SuiResult<Arc<AuthorityPerEpochStore>> {
-        self.epoch_store.upgrade().ok_or(SuiError::EpochEnded(self.epoch))
+        self.epoch_store.upgrade().ok_or(SuiErrorKind::EpochEnded(self.epoch).into())
     }
 
     fn randomness_dkg_info_from_committee(
@@ -639,7 +645,7 @@ impl RandomnessReporter {
     /// durably committed in a checkpoint. This completes the process of generating randomness for
     /// the round.
     pub fn notify_randomness_in_checkpoint(&self, round: RandomnessRound) -> SuiResult {
-        let epoch_store = self.epoch_store.upgrade().ok_or(SuiError::EpochEnded(self.epoch))?;
+        let epoch_store = self.epoch_store.upgrade().ok_or(SuiErrorKind::EpochEnded(self.epoch))?;
         let mut highest_completed_round = self.highest_completed_round.lock();
         if Some(round) > *highest_completed_round {
             *highest_completed_round = Some(round);
@@ -661,7 +667,8 @@ pub enum DkgStatus {
 mod tests {
     use std::num::NonZeroUsize;
 
-    use consensus_core::{BlockRef, BlockStatus};
+    use consensus_core::BlockStatus;
+    use consensus_types::block::BlockRef;
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
     use sui_types::messages_consensus::ConsensusTransactionKind;
     use tokio::sync::mpsc;
@@ -712,7 +719,7 @@ mod tests {
                     tx_consensus.try_send(transactions.to_vec()).unwrap();
                     true
                 })
-                .returning(|_, _| Ok(with_block_status(BlockStatus::Sequenced(BlockRef::MIN))));
+                .returning(|_, _| Ok((Vec::new(), with_block_status(BlockStatus::Sequenced(BlockRef::MIN)))));
 
             let state = TestAuthorityBuilder::new()
                 .with_protocol_config(protocol_config.clone())
@@ -841,7 +848,9 @@ mod tests {
                     tx_consensus.try_send(transactions.to_vec()).unwrap();
                     true
                 })
-                .returning(|_, _| Ok(with_block_status(consensus_core::BlockStatus::Sequenced(BlockRef::MIN))));
+                .returning(|_, _| {
+                    Ok((Vec::new(), with_block_status(consensus_core::BlockStatus::Sequenced(BlockRef::MIN))))
+                });
 
             let state = TestAuthorityBuilder::new()
                 .with_protocol_config(protocol_config.clone())

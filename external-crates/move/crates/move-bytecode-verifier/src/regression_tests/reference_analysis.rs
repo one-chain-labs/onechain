@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
+    CompiledModule,
     file_format::{
-        empty_module, AbilitySet, AddressIdentifierIndex,
+        AbilitySet, AddressIdentifierIndex,
         Bytecode::{self, *},
         CodeUnit, Constant, DatatypeHandle, DatatypeHandleIndex, FieldDefinition,
         FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
@@ -11,8 +12,8 @@ use move_binary_format::{
         SignatureToken::{self, *},
         StructDefinition, StructDefinitionIndex, StructFieldInformation, TypeSignature, Visibility,
         Visibility::*,
+        empty_module,
     },
-    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
@@ -102,7 +103,11 @@ fn unbalanced_stack_crash() {
     };
 
     module.function_defs.push(fun_def);
-    match crate::verify_module_unmetered(&module) {
+    let config = VerifierConfig {
+        deprecate_global_storage_ops: false,
+        ..VerifierConfig::default()
+    };
+    match crate::verify_module_with_config_unmetered(&config, &module) {
         Ok(_) => {}
         Err(e) => assert_eq!(e.major_status(), StatusCode::GLOBAL_REFERENCE_ERROR),
     }
@@ -120,6 +125,7 @@ fn too_many_locals() {
         .collect::<Vec<_>>();
     let module = CompiledModule {
         version: 5,
+        publishable: true,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
@@ -173,6 +179,7 @@ fn too_many_locals() {
 fn borrow_graph() {
     let module = CompiledModule {
         version: 5,
+        publishable: true,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
@@ -274,6 +281,7 @@ fn indirect_code() {
     assert_eq!(code.len(), (u16::MAX as usize));
     let module = CompiledModule {
         version: 5,
+        publishable: true,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),

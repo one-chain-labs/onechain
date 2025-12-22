@@ -22,7 +22,13 @@ use std::{
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize_with_defaults(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        Self::deserialize_with_config(binary, &BinaryConfig::with_extraneous_bytes_check(false))
+        Self::deserialize_with_config(
+            binary,
+            &BinaryConfig::legacy_with_flags(
+                /* check_no_extraneous_bytes */ true,
+                /* deprecate_global_storage_ops */ true,
+            ),
+        )
     }
 
     /// Deserialize a &[u8] slice into a `CompiledModule` instance with settings
@@ -33,14 +39,20 @@ impl CompiledModule {
         binary_config: &BinaryConfig,
     ) -> BinaryLoaderResult<Self> {
         let module = deserialize_compiled_module(binary, binary_config)?;
-        BoundsChecker::verify_module(&module)?;
+        BoundsChecker::verify_module(&module, binary_config.deprecate_global_storage_ops)?;
         Ok(module)
     }
 
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        deserialize_compiled_module(binary, &BinaryConfig::with_extraneous_bytes_check(false))
+        deserialize_compiled_module(
+            binary,
+            &BinaryConfig::legacy_with_flags(
+                /* check_no_extraneous_bytes */ false,
+                /* deprecate_global_storage_ops */ false,
+            ),
+        )
     }
 }
 
@@ -276,7 +288,7 @@ fn load_field_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
 }
 
 fn load_variant_tag(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u16> {
-    read_uleb_internal(cursor, VARIANT_COUNT_MAX)
+    read_uleb_internal(cursor, VARIANT_TAG_MAX_VALUE)
 }
 
 fn load_variant_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
@@ -349,11 +361,13 @@ fn deserialize_compiled_module(
     binary_config: &BinaryConfig,
 ) -> BinaryLoaderResult<CompiledModule> {
     let versioned_binary = VersionedBinary::initialize(binary, binary_config, true)?;
+    let publishable = versioned_binary.publishable;
     let version = versioned_binary.version();
     let self_module_handle_idx = versioned_binary.module_idx();
     let mut module = CompiledModule {
         version,
         self_module_handle_idx,
+        publishable,
         ..Default::default()
     };
 
@@ -388,7 +402,7 @@ fn read_table(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Table> {
         Ok(kind) => kind,
         Err(_) => {
             return Err(PartialVMError::new(StatusCode::MALFORMED)
-                .with_message("Error reading table".to_string()))
+                .with_message("Error reading table".to_string()));
         }
     };
     let table_offset = load_table_offset(cursor)?;
@@ -899,7 +913,7 @@ fn load_address_identifiers(
     addresses: &mut AddressIdentifierPool,
 ) -> BinaryLoaderResult<()> {
     let mut start = table.offset as usize;
-    if table.count as usize % AccountAddress::LENGTH != 0 {
+    if !(table.count as usize).is_multiple_of(AccountAddress::LENGTH) {
         return Err(PartialVMError::new(StatusCode::MALFORMED)
             .with_message("Bad Address Identifier pool size".to_string()));
     }
@@ -1202,7 +1216,7 @@ fn load_ability_set(
             Ok(byte) => byte,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Unexpected EOF".to_string()))
+                    .with_message("Unexpected EOF".to_string()));
             }
         };
         match pos {
@@ -1295,7 +1309,7 @@ fn load_struct_defs(
             Ok(byte) => SerializedNativeStructFlag::from_u8(byte)?,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid field info in struct".to_string()))
+                    .with_message("Invalid field info in struct".to_string()));
             }
         };
         let field_information = match field_information_flag {
@@ -1349,7 +1363,7 @@ fn load_enum_defs(
             Ok(byte) => SerializedEnumFlag::from_u8(byte)?,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid field info in enum".to_string()))
+                    .with_message("Invalid field info in enum".to_string()));
             }
         };
         let variants = match field_information_flag {
@@ -1536,6 +1550,9 @@ fn load_function_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Functio
     };
 
     let acquires_global_resources = load_struct_definition_indices(cursor)?;
+    if !acquires_global_resources.is_empty() {
+        check_deprecate_global_storage_ops(cursor)?;
+    }
     let code_unit = if (extra_flags & FunctionDefinition::NATIVE) != 0 {
         extra_flags ^= FunctionDefinition::NATIVE;
         None
@@ -1632,6 +1649,15 @@ fn check_cursor_version_enum_compatible(cursor_version: u32) -> BinaryLoaderResu
                 cursor_version
             )),
         )
+    } else {
+        Ok(())
+    }
+}
+
+fn check_deprecate_global_storage_ops(cursor: &VersionedCursor) -> BinaryLoaderResult<()> {
+    if cursor.deprecate_global_storage_ops {
+        Err(PartialVMError::new(StatusCode::DEPRECATED_BYTECODE_FORMAT)
+            .with_message("global storage operations are not supported".to_owned()))
     } else {
         Ok(())
     }
@@ -1832,33 +1858,43 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             }
             // ******** DEPRECATED BYTECODES ********
             Opcodes::EXISTS_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::ExistsDeprecated(load_struct_def_index(cursor)?)
             }
             Opcodes::EXISTS_GENERIC_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::ExistsGenericDeprecated(load_struct_def_inst_index(cursor)?)
             }
             Opcodes::MUT_BORROW_GLOBAL_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::MutBorrowGlobalDeprecated(load_struct_def_index(cursor)?)
             }
             Opcodes::MUT_BORROW_GLOBAL_GENERIC_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::MutBorrowGlobalGenericDeprecated(load_struct_def_inst_index(cursor)?)
             }
             Opcodes::IMM_BORROW_GLOBAL_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::ImmBorrowGlobalDeprecated(load_struct_def_index(cursor)?)
             }
             Opcodes::IMM_BORROW_GLOBAL_GENERIC_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::ImmBorrowGlobalGenericDeprecated(load_struct_def_inst_index(cursor)?)
             }
             Opcodes::MOVE_FROM_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::MoveFromDeprecated(load_struct_def_index(cursor)?)
             }
             Opcodes::MOVE_FROM_GENERIC_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::MoveFromGenericDeprecated(load_struct_def_inst_index(cursor)?)
             }
             Opcodes::MOVE_TO_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::MoveToDeprecated(load_struct_def_index(cursor)?)
             }
             Opcodes::MOVE_TO_GENERIC_DEPRECATED => {
+                check_deprecate_global_storage_ops(cursor)?;
                 Bytecode::MoveToGenericDeprecated(load_struct_def_inst_index(cursor)?)
             }
         };
@@ -2087,6 +2123,7 @@ struct VersionedBinary<'a, 'b> {
     binary_config: &'b BinaryConfig,
     binary: &'a [u8],
     version: u32,
+    publishable: bool,
     tables: Vec<Table>,
     module_idx: ModuleHandleIndex,
     // index after the binary header (including table info)
@@ -2097,6 +2134,7 @@ struct VersionedBinary<'a, 'b> {
 #[derive(Debug)]
 struct VersionedCursor<'a> {
     version: u32,
+    deprecate_global_storage_ops: bool,
     cursor: Cursor<&'a [u8]>,
 }
 
@@ -2109,22 +2147,34 @@ impl<'a, 'b> VersionedBinary<'a, 'b> {
         let binary_len = binary.len();
         let mut cursor = Cursor::<&'a [u8]>::new(binary);
         // check magic
-        let mut magic = [0u8; BinaryConstants::MOVE_MAGIC_SIZE];
-        if let Ok(count) = cursor.read(&mut magic) {
-            if count != BinaryConstants::MOVE_MAGIC_SIZE || magic != BinaryConstants::MOVE_MAGIC {
-                return Err(PartialVMError::new(StatusCode::BAD_MAGIC));
-            }
-        } else {
-            return Err(PartialVMError::new(StatusCode::MALFORMED)
-                .with_message("Bad binary header".to_string()));
-        }
-        // load binary version
-        let flavored_version = match read_u32(&mut cursor) {
-            Ok(v) => v,
-            Err(_) => {
+        let publishable = {
+            let mut magic = [0u8; BinaryConstants::MOVE_MAGIC_SIZE];
+            let Ok(count) = cursor.read(&mut magic) else {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
                     .with_message("Bad binary header".to_string()));
+            };
+            match BinaryConstants::decode_magic(magic, count) {
+                Ok(MagicKind::Normal) => true,
+                Ok(MagicKind::Unpublishable) if binary_config.allow_unpublishable() => false,
+                Ok(MagicKind::Unpublishable) => {
+                    return Err(PartialVMError::new(StatusCode::BAD_MAGIC)
+                        .with_message("Binary header not allowed".to_string()));
+                }
+                Err(MagicError::BadSize) => {
+                    return Err(PartialVMError::new(StatusCode::BAD_MAGIC)
+                        .with_message("Binary header too short".to_string()));
+                }
+                Err(MagicError::BadNumber) => {
+                    return Err(PartialVMError::new(StatusCode::BAD_MAGIC)
+                        .with_message("Unexpected binary header".to_string()));
+                }
             }
+        };
+
+        // load binary version
+        let Ok(flavored_version) = read_u32(&mut cursor) else {
+            return Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("Bad binary header".to_string()));
         };
 
         let version = BinaryFlavor::decode_version(flavored_version);
@@ -2145,7 +2195,11 @@ impl<'a, 'b> VersionedBinary<'a, 'b> {
             return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION));
         }
 
-        let mut versioned_cursor = VersionedCursor { version, cursor };
+        let mut versioned_cursor = VersionedCursor {
+            version,
+            deprecate_global_storage_ops: binary_config.deprecate_global_storage_ops,
+            cursor,
+        };
         // load table info
         let table_count = load_table_count(&mut versioned_cursor)?;
         let mut tables: Vec<Table> = Vec::new();
@@ -2170,6 +2224,7 @@ impl<'a, 'b> VersionedBinary<'a, 'b> {
         let binary_end_offset = versioned_cursor.position() as usize;
         Ok(Self {
             binary_config,
+            publishable,
             binary,
             version,
             tables,
@@ -2193,8 +2248,9 @@ impl<'a, 'b> VersionedBinary<'a, 'b> {
 
     fn new_cursor(&self, start: usize, end: usize) -> VersionedCursor<'a> {
         VersionedCursor {
-            cursor: Cursor::new(&self.binary[start + self.data_offset..end + self.data_offset]),
             version: self.version(),
+            deprecate_global_storage_ops: self.binary_config.deprecate_global_storage_ops,
+            cursor: Cursor::new(&self.binary[start + self.data_offset..end + self.data_offset]),
         }
     }
 
@@ -2236,7 +2292,11 @@ impl<'a> VersionedCursor<'a> {
 
     #[cfg(test)]
     fn new_for_test(version: u32, cursor: Cursor<&'a [u8]>) -> Self {
-        Self { version, cursor }
+        Self {
+            version,
+            deprecate_global_storage_ops: false,
+            cursor,
+        }
     }
 }
 

@@ -38,14 +38,8 @@ async fn init_genesis(
     let modules: Vec<_> = compile_basics_package().get_modules().cloned().collect();
     let genesis_move_packages: Vec<_> = BuiltInFramework::genesis_move_packages().collect();
     let config = ProtocolConfig::get_for_max_version_UNSAFE();
-    let pkg = Object::new_package(
-        &modules,
-        TransactionDigest::genesis_marker(),
-        config.max_move_package_size(),
-        config.move_binary_format_version(),
-        &genesis_move_packages,
-    )
-    .unwrap();
+    let pkg =
+        Object::new_package(&modules, TransactionDigest::genesis_marker(), &config, &genesis_move_packages).unwrap();
     let pkg_id = pkg.id();
     genesis_objects.push(pkg);
 
@@ -63,7 +57,6 @@ async fn init_genesis(
             protocol_key: authority_name,
             worker_key: worker_name,
             account_address: SuiAddress::from(&account_key_pair.public()),
-            revenue_receiving_address: SuiAddress::from(&account_key_pair.public()),
             network_key: network_key_pair.public().clone(),
             gas_price: 1,
             commission_rate: 0,
@@ -132,10 +125,7 @@ pub async fn init_local_authorities_with_genesis(
         let client = LocalAuthorityClient::new_from_authority(state);
         clients.insert(name, client);
     }
-    let timeouts = TimeoutConfig {
-        pre_quorum_timeout: Duration::from_secs(5),
-        post_quorum_timeout: Duration::from_secs(5),
-        serial_authority_request_interval: Duration::from_secs(1),
-    };
+    let timeouts =
+        TimeoutConfig { pre_quorum_timeout: Duration::from_secs(5), post_quorum_timeout: Duration::from_secs(5) };
     AuthorityAggregatorBuilder::from_genesis(genesis).with_timeouts_config(timeouts).build_custom_clients(clients)
 }

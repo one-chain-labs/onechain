@@ -3,11 +3,11 @@
 
 use std::sync::Arc;
 
-use sui_types::full_checkpoint_content::CheckpointData;
+use sui_types::full_checkpoint_content::Checkpoint;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{error, info, trace};
+use tracing::{info, trace};
 
-use crate::{metrics::SubscriptionMetrics, proto::node::v2::GetFullCheckpointResponse};
+use crate::metrics::SubscriptionMetrics;
 
 const CHECKPOINT_MAILBOX_SIZE: usize = 1024;
 const MAILBOX_SIZE: usize = 128;
@@ -15,7 +15,7 @@ const SUBSCRIPTION_CHANNEL_SIZE: usize = 256;
 const MAX_SUBSCRIBERS: usize = 1024;
 
 struct SubscriptionRequest {
-    sender: oneshot::Sender<mpsc::Receiver<Arc<GetFullCheckpointResponse>>>,
+    sender: oneshot::Sender<mpsc::Receiver<Arc<Checkpoint>>>,
 }
 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ pub struct SubscriptionServiceHandle {
 }
 
 impl SubscriptionServiceHandle {
-    pub async fn register_subscription(&self) -> Option<mpsc::Receiver<Arc<GetFullCheckpointResponse>>> {
+    pub async fn register_subscription(&self) -> Option<mpsc::Receiver<Arc<Checkpoint>>> {
         let (sender, reciever) = oneshot::channel();
         let request = SubscriptionRequest { sender };
         self.sender.send(request).await.ok()?;
@@ -34,18 +34,18 @@ impl SubscriptionServiceHandle {
 }
 
 pub struct SubscriptionService {
-    // Mailbox for recieving `CheckpointData` from the Checkpoint Executor
+    // Mailbox for recieving `Checkpoint` from the Checkpoint Executor
     //
     // Expectation is that checkpoints are recieved in-order
-    checkpoint_mailbox: mpsc::Receiver<CheckpointData>,
+    checkpoint_mailbox: mpsc::Receiver<Checkpoint>,
     mailbox: mpsc::Receiver<SubscriptionRequest>,
-    subscribers: Vec<mpsc::Sender<Arc<GetFullCheckpointResponse>>>,
+    subscribers: Vec<mpsc::Sender<Arc<Checkpoint>>>,
 
     metrics: SubscriptionMetrics,
 }
 
 impl SubscriptionService {
-    pub fn build(registry: &prometheus::Registry) -> (mpsc::Sender<CheckpointData>, SubscriptionServiceHandle) {
+    pub fn build(registry: &prometheus::Registry) -> (mpsc::Sender<Checkpoint>, SubscriptionServiceHandle) {
         let metrics = SubscriptionMetrics::new(registry);
         let (checkpoint_sender, checkpoint_mailbox) = mpsc::channel(CHECKPOINT_MAILBOX_SIZE);
         let (subscription_request_sender, mailbox) = mpsc::channel(MAILBOX_SIZE);
@@ -83,11 +83,11 @@ impl SubscriptionService {
         info!("RPC Subscription Services ended");
     }
 
-    fn handle_checkpoint(&mut self, checkpoint: CheckpointData) {
+    fn handle_checkpoint(&mut self, checkpoint: Checkpoint) {
         // Check that we recieved checkpoints in-order
         {
             let last_sequence_number = self.metrics.last_recieved_checkpoint.get();
-            let sequence_number = *checkpoint.checkpoint_summary.sequence_number() as i64;
+            let sequence_number = *checkpoint.summary.sequence_number() as i64;
 
             if last_sequence_number != 0 && (last_sequence_number + 1) != sequence_number {
                 panic!(
@@ -101,23 +101,14 @@ impl SubscriptionService {
             self.metrics.last_recieved_checkpoint.set(sequence_number);
         }
 
-        let checkpoint = match crate::service::checkpoints::checkpoint_data_to_full_checkpoint_response(
-            checkpoint,
-            &crate::field_mask::FieldMaskTree::new_wildcard(),
-        ) {
-            Ok(checkpoint) => Arc::new(checkpoint),
-            Err(e) => {
-                error!("unable to convert checkpoint to proto: {e:?}");
-                return;
-            }
-        };
+        let checkpoint = Arc::new(checkpoint);
 
         // Try to send the latest checkpoint to all subscribers. If a subscriber's channel is full
         // then they are likely too slow so we drop them.
         self.subscribers.retain(|subscriber| {
             match subscriber.try_send(Arc::clone(&checkpoint)) {
                 Ok(()) => {
-                    trace!("succesfully enqueued checkpont for subscriber");
+                    trace!("successfully enqueued checkpont for subscriber");
                     true // Retain this subscriber
                 }
                 Err(e) => {
@@ -140,7 +131,7 @@ impl SubscriptionService {
         let (sender, reciever) = mpsc::channel(SUBSCRIPTION_CHANNEL_SIZE);
         match request.sender.send(reciever) {
             Ok(()) => {
-                trace!("succesfully registered new subscriber");
+                trace!("successfully registered new subscriber");
                 self.metrics.inflight_subscribers.inc();
                 self.subscribers.push(sender);
             }

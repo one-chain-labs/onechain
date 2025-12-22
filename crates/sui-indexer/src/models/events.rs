@@ -80,7 +80,7 @@ impl StoredEvent {
             None => {
                 return Err(IndexerError::PersistentStorageDataCorruptionError(
                     "Event senders element should not be null".to_string(),
-                ))
+                ));
             }
         };
 

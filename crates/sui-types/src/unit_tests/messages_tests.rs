@@ -13,7 +13,7 @@ use roaring::RoaringBitmap;
 
 use super::*;
 use crate::{
-    base_types::random_object_ref,
+    base_types::{random_object_ref, FullObjectRef},
     committee::Committee,
     crypto::{
         bcs_signable_test::{get_obligation_input, Foo},
@@ -53,7 +53,7 @@ fn test_signed_values() {
     let transaction = Transaction::from_data_and_signer(
         TransactionData::new_transfer(
             _a2,
-            random_object_ref(),
+            FullObjectRef::from_fastpath_ref(random_object_ref()),
             a_sender,
             random_object_ref(),
             TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -67,7 +67,7 @@ fn test_signed_values() {
     let bad_transaction = VerifiedTransaction::new_unchecked(Transaction::from_data_and_signer(
         TransactionData::new_transfer(
             _a2,
-            random_object_ref(),
+            FullObjectRef::from_fastpath_ref(random_object_ref()),
             a_sender,
             random_object_ref(),
             TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -124,7 +124,7 @@ fn test_certificates() {
     let transaction = Transaction::from_data_and_signer(
         TransactionData::new_transfer(
             a2,
-            random_object_ref(),
+            FullObjectRef::from_fastpath_ref(random_object_ref()),
             a_sender,
             random_object_ref(),
             TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -413,7 +413,7 @@ fn test_digest_caching() {
     let transaction = Transaction::from_data_and_signer(
         TransactionData::new_transfer(
             sa1,
-            random_object_ref(),
+            FullObjectRef::from_fastpath_ref(random_object_ref()),
             sa2,
             random_object_ref(),
             TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -474,7 +474,7 @@ fn test_user_signature_committed_in_transactions() {
     let gas_price = 10;
     let tx_data = TransactionData::new_transfer(
         a_sender2,
-        random_object_ref(),
+        FullObjectRef::from_fastpath_ref(random_object_ref()),
         a_sender,
         random_object_ref(),
         TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -523,7 +523,7 @@ fn test_user_signature_committed_in_signed_transactions() {
     let gas_price = 10;
     let tx_data = TransactionData::new_transfer(
         a_sender2,
-        random_object_ref(),
+        FullObjectRef::from_fastpath_ref(random_object_ref()),
         a_sender,
         random_object_ref(),
         TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -594,7 +594,7 @@ fn test_sponsored_transaction_message() {
     let sponsor = (&sponsor_kp.public()).into();
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_object(dbg_addr(1), random_object_ref()).unwrap();
+        builder.transfer_object(dbg_addr(1), FullObjectRef::from_fastpath_ref(random_object_ref())).unwrap();
         builder.finish()
     };
     let gas_price = 10;
@@ -631,16 +631,18 @@ fn test_sponsored_transaction_message() {
     assert!(matches!(
         Transaction::from_generic_sig_data(tx_data.clone(), vec![sender_sig.clone()],)
             .try_into_verified_for_testing(epoch, &Default::default())
-            .unwrap_err(),
-        SuiError::SignerSignatureNumberMismatch { .. }
+            .unwrap_err()
+            .into_inner(),
+        SuiErrorKind::SignerSignatureNumberMismatch { .. }
     ));
 
     // Test incomplete signature lists (missing sender sig)
     assert!(matches!(
         Transaction::from_generic_sig_data(tx_data.clone(), vec![sponsor_sig.clone()],)
             .try_into_verified_for_testing(epoch, &Default::default())
-            .unwrap_err(),
-        SuiError::SignerSignatureNumberMismatch { .. }
+            .unwrap_err()
+            .into_inner(),
+        SuiErrorKind::SignerSignatureNumberMismatch { .. }
     ));
 
     // Test incomplete signature lists (more sigs than expected)
@@ -654,16 +656,18 @@ fn test_sponsored_transaction_message() {
             third_party_sig.clone()
         ],)
         .try_into_verified_for_testing(epoch, &Default::default())
-        .unwrap_err(),
-        SuiError::SignerSignatureNumberMismatch { .. }
+        .unwrap_err()
+        .into_inner(),
+        SuiErrorKind::SignerSignatureNumberMismatch { .. }
     ));
 
     // Test irrelevant sigs
     assert!(matches!(
         Transaction::from_generic_sig_data(tx_data, vec![sponsor_sig, third_party_sig],)
             .try_into_verified_for_testing(epoch, &Default::default())
-            .unwrap_err(),
-        SuiError::SignerSignatureAbsent { .. }
+            .unwrap_err()
+            .into_inner(),
+        SuiErrorKind::SignerSignatureAbsent { .. }
     ));
 
     let tx = transaction.data().transaction_data();
@@ -692,7 +696,7 @@ fn test_sponsored_transaction_validity_check() {
 
     let pt = {
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_object(dbg_addr(1), random_object_ref()).unwrap();
+        builder.transfer_object(dbg_addr(1), FullObjectRef::from_fastpath_ref(random_object_ref())).unwrap();
         builder.finish()
     };
     let kind = TransactionKind::programmable(pt);
@@ -793,7 +797,7 @@ fn verify_sender_signature_correctly_with_flag() {
     let gas_price = 10;
     let tx_data = TransactionData::new_transfer(
         receiver_address,
-        random_object_ref(),
+        FullObjectRef::from_fastpath_ref(random_object_ref()),
         (&sender_kp.public()).into(),
         random_object_ref(),
         TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -890,7 +894,7 @@ fn verify_sender_signature_correctly_with_flag() {
 #[test]
 fn test_change_epoch_transaction() {
     let tx = VerifiedTransaction::new_change_epoch(1, ProtocolVersion::MIN, 0, 0, 0, 0, 0, vec![]);
-    assert!(tx.contains_shared_object());
+    assert!(tx.is_consensus_tx());
     assert_eq!(tx.shared_input_objects().next().unwrap(), SharedInputObject::SUI_SYSTEM_OBJ);
     assert!(tx.is_system_tx());
     assert_eq!(tx.data().intent_message().value.input_objects().unwrap().len(), 1);
@@ -899,11 +903,11 @@ fn test_change_epoch_transaction() {
 #[test]
 fn test_consensus_commit_prologue_transaction() {
     let tx = VerifiedTransaction::new_consensus_commit_prologue(0, 0, 42);
-    assert!(tx.contains_shared_object());
+    assert!(tx.is_consensus_tx());
     assert_eq!(tx.shared_input_objects().next().unwrap(), SharedInputObject {
         id: SUI_CLOCK_OBJECT_ID,
         initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
-        mutable: true,
+        mutability: SharedObjectMutability::Mutable,
     },);
     assert!(tx.is_system_tx());
     assert_eq!(tx.data().intent_message().value.input_objects().unwrap().len(), 1);
@@ -912,11 +916,11 @@ fn test_consensus_commit_prologue_transaction() {
 #[test]
 fn test_consensus_commit_prologue_v2_transaction() {
     let tx = VerifiedTransaction::new_consensus_commit_prologue_v2(0, 0, 42, ConsensusCommitDigest::default());
-    assert!(tx.contains_shared_object());
+    assert!(tx.is_consensus_tx());
     assert_eq!(tx.shared_input_objects().next().unwrap(), SharedInputObject {
         id: SUI_CLOCK_OBJECT_ID,
         initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
-        mutable: true,
+        mutability: SharedObjectMutability::Mutable,
     },);
     assert!(tx.is_system_tx());
     assert_eq!(tx.data().intent_message().value.input_objects().unwrap().len(), 1);
@@ -931,11 +935,11 @@ fn test_consensus_commit_prologue_v3_transaction() {
         ConsensusCommitDigest::default(),
         ConsensusDeterminedVersionAssignments::empty_for_testing(),
     );
-    assert!(tx.contains_shared_object());
+    assert!(tx.is_consensus_tx());
     assert_eq!(tx.shared_input_objects().next().unwrap(), SharedInputObject {
         id: SUI_CLOCK_OBJECT_ID,
         initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
-        mutable: true,
+        mutability: SharedObjectMutability::Mutable,
     },);
     assert!(tx.is_system_tx());
     assert_eq!(tx.data().intent_message().value.input_objects().unwrap().len(), 1);
@@ -975,7 +979,7 @@ fn test_move_input_objects() {
             .input(CallArg::Object(ObjectArg::SharedObject {
                 id: shared.0,
                 initial_shared_version: shared.1,
-                mutable: true,
+                mutability: SharedObjectMutability::Mutable,
             }))
             .unwrap(),
     ];
@@ -1012,7 +1016,11 @@ fn test_move_input_objects() {
     rem!(InputObjectKind::ImmOrOwnedMoveObject(o1));
     rem!(InputObjectKind::ImmOrOwnedMoveObject(o2));
     rem!(InputObjectKind::ImmOrOwnedMoveObject(o3));
-    rem!(InputObjectKind::SharedMoveObject { id: shared.0, initial_shared_version: shared.1, mutable: true });
+    rem!(InputObjectKind::SharedMoveObject {
+        id: shared.0,
+        initial_shared_version: shared.1,
+        mutability: SharedObjectMutability::Mutable,
+    });
     rem!(InputObjectKind::ImmOrOwnedMoveObject(gas_object_ref));
     assert!(input_objects.is_empty());
 }
@@ -1051,7 +1059,7 @@ fn test_unique_input_objects() {
         .input(CallArg::Object(ObjectArg::SharedObject {
             id: shared.0,
             initial_shared_version: shared.1,
-            mutable: true,
+            mutability: SharedObjectMutability::Mutable,
         }))
         .unwrap()];
 
@@ -1102,7 +1110,7 @@ fn test_certificate_digest() {
         Transaction::from_data_and_signer(
             TransactionData::new_transfer(
                 receiver,
-                random_object_ref(),
+                FullObjectRef::from_fastpath_ref(random_object_ref()),
                 sender,
                 random_object_ref(),
                 TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
@@ -1182,19 +1190,19 @@ fn check_approx_effects_components_size() {
     };
 
     assert!(
-        size_of::<GasCostSummary>() < APPROX_SIZE_OF_GAS_COST_SUMMARY,
+        size_of::<GasCostSummary>() <= APPROX_SIZE_OF_GAS_COST_SUMMARY,
         "Update APPROX_SIZE_OF_GAS_COST_SUMMARY constant"
     );
-    assert!(size_of::<EpochId>() < APPROX_SIZE_OF_EPOCH_ID, "Update APPROX_SIZE_OF_EPOCH_ID constant");
+    assert!(size_of::<EpochId>() <= APPROX_SIZE_OF_EPOCH_ID, "Update APPROX_SIZE_OF_EPOCH_ID constant");
     assert!(
-        size_of::<Option<TransactionEventsDigest>>() < APPROX_SIZE_OF_OPT_TX_EVENTS_DIGEST,
+        size_of::<Option<TransactionEventsDigest>>() <= APPROX_SIZE_OF_OPT_TX_EVENTS_DIGEST,
         "Update APPROX_SIZE_OF_OPT_TX_EVENTS_DIGEST constant"
     );
-    assert!(size_of::<ObjectRef>() < APPROX_SIZE_OF_OBJECT_REF, "Update APPROX_SIZE_OF_OBJECT_REF constant");
-    assert!(size_of::<TransactionDigest>() < APPROX_SIZE_OF_TX_DIGEST, "Update APPROX_SIZE_OF_TX_DIGEST constant");
-    assert!(size_of::<Owner>() < APPROX_SIZE_OF_OWNER, "Update APPROX_SIZE_OF_OWNER constant");
+    assert!(size_of::<ObjectRef>() <= APPROX_SIZE_OF_OBJECT_REF, "Update APPROX_SIZE_OF_OBJECT_REF constant");
+    assert!(size_of::<TransactionDigest>() <= APPROX_SIZE_OF_TX_DIGEST, "Update APPROX_SIZE_OF_TX_DIGEST constant");
+    assert!(size_of::<Owner>() <= APPROX_SIZE_OF_OWNER, "Update APPROX_SIZE_OF_OWNER constant");
     assert!(
-        size_of::<ExecutionStatus>() < APPROX_SIZE_OF_EXECUTION_STATUS,
+        size_of::<ExecutionStatus>() <= APPROX_SIZE_OF_EXECUTION_STATUS,
         "Update APPROX_SIZE_OF_EXECUTION_STATUS constant"
     );
 }

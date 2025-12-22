@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     base_types::SequenceNumber,
     dynamic_field::get_dynamic_field_from_store,
-    error::{SuiError, SuiResult},
+    error::{SuiErrorKind, SuiResult},
     id::UID,
     object::Owner,
     storage::ObjectStore,
@@ -111,10 +111,10 @@ pub fn get_authenticator_state(object_store: impl ObjectStore) -> SuiResult<Opti
         return Ok(None);
     };
     let move_object = outer.data.try_as_move().ok_or_else(|| {
-        SuiError::SuiSystemStateReadError("AuthenticatorState object must be a Move object".to_owned())
+        SuiErrorKind::SuiSystemStateReadError("AuthenticatorState object must be a Move object".to_owned())
     })?;
     let outer = bcs::from_bytes::<AuthenticatorState>(move_object.contents())
-        .map_err(|err| SuiError::SuiSystemStateReadError(err.to_string()))?;
+        .map_err(|err| SuiErrorKind::SuiSystemStateReadError(err.to_string()))?;
 
     // No other versions exist yet.
     assert_eq!(outer.version, AUTHENTICATOR_STATE_VERSION);
@@ -122,7 +122,7 @@ pub fn get_authenticator_state(object_store: impl ObjectStore) -> SuiResult<Opti
     let id = outer.id.id.bytes;
     let inner: AuthenticatorStateInner =
         get_dynamic_field_from_store(&object_store, id, &outer.version).map_err(|err| {
-            SuiError::DynamicFieldReadError(format!(
+            SuiErrorKind::DynamicFieldReadError(format!(
                 "Failed to load sui system state inner object with ID {:?} and version {:?}: {:?}",
                 id, outer.version, err
             ))

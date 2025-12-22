@@ -5,7 +5,7 @@ license = "Apache-2.0"
 authors = ["Evan Chan <echan@mystenlabs.com>"]
 description = "Library for common telemetry and observability functionality"
 repository = "https://github.com/mystenlabs/mysten-infra"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
@@ -26,7 +26,7 @@ tokio = { workspace = true, features = ["full"] }
 futures.workspace = true
 clap.workspace = true
 bytes.workspace = true
-bytes-varint = { version = "1" }
+bytes-varint = { version = "1.1.0" }
 
 # must use same version as opentelemetry for tonic and prost, so we can't use from
 # workspace

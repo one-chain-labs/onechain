@@ -1,0 +1,9 @@
+[package]
+name = "registry_coin"
+edition = "2024.beta"
+
+[dependencies]
+One = { local = "../../../../../sui-framework/packages/one-framework" }
+
+[addresses]
+registry_coin = "0x0"

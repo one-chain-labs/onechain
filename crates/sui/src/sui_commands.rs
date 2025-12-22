@@ -2,22 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
+    collections::BTreeMap,
     fs,
     io,
-    io::{stderr, stdout, Write},
-    net::{AddrParseError, IpAddr, Ipv4Addr, SocketAddr},
+    io::{stdout, Write},
+    net::{AddrParseError, IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     num::NonZeroUsize,
+    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{anyhow, bail, ensure, Context};
 use clap::*;
 use colored::Colorize;
 use fastcrypto::traits::KeyPair;
+use futures::future;
 use move_analyzer::analyzer;
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
+use move_compiler::editions::Flavor;
+use move_core_types::account_address::AccountAddress;
 use move_package::BuildConfig;
+use mysten_common::tempdir;
+use prometheus::Registry;
 use rand::rngs::OsRng;
+use serde_json::json;
 use sui_bridge::{
     config::BridgeCommitteeConfig,
     metrics::BridgeMetrics,
@@ -39,119 +49,157 @@ use sui_config::{
     SUI_KEYSTORE_FILENAME,
     SUI_NETWORK_CONFIG,
 };
-use sui_faucet::{create_wallet_context, start_faucet, AppState, FaucetConfig, SimpleFaucet};
-use sui_graphql_rpc::{
-    config::{ConnectionConfig, ServiceConfig},
-    test_infra::cluster::start_graphql_server_with_fn_rpc,
+use sui_faucet::{create_wallet_context, start_faucet, AppState, FaucetConfig, LocalFaucet};
+use one_indexer_alt::{config::IndexerConfig, setup_indexer};
+use one_indexer_alt_consistent_store::{
+    args::RpcArgs as ConsistentArgs,
+    config::ServiceConfig as ConsistentConfig,
+    start_service as start_consistent_store,
 };
-use sui_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
+use one_indexer_alt_framework::{
+    ingestion::{ingestion_client::IngestionClientArgs, ClientArgs},
+    IndexerArgs,
+};
+use one_indexer_alt_graphql::{
+    args::KvArgs as GraphQlKvArgs,
+    config::RpcConfig as GraphQlConfig,
+    start_rpc as start_graphql,
+    RpcArgs as GraphQlArgs,
+};
+use one_indexer_alt_reader::{
+    consistent_reader::ConsistentReaderArgs,
+    fullnode_client::FullnodeArgs,
+    system_package_task::SystemPackageTaskArgs,
+};
+use sui_json_rpc_types::{SuiObjectDataOptions, SuiRawData};
 use sui_keys::{
+    key_derive::generate_new_key,
     keypair_file::read_key,
     keystore::{AccountKeystore, FileBasedKeystore, Keystore},
 };
-use sui_move::{self, execute_move_command};
-use sui_move_build::SuiPackageHooks;
+use sui_move::{self, execute_move_command, manage_package::resolve_lock_file_path, summary::PackageSummaryMetadata};
+use sui_move_build::{
+    check_conflicting_addresses,
+    check_invalid_dependencies,
+    check_unpublished_dependencies,
+    implicit_deps,
+    BuildConfig as SuiBuildConfig,
+    SuiPackageHooks,
+};
+use sui_package_management::system_package_versions::latest_system_packages;
+use sui_pg_db::{
+    temp::{get_available_port, LocalDatabase},
+    DbArgs,
+};
+use sui_protocol_config::Chain;
+use sui_replay_2 as SR2;
 use sui_sdk::{
+    apis::ReadApi,
     sui_client_config::{SuiClientConfig, SuiEnv},
     wallet_context::WalletContext,
+    SuiClient,
 };
 use sui_swarm::memory::Swarm;
 use sui_swarm_config::{
-    genesis_config::{GenesisConfig, DEFAULT_NUMBER_OF_AUTHORITIES},
+    genesis_config::GenesisConfig,
     network_config::NetworkConfig,
     network_config_builder::ConfigBuilder,
     node_config_builder::FullnodeConfigBuilder,
 };
 use sui_types::{
-    base_types::SuiAddress,
+    base_types::{ObjectID, SuiAddress},
     crypto::{SignatureScheme, SuiKeyPair, ToFromBytes},
+    digests::ChainIdentifier,
+    move_package::MovePackage,
 };
-use tempfile::tempdir;
-use tracing::{self, info};
+use tokio::time::interval;
+use tokio_util::sync::CancellationToken;
+use tracing::info;
+use url::Url;
 
 use crate::{
-    client_commands::SuiClientCommands,
-    console::start_console,
+    client_commands::{implicit_deps_for_protocol_version, pkg_tree_shake, SuiClientCommands, USER_AGENT},
     fire_drill::{run_fire_drill, FireDrill},
     genesis_ceremony::{run, Ceremony},
     keytool::KeyToolCommand,
-    supper_committee::SuiSupperCommitteeCommand,
+    trace_analysis_commands::AnalyzeTraceCommand,
     validator_commands::SuiValidatorCommand,
 };
 
-const CONCURRENCY_LIMIT: usize = 30;
 const DEFAULT_EPOCH_DURATION_MS: u64 = 60_000;
-const DEFAULT_FAUCET_NUM_COINS: usize = 5; // 5 coins per request was the default in sui-test-validator
+
 const DEFAULT_FAUCET_MIST_AMOUNT: u64 = 200_000_000_000; // 200 SUI
 const DEFAULT_FAUCET_PORT: u16 = 9123;
 
+const DEFAULT_CONSISTENT_STORE_PORT: u16 = 9124;
 const DEFAULT_GRAPHQL_PORT: u16 = 9125;
 
-const DEFAULT_INDEXER_PORT: u16 = 9124;
-
 #[derive(Args)]
-pub struct IndexerArgs {
-    /// Start an indexer with default host and port: 0.0.0.0:9124. This flag accepts also a port,
-    /// a host, or both (e.g., 0.0.0.0:9124).
+pub struct RpcArgs {
+    /// Start an indexer with a PostgreSQL database.
+    ///
+    /// Three modes of operation:
+    /// - Not specified: No indexer is started (unless --with-graphql is set)
+    /// - `--with-indexer`: Create/use a temporary database in the network's configuration directory
+    /// - `--with-indexer=<URL>`: Use the provided PostgreSQL database URL
+    ///
+    /// When providing a database URL, use the = sign: `--with-indexer=postgres://user:pass@host:5432/db`
+    #[clap(
+        long,
+        num_args = 0..=1,
+        require_equals = true,
+        value_name = "DATABASE_URL"
+    )]
+    with_indexer: Option<Option<Url>>,
+
+    /// Start a Consistent Store with default host and port: 0.0.0.0:9124. This flag accepts also a
+    /// port, a host, or both (e.g., 0.0.0.0:9124).
+    ///
     /// When providing a specific value, please use the = sign between the flag and value:
-    /// `--with-indexer=6124` or `--with-indexer=0.0.0.0`, or `--with-indexer=0.0.0.0:9124`
-    /// The indexer will be started in writer mode and reader mode.
-    #[clap(long,
-    default_missing_value = "0.0.0.0:9124",
-    num_args = 0..=1,
-    require_equals = true,
-    value_name = "INDEXER_HOST_PORT",
-)]
-    with_indexer: Option<String>,
+    /// `--with-consistent-store=9124` or `--with-consistent-store=0.0.0.0`, or `--with-consistent-store=0.0.0.0:9124`
+    /// The Consistent Store will be automatically enabled when `--with-graphql` is set.
+    #[clap(
+        long,
+        default_missing_value = "0.0.0.0:9124",
+        num_args = 0..=1,
+        require_equals = true,
+        value_name = "CONSISTENT_STORE_HOST_PORT"
+    )]
+    with_consistent_store: Option<String>,
 
     /// Start a GraphQL server with default host and port: 0.0.0.0:9125. This flag accepts also a
     /// port, a host, or both (e.g., 0.0.0.0:9125).
+    ///
     /// When providing a specific value, please use the = sign between the flag and value:
-    /// `--with-graphql=6124` or `--with-graphql=0.0.0.0`, or `--with-graphql=0.0.0.0:9125`
-    /// Note that GraphQL requires a running indexer, which will be enabled by default if the
-    /// `--with-indexer` flag is not set.
+    /// `--with-graphql=9125` or `--with-graphql=0.0.0.0`, or `--with-graphql=0.0.0.0:9125`
+    ///
+    /// Note that GraphQL requires a running indexer and consistent store, which will be enabled
+    /// by default even if those flags are not set.
     #[clap(
-    long,
-    default_missing_value = "0.0.0.0:9125",
-    num_args = 0..=1,
-    require_equals = true,
-    value_name = "GRAPHQL_HOST_PORT"
-)]
+        long,
+        default_missing_value = "0.0.0.0:9125",
+        num_args = 0..=1,
+        require_equals = true,
+        value_name = "GRAPHQL_HOST_PORT"
+    )]
     with_graphql: Option<String>,
-
-    /// Port for the Indexer Postgres DB. Default port is 5432.
-    #[clap(long, default_value = "5432")]
-    pg_port: u16,
-
-    /// Hostname for the Indexer Postgres DB. Default host is localhost.
-    #[clap(long, default_value = "localhost")]
-    pg_host: String,
-
-    /// DB name for the Indexer Postgres DB. Default DB name is one_indexer.
-    #[clap(long, default_value = "one_indexer")]
-    pg_db_name: String,
-
-    /// DB username for the Indexer Postgres DB. Default username is postgres.
-    #[clap(long, default_value = "postgres")]
-    pg_user: String,
-
-    /// DB password for the Indexer Postgres DB. Default password is postgrespw.
-    #[clap(long, default_value = "postgrespw")]
-    pg_password: String,
 }
 
-impl IndexerArgs {
+impl RpcArgs {
     pub fn for_testing() -> Self {
-        Self {
-            with_indexer: None,
-            with_graphql: None,
-            pg_port: 5432,
-            pg_host: "localhost".to_string(),
-            pg_db_name: "one_indexer".to_string(),
-            pg_user: "postgres".to_string(),
-            pg_password: "postgrespw".to_string(),
-        }
+        Self { with_indexer: None, with_consistent_store: None, with_graphql: None }
     }
+}
+
+#[derive(Parser)]
+#[clap(rename_all = "kebab-case")]
+pub struct SuiEnvConfig {
+    /// Sets the file storing the state of our user accounts (an empty one will be created if missing)
+    #[clap(long = "client.config")]
+    config: Option<PathBuf>,
+    /// The OneChain environment to use. This must be present in the current config file.
+    #[clap(long = "client.env")]
+    env: Option<String>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -180,9 +228,9 @@ pub enum SuiCommand {
     /// may break. Changing these values outside of local networks is very dangerous.
     #[clap(name = "start", verbatim_doc_comment)]
     Start {
-        /// Config directory that will be used to store network config, node db, keystore
+        /// Config directory that will be used to store network config, node db, keystore.
         /// one genesis -f --with-faucet generates a genesis config that can be used to start this
-        /// proces. Use with caution as the `-f` flag will overwrite the existing config directory.
+        /// process. Use with caution as the `-f` flag will overwrite the existing config directory.
         /// We can use any config dir that is generated by the `one genesis`.
         #[clap(long = "network.config")]
         config_dir: Option<std::path::PathBuf>,
@@ -210,7 +258,7 @@ pub enum SuiCommand {
         with_faucet: Option<String>,
 
         #[clap(flatten)]
-        indexer_feature_args: IndexerArgs,
+        rpc_args: RpcArgs,
 
         /// Port to start the Fullnode RPC server on. Default port is 9000.
         #[clap(long, default_value = "9000")]
@@ -245,7 +293,7 @@ pub enum SuiCommand {
         #[clap(short, long, help = "Dump the public keys of all authorities")]
         dump_addresses: bool,
     },
-    /// Bootstrap and initialize a new OneChain network
+    /// Bootstrap and initialize a new one network
     #[clap(name = "genesis")]
     Genesis {
         #[clap(long, help = "Start genesis with a given config file")]
@@ -285,19 +333,11 @@ pub enum SuiCommand {
         #[clap(subcommand)]
         cmd: KeyToolCommand,
     },
-    /// Start OneChain interactive console.
-    #[clap(name = "console")]
-    Console {
-        /// Sets the file storing the state of our user accounts (an empty one will be created if missing)
-        #[clap(long = "client.config")]
-        config: Option<PathBuf>,
-    },
     /// Client for interacting with the OneChain network.
     #[clap(name = "client")]
     Client {
-        /// Sets the file storing the state of our user accounts (an empty one will be created if missing)
-        #[clap(long = "client.config")]
-        config: Option<PathBuf>,
+        #[clap(flatten)]
+        config: SuiEnvConfig,
         #[clap(subcommand)]
         cmd: Option<SuiClientCommands>,
         /// Return command outputs in json format.
@@ -320,27 +360,15 @@ pub enum SuiCommand {
         #[clap(short = 'y', long = "yes")]
         accept_defaults: bool,
     },
-    #[clap(name = "supper-committee")]
-    SupperCommittee {
-        /// Sets the file storing the state of our user accounts (an empty one will be created if missing)
-        #[clap(long = "client.config")]
-        config: Option<PathBuf>,
-        #[clap(subcommand)]
-        cmd: SuiSupperCommitteeCommand,
-        /// Return command outputs in json format.
-        #[clap(long, global = true)]
-        json: bool,
-    },
+
     /// Tool to build and test Move applications.
     #[clap(name = "move")]
     Move {
         /// Path to a package which the command should be run with respect to.
         #[clap(long = "path", short = 'p', global = true)]
         package_path: Option<PathBuf>,
-        /// Sets the file storing the state of our user accounts (an empty one will be created if missing)
-        /// Only used when the `--dump-bytecode-as-base64` is set.
-        #[clap(long = "client.config")]
-        config: Option<PathBuf>,
+        #[clap(flatten)]
+        config: SuiEnvConfig,
         /// Package build options
         #[clap(flatten)]
         build_config: BuildConfig,
@@ -367,9 +395,33 @@ pub enum SuiCommand {
         fire_drill: FireDrill,
     },
 
-    /// Invoke Sui's move-analyzer via CLI
+    /// Invoke OneChain's move-analyzer via CLI
     #[clap(name = "analyzer", hide = true)]
     Analyzer,
+
+    /// Analyze and/or transform a trace file
+    #[clap(name = "analyze-trace")]
+    AnalyzeTrace {
+        /// The path to the trace file to analyze
+        #[arg(long, short)]
+        path: PathBuf,
+
+        /// The output directory for any generated artifacts. Defaults `<cur_dir>`
+        #[arg(long, short)]
+        output_dir: Option<PathBuf>,
+
+        #[clap(subcommand)]
+        command: AnalyzeTraceCommand,
+    },
+
+    #[clap(name = "replay")]
+    ReplayTransaction {
+        #[clap(flatten)]
+        config: SuiEnvConfig,
+
+        #[command(flatten)]
+        replay_config: SR2::ReplayConfigStable,
+    },
 }
 
 impl SuiCommand {
@@ -378,9 +430,8 @@ impl SuiCommand {
         match self {
             SuiCommand::Network { config, dump_addresses } => {
                 let config_path = config.unwrap_or(sui_config_dir()?.join(SUI_NETWORK_CONFIG));
-                let config: NetworkConfig = PersistedConfig::read(&config_path).map_err(|err| {
-                    err.context(format!("Cannot open OneChain network config file at {:?}", config_path))
-                })?;
+                let config: NetworkConfig = PersistedConfig::read(&config_path)
+                    .map_err(|err| err.context(format!("Cannot open OneChain network config file at {:?}", config_path)))?;
 
                 if dump_addresses {
                     for validator in config.validator_configs() {
@@ -393,8 +444,7 @@ impl SuiCommand {
                 config_dir,
                 force_regenesis,
                 with_faucet,
-
-                indexer_feature_args,
+                rpc_args,
                 fullnode_rpc_port,
                 data_ingestion_dir,
                 no_full_node,
@@ -404,7 +454,7 @@ impl SuiCommand {
                 start(
                     config_dir.clone(),
                     with_faucet,
-                    indexer_feature_args,
+                    rpc_args,
                     force_regenesis,
                     epoch_duration_ms,
                     fullnode_rpc_port,
@@ -441,25 +491,21 @@ impl SuiCommand {
             SuiCommand::GenesisCeremony(cmd) => run(cmd),
             SuiCommand::KeyTool { keystore_path, json, cmd } => {
                 let keystore_path = keystore_path.unwrap_or(sui_config_dir()?.join(SUI_KEYSTORE_FILENAME));
-                let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path)?);
+                let mut keystore = Keystore::from(FileBasedKeystore::load_or_create(&keystore_path)?);
                 cmd.execute(&mut keystore).await?.print(!json);
                 Ok(())
             }
-            SuiCommand::Console { config } => {
-                let config = config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
-                prompt_if_no_config(&config, false).await?;
-                let context = WalletContext::new(&config, None, None)?;
-                if let Err(e) = context.get_client().await?.check_api_version() {
-                    eprintln!("{}", format!("[warning] {e}").yellow().bold());
-                }
-                start_console(context, &mut stdout(), &mut stderr()).await
-            }
             SuiCommand::Client { config, cmd, json, accept_defaults } => {
-                let config_path = config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
+                let config_path = config.config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
                 prompt_if_no_config(&config_path, accept_defaults).await?;
                 if let Some(cmd) = cmd {
-                    let mut context = WalletContext::new(&config_path, None, None)?;
-                    if let Err(e) = context.get_client().await?.check_api_version() {
+                    let mut context = WalletContext::new(&config_path)?;
+                    if let Some(env_override) = config.env {
+                        context = context.with_env_override(env_override);
+                    }
+                    if let Ok(client) = context.get_client().await
+                        && let Err(e) = client.check_api_version()
+                    {
                         eprintln!("{}", format!("[warning] {e}").yellow().bold());
                     }
                     cmd.execute(&mut context).await?.print(!json);
@@ -474,9 +520,11 @@ impl SuiCommand {
             SuiCommand::Validator { config, cmd, json, accept_defaults } => {
                 let config_path = config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
                 prompt_if_no_config(&config_path, accept_defaults).await?;
-                let mut context = WalletContext::new(&config_path, None, None)?;
+                let mut context = WalletContext::new(&config_path)?;
                 if let Some(cmd) = cmd {
-                    if let Err(e) = context.get_client().await?.check_api_version() {
+                    if let Ok(client) = context.get_client().await
+                        && let Err(e) = client.check_api_version()
+                    {
                         eprintln!("{}", format!("[warning] {e}").yellow().bold());
                     }
                     cmd.execute(&mut context).await?.print(!json);
@@ -488,39 +536,140 @@ impl SuiCommand {
                 }
                 Ok(())
             }
-            SuiCommand::SupperCommittee { config, cmd, json } => {
-                let config_path = config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
-                let mut context = WalletContext::new(&config_path, None, None)?;
-                cmd.execute(&mut context).await?.print(!json);
-                Ok(())
-            }
             SuiCommand::Move { package_path, build_config, mut cmd, config: client_config } => {
-                match &mut cmd {
-                    sui_move::Command::Build(build) if build.dump_bytecode_as_base64 => {
-                        if build.ignore_chain {
-                            build.chain_id = None;
-                        } else {
-                            // `one move build` does not ordinarily require a network connection.
-                            // The exception is when --dump-bytecode-as-base64 is specified: In this
-                            // case, we should resolve the correct addresses for the respective chain
-                            // (e.g., testnet, mainnet) from the Move.lock under automated address management.
-                            let config = client_config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
-                            prompt_if_no_config(&config, false).await?;
-                            let context = WalletContext::new(&config, None, None)?;
-                            if let Err(e) = context.get_client().await?.check_api_version() {
-                                eprintln!("{}", format!("[warning] {e}").yellow().bold());
-                            }
-                            let client = context.get_client().await?;
-                            let chain_id = client.read_api().get_chain_identifier().await.ok();
-                            build.chain_id = chain_id.clone();
+                match cmd {
+                    sui_move::Command::Summary(mut s) if s.package_id.is_some() => {
+                        let (_, client) =
+                            get_chain_id_and_client(client_config, "one move summary --package-id <object_id>").await?;
+                        let Some(client) = client else {
+                            bail!("`one move summary --package-id <object_id>` requires a configured network");
+                        };
+
+                        let read_api = client.read_api();
+
+                        // If they didn't run with `--bytecode` correct this for them but warn them
+                        // to let them know that we are changing it.
+                        if !s.summary.bytecode {
+                            eprintln!("{}",
+                                "[warning] `one move summary --package-id <object_id>` only supports bytecode summaries. \
+                                 Falling back to producing a bytecode-based summary. To not get this warning you can run with `--bytecode`".yellow().bold()
+                            );
+                            s.summary.bytecode = true;
                         }
+                        let root_package_id =
+                            s.package_id.as_ref().expect("Safe since we checked in the match statement");
+
+                        // Create a tempdir to download the package bytes to, and then download the
+                        // packages bytes there.
+                        let package_bytes_location = tempdir()?;
+                        let path = package_bytes_location.path();
+                        let package_metadata = download_package_and_deps_under(read_api, path, *root_package_id).await?;
+
+                        // Now produce the summary, pointing at the tempdir containing the package
+                        // bytes.
+                        execute_move_command(
+                            Some(path),
+                            build_config,
+                            sui_move::Command::Summary(s),
+                            Some(sui_move::CommandMeta::Summary(package_metadata)),
+                        )?;
+                        return Ok(());
+                    }
+                    sui_move::Command::Build(build) if build.dump_bytecode_as_base64 => {
+                        // `one move build` does not ordinarily require a network connection.
+                        // The exception is when --dump-bytecode-as-base64 is specified: In this
+                        // case, we should resolve the correct addresses for the respective chain
+                        // (e.g., testnet, mainnet) from the Move.lock under automated address management.
+                        // In addition, tree shaking also requires a network as it needs to fetch
+                        // on-chain linkage table of package dependencies.
+                        let (chain_id, client) = if build.ignore_chain {
+                            // for tests it's useful to ignore the chain id!
+                            (None, None)
+                        } else {
+                            get_chain_id_and_client(client_config, "one move build --dump-bytecode-as-base64").await?
+                        };
+
+                        let rerooted_path = move_cli::base::reroot_path(package_path.as_deref())?;
+                        let mut build_config = resolve_lock_file_path(build_config, Some(&rerooted_path))?;
+
+                        let previous_id = if let Some(ref chain_id) = chain_id {
+                            sui_package_management::set_package_id(
+                                &rerooted_path,
+                                build_config.install_dir.clone(),
+                                chain_id,
+                                AccountAddress::ZERO,
+                            )?
+                        } else {
+                            None
+                        };
+
+                        if let Some(client) = &client {
+                            let protocol_config = client.read_api().get_protocol_config(None).await?;
+                            build_config.implicit_dependencies =
+                                implicit_deps_for_protocol_version(protocol_config.protocol_version)?;
+                        } else {
+                            build_config.implicit_dependencies = implicit_deps(latest_system_packages());
+                        }
+
+                        let mut pkg = SuiBuildConfig {
+                            config: build_config.clone(),
+                            run_bytecode_verifier: true,
+                            print_diags_to_stderr: true,
+                            chain_id: chain_id.clone(),
+                        }
+                        .build(&rerooted_path)?;
+
+                        // Restore original ID, then check result.
+                        if let (Some(chain_id), Some(previous_id)) = (chain_id, previous_id) {
+                            let _ = sui_package_management::set_package_id(
+                                &rerooted_path,
+                                build_config.install_dir.clone(),
+                                &chain_id,
+                                previous_id,
+                            )?;
+                        }
+
+                        let with_unpublished_deps = build.with_unpublished_dependencies;
+
+                        check_conflicting_addresses(&pkg.dependency_ids.conflicting, true)?;
+                        check_invalid_dependencies(&pkg.dependency_ids.invalid)?;
+                        if !with_unpublished_deps {
+                            check_unpublished_dependencies(&pkg.dependency_ids.unpublished)?;
+                        }
+
+                        if let Some(client) = client {
+                            pkg_tree_shake(client.read_api(), with_unpublished_deps, &mut pkg).await?;
+                        }
+
+                        println!(
+                            "{}",
+                            json!({
+                                "modules": pkg.get_package_base64(with_unpublished_deps),
+                                "dependencies": pkg.get_dependency_storage_package_ids(),
+                                "digest": pkg.get_package_digest(with_unpublished_deps),
+                            })
+                        );
+                        return Ok(());
                     }
                     _ => (),
                 };
-                execute_move_command(package_path.as_deref(), build_config, cmd)
+
+                // If a specific environment is specified for the build command we set the chain ID
+                // to the one that is specified.
+                if client_config.env.is_some() && matches!(cmd, sui_move::Command::Build(_)) {
+                    let (chain_id, _) = get_chain_id_and_client(client_config, "one move build").await?;
+
+                    let sui_move::Command::Build(build_config) = &mut cmd else {
+                        unreachable!("We checked for Build above, so this should never happen");
+                    };
+
+                    build_config.chain_id = chain_id;
+                }
+
+                execute_move_command(package_path.as_deref(), build_config, cmd, None)
             }
             SuiCommand::BridgeInitialize { network_config, client_config, bridge_committee_config_path } => {
-                // Load the config of the Sui authority.
+                // Load the config of the OneChain authority.
                 let network_config_path = network_config.clone().unwrap_or(sui_config_dir()?.join(SUI_NETWORK_CONFIG));
                 let network_config: NetworkConfig = PersistedConfig::read(&network_config_path).map_err(|err| {
                     err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path))
@@ -534,13 +683,14 @@ impl SuiCommand {
                     })?;
 
                 let config_path = client_config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
-                let mut context = WalletContext::new(&config_path, None, None)?;
-                if let Err(e) = context.get_client().await?.check_api_version() {
+                let mut context = WalletContext::new(&config_path)?;
+                if let Ok(client) = context.get_client().await
+                    && let Err(e) = client.check_api_version()
+                {
                     eprintln!("{}", format!("[warning] {e}").yellow().bold());
                 }
                 let rgp = context.get_reference_gas_price().await?;
-                let rpc_url = &context.config.get_active_env()?.rpc;
-                println!("rpc_url: {}", rpc_url);
+                let rpc_url = &context.get_active_env()?.rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let sui_bridge_client = SuiBridgeClient::new(rpc_url, bridge_metrics).await?;
                 let bridge_arg = sui_bridge_client.get_mutable_bridge_object_arg_must_succeed().await;
@@ -550,7 +700,7 @@ impl SuiCommand {
                 );
                 for node_config in network_config.validator_configs() {
                     let account_kp = node_config.account_key_pair.keypair();
-                    context.add_account(None, account_kp.copy());
+                    context.add_account(None, account_kp.copy()).await;
                 }
 
                 let context = context;
@@ -582,15 +732,45 @@ impl SuiCommand {
                         1000000000,
                     )
                     .unwrap();
-                    let signed_tx = context.sign_transaction(&tx);
+                    let signed_tx = context.sign_transaction(&tx).await;
                     tasks.push(context.execute_transaction_must_succeed(signed_tx));
                 }
-                futures::future::join_all(tasks).await;
+                future::join_all(tasks).await;
                 Ok(())
             }
             SuiCommand::FireDrill { fire_drill } => run_fire_drill(fire_drill).await,
             SuiCommand::Analyzer => {
-                analyzer::run();
+                let sui_implicit_deps = implicit_deps(latest_system_packages());
+                let flavor = Flavor::OneChain;
+                let sui_pkg_hooks = Box::new(SuiPackageHooks);
+                analyzer::run(sui_implicit_deps, Some(flavor), Some(sui_pkg_hooks));
+                Ok(())
+            }
+            SuiCommand::AnalyzeTrace { path, output_dir, command } => command.execute(path, output_dir).await,
+            SuiCommand::ReplayTransaction { config, replay_config } => {
+                let config_path = config.config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
+                prompt_if_no_config(&config_path, /* accept_defaults */ false).await?;
+                let mut context = WalletContext::new(&config_path)?;
+                if let Some(env_override) = config.env {
+                    context = context.with_env_override(env_override);
+                }
+
+                let node = get_replay_node(&context).await?;
+                let file_config = SR2::load_config_file()?;
+                let stable_config = SR2::merge_configs(replay_config, file_config);
+                let experimental_config = SR2::ReplayConfigExperimental { node, ..Default::default() };
+
+                let artifact_path = SR2::handle_replay_config(&stable_config, &experimental_config, USER_AGENT).await?;
+
+                if let Some(digest) = &stable_config.digest {
+                    SR2::print_effects_or_fork(
+                        digest,
+                        &artifact_path,
+                        stable_config.show_effects,
+                        &mut std::io::stdout(),
+                    )?;
+                }
+
                 Ok(())
             }
         }
@@ -601,7 +781,7 @@ impl SuiCommand {
 async fn start(
     config: Option<PathBuf>,
     with_faucet: Option<String>,
-    indexer_feature_args: IndexerArgs,
+    rpc_args: RpcArgs,
     force_regenesis: bool,
     epoch_duration_ms: Option<u64>,
     fullnode_rpc_port: u16,
@@ -613,14 +793,20 @@ async fn start(
         ensure!(config.is_none(), "Cannot pass `--force-regenesis` and `--network.config` at the same time.");
     }
 
-    let IndexerArgs { mut with_indexer, with_graphql, pg_port, pg_host, pg_db_name, pg_user, pg_password } =
-        indexer_feature_args;
+    let RpcArgs { with_indexer, mut with_consistent_store, with_graphql } = rpc_args;
 
-    let pg_address = format!("postgres://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db_name}");
-
-    if with_graphql.is_some() {
-        with_indexer = Some(with_indexer.unwrap_or_default());
+    // Automatically enable consistent store if GraphQL is enabled
+    if with_graphql.is_some() && with_consistent_store.is_none() {
+        with_consistent_store = Some("0.0.0.0:9124".to_string());
     }
+
+    // Automatically enable indexer if GraphQL is enabled
+    // If with_indexer is None but with_graphql is Some, default to temporary database (Some(None))
+    let with_indexer = match (with_indexer, with_graphql.is_some()) {
+        (Some(db_url), _) => Some(db_url),
+        (None, true) => Some(None),
+        (None, false) => None,
+    };
 
     if with_indexer.is_some() {
         ensure!(!no_full_node, "Cannot start the indexer without a fullnode.");
@@ -641,7 +827,7 @@ async fn start(
     let config_dir = if force_regenesis {
         let committee_size = match committee_size {
             Some(x) => NonZeroUsize::new(x),
-            None => NonZeroUsize::new(DEFAULT_NUMBER_OF_AUTHORITIES),
+            None => NonZeroUsize::new(1),
         }
         .ok_or_else(|| anyhow!("Committee size must be at least 1."))?;
         swarm_builder = swarm_builder.committee_size(committee_size);
@@ -649,11 +835,11 @@ async fn start(
         swarm_builder = swarm_builder.with_genesis_config(genesis_config);
         let epoch_duration_ms = epoch_duration_ms.unwrap_or(DEFAULT_EPOCH_DURATION_MS);
         swarm_builder = swarm_builder.with_epoch_duration_ms(epoch_duration_ms);
-        tempdir()?.into_path()
+        mysten_common::tempdir()?.keep()
     } else {
         // If the config path looks like a YAML file, it is treated as if it is the network.yaml
         // overriding the network.yaml found in the one config directry. Otherwise it is treated as
-        // the one config directory for backwards compatibility with `sui-test-validator`.
+        // the one config directory for backwards compatibility with `one-test-validator`.
         let (network_config_path, sui_config_path) = match config {
             Some(config) if config.is_file() && config.extension().is_some_and(|e| e == "yml" || e == "yaml") => {
                 if committee_size.is_some() {
@@ -723,10 +909,9 @@ async fn start(
             }
         };
 
-        // Load the config of the Sui authority.
-        let network_config: NetworkConfig = PersistedConfig::read(&network_config_path).map_err(|err| {
-            err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path))
-        })?;
+        // Load the config of the OneChain authority.
+        let network_config: NetworkConfig = PersistedConfig::read(&network_config_path)
+            .map_err(|err| err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path)))?;
 
         swarm_builder = swarm_builder.dir(sui_config_path.clone()).with_network_config(network_config);
 
@@ -737,20 +922,25 @@ async fn start(
     // note that this overrides the default configuration that is set when running the genesis
     // command, which sets data_ingestion_dir to None.
     if with_indexer.is_some() && data_ingestion_dir.is_none() {
-        data_ingestion_dir = Some(tempdir()?.into_path())
+        data_ingestion_dir = Some(mysten_common::tempdir()?.keep())
     }
 
     if let Some(ref dir) = data_ingestion_dir {
         swarm_builder = swarm_builder.with_data_ingestion_dir(dir.clone());
     }
 
-    let mut fullnode_url = sui_config::node::default_json_rpc_address();
-    fullnode_url.set_port(fullnode_rpc_port);
+    let mut fullnode_rpc_address = sui_config::node::default_json_rpc_address();
+    fullnode_rpc_address.set_port(fullnode_rpc_port);
 
     if no_full_node {
         swarm_builder = swarm_builder.with_fullnode_count(0);
     } else {
-        swarm_builder = swarm_builder.with_fullnode_count(1).with_fullnode_rpc_addr(fullnode_url);
+        let rpc_config = sui_config::RpcConfig { enable_indexing: Some(true), ..Default::default() };
+
+        swarm_builder = swarm_builder
+            .with_fullnode_count(1)
+            .with_fullnode_rpc_addr(fullnode_rpc_address)
+            .with_fullnode_rpc_config(rpc_config);
     }
 
     let mut swarm = swarm_builder.build();
@@ -759,57 +949,155 @@ async fn start(
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     info!("Cluster started");
 
-    // the indexer requires a fullnode url with protocol specified
-    let fullnode_url = format!("http://{}", fullnode_url);
-    info!("Fullnode URL: {}", fullnode_url);
+    let fullnode_rpc_url = socket_addr_to_url(fullnode_rpc_address)?.to_string().trim_end_matches("/").to_string();
+    info!("Fullnode RPC URL: {fullnode_rpc_url}");
 
-    if let Some(input) = with_indexer {
-        let indexer_address =
-            parse_host_port(input, DEFAULT_INDEXER_PORT).map_err(|_| anyhow!("Invalid indexer host and port"))?;
-        info!("Starting the indexer service at {indexer_address}");
-        // Start in reader mode
-        start_indexer_jsonrpc_for_testing(pg_address.clone(), fullnode_url.clone(), indexer_address.to_string(), None)
-            .await;
-        info!("Indexer started in reader mode");
-        start_indexer_writer_for_testing(
-            pg_address.clone(),
-            None,
-            None,
-            // We ensured above that this is set to something if --with-indexer is set
-            data_ingestion_dir,
-            None,
-            None, /* start_checkpoint */
-            None, /* end_checkpoint */
-        )
-        .await;
-        info!("Indexer started in writer mode");
-    }
+    let prometheus_registry = Registry::new();
+    let cancel = CancellationToken::new();
+    let mut rpc_services = vec![];
 
-    if let Some(input) = with_graphql {
-        let graphql_address =
-            parse_host_port(input, DEFAULT_GRAPHQL_PORT).map_err(|_| anyhow!("Invalid graphql host and port"))?;
-        tracing::info!("Starting the GraphQL service at {graphql_address}");
-        let graphql_connection_config = ConnectionConfig {
-            port: graphql_address.port(),
-            host: graphql_address.ip().to_string(),
-            db_url: pg_address,
+    // Set-up the database for the indexer, if needed
+    let (_database, database_url) = match with_indexer {
+        None => (None, None),
+
+        // Temporary (local) database in config directory
+        Some(None) => {
+            let pg_dir = config_dir.join("indexer");
+            let port = get_available_port();
+
+            info!("Starting local PostgreSQL database at {pg_dir:?} on port {port}");
+
+            let db = if pg_dir.exists() {
+                LocalDatabase::new(pg_dir, port).context("Failed to start local PostgreSQL database")?
+            } else {
+                LocalDatabase::new_initdb(pg_dir, port)
+                    .context("Failed to initialize and start local PostgreSQL database")?
+            };
+
+            let url = db.url().clone();
+            info!("Starting indexer with local database");
+            (Some(db), Some(url))
+        }
+
+        // Use provided database URL
+        Some(Some(url)) => {
+            info!("Starting indexer with provided database");
+            (None, Some(url))
+        }
+    };
+
+    let pipelines = if let Some(ref db_url) = database_url {
+        let client_args = ClientArgs {
+            ingestion: IngestionClientArgs { local_ingestion_path: data_ingestion_dir.clone(), ..Default::default() },
             ..Default::default()
         };
 
-        start_graphql_server_with_fn_rpc(
-            graphql_connection_config,
-            Some(fullnode_url.clone()),
-            None, // it will be initialized by default
-            ServiceConfig::test_defaults(),
+        let indexer = setup_indexer(
+            db_url.clone(),
+            DbArgs::default(),
+            IndexerArgs::default(),
+            client_args,
+            IndexerConfig::for_test(),
+            None,
+            &prometheus_registry,
+            cancel.child_token(),
         )
-        .await;
-        info!("GraphQL started");
+        .await
+        .context("Failed to setup indexer")?;
+
+        let pipelines = indexer.pipelines().map(|s| s.to_string()).collect();
+        let handle = indexer.run().await.context("Failed to start indexer")?;
+        rpc_services.push(handle);
+
+        info!("Indexer started with pipelines: {pipelines:?}");
+        pipelines
+    } else {
+        vec![]
+    };
+
+    let consistent_store_url = if let Some(input) = with_consistent_store {
+        let address =
+            parse_host_port(input, DEFAULT_CONSISTENT_STORE_PORT).context("Invalid consistent store host and port")?;
+
+        let client_args = ClientArgs {
+            ingestion: IngestionClientArgs { local_ingestion_path: data_ingestion_dir.clone(), ..Default::default() },
+            ..Default::default()
+        };
+
+        let consistent_args = ConsistentArgs { rpc_listen_address: address, ..Default::default() };
+
+        let handle = start_consistent_store(
+            config_dir.join("consistent_store"),
+            IndexerArgs::default(),
+            client_args,
+            consistent_args,
+            "0.0.0",
+            ConsistentConfig::for_test(),
+            &prometheus_registry,
+            cancel.child_token(),
+        )
+        .await
+        .context("Failed to start Consistent Store")?;
+        rpc_services.push(handle);
+
+        info!("Consistent Store started at {address}");
+        Some(address)
+    } else {
+        None
+    };
+
+    if let Some(input) = with_graphql {
+        let address = parse_host_port(input, DEFAULT_GRAPHQL_PORT).context("Invalid graphql host and port")?;
+
+        info!("Starting the GraphQL service at {address}");
+
+        let graphql_args = GraphQlArgs { rpc_listen_address: address, no_ide: false };
+
+        let consistent_store_url = consistent_store_url.map(socket_addr_to_url).transpose()?;
+        let consistent_reader_args = ConsistentReaderArgs { consistent_store_url, ..Default::default() };
+
+        let fullnode_args = FullnodeArgs { fullnode_rpc_url: Some(fullnode_rpc_url.clone()) };
+
+        let mut graphql_config = GraphQlConfig::default();
+        graphql_config.zklogin.env = one_indexer_alt_graphql::config::ZkLoginEnv::Test;
+
+        let handle = start_graphql(
+            database_url.clone(),
+            fullnode_args,
+            DbArgs::default(),
+            GraphQlKvArgs::default(),
+            consistent_reader_args,
+            graphql_args,
+            SystemPackageTaskArgs::default(),
+            "0.0.0",
+            graphql_config,
+            pipelines,
+            &prometheus_registry,
+            cancel.child_token(),
+        )
+        .await
+        .context("Failed to start GraphQL server")?;
+        rpc_services.push(handle);
+
+        info!("GraphQL started at {address}");
+    }
+
+    // Update the wallet_context with the configured fullnode rpc url so client operations will
+    // succeed if a non-default port was provided.
+
+    if config_dir.join(SUI_CLIENT_CONFIG).exists() {
+        let _ = update_wallet_config_rpc(config_dir.clone(), fullnode_rpc_url.clone())?;
+    }
+
+    if force_regenesis && sui_config_dir()?.join(SUI_CLIENT_CONFIG).exists() {
+        let _ = update_wallet_config_rpc(sui_config_dir()?, fullnode_rpc_url.clone())?;
     }
 
     if let Some(input) = with_faucet {
         let faucet_address =
             parse_host_port(input, DEFAULT_FAUCET_PORT).map_err(|_| anyhow!("Invalid faucet host and port"))?;
-        tracing::info!("Starting the faucet service at {faucet_address}");
+
+        info!("Starting the faucet service at {faucet_address}");
 
         let host_ip = match faucet_address {
             SocketAddr::V4(addr) => *addr.ip(),
@@ -819,21 +1107,27 @@ async fn start(
         let config = FaucetConfig {
             host_ip,
             port: faucet_address.port(),
-            num_coins: DEFAULT_FAUCET_NUM_COINS,
             amount: DEFAULT_FAUCET_MIST_AMOUNT,
             ..Default::default()
         };
 
-        let prometheus_registry = prometheus::Registry::new();
         if force_regenesis {
             let kp = swarm.config_mut().account_keys.swap_remove(0);
             let keystore_path = config_dir.join(SUI_KEYSTORE_FILENAME);
-            let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
+            let mut keystore = Keystore::from(FileBasedKeystore::load_or_create(&keystore_path).unwrap());
             let address: SuiAddress = kp.public().into();
-            keystore.add_key(None, SuiKeyPair::Ed25519(kp)).unwrap();
+            keystore.import(None, SuiKeyPair::Ed25519(kp)).await.unwrap();
+
             SuiClientConfig {
                 keystore,
-                envs: vec![SuiEnv { alias: "localnet".to_string(), rpc: fullnode_url, ws: None, basic_auth: None }],
+                external_keys: None,
+                envs: vec![SuiEnv {
+                    alias: "localnet".to_string(),
+                    rpc: fullnode_rpc_url.clone(),
+                    ws: None,
+                    basic_auth: None,
+                    chain_id: None,
+                }],
                 active_address: Some(address),
                 active_env: Some("localnet".to_string()),
             }
@@ -841,41 +1135,52 @@ async fn start(
             .save()
             .unwrap();
         }
-        let faucet_wal = config_dir.join("faucet.wal");
-        let simple_faucet = SimpleFaucet::new(
-            create_wallet_context(config.wallet_client_timeout_secs, config_dir)?,
-            &prometheus_registry,
-            faucet_wal.as_path(),
+
+        let local_faucet = LocalFaucet::new(
+            create_wallet_context(config.wallet_client_timeout_secs, config_dir.clone())?,
             config.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
 
-        let app_state = Arc::new(AppState { faucet: simple_faucet, config });
+        let app_state = Arc::new(AppState { faucet: local_faucet, config });
 
-        start_faucet(app_state, CONCURRENCY_LIMIT, &prometheus_registry).await?;
+        start_faucet(app_state).await?;
     }
 
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
-    let mut unhealthy_cnt = 0;
+    // Run health check loop until Ctrl+C or failure
+    let mut interval = interval(Duration::from_secs(3));
+    let mut unhealthy = 0;
+
     loop {
-        for node in swarm.validator_nodes() {
-            if let Err(err) = node.health_check(true).await {
-                unhealthy_cnt += 1;
-                if unhealthy_cnt > 3 {
-                    // The network could temporarily go down during reconfiguration.
-                    // If we detect a failed validator 3 times in a row, give up.
-                    return Err(err.into());
-                }
-                // Break the inner loop so that we could retry latter.
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                info!("Received Ctrl+C, shutting down...");
                 break;
-            } else {
-                unhealthy_cnt = 0;
             }
+            _ = interval.tick() => {}
         }
 
-        interval.tick().await;
+        for node in swarm.validator_nodes() {
+            let Err(e) = node.health_check(true).await else {
+                unhealthy = 0;
+                break;
+            };
+
+            unhealthy += 1;
+            if unhealthy > 3 {
+                return Err(e.into());
+            }
+        }
     }
+
+    // Trigger cancellation to shut down all RPC services, and wait for all services to exit
+    // cleanly.
+    cancel.cancel();
+    // TODO (amnn): The indexer can take some time to shut down if the database it is talking to
+    // stops responding. Re-enable graceful shutdown once cancel handling is revamped across the
+    // framework.
+    // future::join_all(rpc_services).await;
+    Ok(())
 }
 
 async fn genesis(
@@ -892,7 +1197,7 @@ async fn genesis(
         // if a directory is specified, it must exist (it
         // will not be created)
         Some(v) => v,
-        // create default Sui config dir if not specified
+        // create default OneChain config dir if not specified
         // on the command line and if it does not exist
         // yet
         None => {
@@ -902,12 +1207,12 @@ async fn genesis(
         }
     };
 
-    // if Sui config dir is not empty then either clean it
+    // if OneChain config dir is not empty then either clean it
     // up (if --force/-f option was specified or report an
     // error
     let dir = sui_config_dir
         .read_dir()
-        .map_err(|err| anyhow!(err).context(format!("Cannot open Sui config dir {:?}", sui_config_dir)))?;
+        .map_err(|err| anyhow!(err).context(format!("Cannot open OneChain config dir {:?}", sui_config_dir)))?;
     let files = dir.collect::<Result<Vec<_>, _>>()?;
 
     let client_path = sui_config_dir.join(SUI_CLIENT_CONFIG);
@@ -916,7 +1221,7 @@ async fn genesis(
     if write_config.is_none() && !files.is_empty() {
         if force {
             // check old keystore and client.yaml is compatible
-            let is_compatible = FileBasedKeystore::new(&keystore_path).is_ok()
+            let is_compatible = FileBasedKeystore::load_or_create(&keystore_path).is_ok()
                 && PersistedConfig::<SuiClientConfig>::read(&client_path).is_ok();
             // Keep keystore and client.yaml if they are compatible
             if is_compatible {
@@ -929,12 +1234,15 @@ async fn genesis(
                 }
             } else {
                 fs::remove_dir_all(sui_config_dir)
-                    .map_err(|err| anyhow!(err).context(format!("Cannot remove Sui config dir {:?}", sui_config_dir)))?;
+                    .map_err(|err| anyhow!(err).context(format!("Cannot remove OneChain config dir {:?}", sui_config_dir)))?;
                 fs::create_dir(sui_config_dir)
-                    .map_err(|err| anyhow!(err).context(format!("Cannot create Sui config dir {:?}", sui_config_dir)))?;
+                    .map_err(|err| anyhow!(err).context(format!("Cannot create OneChain config dir {:?}", sui_config_dir)))?;
             }
         } else if files.len() != 2 || !client_path.exists() || !keystore_path.exists() {
-            bail!("Cannot run genesis with non-empty OneChain config directory {}, please use the --force/-f option to remove the existing configuration", sui_config_dir.to_str().unwrap());
+            bail!(
+                "Cannot run genesis with non-empty OneChain config directory {}, please use the --force/-f option to remove the existing configuration",
+                sui_config_dir.to_str().unwrap()
+            );
         }
     }
 
@@ -947,16 +1255,16 @@ async fn genesis(
             if let Some(ips) = benchmark_ips {
                 // Make a keystore containing the key for the genesis gas object.
                 let path = sui_config_dir.join(SUI_BENCHMARK_GENESIS_GAS_KEYSTORE_FILENAME);
-                let mut keystore = FileBasedKeystore::new(&path)?;
+                let mut keystore = FileBasedKeystore::load_or_create(&path)?;
                 for gas_key in GenesisConfig::benchmark_gas_keys(ips.len()) {
-                    keystore.add_key(None, gas_key)?;
+                    keystore.import(None, gas_key).await?;
                 }
-                keystore.save()?;
+                keystore.save().await?;
 
                 // Make a new genesis config from the provided ip addresses.
                 GenesisConfig::new_for_benchmarks(&ips)
             } else if keystore_path.exists() {
-                let existing_keys = FileBasedKeystore::new(&keystore_path)?.addresses();
+                let existing_keys = FileBasedKeystore::load_or_create(&keystore_path)?.addresses();
                 GenesisConfig::for_local_testing_with_addresses(existing_keys)
             } else {
                 GenesisConfig::for_local_testing()
@@ -985,7 +1293,7 @@ async fn genesis(
     }
     let committee_size = match committee_size {
         Some(x) => NonZeroUsize::new(x),
-        None => NonZeroUsize::new(DEFAULT_NUMBER_OF_AUTHORITIES),
+        None => NonZeroUsize::new(1),
     }
     .ok_or_else(|| anyhow!("Committee size must be at least 1."))?;
 
@@ -995,9 +1303,9 @@ async fn genesis(
         builder.committee_size(committee_size).with_genesis_config(genesis_conf).build()
     };
 
-    let mut keystore = FileBasedKeystore::new(&keystore_path)?;
+    let mut keystore = FileBasedKeystore::load_or_create(&keystore_path)?;
     for key in &network_config.account_keys {
-        keystore.add_key(None, SuiKeyPair::Ed25519(key.copy()))?;
+        keystore.import(None, SuiKeyPair::Ed25519(key.copy())).await?;
     }
     let active_address = keystore.addresses().pop();
 
@@ -1068,19 +1376,8 @@ async fn genesis(
         client_config.active_address = active_address;
     }
 
-    // On windows, using 0.0.0.0 will usually yield in an networking error. This localnet ip
-    // address must bind to 127.0.0.1 if the default 0.0.0.0 is used.
-    let localnet_ip = if fullnode_config.json_rpc_address.ip() == IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)) {
-        "127.0.0.1".to_string()
-    } else {
-        fullnode_config.json_rpc_address.ip().to_string()
-    };
-    client_config.add_env(SuiEnv {
-        alias: "localnet".to_string(),
-        rpc: format!("http://{}:{}", localnet_ip, fullnode_config.json_rpc_address.port()),
-        ws: None,
-        basic_auth: None,
-    });
+    let rpc = socket_addr_to_url(fullnode_config.json_rpc_address)?.to_string().trim_end_matches("/").to_string();
+    client_config.add_env(SuiEnv { alias: "localnet".to_string(), rpc, ws: None, basic_auth: None, chain_id: None });
     client_config.add_env(SuiEnv::devnet());
 
     if client_config.active_env.is_none() {
@@ -1097,9 +1394,13 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
     // Prompt user for connect to devnet fullnode if config does not exist.
     if !wallet_conf_path.exists() {
         let env = match std::env::var_os("ONE_CONFIG_WITH_RPC_URL") {
-            Some(v) => {
-                Some(SuiEnv { alias: "custom".to_string(), rpc: v.into_string().unwrap(), ws: None, basic_auth: None })
-            }
+            Some(v) => Some(SuiEnv {
+                alias: "custom".to_string(),
+                rpc: v.into_string().unwrap(),
+                ws: None,
+                basic_auth: None,
+                chain_id: None,
+            }),
             None => {
                 if accept_defaults {
                     print!(
@@ -1116,7 +1417,7 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
                     let url = if accept_defaults {
                         String::new()
                     } else {
-                        print!("Sui Full node server URL (Defaults to Sui Testnet if not specified) : ");
+                        print!("OneChain Full node server URL (Defaults to OneChain Testnet if not specified) : ");
                         read_line()?
                     };
                     Some(if url.trim().is_empty() {
@@ -1125,7 +1426,7 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
                         print!("Environment alias for [{url}] : ");
                         let alias = read_line()?;
                         let alias = if alias.trim().is_empty() { "custom".to_string() } else { alias };
-                        SuiEnv { alias, rpc: url, ws: None, basic_auth: None }
+                        SuiEnv { alias, rpc: url, ws: None, basic_auth: None, chain_id: None }
                     })
                 } else {
                     None
@@ -1141,7 +1442,7 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
                 }
 
                 // Wallet config was given a path with some parent (could be relative or absolute).
-                Some(parent) => parent.canonicalize().context("Could not find One config directory")?,
+                Some(parent) => parent.canonicalize().context("Could not find one config directory")?,
 
                 // No parent component and the wallet config was the empty string, use the default
                 // config.
@@ -1152,7 +1453,7 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
             }
             .join(SUI_KEYSTORE_FILENAME);
 
-            let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path)?);
+            let mut keystore = Keystore::from(FileBasedKeystore::load_or_create(&keystore_path)?);
             let key_scheme = if accept_defaults {
                 SignatureScheme::ED25519
             } else {
@@ -1162,17 +1463,28 @@ async fn prompt_if_no_config(wallet_conf_path: &Path, accept_defaults: bool) -> 
                     Err(e) => return Err(anyhow!("{e}")),
                 }
             };
-            let (new_address, phrase, scheme) = keystore.generate_and_add_new_key(key_scheme, None, None, None)?;
-            let alias = keystore.get_alias_by_address(&new_address)?;
+
+            let (new_address, key_pair, scheme, phrase) = generate_new_key(key_scheme, None, None)?;
+            keystore.import(None, key_pair).await?;
+            let alias = keystore.get_alias(&new_address)?;
             println!(
                 "Generated new keypair and alias for address with scheme {:?} [{alias}: {new_address}]",
                 scheme.to_string()
             );
             println!("Secret Recovery Phrase : [{phrase}]");
             let alias = env.alias.clone();
-            SuiClientConfig { keystore, envs: vec![env], active_address: Some(new_address), active_env: Some(alias) }
-                .persisted(wallet_conf_path)
-                .save()?;
+            SuiClientConfig {
+                keystore,
+                external_keys: None,
+                envs: vec![env],
+                active_address: Some(new_address),
+                active_env: Some(alias),
+            }
+            .persisted(wallet_conf_path)
+            .save()?;
+
+            let context = WalletContext::new(wallet_conf_path)?;
+            let _ = context.cache_chain_id(&context.get_client().await?).await?;
         }
     }
     Ok(())
@@ -1183,6 +1495,106 @@ fn read_line() -> Result<String, anyhow::Error> {
     let _ = stdout().flush();
     io::stdin().read_line(&mut s)?;
     Ok(s.trim_end().to_string())
+}
+
+/// Get the currently configured client, and the chain ID for that client.
+async fn get_chain_id_and_client(
+    client_config: SuiEnvConfig,
+    command_err_string: &str,
+) -> anyhow::Result<(Option<String>, Option<SuiClient>)> {
+    let config = client_config.config.unwrap_or(sui_config_dir()?.join(SUI_CLIENT_CONFIG));
+    prompt_if_no_config(&config, false).await?;
+    let mut context = WalletContext::new(&config)?;
+
+    if let Some(env_override) = client_config.env {
+        context = context.with_env_override(env_override);
+    }
+
+    let Ok(client) = context.get_client().await else {
+        bail!(
+            "`{command_err_string}` requires a connection to the network. \
+             Current active network is {} but failed to connect to it.",
+            context.config.active_env.as_ref().unwrap()
+        );
+    };
+
+    if let Err(e) = client.check_api_version() {
+        eprintln!("{}", format!("[warning] {e}").yellow().bold());
+    }
+
+    Ok((client.read_api().get_chain_identifier().await.ok(), Some(client)))
+}
+
+/// Try to resolve an ObjectID to a MovePackage
+async fn resolve_package(reader: &ReadApi, package_id: ObjectID) -> anyhow::Result<MovePackage> {
+    let object =
+        reader.get_object_with_options(package_id, SuiObjectDataOptions::bcs_lossless()).await?.into_object()?;
+
+    let Some(SuiRawData::Package(package)) = object.bcs else {
+        bail!("Object {} is not a package.", package_id);
+    };
+
+    Ok(MovePackage::new(
+        package.id,
+        package.version,
+        package.module_map,
+        // This package came from on-chain and the tool runs locally, so don't worry about
+        // trying to enforce the package size limit.
+        u64::MAX,
+        package.type_origin_table,
+        package.linkage_table,
+    )?)
+}
+
+/// Download the package's modules and its dependencies to the specified path.
+async fn download_package_and_deps_under(
+    read_api: &ReadApi,
+    path: &Path,
+    package_id: ObjectID,
+) -> anyhow::Result<PackageSummaryMetadata> {
+    let mut dependencies = BTreeMap::new();
+    let mut linkage = BTreeMap::new();
+    let mut type_origins = BTreeMap::new();
+
+    let root_package = resolve_package(read_api, package_id).await?;
+    for (original_id, pkg_info) in root_package.linkage_table().iter() {
+        let package = resolve_package(read_api, pkg_info.upgraded_id).await?;
+        let relative_package_path = package.id().deref().to_canonical_string(/* with_prefix */ true);
+
+        let package_path = path.join(&relative_package_path);
+        fs::create_dir_all(&package_path)?;
+        for (m_name, module) in package.serialized_module_map() {
+            let mut file = fs::File::create(package_path.join(m_name).with_extension(MOVE_COMPILED_EXTENSION))?;
+            file.write_all(module)?;
+        }
+
+        dependencies.insert(*original_id, PathBuf::from(relative_package_path));
+        linkage.insert(*original_id, pkg_info.clone());
+        type_origins.insert(*original_id, package.type_origin_table().clone());
+    }
+
+    let package_path = path.join(root_package.id().deref().to_canonical_string(/* with_prefix */ true));
+    fs::create_dir_all(&package_path)?;
+    for (m_name, module) in root_package.serialized_module_map() {
+        let file_path = package_path.join(m_name).with_extension(MOVE_COMPILED_EXTENSION);
+        let mut file = fs::File::create(&file_path)?;
+        file.write_all(module).with_context(|| {
+            format!(
+                "Unable to write module {m_name} for package {} to {}",
+                root_package.id().deref().to_canonical_string(/* with_prefix */ true),
+                file_path.display(),
+            )
+        })?;
+    }
+
+    Ok(PackageSummaryMetadata {
+        root_package_id: Some(root_package.id()),
+        root_package_original_id: Some(root_package.original_package_id()),
+        root_package_version: Some(root_package.version().value()),
+        type_origins: Some(type_origins),
+        dependencies: Some(dependencies),
+        linkage: Some(linkage),
+    })
 }
 
 /// Parse the input string into a SocketAddr, with a default port if none is provided.
@@ -1203,4 +1615,49 @@ pub fn parse_host_port(input: String, default_port_if_missing: u16) -> Result<So
     } else {
         format!("{default_host}:{default_port_if_missing}").parse::<SocketAddr>()
     }
+}
+
+/// Get the replay node representing a specific chain (e.g., testnet, mainnet, or custom)
+/// from a given wallet context contining chain identifier string.
+pub async fn get_replay_node(context: &WalletContext) -> Result<sui_data_store::Node, anyhow::Error> {
+    let chain_id = context.get_client().await?.read_api().get_chain_identifier().await?;
+    let err_msg = format!(
+        "'{chain_id}' chain identifier is not supported for replay -- only testnet and mainnet are supported currently"
+    );
+    let chain_id = ChainIdentifier::from_chain_short_id(&chain_id).ok_or_else(|| anyhow::anyhow!(err_msg.clone()))?;
+    Ok(match chain_id.chain() {
+        Chain::Mainnet => sui_data_store::Node::Mainnet,
+        Chain::Testnet => sui_data_store::Node::Testnet,
+        Chain::Unknown => bail!(err_msg),
+    })
+}
+
+/// Converts a socket address to a Url by setting the scheme to HTTP.
+fn socket_addr_to_url(addr: SocketAddr) -> Result<Url, anyhow::Error> {
+    let ip = normalize_bind_addr(addr);
+    Url::parse(&format!("http://{ip}:{}", addr.port())).with_context(|| format!("Failed to parse {addr} into a Url"))
+}
+
+/// Resolves an unspecified ip address to a localhost IP address. Particularly on Windows, clients
+/// cannot connect to 0.0.0.0 addresses.
+fn normalize_bind_addr(addr: SocketAddr) -> IpAddr {
+    match addr.ip() {
+        IpAddr::V4(v4) if v4.is_unspecified() => IpAddr::V4(Ipv4Addr::LOCALHOST),
+        IpAddr::V6(v6) if v6.is_unspecified() => IpAddr::V6(Ipv6Addr::LOCALHOST),
+        ip => ip,
+    }
+}
+
+fn update_wallet_config_rpc(
+    config_dir: PathBuf,
+    fullnode_rpc_url: String,
+) -> anyhow::Result<WalletContext, anyhow::Error> {
+    let mut wallet_context =
+        create_wallet_context(FaucetConfig::default().wallet_client_timeout_secs, config_dir.clone())?;
+    if let Some(env) = wallet_context.config.envs.iter_mut().find(|env| env.alias == "localnet") {
+        env.rpc = fullnode_rpc_url;
+    }
+    wallet_context.config.save()?;
+
+    Ok(wallet_context)
 }

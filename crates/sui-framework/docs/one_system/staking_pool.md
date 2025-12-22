@@ -4,75 +4,60 @@ title: Module `one_system::staking_pool`
 
 
 
--  [Struct `StakingPool`](#one_system_staking_pool_StakingPool)
--  [Struct `PoolTokenExchangeRate`](#one_system_staking_pool_PoolTokenExchangeRate)
--  [Struct `StakedOct`](#one_system_staking_pool_StakedOct)
--  [Struct `FungibleStakedOct`](#one_system_staking_pool_FungibleStakedOct)
--  [Struct `FungibleStakedOctData`](#one_system_staking_pool_FungibleStakedOctData)
--  [Struct `FungibleStakedOctDataKey`](#one_system_staking_pool_FungibleStakedOctDataKey)
+-  [Struct `StakingPool`](#sui_system_staking_pool_StakingPool)
+-  [Struct `PoolTokenExchangeRate`](#sui_system_staking_pool_PoolTokenExchangeRate)
+-  [Struct `StakedOct`](#sui_system_staking_pool_StakedOct)
+-  [Struct `FungibleStakedOct`](#sui_system_staking_pool_FungibleStakedOct)
+-  [Struct `FungibleStakedOctData`](#sui_system_staking_pool_FungibleStakedOctData)
+-  [Struct `FungibleStakedOctDataKey`](#sui_system_staking_pool_FungibleStakedOctDataKey)
+-  [Struct `UnderflowSuiBalance`](#sui_system_staking_pool_UnderflowSuiBalance)
 -  [Constants](#@Constants_0)
--  [Function `new`](#one_system_staking_pool_new)
--  [Function `request_add_stake`](#one_system_staking_pool_request_add_stake)
--  [Function `request_withdraw_stake`](#one_system_staking_pool_request_withdraw_stake)
--  [Function `redeem_fungible_staked_oct`](#one_system_staking_pool_redeem_fungible_staked_oct)
--  [Function `calculate_fungible_staked_oct_withdraw_amount`](#one_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount)
--  [Function `convert_to_fungible_staked_oct`](#one_system_staking_pool_convert_to_fungible_staked_oct)
--  [Function `withdraw_from_principal`](#one_system_staking_pool_withdraw_from_principal)
--  [Function `unwrap_staked_oct`](#one_system_staking_pool_unwrap_staked_oct)
--  [Function `deposit_rewards`](#one_system_staking_pool_deposit_rewards)
--  [Function `process_pending_stakes_and_withdraws`](#one_system_staking_pool_process_pending_stakes_and_withdraws)
--  [Function `process_pending_stake_withdraw`](#one_system_staking_pool_process_pending_stake_withdraw)
--  [Function `process_pending_stake`](#one_system_staking_pool_process_pending_stake)
--  [Function `withdraw_rewards`](#one_system_staking_pool_withdraw_rewards)
--  [Function `activate_staking_pool`](#one_system_staking_pool_activate_staking_pool)
--  [Function `deactivate_staking_pool`](#one_system_staking_pool_deactivate_staking_pool)
--  [Function `sui_balance`](#one_system_staking_pool_sui_balance)
--  [Function `pool_id`](#one_system_staking_pool_pool_id)
--  [Function `fungible_staked_oct_pool_id`](#one_system_staking_pool_fungible_staked_oct_pool_id)
--  [Function `staked_oct_amount`](#one_system_staking_pool_staked_oct_amount)
--  [Function `lock`](#one_system_staking_pool_lock)
--  [Function `stake_activation_epoch`](#one_system_staking_pool_stake_activation_epoch)
--  [Function `is_preactive`](#one_system_staking_pool_is_preactive)
--  [Function `is_inactive`](#one_system_staking_pool_is_inactive)
--  [Function `fungible_staked_oct_value`](#one_system_staking_pool_fungible_staked_oct_value)
--  [Function `split_fungible_staked_oct`](#one_system_staking_pool_split_fungible_staked_oct)
--  [Function `join_fungible_staked_oct`](#one_system_staking_pool_join_fungible_staked_oct)
--  [Function `split`](#one_system_staking_pool_split)
--  [Function `split_staked_oct`](#one_system_staking_pool_split_staked_oct)
--  [Function `join_staked_oct`](#one_system_staking_pool_join_staked_oct)
--  [Function `is_equal_staking_metadata`](#one_system_staking_pool_is_equal_staking_metadata)
--  [Function `pool_token_exchange_rate_at_epoch`](#one_system_staking_pool_pool_token_exchange_rate_at_epoch)
--  [Function `pending_stake_amount`](#one_system_staking_pool_pending_stake_amount)
--  [Function `pending_stake_withdraw_amount`](#one_system_staking_pool_pending_stake_withdraw_amount)
--  [Function `exchange_rates`](#one_system_staking_pool_exchange_rates)
--  [Function `sui_amount`](#one_system_staking_pool_sui_amount)
--  [Function `pool_token_amount`](#one_system_staking_pool_pool_token_amount)
--  [Function `is_preactive_at_epoch`](#one_system_staking_pool_is_preactive_at_epoch)
--  [Function `get_sui_amount`](#one_system_staking_pool_get_sui_amount)
--  [Function `get_token_amount`](#one_system_staking_pool_get_token_amount)
--  [Function `initial_exchange_rate`](#one_system_staking_pool_initial_exchange_rate)
--  [Function `check_balance_invariants`](#one_system_staking_pool_check_balance_invariants)
+-  [Function `new`](#sui_system_staking_pool_new)
+-  [Function `request_add_stake`](#sui_system_staking_pool_request_add_stake)
+-  [Function `request_withdraw_stake`](#sui_system_staking_pool_request_withdraw_stake)
+-  [Function `redeem_fungible_staked_oct`](#sui_system_staking_pool_redeem_fungible_staked_oct)
+-  [Function `calculate_fungible_staked_oct_withdraw_amount`](#sui_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount)
+-  [Function `convert_to_fungible_staked_oct`](#sui_system_staking_pool_convert_to_fungible_staked_oct)
+-  [Function `withdraw_from_principal`](#sui_system_staking_pool_withdraw_from_principal)
+-  [Function `unwrap_staked_oct`](#sui_system_staking_pool_unwrap_staked_oct)
+-  [Function `deposit_rewards`](#sui_system_staking_pool_deposit_rewards)
+-  [Function `process_pending_stakes_and_withdraws`](#sui_system_staking_pool_process_pending_stakes_and_withdraws)
+-  [Function `process_pending_stake_withdraw`](#sui_system_staking_pool_process_pending_stake_withdraw)
+-  [Function `process_pending_stake`](#sui_system_staking_pool_process_pending_stake)
+-  [Function `withdraw_rewards`](#sui_system_staking_pool_withdraw_rewards)
+-  [Function `activate_staking_pool`](#sui_system_staking_pool_activate_staking_pool)
+-  [Function `deactivate_staking_pool`](#sui_system_staking_pool_deactivate_staking_pool)
+-  [Function `sui_balance`](#sui_system_staking_pool_oct_balance)
+-  [Function `pool_id`](#sui_system_staking_pool_pool_id)
+-  [Function `fungible_staked_oct_pool_id`](#sui_system_staking_pool_fungible_staked_oct_pool_id)
+-  [Function `staked_oct_amount`](#sui_system_staking_pool_staked_oct_amount)
+-  [Function `stake_activation_epoch`](#sui_system_staking_pool_stake_activation_epoch)
+-  [Function `is_preactive`](#sui_system_staking_pool_is_preactive)
+-  [Function `activation_epoch`](#sui_system_staking_pool_activation_epoch)
+-  [Function `is_inactive`](#sui_system_staking_pool_is_inactive)
+-  [Function `fungible_staked_oct_value`](#sui_system_staking_pool_fungible_staked_oct_value)
+-  [Function `split_fungible_staked_oct`](#sui_system_staking_pool_split_fungible_staked_oct)
+-  [Function `join_fungible_staked_oct`](#sui_system_staking_pool_join_fungible_staked_oct)
+-  [Function `split`](#sui_system_staking_pool_split)
+-  [Function `split_staked_oct`](#sui_system_staking_pool_split_staked_oct)
+-  [Function `join_staked_oct`](#sui_system_staking_pool_join_staked_oct)
+-  [Function `is_equal_staking_metadata`](#sui_system_staking_pool_is_equal_staking_metadata)
+-  [Function `pool_token_exchange_rate_at_epoch`](#sui_system_staking_pool_pool_token_exchange_rate_at_epoch)
+-  [Function `pending_stake_amount`](#sui_system_staking_pool_pending_stake_amount)
+-  [Function `pending_stake_withdraw_amount`](#sui_system_staking_pool_pending_stake_withdraw_amount)
+-  [Function `exchange_rates`](#sui_system_staking_pool_exchange_rates)
+-  [Function `sui_amount`](#sui_system_staking_pool_sui_amount)
+-  [Function `pool_token_amount`](#sui_system_staking_pool_pool_token_amount)
+-  [Function `is_preactive_at_epoch`](#sui_system_staking_pool_is_preactive_at_epoch)
+-  [Function `get_sui_amount`](#sui_system_staking_pool_get_sui_amount)
+-  [Function `get_token_amount`](#sui_system_staking_pool_get_token_amount)
+-  [Function `initial_exchange_rate`](#sui_system_staking_pool_initial_exchange_rate)
+-  [Function `check_balance_invariants`](#sui_system_staking_pool_check_balance_invariants)
+-  [Macro function `mul_div`](#sui_system_staking_pool_mul_div)
+-  [Function `calculate_rewards`](#sui_system_staking_pool_calculate_rewards)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
-<b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
-<b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
-<b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
-<b>use</b> <a href="../one/config.md#one_config">one::config</a>;
-<b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
-<b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
-<b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
-<b>use</b> <a href="../one/event.md#one_event">one::event</a>;
-<b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
-<b>use</b> <a href="../one/object.md#one_object">one::object</a>;
-<b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
-<b>use</b> <a href="../one/table.md#one_table">one::table</a>;
-<b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
-<b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
-<b>use</b> <a href="../one/types.md#one_types">one::types</a>;
-<b>use</b> <a href="../one/url.md#one_url">one::url</a>;
-<b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
-<b>use</b> <a href="../std/address.md#std_address">std::address</a>;
+<pre><code><b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -80,18 +65,44 @@ title: Module `one_system::staking_pool`
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/u64.md#std_u64">std::u64</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
+<b>use</b> <a href="../sui/accumulator.md#sui_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../sui/accumulator_metadata.md#sui_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../sui/accumulator_settlement.md#sui_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bag.md#sui_bag">one::bag</a>;
+<b>use</b> <a href="../sui/balance.md#sui_balance">one::balance</a>;
+<b>use</b> <a href="../sui/bcs.md#sui_bcs">one::bcs</a>;
+<b>use</b> <a href="../sui/coin.md#sui_coin">one::coin</a>;
+<b>use</b> <a href="../sui/config.md#sui_config">one::config</a>;
+<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">one::deny_list</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/event.md#sui_event">one::event</a>;
+<b>use</b> <a href="../sui/funds_accumulator.md#sui_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../sui/hash.md#sui_hash">one::hash</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/sui.md#sui_sui">one::sui</a>;
+<b>use</b> <a href="../sui/table.md#sui_table">one::table</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/types.md#sui_types">one::types</a>;
+<b>use</b> <a href="../sui/url.md#sui_url">one::url</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
+<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">one::vec_set</a>;
 </code></pre>
 
 
 
-<a name="one_system_staking_pool_StakingPool"></a>
+<a name="sui_system_staking_pool_StakingPool"></a>
 
 ## Struct `StakingPool`
 
 A staking pool embedded in each validator struct in the system state object.
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a> <b>has</b> key, store
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a> <b>has</b> key, store
 </code></pre>
 
 
@@ -102,12 +113,12 @@ A staking pool embedded in each validator struct in the system state object.
 
 <dl>
 <dt>
-<code>id: <a href="../one/object.md#one_object_UID">one::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>activation_epoch: <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;u64&gt;</code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>: <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;u64&gt;</code>
 </dt>
 <dd>
  The epoch at which this pool became active.
@@ -121,14 +132,14 @@ A staking pool embedded in each validator struct in the system state object.
  <code>Some(&lt;epoch_number&gt;)</code> if in-active, and it was de-activated at epoch <code>&lt;epoch_number&gt;</code>.
 </dd>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>: u64</code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>: u64</code>
 </dt>
 <dd>
- The total number of SUI tokens in this pool, including the SUI in the rewards_pool, as well as in all the principal
- in the <code><a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a></code> object, updated at epoch boundaries.
+ The total number of OCT tokens in this pool, including the SUI in the rewards_pool, as well as in all the principal
+ in the <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a></code> object, updated at epoch boundaries.
 </dd>
 <dt>
-<code>rewards_pool: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;</code>
+<code>rewards_pool: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
  The epoch stake rewards will be added here at the end of each epoch.
@@ -140,11 +151,11 @@ A staking pool embedded in each validator struct in the system state object.
  Total number of pool tokens issued by the pool.
 </dd>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>: <a href="../one/table.md#one_table_Table">one::table::Table</a>&lt;u64, <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>&gt;</code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>: <a href="../sui/table.md#sui_table_Table">one::table::Table</a>&lt;u64, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>&gt;</code>
 </dt>
 <dd>
  Exchange rate history of previous epochs. Key is the epoch number.
- The entries start from the <code>activation_epoch</code> of this pool and contains exchange rates at the beginning of each epoch,
+ The entries start from the <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a></code> of this pool and contains exchange rates at the beginning of each epoch,
  i.e., right after the rewards for the previous epoch have been deposited into the pool.
 </dd>
 <dt>
@@ -154,7 +165,7 @@ A staking pool embedded in each validator struct in the system state object.
  Pending stake amount for this epoch, emptied at epoch boundaries.
 </dd>
 <dt>
-<code>pending_total_sui_withdraw: u64</code>
+<code>pending_total_oct_withdraw: u64</code>
 </dt>
 <dd>
  Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
@@ -167,7 +178,7 @@ A staking pool embedded in each validator struct in the system state object.
  Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
 </dd>
 <dt>
-<code>extra_fields: <a href="../one/bag.md#one_bag_Bag">one::bag::Bag</a></code>
+<code>extra_fields: <a href="../sui/bag.md#sui_bag_Bag">one::bag::Bag</a></code>
 </dt>
 <dd>
  Any extra fields that's not defined statically.
@@ -177,14 +188,14 @@ A staking pool embedded in each validator struct in the system state object.
 
 </details>
 
-<a name="one_system_staking_pool_PoolTokenExchangeRate"></a>
+<a name="sui_system_staking_pool_PoolTokenExchangeRate"></a>
 
 ## Struct `PoolTokenExchangeRate`
 
 Struct representing the exchange rate of the stake pool token to SUI.
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -195,12 +206,12 @@ Struct representing the exchange rate of the stake pool token to SUI.
 
 <dl>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>: u64</code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>: u64</code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>: u64</code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>: u64</code>
 </dt>
 <dd>
 </dd>
@@ -209,14 +220,14 @@ Struct representing the exchange rate of the stake pool token to SUI.
 
 </details>
 
-<a name="one_system_staking_pool_StakedOct"></a>
+<a name="sui_system_staking_pool_StakedOct"></a>
 
 ## Struct `StakedOct`
 
-A self-custodial object holding the staked SUI tokens.
+A self-custodial object holding the staked OCT tokens.
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> <b>has</b> key, store
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> <b>has</b> key, store
 </code></pre>
 
 
@@ -227,50 +238,44 @@ A self-custodial object holding the staked SUI tokens.
 
 <dl>
 <dt>
-<code>id: <a href="../one/object.md#one_object_UID">one::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: <a href="../one/object.md#one_object_ID">one::object::ID</a></code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  ID of the staking pool we are staking with.
 </dd>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: u64</code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: u64</code>
 </dt>
 <dd>
  The epoch at which the stake becomes active.
 </dd>
 <dt>
-<code>principal: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;</code>
+<code>principal: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
- The staked SUI tokens.
-</dd>
-<dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>: bool</code>
-</dt>
-<dd>
- coin lock
+ The staked OCT tokens.
 </dd>
 </dl>
 
 
 </details>
 
-<a name="one_system_staking_pool_FungibleStakedOct"></a>
+<a name="sui_system_staking_pool_FungibleStakedOct"></a>
 
 ## Struct `FungibleStakedOct`
 
-An alternative to <code><a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a></code> that holds the pool token amount instead of the SUI balance.
+An alternative to <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a></code> that holds the pool token amount instead of the OCT balance.
 StakedOct objects can be converted to FungibleStakedOcts after the initial warmup period.
 The advantage of this is that you can now merge multiple StakedOct objects from different
 activation epochs into a single FungibleStakedOct object.
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> <b>has</b> key, store
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> <b>has</b> key, store
 </code></pre>
 
 
@@ -281,12 +286,12 @@ activation epochs into a single FungibleStakedOct object.
 
 <dl>
 <dt>
-<code>id: <a href="../one/object.md#one_object_UID">one::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code><a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: <a href="../one/object.md#one_object_ID">one::object::ID</a></code>
+<code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
  ID of the staking pool we are staking with.
@@ -302,14 +307,14 @@ activation epochs into a single FungibleStakedOct object.
 
 </details>
 
-<a name="one_system_staking_pool_FungibleStakedOctData"></a>
+<a name="sui_system_staking_pool_FungibleStakedOctData"></a>
 
 ## Struct `FungibleStakedOctData`
 
 Holds useful information
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> <b>has</b> key, store
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> <b>has</b> key, store
 </code></pre>
 
 
@@ -320,7 +325,7 @@ Holds useful information
 
 <dl>
 <dt>
-<code>id: <a href="../one/object.md#one_object_UID">one::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
@@ -331,7 +336,7 @@ Holds useful information
  fungible_staked_oct supply
 </dd>
 <dt>
-<code>principal: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;</code>
+<code>principal: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
  principal balance. Rewards are withdrawn from the reward pool
@@ -341,13 +346,36 @@ Holds useful information
 
 </details>
 
-<a name="one_system_staking_pool_FungibleStakedOctDataKey"></a>
+<a name="sui_system_staking_pool_FungibleStakedOctDataKey"></a>
 
 ## Struct `FungibleStakedOctDataKey`
 
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+<a name="sui_system_staking_pool_UnderflowSuiBalance"></a>
+
+## Struct `UnderflowSuiBalance`
+
+Holds the amount of SUI that was underflowed when withdrawing from the pool
+post safe mode. Cleaned up in the same transaction.
+
+
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_UnderflowSuiBalance">UnderflowSuiBalance</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -367,213 +395,213 @@ Holds useful information
 ## Constants
 
 
-<a name="one_system_staking_pool_EActivationOfInactivePool"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EActivationOfInactivePool">EActivationOfInactivePool</a>: u64 = 16;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_ECannotMintFungibleStakedOctYet"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_ECannotMintFungibleStakedOctYet">ECannotMintFungibleStakedOctYet</a>: u64 = 19;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EDeactivationOfInactivePool"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EDeactivationOfInactivePool">EDeactivationOfInactivePool</a>: u64 = 11;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EDelegationOfZeroSui"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EDelegationOfZeroSui">EDelegationOfZeroSui</a>: u64 = 17;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EDelegationToInactivePool"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EDelegationToInactivePool">EDelegationToInactivePool</a>: u64 = 10;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EDestroyNonzeroBalance"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EDestroyNonzeroBalance">EDestroyNonzeroBalance</a>: u64 = 5;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EIncompatibleStakedOct"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EIncompatibleStakedOct">EIncompatibleStakedOct</a>: u64 = 12;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EInsufficientPoolTokenBalance"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EInsufficientPoolTokenBalance">EInsufficientPoolTokenBalance</a>: u64 = 0;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EInsufficientRewardsPoolBalance"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EInsufficientRewardsPoolBalance">EInsufficientRewardsPoolBalance</a>: u64 = 4;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EInsufficientSuiTokenBalance"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EInsufficientSuiTokenBalance">EInsufficientSuiTokenBalance</a>: u64 = 3;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EInvariantFailure"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EInvariantFailure">EInvariantFailure</a>: u64 = 20;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EPendingDelegationDoesNotExist"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EPendingDelegationDoesNotExist">EPendingDelegationDoesNotExist</a>: u64 = 8;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EPoolAlreadyActive"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EPoolAlreadyActive">EPoolAlreadyActive</a>: u64 = 14;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EPoolNotPreactive"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EPoolNotPreactive">EPoolNotPreactive</a>: u64 = 15;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EStakedOctBelowThreshold"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EStakedOctBelowThreshold">EStakedOctBelowThreshold</a>: u64 = 18;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_ETokenBalancesDoNotMatchExchangeRate"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_ETokenBalancesDoNotMatchExchangeRate">ETokenBalancesDoNotMatchExchangeRate</a>: u64 = 9;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_ETokenTimeLockIsSome"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_ETokenTimeLockIsSome">ETokenTimeLockIsSome</a>: u64 = 6;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EWithdrawAmountCannotBeZero"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EWithdrawAmountCannotBeZero">EWithdrawAmountCannotBeZero</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EWithdrawalInSameEpoch"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EWithdrawalInSameEpoch">EWithdrawalInSameEpoch</a>: u64 = 13;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EWrongDelegation"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EWrongDelegation">EWrongDelegation</a>: u64 = 7;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_EWrongPool"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_EWrongPool">EWrongPool</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="one_system_staking_pool_MIN_STAKING_THRESHOLD"></a>
+<a name="sui_system_staking_pool_MIN_STAKING_THRESHOLD"></a>
 
 StakedOct objects cannot be split to below this amount.
 
 
-<pre><code><b>const</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>: u64 = 1000000000;
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>: u64 = 1000000000;
 </code></pre>
 
 
 
-<a name="one_system_staking_pool_new"></a>
+<a name="sui_system_staking_pool_EInsufficientPoolTokenBalance"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInsufficientPoolTokenBalance">EInsufficientPoolTokenBalance</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EWrongPool"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWrongPool">EWrongPool</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EWithdrawAmountCannotBeZero"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWithdrawAmountCannotBeZero">EWithdrawAmountCannotBeZero</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EInsufficientSuiTokenBalance"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInsufficientSuiTokenBalance">EInsufficientSuiTokenBalance</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EInsufficientRewardsPoolBalance"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInsufficientRewardsPoolBalance">EInsufficientRewardsPoolBalance</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EDestroyNonzeroBalance"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDestroyNonzeroBalance">EDestroyNonzeroBalance</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_ETokenTimeLockIsSome"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_ETokenTimeLockIsSome">ETokenTimeLockIsSome</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EWrongDelegation"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWrongDelegation">EWrongDelegation</a>: u64 = 7;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EPendingDelegationDoesNotExist"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EPendingDelegationDoesNotExist">EPendingDelegationDoesNotExist</a>: u64 = 8;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_ETokenBalancesDoNotMatchExchangeRate"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_ETokenBalancesDoNotMatchExchangeRate">ETokenBalancesDoNotMatchExchangeRate</a>: u64 = 9;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EDelegationToInactivePool"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDelegationToInactivePool">EDelegationToInactivePool</a>: u64 = 10;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EDeactivationOfInactivePool"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDeactivationOfInactivePool">EDeactivationOfInactivePool</a>: u64 = 11;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EIncompatibleStakedOct"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EIncompatibleStakedOct">EIncompatibleStakedOct</a>: u64 = 12;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EWithdrawalInSameEpoch"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWithdrawalInSameEpoch">EWithdrawalInSameEpoch</a>: u64 = 13;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EPoolAlreadyActive"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EPoolAlreadyActive">EPoolAlreadyActive</a>: u64 = 14;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EPoolPreactiveOrInactive"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EPoolPreactiveOrInactive">EPoolPreactiveOrInactive</a>: u64 = 15;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EActivationOfInactivePool"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EActivationOfInactivePool">EActivationOfInactivePool</a>: u64 = 16;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EDelegationOfZeroSui"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDelegationOfZeroSui">EDelegationOfZeroSui</a>: u64 = 17;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EStakedOctBelowThreshold"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EStakedOctBelowThreshold">EStakedOctBelowThreshold</a>: u64 = 18;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_ECannotMintFungibleStakedOctYet"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_ECannotMintFungibleStakedOctYet">ECannotMintFungibleStakedOctYet</a>: u64 = 19;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_EInvariantFailure"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInvariantFailure">EInvariantFailure</a>: u64 = 20;
+</code></pre>
+
+
+
+<a name="sui_system_staking_pool_new"></a>
 
 ## Function `new`
 
 Create a new, empty staking pool.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_new">new</a>(ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>
 </code></pre>
 
 
@@ -582,18 +610,17 @@ Create a new, empty staking pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_new">new</a>(ctx: &<b>mut</b> TxContext): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a> {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a> = table::new(ctx);
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a> {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_new">new</a>(ctx: &<b>mut</b> TxContext): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a> {
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a> {
         id: object::new(ctx),
-        activation_epoch: option::none(),
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>: option::none(),
         deactivation_epoch: option::none(),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>: 0,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>: 0,
         rewards_pool: balance::zero(),
         pool_token_balance: 0,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>: table::new(ctx),
         pending_stake: 0,
-        pending_total_sui_withdraw: 0,
+        pending_total_oct_withdraw: 0,
         pending_pool_token_withdraw: 0,
         extra_fields: bag::new(ctx),
     }
@@ -604,14 +631,14 @@ Create a new, empty staking pool.
 
 </details>
 
-<a name="one_system_staking_pool_request_add_stake"></a>
+<a name="sui_system_staking_pool_request_add_stake"></a>
 
 ## Function `request_add_stake`
 
 Request to stake to a staking pool. The stake starts counting at the beginning of the next epoch,
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_request_add_stake">request_add_stake</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, stake: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;, <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: u64, <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>: bool, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_request_add_stake">request_add_stake</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, stake: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: u64, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -620,25 +647,22 @@ Request to stake to a staking pool. The stake starts counting at the beginning o
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_request_add_stake">request_add_stake</a>(
-    pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>,
-    stake: Balance&lt;OCT&gt;,
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: u64,
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>: bool,
-    ctx: &<b>mut</b> TxContext
-): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> = stake.value();
-    <b>assert</b>!(!<a href="../one_system/staking_pool.md#one_system_staking_pool_is_inactive">is_inactive</a>(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EDelegationToInactivePool">EDelegationToInactivePool</a>);
-    <b>assert</b>!(<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> &gt; 0, <a href="../one_system/staking_pool.md#one_system_staking_pool_EDelegationOfZeroSui">EDelegationOfZeroSui</a>);
-    <b>let</b> staked_oct = <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_request_add_stake">request_add_stake</a>(
+    pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    stake: Balance&lt;SUI&gt;,
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: u64,
+    ctx: &<b>mut</b> TxContext,
+): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> {
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a> = stake.value();
+    <b>assert</b>!(!pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>(), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDelegationToInactivePool">EDelegationToInactivePool</a>);
+    <b>assert</b>!(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a> &gt; 0, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDelegationOfZeroSui">EDelegationOfZeroSui</a>);
+    pool.pending_stake = pool.pending_stake + <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>;
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> {
         id: object::new(ctx),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: object::id(pool),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>: object::id(pool),
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>,
         principal: stake,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>,
-    };
-    pool.pending_stake = pool.pending_stake + <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>;
-    staked_oct
+    }
 }
 </code></pre>
 
@@ -646,7 +670,7 @@ Request to stake to a staking pool. The stake starts counting at the beginning o
 
 </details>
 
-<a name="one_system_staking_pool_request_withdraw_stake"></a>
+<a name="sui_system_staking_pool_request_withdraw_stake"></a>
 
 ## Function `request_withdraw_stake`
 
@@ -655,7 +679,7 @@ Both the principal and corresponding rewards in SUI are withdrawn.
 A proportional amount of pool token withdraw is recorded and processed at epoch change time.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_request_withdraw_stake">request_withdraw_stake</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, ctx: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_request_withdraw_stake">request_withdraw_stake</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -664,28 +688,34 @@ A proportional amount of pool token withdraw is recorded and processed at epoch 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_request_withdraw_stake">request_withdraw_stake</a>(
-    pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>,
-    staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>,
-    ctx: &TxContext
-): Balance&lt;OCT&gt; {
-    // stake is inactive
-    <b>if</b> (staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a> &gt; ctx.epoch()) {
-        <b>let</b> principal = <a href="../one_system/staking_pool.md#one_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct);
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_request_withdraw_stake">request_withdraw_stake</a>(
+    pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>,
+    ctx: &TxContext,
+): Balance&lt;SUI&gt; {
+    // stake is inactive and the pool is not preactive - allow direct withdraw
+    // the reason why we exclude preactive pools is to avoid potential underflow
+    // on subtraction, and we need to enforce `pending_stake_withdraw` call.
+    <b>if</b> (staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a> &gt; ctx.epoch() && !pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>()) {
+        <b>let</b> principal = staked_oct.into_balance();
         pool.pending_stake = pool.pending_stake - principal.value();
         <b>return</b> principal
     };
-    <b>let</b> (pool_token_withdraw_amount, <b>mut</b> principal_withdraw) =
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_withdraw_from_principal">withdraw_from_principal</a>(pool, staked_oct);
-    <b>let</b> principal_withdraw_amount = principal_withdraw.value();
-    <b>let</b> rewards_withdraw = <a href="../one_system/staking_pool.md#one_system_staking_pool_withdraw_rewards">withdraw_rewards</a>(
-        pool, principal_withdraw_amount, pool_token_withdraw_amount, ctx.epoch()
+    <b>let</b> (pool_token_withdraw_amount, <b>mut</b> principal_withdraw) = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_withdraw_from_principal">withdraw_from_principal</a>(
+        staked_oct,
     );
-    <b>let</b> total_sui_withdraw_amount = principal_withdraw_amount + rewards_withdraw.value();
-    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + total_sui_withdraw_amount;
-    pool.pending_pool_token_withdraw = pool.pending_pool_token_withdraw + pool_token_withdraw_amount;
-    // If the pool is inactive, we immediately process the withdrawal.
-    <b>if</b> (<a href="../one_system/staking_pool.md#one_system_staking_pool_is_inactive">is_inactive</a>(pool)) <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool);
+    <b>let</b> principal_withdraw_amount = principal_withdraw.value();
+    <b>let</b> rewards_withdraw = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_withdraw_rewards">withdraw_rewards</a>(
+        principal_withdraw_amount,
+        pool_token_withdraw_amount,
+        ctx.epoch(),
+    );
+    <b>let</b> total_oct_withdraw_amount = principal_withdraw_amount + rewards_withdraw.value();
+    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + total_oct_withdraw_amount;
+    pool.pending_pool_token_withdraw =
+        pool.pending_pool_token_withdraw + pool_token_withdraw_amount;
+    // If the pool is inactive or preactive, we immediately process the withdrawal.
+    <b>if</b> (pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>() || pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>()) pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>();
     // TODO: implement withdraw bonding period here.
     principal_withdraw.join(rewards_withdraw);
     principal_withdraw
@@ -696,13 +726,13 @@ A proportional amount of pool token withdraw is recorded and processed at epoch 
 
 </details>
 
-<a name="one_system_staking_pool_redeem_fungible_staked_oct"></a>
+<a name="sui_system_staking_pool_redeem_fungible_staked_oct"></a>
 
 ## Function `redeem_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, fungible_staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>, ctx: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, fungible_staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -711,32 +741,29 @@ A proportional amount of pool token withdraw is recorded and processed at epoch 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(
-    pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>,
-    fungible_staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>,
-    ctx: &TxContext
-): Balance&lt;OCT&gt; {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> { id, <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>, value } = fungible_staked_oct;
-    <b>assert</b>!(<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> == object::id(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EWrongPool">EWrongPool</a>);
-    object::delete(id);
-    <b>let</b> latest_exchange_rate = <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool, tx_context::epoch(ctx));
-    <b>let</b> fungible_staked_oct_data: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> = bag::borrow_mut(
-        &<b>mut</b> pool.extra_fields,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> {}
-    );
-    <b>let</b> (principal_amount, rewards_amount) = <a href="../one_system/staking_pool.md#one_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount">calculate_fungible_staked_oct_withdraw_amount</a>(
-        latest_exchange_rate,
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(
+    pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    fungible_staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>,
+    ctx: &TxContext,
+): Balance&lt;SUI&gt; {
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> { id, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>, value } = fungible_staked_oct;
+    <b>assert</b>!(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a> == object::id(pool), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWrongPool">EWrongPool</a>);
+    id.delete();
+    <b>let</b> latest_exchange_rate = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(ctx.epoch());
+    <b>let</b> fungible_staked_oct_data: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> =
+        &<b>mut</b> pool.extra_fields[<a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> {}];
+    <b>let</b> (
+        principal_amount,
+        rewards_amount,
+    ) = latest_exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount">calculate_fungible_staked_oct_withdraw_amount</a>(
         value,
-        balance::value(&fungible_staked_oct_data.principal),
-        fungible_staked_oct_data.total_supply
+        fungible_staked_oct_data.principal.value(),
+        fungible_staked_oct_data.total_supply,
     );
     fungible_staked_oct_data.total_supply = fungible_staked_oct_data.total_supply - value;
-    <b>let</b> <b>mut</b> sui_out = balance::split(&<b>mut</b> fungible_staked_oct_data.principal, principal_amount);
-    balance::join(
-        &<b>mut</b> sui_out,
-        balance::split(&<b>mut</b> pool.rewards_pool, rewards_amount)
-    );
-    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + balance::value(&sui_out);
+    <b>let</b> <b>mut</b> sui_out = fungible_staked_oct_data.principal.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(principal_amount);
+    sui_out.join(pool.rewards_pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(rewards_amount));
+    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + sui_out.value();
     pool.pending_pool_token_withdraw = pool.pending_pool_token_withdraw + value;
     sui_out
 }
@@ -746,7 +773,7 @@ A proportional amount of pool token withdraw is recorded and processed at epoch 
 
 </details>
 
-<a name="one_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount"></a>
+<a name="sui_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount"></a>
 
 ## Function `calculate_fungible_staked_oct_withdraw_amount`
 
@@ -754,7 +781,7 @@ written in separate function so i can test with random values
 returns (principal_withdraw_amount, rewards_withdraw_amount)
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount">calculate_fungible_staked_oct_withdraw_amount</a>(latest_exchange_rate: <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>: u64, fungible_staked_oct_data_principal_amount: u64, fungible_staked_oct_data_total_supply: u64): (u64, u64)
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount">calculate_fungible_staked_oct_withdraw_amount</a>(latest_exchange_rate: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>: u64, fungible_staked_oct_data_principal_amount: u64, fungible_staked_oct_data_total_supply: u64): (u64, u64)
 </code></pre>
 
 
@@ -763,31 +790,39 @@ returns (principal_withdraw_amount, rewards_withdraw_amount)
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount">calculate_fungible_staked_oct_withdraw_amount</a>(
-    latest_exchange_rate: <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>,
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>: u64,
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_calculate_fungible_staked_oct_withdraw_amount">calculate_fungible_staked_oct_withdraw_amount</a>(
+    latest_exchange_rate: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>,
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>: u64,
     fungible_staked_oct_data_principal_amount: u64, // fungible_staked_oct_data.principal.value()
     fungible_staked_oct_data_total_supply: u64, // fungible_staked_oct_data.total_supply
 ): (u64, u64) {
-    // 1. <b>if</b> the entire <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> supply is redeemed, how much sui should we receive?
-    <b>let</b> total_sui_amount = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_sui_amount">get_sui_amount</a>(&latest_exchange_rate, fungible_staked_oct_data_total_supply);
-    // min with total_sui_amount to prevent underflow
-    <b>let</b> fungible_staked_oct_data_principal_amount = <a href="../std/u64.md#std_u64_min">std::u64::min</a>(
-        fungible_staked_oct_data_principal_amount,
-        total_sui_amount
+    // 1. <b>if</b> the entire <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> supply is redeemed, how much sui should we receive?
+    <b>let</b> total_oct_amount = latest_exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_sui_amount">get_sui_amount</a>(
+        fungible_staked_oct_data_total_supply,
+    );
+    // min with total_oct_amount to prevent underflow
+    <b>let</b> fungible_staked_oct_data_principal_amount = fungible_staked_oct_data_principal_amount.min(
+        total_oct_amount,
     );
     // 2. how much do we need to withdraw from the rewards pool?
-    <b>let</b> total_rewards = total_sui_amount - fungible_staked_oct_data_principal_amount;
-    // 3. proportionally withdraw from both wrt the <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>.
-    <b>let</b> principal_withdraw_amount = ((<a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a> <b>as</b> u128)
-        * (fungible_staked_oct_data_principal_amount <b>as</b> u128)
-        / (fungible_staked_oct_data_total_supply <b>as</b> u128)) <b>as</b> u64;
-    <b>let</b> rewards_withdraw_amount = ((<a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a> <b>as</b> u128)
-        * (total_rewards <b>as</b> u128)
-        / (fungible_staked_oct_data_total_supply <b>as</b> u128)) <b>as</b> u64;
+    <b>let</b> total_rewards = total_oct_amount - fungible_staked_oct_data_principal_amount;
+    // 3. proportionally withdraw from both wrt the <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>.
+    <b>let</b> principal_withdraw_amount = <a href="../sui_system/staking_pool.md#sui_system_staking_pool_mul_div">mul_div</a>!(
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>,
+        fungible_staked_oct_data_principal_amount,
+        fungible_staked_oct_data_total_supply,
+    );
+    <b>let</b> rewards_withdraw_amount = <a href="../sui_system/staking_pool.md#sui_system_staking_pool_mul_div">mul_div</a>!(
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>,
+        total_rewards,
+        fungible_staked_oct_data_total_supply,
+    );
     // <b>invariant</b> check, just in case
-    <b>let</b> expected_sui_amount = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_sui_amount">get_sui_amount</a>(&latest_exchange_rate, <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>);
-    <b>assert</b>!(principal_withdraw_amount + rewards_withdraw_amount &lt;= expected_sui_amount, <a href="../one_system/staking_pool.md#one_system_staking_pool_EInvariantFailure">EInvariantFailure</a>);
+    <b>let</b> expected_oct_amount = latest_exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_sui_amount">get_sui_amount</a>(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>);
+    <b>assert</b>!(
+        principal_withdraw_amount + rewards_withdraw_amount &lt;= expected_oct_amount,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInvariantFailure">EInvariantFailure</a>,
+    );
     (principal_withdraw_amount, rewards_withdraw_amount)
 }
 </code></pre>
@@ -796,14 +831,14 @@ returns (principal_withdraw_amount, rewards_withdraw_amount)
 
 </details>
 
-<a name="one_system_staking_pool_convert_to_fungible_staked_oct"></a>
+<a name="sui_system_staking_pool_convert_to_fungible_staked_oct"></a>
 
 ## Function `convert_to_fungible_staked_oct`
 
-Convert the given staked SUI to an FungibleStakedOct object
+Convert the given staked OCT to an FungibleStakedOct object
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>
 </code></pre>
 
 
@@ -812,49 +847,42 @@ Convert the given staked SUI to an FungibleStakedOct object
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(
-    pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>,
-    staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>,
-    ctx: &<b>mut</b> TxContext
-): <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> { id, <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>, principal,<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>:_ } = staked_oct;
-    <b>assert</b>!(<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> == object::id(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EWrongPool">EWrongPool</a>);
-    <b>assert</b>!(
-        tx_context::epoch(ctx) &gt;= <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_ECannotMintFungibleStakedOctYet">ECannotMintFungibleStakedOctYet</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(
+    pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>,
+    ctx: &<b>mut</b> TxContext,
+): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> { id, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>, principal } = staked_oct;
+    <b>assert</b>!(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a> == object::id(pool), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWrongPool">EWrongPool</a>);
+    <b>assert</b>!(ctx.epoch() &gt;= <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_ECannotMintFungibleStakedOctYet">ECannotMintFungibleStakedOctYet</a>);
+    <b>assert</b>!(!pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>() && !pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>(), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EPoolPreactiveOrInactive">EPoolPreactiveOrInactive</a>);
+    id.delete();
+    <b>let</b> exchange_rate_at_staking_epoch = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>,
     );
-    object::delete(id);
-    <b>let</b> exchange_rate_at_staking_epoch = <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(
-        pool,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>
-    );
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a> = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_token_amount">get_token_amount</a>(
-        &exchange_rate_at_staking_epoch,
-        balance::value(&principal)
-    );
-    <b>if</b> (!bag::contains(&pool.extra_fields, <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> {})) {
-        bag::add(
-            &<b>mut</b> pool.extra_fields,
-            <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> {},
-            <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> {
-                id: object::new(ctx),
-                total_supply: <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>,
-                principal
-            }
-        );
-    }
-    <b>else</b> {
-        <b>let</b> fungible_staked_oct_data: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> = bag::borrow_mut(
-            &<b>mut</b> pool.extra_fields,
-            <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> {}
-        );
-        fungible_staked_oct_data.total_supply = fungible_staked_oct_data.total_supply + <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>;
-        balance::join(&<b>mut</b> fungible_staked_oct_data.principal, principal);
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a> = exchange_rate_at_staking_epoch.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(principal.value());
+    <b>let</b> key = <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctDataKey">FungibleStakedOctDataKey</a> {};
+    <b>if</b> (!pool.extra_fields.contains(key)) {
+        pool
+            .extra_fields
+            .add(
+                key,
+                <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> {
+                    id: object::new(ctx),
+                    total_supply: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>,
+                    principal,
+                },
+            );
+    } <b>else</b> {
+        <b>let</b> fungible_staked_oct_data: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOctData">FungibleStakedOctData</a> = &<b>mut</b> pool.extra_fields[key];
+        fungible_staked_oct_data.total_supply =
+            fungible_staked_oct_data.total_supply + <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>;
+        fungible_staked_oct_data.principal.join(principal);
     };
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
         id: object::new(ctx),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>,
-        value: <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>,
+        value: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>,
     }
 }
 </code></pre>
@@ -863,7 +891,7 @@ Convert the given staked SUI to an FungibleStakedOct object
 
 </details>
 
-<a name="one_system_staking_pool_withdraw_from_principal"></a>
+<a name="sui_system_staking_pool_withdraw_from_principal"></a>
 
 ## Function `withdraw_from_principal`
 
@@ -872,7 +900,7 @@ tokens using exchange rate at staking epoch.
 Returns values are amount of pool tokens withdrawn and withdrawn principal portion of SUI.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_withdraw_from_principal">withdraw_from_principal</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): (u64, <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_withdraw_from_principal">withdraw_from_principal</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): (u64, <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;)
 </code></pre>
 
 
@@ -881,22 +909,16 @@ Returns values are amount of pool tokens withdrawn and withdrawn principal porti
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_withdraw_from_principal">withdraw_from_principal</a>(
-    pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>,
-    staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>,
-): (u64, Balance&lt;OCT&gt;) {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_withdraw_from_principal">withdraw_from_principal</a>(
+    pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>,
+): (u64, Balance&lt;SUI&gt;) {
     // Check that the stake information matches the pool.
-    <b>assert</b>!(staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> == object::id(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EWrongPool">EWrongPool</a>);
-    <b>let</b> exchange_rate_at_staking_epoch = <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool, staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>);
-    <b>let</b> principal_withdraw = <a href="../one_system/staking_pool.md#one_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct);
-    <b>let</b> pool_token_withdraw_amount = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_token_amount">get_token_amount</a>(
-    &exchange_rate_at_staking_epoch,
-    principal_withdraw.value()
-);
-    (
-        pool_token_withdraw_amount,
-        principal_withdraw,
-    )
+    <b>assert</b>!(staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a> == object::id(pool), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWrongPool">EWrongPool</a>);
+    <b>let</b> exchange_rate_at_staking_epoch = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>);
+    <b>let</b> principal_withdraw = staked_oct.into_balance();
+    <b>let</b> pool_token_withdraw_amount = exchange_rate_at_staking_epoch.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(principal_withdraw.value());
+    (pool_token_withdraw_amount, principal_withdraw)
 }
 </code></pre>
 
@@ -904,13 +926,13 @@ Returns values are amount of pool tokens withdrawn and withdrawn principal porti
 
 </details>
 
-<a name="one_system_staking_pool_unwrap_staked_oct"></a>
+<a name="sui_system_staking_pool_unwrap_staked_oct"></a>
 
 ## Function `unwrap_staked_oct`
 
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -919,15 +941,9 @@ Returns values are amount of pool tokens withdrawn and withdrawn principal porti
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): Balance&lt;OCT&gt; {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> {
-        id,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: _,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: _,
-        principal,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>: _,
-    } = staked_oct;
-    object::delete(id);
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>): Balance&lt;SUI&gt; {
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> { id, principal, .. } = staked_oct;
+    id.delete();
     principal
 }
 </code></pre>
@@ -936,14 +952,14 @@ Returns values are amount of pool tokens withdrawn and withdrawn principal porti
 
 </details>
 
-<a name="one_system_staking_pool_deposit_rewards"></a>
+<a name="sui_system_staking_pool_deposit_rewards"></a>
 
 ## Function `deposit_rewards`
 
 Called at epoch advancement times to add rewards (in SUI) to the staking pool.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_deposit_rewards">deposit_rewards</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, rewards: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_deposit_rewards">deposit_rewards</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, rewards: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;)
 </code></pre>
 
 
@@ -952,8 +968,8 @@ Called at epoch advancement times to add rewards (in SUI) to the staking pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_deposit_rewards">deposit_rewards</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, rewards: Balance&lt;OCT&gt;) {
-    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> = pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> + rewards.value();
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_deposit_rewards">deposit_rewards</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>, rewards: Balance&lt;SUI&gt;) {
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> + rewards.value();
     pool.rewards_pool.join(rewards);
 }
 </code></pre>
@@ -962,13 +978,13 @@ Called at epoch advancement times to add rewards (in SUI) to the staking pool.
 
 </details>
 
-<a name="one_system_staking_pool_process_pending_stakes_and_withdraws"></a>
+<a name="sui_system_staking_pool_process_pending_stakes_and_withdraws"></a>
 
 ## Function `process_pending_stakes_and_withdraws`
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stakes_and_withdraws">process_pending_stakes_and_withdraws</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, ctx: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stakes_and_withdraws">process_pending_stakes_and_withdraws</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -977,15 +993,20 @@ Called at epoch advancement times to add rewards (in SUI) to the staking pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stakes_and_withdraws">process_pending_stakes_and_withdraws</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, ctx: &TxContext) {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stakes_and_withdraws">process_pending_stakes_and_withdraws</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>, ctx: &TxContext) {
     <b>let</b> new_epoch = ctx.epoch() + 1;
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool);
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake">process_pending_stake</a>(pool);
-    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>.add(
-        new_epoch,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> { <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>: pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>: pool.pool_token_balance },
-    );
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_check_balance_invariants">check_balance_invariants</a>(pool, new_epoch);
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>();
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake">process_pending_stake</a>();
+    pool
+        .<a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>
+        .add(
+            new_epoch,
+            <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> {
+                <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>: pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>,
+                <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>: pool.pool_token_balance,
+            },
+        );
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_check_balance_invariants">check_balance_invariants</a>(new_epoch);
 }
 </code></pre>
 
@@ -993,7 +1014,7 @@ Called at epoch advancement times to add rewards (in SUI) to the staking pool.
 
 </details>
 
-<a name="one_system_staking_pool_process_pending_stake_withdraw"></a>
+<a name="sui_system_staking_pool_process_pending_stake_withdraw"></a>
 
 ## Function `process_pending_stake_withdraw`
 
@@ -1001,7 +1022,7 @@ Called at epoch boundaries to process pending stake withdraws requested during t
 Also called immediately upon withdrawal if the pool is inactive.
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>)
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>)
 </code></pre>
 
 
@@ -1010,10 +1031,21 @@ Also called immediately upon withdrawal if the pool is inactive.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>) {
-    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> = pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> - pool.pending_total_sui_withdraw;
-    pool.pool_token_balance = pool.pool_token_balance - pool.pending_pool_token_withdraw;
-    pool.pending_total_sui_withdraw = 0;
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>) {
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> = <b>if</b> (pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> &gt;= pool.pending_total_oct_withdraw) {
+        pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> - pool.pending_total_oct_withdraw
+    } <b>else</b> {
+        // the diff will be applied in the `<a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake">process_pending_stake</a>` function.
+        <b>let</b> diff = pool.pending_total_oct_withdraw - pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>;
+        pool.extra_fields.add(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_UnderflowSuiBalance">UnderflowSuiBalance</a> {}, diff);
+        0
+    };
+    pool.pool_token_balance = <b>if</b> (pool.pool_token_balance &gt;= pool.pending_pool_token_withdraw) {
+        pool.pool_token_balance - pool.pending_pool_token_withdraw
+    } <b>else</b> {
+        0
+    };
+    pool.pending_total_oct_withdraw = 0;
     pool.pending_pool_token_withdraw = 0;
 }
 </code></pre>
@@ -1022,14 +1054,14 @@ Also called immediately upon withdrawal if the pool is inactive.
 
 </details>
 
-<a name="one_system_staking_pool_process_pending_stake"></a>
+<a name="sui_system_staking_pool_process_pending_stake"></a>
 
 ## Function `process_pending_stake`
 
 Called at epoch boundaries to process the pending stake.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake">process_pending_stake</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake">process_pending_stake</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>)
 </code></pre>
 
 
@@ -1038,12 +1070,20 @@ Called at epoch boundaries to process the pending stake.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake">process_pending_stake</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>) {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_process_pending_stake">process_pending_stake</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>) {
     // Use the most up to date exchange rate with the rewards deposited and withdraws effectuated.
-    <b>let</b> latest_exchange_rate =
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> { <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>: pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>: pool.pool_token_balance };
-    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> = pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> + pool.pending_stake;
-    pool.pool_token_balance = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_token_amount">get_token_amount</a>(&latest_exchange_rate, pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>);
+    <b>let</b> latest_exchange_rate = <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> {
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>: pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>: pool.pool_token_balance,
+    };
+    // This key is only present <b>if</b> the `<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>` underflowed, hence, the current value of `<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>`
+    // is `0`. Pool token balance will be recalculated automatically <b>for</b> `0` value.
+    <b>let</b> sui_diff = {
+        <b>let</b> key = <a href="../sui_system/staking_pool.md#sui_system_staking_pool_UnderflowSuiBalance">UnderflowSuiBalance</a> {};
+        <b>if</b> (pool.extra_fields.contains(key)) pool.extra_fields.remove(key) <b>else</b> 0
+    };
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> + pool.pending_stake - sui_diff;
+    pool.pool_token_balance = latest_exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>);
     pool.pending_stake = 0;
 }
 </code></pre>
@@ -1052,7 +1092,7 @@ Called at epoch boundaries to process the pending stake.
 
 </details>
 
-<a name="one_system_staking_pool_withdraw_rewards"></a>
+<a name="sui_system_staking_pool_withdraw_rewards"></a>
 
 ## Function `withdraw_rewards`
 
@@ -1065,7 +1105,7 @@ stake we should withdraw.
 portion because the principal portion was already taken out of the staker's self custodied StakedOct.
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_withdraw_rewards">withdraw_rewards</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, principal_withdraw_amount: u64, pool_token_withdraw_amount: u64, epoch: u64): <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_withdraw_rewards">withdraw_rewards</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, principal_withdraw_amount: u64, pool_token_withdraw_amount: u64, epoch: u64): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -1074,23 +1114,22 @@ portion because the principal portion was already taken out of the staker's self
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_withdraw_rewards">withdraw_rewards</a>(
-    pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>,
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_withdraw_rewards">withdraw_rewards</a>(
+    pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
     principal_withdraw_amount: u64,
     pool_token_withdraw_amount: u64,
     epoch: u64,
-): Balance&lt;OCT&gt; {
-    <b>let</b> exchange_rate = <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool, epoch);
-    <b>let</b> total_sui_withdraw_amount = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_sui_amount">get_sui_amount</a>(&exchange_rate, pool_token_withdraw_amount);
-    <b>let</b> <b>mut</b> reward_withdraw_amount =
-        <b>if</b> (total_sui_withdraw_amount &gt;= principal_withdraw_amount)
-            total_sui_withdraw_amount - principal_withdraw_amount
-        <b>else</b> 0;
+): Balance&lt;SUI&gt; {
+    <b>let</b> exchange_rate = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(epoch);
+    <b>let</b> total_oct_withdraw_amount = exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_sui_amount">get_sui_amount</a>(pool_token_withdraw_amount);
+    <b>let</b> <b>mut</b> reward_withdraw_amount = <b>if</b> (total_oct_withdraw_amount &gt;= principal_withdraw_amount) {
+        total_oct_withdraw_amount - principal_withdraw_amount
+    } <b>else</b> 0;
     // This may happen when we are withdrawing everything from the pool and
     // the rewards pool balance may be less than reward_withdraw_amount.
     // TODO: FIGURE OUT EXACTLY WHY THIS CAN HAPPEN.
     reward_withdraw_amount = reward_withdraw_amount.min(pool.rewards_pool.value());
-    pool.rewards_pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(reward_withdraw_amount)
+    pool.rewards_pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(reward_withdraw_amount)
 }
 </code></pre>
 
@@ -1098,14 +1137,14 @@ portion because the principal portion was already taken out of the staker's self
 
 </details>
 
-<a name="one_system_staking_pool_activate_staking_pool"></a>
+<a name="sui_system_staking_pool_activate_staking_pool"></a>
 
 ## Function `activate_staking_pool`
 
-Called by <code><a href="../one_system/validator.md#one_system_validator">validator</a></code> module to activate a staking pool.
+Called by <code><a href="../sui_system/validator.md#sui_system_validator">validator</a></code> module to activate a staking pool.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_activate_staking_pool">activate_staking_pool</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, activation_epoch: u64)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activate_staking_pool">activate_staking_pool</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>: u64)
 </code></pre>
 
 
@@ -1114,17 +1153,14 @@ Called by <code><a href="../one_system/validator.md#one_system_validator">valida
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_activate_staking_pool">activate_staking_pool</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, activation_epoch: u64) {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activate_staking_pool">activate_staking_pool</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>: u64) {
     // Add the initial exchange rate to the table.
-    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>.add(
-        activation_epoch,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>()
-    );
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>.add(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>());
     // Check that the pool is preactive and not inactive.
-    <b>assert</b>!(<a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive">is_preactive</a>(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EPoolAlreadyActive">EPoolAlreadyActive</a>);
-    <b>assert</b>!(!<a href="../one_system/staking_pool.md#one_system_staking_pool_is_inactive">is_inactive</a>(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EActivationOfInactivePool">EActivationOfInactivePool</a>);
+    <b>assert</b>!(pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>(), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EPoolAlreadyActive">EPoolAlreadyActive</a>);
+    <b>assert</b>!(!pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>(), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EActivationOfInactivePool">EActivationOfInactivePool</a>);
     // Fill in the active epoch.
-    pool.activation_epoch.fill(activation_epoch);
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>.fill(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>);
 }
 </code></pre>
 
@@ -1132,7 +1168,7 @@ Called by <code><a href="../one_system/validator.md#one_system_validator">valida
 
 </details>
 
-<a name="one_system_staking_pool_deactivate_staking_pool"></a>
+<a name="sui_system_staking_pool_deactivate_staking_pool"></a>
 
 ## Function `deactivate_staking_pool`
 
@@ -1141,7 +1177,7 @@ this pool deactivation, the pool stops earning rewards. Only stake
 withdraws can be made to the pool.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_deactivate_staking_pool">deactivate_staking_pool</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, deactivation_epoch: u64)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_deactivate_staking_pool">deactivate_staking_pool</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, deactivation_epoch: u64)
 </code></pre>
 
 
@@ -1150,9 +1186,9 @@ withdraws can be made to the pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_deactivate_staking_pool">deactivate_staking_pool</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, deactivation_epoch: u64) {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_deactivate_staking_pool">deactivate_staking_pool</a>(pool: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>, deactivation_epoch: u64) {
     // We can't deactivate an already deactivated pool.
-    <b>assert</b>!(!<a href="../one_system/staking_pool.md#one_system_staking_pool_is_inactive">is_inactive</a>(pool), <a href="../one_system/staking_pool.md#one_system_staking_pool_EDeactivationOfInactivePool">EDeactivationOfInactivePool</a>);
+    <b>assert</b>!(!pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>(), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EDeactivationOfInactivePool">EDeactivationOfInactivePool</a>);
     pool.deactivation_epoch = option::some(deactivation_epoch);
 }
 </code></pre>
@@ -1161,13 +1197,13 @@ withdraws can be made to the pool.
 
 </details>
 
-<a name="one_system_staking_pool_sui_balance"></a>
+<a name="sui_system_staking_pool_oct_balance"></a>
 
 ## Function `sui_balance`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): u64
 </code></pre>
 
 
@@ -1176,20 +1212,20 @@ withdraws can be made to the pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): u64 { pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): u64 { pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="one_system_staking_pool_pool_id"></a>
+<a name="sui_system_staking_pool_pool_id"></a>
 
 ## Function `pool_id`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): <a href="../one/object.md#one_object_ID">one::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>(staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -1198,20 +1234,20 @@ withdraws can be made to the pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): ID { staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>(staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>): ID { staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="one_system_staking_pool_fungible_staked_oct_pool_id"></a>
+<a name="sui_system_staking_pool_fungible_staked_oct_pool_id"></a>
 
 ## Function `fungible_staked_oct_pool_id`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_pool_id">fungible_staked_oct_pool_id</a>(fungible_staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>): <a href="../one/object.md#one_object_ID">one::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_pool_id">fungible_staked_oct_pool_id</a>(fungible_staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -1220,74 +1256,8 @@ withdraws can be made to the pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_pool_id">fungible_staked_oct_pool_id</a>(fungible_staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>): ID { fungible_staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> }
-</code></pre>
-
-
-
-</details>
-
-<a name="one_system_staking_pool_staked_oct_amount"></a>
-
-## Function `staked_oct_amount`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_staked_oct_amount">staked_oct_amount</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_staked_oct_amount">staked_oct_amount</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): u64 { staked_oct.principal.value() }
-</code></pre>
-
-
-
-</details>
-
-<a name="one_system_staking_pool_lock"></a>
-
-## Function `lock`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>(staked_oct:&<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>):bool{staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>}
-</code></pre>
-
-
-
-</details>
-
-<a name="one_system_staking_pool_stake_activation_epoch"></a>
-
-## Function `stake_activation_epoch`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>(staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): u64 {
-    staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_pool_id">fungible_staked_oct_pool_id</a>(fungible_staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>): ID {
+    fungible_staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>
 }
 </code></pre>
 
@@ -1295,14 +1265,62 @@ withdraws can be made to the pool.
 
 </details>
 
-<a name="one_system_staking_pool_is_preactive"></a>
+<a name="sui_system_staking_pool_staked_oct_amount"></a>
+
+## Function `staked_oct_amount`
+
+Returns the principal amount of <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a></code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_staked_oct_amount">staked_oct_amount</a>(staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_staked_oct_amount">staked_oct_amount</a>(staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>): u64 { staked_oct.principal.value() }
+</code></pre>
+
+
+
+</details>
+
+<a name="sui_system_staking_pool_stake_activation_epoch"></a>
+
+## Function `stake_activation_epoch`
+
+Returns the activation epoch of <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a></code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>(staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>(staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>): u64 {
+    staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="sui_system_staking_pool_is_preactive"></a>
 
 ## Function `is_preactive`
 
 Returns true if the input staking pool is preactive.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive">is_preactive</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): bool
 </code></pre>
 
 
@@ -1311,8 +1329,8 @@ Returns true if the input staking pool is preactive.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive">is_preactive</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): bool{
-    pool.activation_epoch.is_none()
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): bool {
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>.is_none()
 }
 </code></pre>
 
@@ -1320,14 +1338,16 @@ Returns true if the input staking pool is preactive.
 
 </details>
 
-<a name="one_system_staking_pool_is_inactive"></a>
+<a name="sui_system_staking_pool_activation_epoch"></a>
 
-## Function `is_inactive`
+## Function `activation_epoch`
 
-Returns true if the input staking pool is inactive.
+Returns the activation epoch of the <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a></code>. For validator candidates,
+or pending validators, the value returned is <code>None</code>. For active validators,
+the value is the epoch before the validator was activated.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_inactive">is_inactive</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): bool
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -1336,7 +1356,32 @@ Returns true if the input staking pool is inactive.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_inactive">is_inactive</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): bool {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): Option&lt;u64&gt; {
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="sui_system_staking_pool_is_inactive"></a>
+
+## Function `is_inactive`
+
+Returns true if the input staking pool is inactive.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_inactive">is_inactive</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): bool {
     pool.deactivation_epoch.is_some()
 }
 </code></pre>
@@ -1345,13 +1390,13 @@ Returns true if the input staking pool is inactive.
 
 </details>
 
-<a name="one_system_staking_pool_fungible_staked_oct_value"></a>
+<a name="sui_system_staking_pool_fungible_staked_oct_value"></a>
 
 ## Function `fungible_staked_oct_value`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>(fungible_staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>(fungible_staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>): u64
 </code></pre>
 
 
@@ -1360,20 +1405,22 @@ Returns true if the input staking pool is inactive.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>(fungible_staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>): u64 { fungible_staked_oct.value }
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_fungible_staked_oct_value">fungible_staked_oct_value</a>(fungible_staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>): u64 {
+    fungible_staked_oct.value
+}
 </code></pre>
 
 
 
 </details>
 
-<a name="one_system_staking_pool_split_fungible_staked_oct"></a>
+<a name="sui_system_staking_pool_split_fungible_staked_oct"></a>
 
 ## Function `split_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_split_fungible_staked_oct">split_fungible_staked_oct</a>(fungible_staked_oct: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>, split_amount: u64, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_split_fungible_staked_oct">split_fungible_staked_oct</a>(fungible_staked_oct: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>, split_amount: u64, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>
 </code></pre>
 
 
@@ -1382,16 +1429,16 @@ Returns true if the input staking pool is inactive.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_split_fungible_staked_oct">split_fungible_staked_oct</a>(
-    fungible_staked_oct: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>,
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_split_fungible_staked_oct">split_fungible_staked_oct</a>(
+    fungible_staked_oct: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>,
     split_amount: u64,
-    ctx: &<b>mut</b> TxContext
-): <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
-    <b>assert</b>!(split_amount &lt;= fungible_staked_oct.value, <a href="../one_system/staking_pool.md#one_system_staking_pool_EInsufficientPoolTokenBalance">EInsufficientPoolTokenBalance</a>);
+    ctx: &<b>mut</b> TxContext,
+): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
+    <b>assert</b>!(split_amount &lt;= fungible_staked_oct.value, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInsufficientPoolTokenBalance">EInsufficientPoolTokenBalance</a>);
     fungible_staked_oct.value = fungible_staked_oct.value - split_amount;
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> {
         id: object::new(ctx),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: fungible_staked_oct.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>: fungible_staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>,
         value: split_amount,
     }
 }
@@ -1401,13 +1448,13 @@ Returns true if the input staking pool is inactive.
 
 </details>
 
-<a name="one_system_staking_pool_join_fungible_staked_oct"></a>
+<a name="sui_system_staking_pool_join_fungible_staked_oct"></a>
 
 ## Function `join_fungible_staked_oct`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_join_fungible_staked_oct">join_fungible_staked_oct</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>, other: <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_join_fungible_staked_oct">join_fungible_staked_oct</a>(self: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>, other: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">one_system::staking_pool::FungibleStakedOct</a>)
 </code></pre>
 
 
@@ -1416,10 +1463,10 @@ Returns true if the input staking pool is inactive.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_join_fungible_staked_oct">join_fungible_staked_oct</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>, other: <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>) {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> { id, <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>, value } = other;
-    <b>assert</b>!(self.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> == <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_EWrongPool">EWrongPool</a>);
-    object::delete(id);
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_join_fungible_staked_oct">join_fungible_staked_oct</a>(self: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>, other: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a>) {
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_FungibleStakedOct">FungibleStakedOct</a> { id, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>, value } = other;
+    <b>assert</b>!(self.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a> == <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EWrongPool">EWrongPool</a>);
+    id.delete();
     self.value = self.value + value;
 }
 </code></pre>
@@ -1428,16 +1475,16 @@ Returns true if the input staking pool is inactive.
 
 </details>
 
-<a name="one_system_staking_pool_split"></a>
+<a name="sui_system_staking_pool_split"></a>
 
 ## Function `split`
 
 Split StakedOct <code>self</code> to two parts, one with principal <code>split_amount</code>,
 and the remaining principal is left in <code>self</code>.
-All the other parameters of the StakedOct like <code><a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a></code> or <code><a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a></code> remain the same.
+All the other parameters of the StakedOct like <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a></code> or <code><a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a></code> remain the same.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(self: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>
 </code></pre>
 
 
@@ -1446,19 +1493,18 @@ All the other parameters of the StakedOct like <code><a href="../one_system/stak
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> TxContext): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(self: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> TxContext): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> {
     <b>let</b> original_amount = self.principal.value();
-    <b>assert</b>!(split_amount &lt;= original_amount, <a href="../one_system/staking_pool.md#one_system_staking_pool_EInsufficientSuiTokenBalance">EInsufficientSuiTokenBalance</a>);
+    <b>assert</b>!(split_amount &lt;= original_amount, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EInsufficientSuiTokenBalance">EInsufficientSuiTokenBalance</a>);
     <b>let</b> remaining_amount = original_amount - split_amount;
-    // Both resulting parts should have at least <a href="../one_system/staking_pool.md#one_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>.
-    <b>assert</b>!(remaining_amount &gt;= <a href="../one_system/staking_pool.md#one_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_EStakedOctBelowThreshold">EStakedOctBelowThreshold</a>);
-    <b>assert</b>!(split_amount &gt;= <a href="../one_system/staking_pool.md#one_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_EStakedOctBelowThreshold">EStakedOctBelowThreshold</a>);
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> {
+    // Both resulting parts should have at least <a href="../sui_system/staking_pool.md#sui_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>.
+    <b>assert</b>!(remaining_amount &gt;= <a href="../sui_system/staking_pool.md#sui_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EStakedOctBelowThreshold">EStakedOctBelowThreshold</a>);
+    <b>assert</b>!(split_amount &gt;= <a href="../sui_system/staking_pool.md#sui_system_staking_pool_MIN_STAKING_THRESHOLD">MIN_STAKING_THRESHOLD</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EStakedOctBelowThreshold">EStakedOctBelowThreshold</a>);
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> {
         id: object::new(ctx),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: self.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: self.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>,
-        principal: self.principal.<a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(split_amount),
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>:self.<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>: self.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>,
+        <a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: self.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>,
+        principal: self.principal.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(split_amount),
     }
 }
 </code></pre>
@@ -1467,7 +1513,7 @@ All the other parameters of the StakedOct like <code><a href="../one_system/stak
 
 </details>
 
-<a name="one_system_staking_pool_split_staked_oct"></a>
+<a name="sui_system_staking_pool_split_staked_oct"></a>
 
 ## Function `split_staked_oct`
 
@@ -1475,7 +1521,7 @@ Split the given StakedOct to the two parts, one with principal <code>split_amoun
 transfer the newly split part to the sender address.
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_split_staked_oct">split_staked_oct</a>(stake: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_split_staked_oct">split_staked_oct</a>(stake: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -1484,8 +1530,8 @@ transfer the newly split part to the sender address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_split_staked_oct">split_staked_oct</a>(stake: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> TxContext) {
-    transfer::transfer(<a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(stake, split_amount, ctx), ctx.sender());
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_split_staked_oct">split_staked_oct</a>(stake: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>, split_amount: u64, ctx: &<b>mut</b> TxContext) {
+    transfer::transfer(stake.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_split">split</a>(split_amount, ctx), ctx.sender());
 }
 </code></pre>
 
@@ -1493,7 +1539,7 @@ transfer the newly split part to the sender address.
 
 </details>
 
-<a name="one_system_staking_pool_join_staked_oct"></a>
+<a name="sui_system_staking_pool_join_staked_oct"></a>
 
 ## Function `join_staked_oct`
 
@@ -1501,7 +1547,7 @@ Consume the staked sui <code>other</code> and add its value to <code>self</code>
 Aborts if some of the staking parameters are incompatible (pool id, stake activation epoch, etc.)
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_join_staked_oct">join_staked_oct</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, other: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_join_staked_oct">join_staked_oct</a>(self: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, other: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>)
 </code></pre>
 
 
@@ -1510,15 +1556,9 @@ Aborts if some of the staking parameters are incompatible (pool id, stake activa
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_join_staked_oct">join_staked_oct</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>, other: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>) {
-    <b>assert</b>!(<a href="../one_system/staking_pool.md#one_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self, &other), <a href="../one_system/staking_pool.md#one_system_staking_pool_EIncompatibleStakedOct">EIncompatibleStakedOct</a>);
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> {
-        id,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>: _,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>: _,
-        principal,
-        <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>:_
-    } = other;
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_join_staked_oct">join_staked_oct</a>(self: &<b>mut</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>, other: <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>) {
+    <b>assert</b>!(<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self, &other), <a href="../sui_system/staking_pool.md#sui_system_staking_pool_EIncompatibleStakedOct">EIncompatibleStakedOct</a>);
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a> { id, principal, .. } = other;
     id.delete();
     self.principal.join(principal);
 }
@@ -1528,14 +1568,14 @@ Aborts if some of the staking parameters are incompatible (pool id, stake activa
 
 </details>
 
-<a name="one_system_staking_pool_is_equal_staking_metadata"></a>
+<a name="sui_system_staking_pool_is_equal_staking_metadata"></a>
 
 ## Function `is_equal_staking_metadata`
 
 Returns true if all the staking parameters of the staked sui except the principal are identical
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, other: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, other: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>): bool
 </code></pre>
 
 
@@ -1544,10 +1584,9 @@ Returns true if all the staking parameters of the staked sui except the principa
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>, other: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): bool {
-    (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>) &&
-    (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>)&&
-    (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>, other: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>): bool {
+    (self.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a> == other.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_id">pool_id</a>) &&
+    (self.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a> == other.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>)
 }
 </code></pre>
 
@@ -1555,13 +1594,13 @@ Returns true if all the staking parameters of the staked sui except the principa
 
 </details>
 
-<a name="one_system_staking_pool_pool_token_exchange_rate_at_epoch"></a>
+<a name="sui_system_staking_pool_pool_token_exchange_rate_at_epoch"></a>
 
 ## Function `pool_token_exchange_rate_at_epoch`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, epoch: u64): <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, epoch: u64): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>
 </code></pre>
 
 
@@ -1570,23 +1609,26 @@ Returns true if all the staking parameters of the staked sui except the principa
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, epoch: u64): <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(
+    pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    epoch: u64,
+): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> {
     // If the pool is preactive then the exchange rate is always 1:1.
-    <b>if</b> (<a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive_at_epoch">is_preactive_at_epoch</a>(pool, epoch)) {
-        <b>return</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>()
+    <b>if</b> (pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive_at_epoch">is_preactive_at_epoch</a>(epoch)) {
+        <b>return</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>()
     };
     <b>let</b> clamped_epoch = pool.deactivation_epoch.get_with_default(epoch);
     <b>let</b> <b>mut</b> epoch = clamped_epoch.min(epoch);
-    <b>let</b> activation_epoch = *pool.activation_epoch.borrow();
+    <b>let</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a> = *pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>.borrow();
     // Find the latest epoch that's earlier than the given epoch with an <b>entry</b> in the table
-    <b>while</b> (epoch &gt;= activation_epoch) {
-        <b>if</b> (pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>.contains(epoch)) {
-            <b>return</b> pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>[epoch]
+    <b>while</b> (epoch &gt;= <a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>) {
+        <b>if</b> (pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>.contains(epoch)) {
+            <b>return</b> pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>[epoch]
         };
         epoch = epoch - 1;
     };
     // This line really should be unreachable. Do we want an <b>assert</b> <b>false</b> here?
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>()
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>()
 }
 </code></pre>
 
@@ -1594,14 +1636,14 @@ Returns true if all the staking parameters of the staked sui except the principa
 
 </details>
 
-<a name="one_system_staking_pool_pending_stake_amount"></a>
+<a name="sui_system_staking_pool_pending_stake_amount"></a>
 
 ## Function `pending_stake_amount`
 
 Returns the total value of the pending staking requests for this staking pool.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pending_stake_amount">pending_stake_amount</a>(<a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pending_stake_amount">pending_stake_amount</a>(<a href="../sui_system/staking_pool.md#sui_system_staking_pool">staking_pool</a>: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): u64
 </code></pre>
 
 
@@ -1610,8 +1652,8 @@ Returns the total value of the pending staking requests for this staking pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pending_stake_amount">pending_stake_amount</a>(<a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): u64 {
-    <a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>.pending_stake
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pending_stake_amount">pending_stake_amount</a>(<a href="../sui_system/staking_pool.md#sui_system_staking_pool">staking_pool</a>: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): u64 {
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool">staking_pool</a>.pending_stake
 }
 </code></pre>
 
@@ -1619,14 +1661,14 @@ Returns the total value of the pending staking requests for this staking pool.
 
 </details>
 
-<a name="one_system_staking_pool_pending_stake_withdraw_amount"></a>
+<a name="sui_system_staking_pool_pending_stake_withdraw_amount"></a>
 
 ## Function `pending_stake_withdraw_amount`
 
 Returns the total withdrawal from the staking pool this epoch.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pending_stake_withdraw_amount">pending_stake_withdraw_amount</a>(<a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pending_stake_withdraw_amount">pending_stake_withdraw_amount</a>(<a href="../sui_system/staking_pool.md#sui_system_staking_pool">staking_pool</a>: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): u64
 </code></pre>
 
 
@@ -1635,8 +1677,8 @@ Returns the total withdrawal from the staking pool this epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pending_stake_withdraw_amount">pending_stake_withdraw_amount</a>(<a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): u64 {
-    <a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>.pending_total_sui_withdraw
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pending_stake_withdraw_amount">pending_stake_withdraw_amount</a>(<a href="../sui_system/staking_pool.md#sui_system_staking_pool">staking_pool</a>: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): u64 {
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool">staking_pool</a>.pending_total_oct_withdraw
 }
 </code></pre>
 
@@ -1644,13 +1686,13 @@ Returns the total withdrawal from the staking pool this epoch.
 
 </details>
 
-<a name="one_system_staking_pool_exchange_rates"></a>
+<a name="sui_system_staking_pool_exchange_rates"></a>
 
 ## Function `exchange_rates`
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): &<a href="../one/table.md#one_table_Table">one::table::Table</a>&lt;u64, <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>): &<a href="../sui/table.md#sui_table_Table">one::table::Table</a>&lt;u64, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>&gt;
 </code></pre>
 
 
@@ -1659,8 +1701,8 @@ Returns the total withdrawal from the staking pool this epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): &Table&lt;u64, <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>&gt; {
-    &pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>): &Table&lt;u64, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>&gt; {
+    &pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_exchange_rates">exchange_rates</a>
 }
 </code></pre>
 
@@ -1668,13 +1710,13 @@ Returns the total withdrawal from the staking pool this epoch.
 
 </details>
 
-<a name="one_system_staking_pool_sui_amount"></a>
+<a name="sui_system_staking_pool_sui_amount"></a>
 
 ## Function `sui_amount`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>): u64
 </code></pre>
 
 
@@ -1683,8 +1725,8 @@ Returns the total withdrawal from the staking pool this epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>): u64 {
-    exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>): u64 {
+    exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>
 }
 </code></pre>
 
@@ -1692,13 +1734,13 @@ Returns the total withdrawal from the staking pool this epoch.
 
 </details>
 
-<a name="one_system_staking_pool_pool_token_amount"></a>
+<a name="sui_system_staking_pool_pool_token_amount"></a>
 
 ## Function `pool_token_amount`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>): u64
 </code></pre>
 
 
@@ -1707,8 +1749,8 @@ Returns the total withdrawal from the staking pool this epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>): u64 {
-    exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>): u64 {
+    exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>
 }
 </code></pre>
 
@@ -1716,14 +1758,14 @@ Returns the total withdrawal from the staking pool this epoch.
 
 </details>
 
-<a name="one_system_staking_pool_is_preactive_at_epoch"></a>
+<a name="sui_system_staking_pool_is_preactive_at_epoch"></a>
 
 ## Function `is_preactive_at_epoch`
 
 Returns true if the provided staking pool is preactive at the provided epoch.
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive_at_epoch">is_preactive_at_epoch</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, epoch: u64): bool
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive_at_epoch">is_preactive_at_epoch</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, epoch: u64): bool
 </code></pre>
 
 
@@ -1732,9 +1774,9 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive_at_epoch">is_preactive_at_epoch</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, epoch: u64): bool{
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive_at_epoch">is_preactive_at_epoch</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>, epoch: u64): bool {
     // Either the pool is currently preactive or the pool's starting epoch is later than the provided epoch.
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_is_preactive">is_preactive</a>(pool) || (*pool.activation_epoch.borrow() &gt; epoch)
+    pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_is_preactive">is_preactive</a>() || (*pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_activation_epoch">activation_epoch</a>.borrow() &gt; epoch)
 }
 </code></pre>
 
@@ -1742,13 +1784,13 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 
 </details>
 
-<a name="one_system_staking_pool_get_sui_amount"></a>
+<a name="sui_system_staking_pool_get_sui_amount"></a>
 
 ## Function `get_sui_amount`
 
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_get_sui_amount">get_sui_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>, token_amount: u64): u64
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_sui_amount">get_sui_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>, token_amount: u64): u64
 </code></pre>
 
 
@@ -1757,16 +1799,13 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_get_sui_amount">get_sui_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>, token_amount: u64): u64 {
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_sui_amount">get_sui_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>, token_amount: u64): u64 {
     // When either amount is 0, that means we have no stakes with this pool.
     // The other amount might be non-zero when there's dust left in the pool.
-    <b>if</b> (exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> == 0 || exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a> == 0) {
+    <b>if</b> (exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a> == 0 || exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a> == 0) {
         <b>return</b> token_amount
     };
-    <b>let</b> res = exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> <b>as</b> u128
-            * (token_amount <b>as</b> u128)
-            / (exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a> <b>as</b> u128);
-    res <b>as</b> u64
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_mul_div">mul_div</a>!(exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>, token_amount, exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>)
 }
 </code></pre>
 
@@ -1774,13 +1813,13 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 
 </details>
 
-<a name="one_system_staking_pool_get_token_amount"></a>
+<a name="sui_system_staking_pool_get_token_amount"></a>
 
 ## Function `get_token_amount`
 
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_get_token_amount">get_token_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>: u64): u64
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>: u64): u64
 </code></pre>
 
 
@@ -1789,16 +1828,13 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_get_token_amount">get_token_amount</a>(exchange_rate: &<a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>, <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>: u64): u64 {
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(exchange_rate: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>: u64): u64 {
     // When either amount is 0, that means we have no stakes with this pool.
     // The other amount might be non-zero when there's dust left in the pool.
-    <b>if</b> (exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> == 0 || exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a> == 0) {
-        <b>return</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>
+    <b>if</b> (exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a> == 0 || exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a> == 0) {
+        <b>return</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>
     };
-    <b>let</b> res = exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a> <b>as</b> u128
-            * (<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> <b>as</b> u128)
-            / (exchange_rate.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a> <b>as</b> u128);
-    res <b>as</b> u64
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_mul_div">mul_div</a>!(exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>, exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>)
 }
 </code></pre>
 
@@ -1806,13 +1842,13 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 
 </details>
 
-<a name="one_system_staking_pool_initial_exchange_rate"></a>
+<a name="sui_system_staking_pool_initial_exchange_rate"></a>
 
 ## Function `initial_exchange_rate`
 
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>(): <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>(): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">one_system::staking_pool::PoolTokenExchangeRate</a>
 </code></pre>
 
 
@@ -1821,8 +1857,8 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>(): <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> {
-    <a href="../one_system/staking_pool.md#one_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> { <a href="../one_system/staking_pool.md#one_system_staking_pool_sui_amount">sui_amount</a>: 0, <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_amount">pool_token_amount</a>: 0 }
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_initial_exchange_rate">initial_exchange_rate</a>(): <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> {
+    <a href="../sui_system/staking_pool.md#sui_system_staking_pool_PoolTokenExchangeRate">PoolTokenExchangeRate</a> { <a href="../sui_system/staking_pool.md#sui_system_staking_pool_sui_amount">sui_amount</a>: 0, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_amount">pool_token_amount</a>: 0 }
 }
 </code></pre>
 
@@ -1830,13 +1866,13 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 
 </details>
 
-<a name="one_system_staking_pool_check_balance_invariants"></a>
+<a name="sui_system_staking_pool_check_balance_invariants"></a>
 
 ## Function `check_balance_invariants`
 
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_check_balance_invariants">check_balance_invariants</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, epoch: u64)
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_check_balance_invariants">check_balance_invariants</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, epoch: u64)
 </code></pre>
 
 
@@ -1845,12 +1881,77 @@ Returns true if the provided staking pool is preactive at the provided epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_check_balance_invariants">check_balance_invariants</a>(pool: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>, epoch: u64) {
-    <b>let</b> exchange_rate = <a href="../one_system/staking_pool.md#one_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(pool, epoch);
+<pre><code><b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_check_balance_invariants">check_balance_invariants</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>, epoch: u64) {
+    <b>let</b> exchange_rate = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(epoch);
     // check that the pool token balance and sui balance ratio matches the exchange rate stored.
-    <b>let</b> expected = <a href="../one_system/staking_pool.md#one_system_staking_pool_get_token_amount">get_token_amount</a>(&exchange_rate, pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a>);
+    <b>let</b> expected = exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_oct_balance">sui_balance</a>);
     <b>let</b> actual = pool.pool_token_balance;
-    <b>assert</b>!(expected == actual, <a href="../one_system/staking_pool.md#one_system_staking_pool_ETokenBalancesDoNotMatchExchangeRate">ETokenBalancesDoNotMatchExchangeRate</a>)
+    <b>assert</b>!(expected == actual, <a href="../sui_system/staking_pool.md#sui_system_staking_pool_ETokenBalancesDoNotMatchExchangeRate">ETokenBalancesDoNotMatchExchangeRate</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="sui_system_staking_pool_mul_div"></a>
+
+## Macro function `mul_div`
+
+
+
+<pre><code><b>macro</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_mul_div">mul_div</a>($a: u64, $b: u64, $c: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>macro</b> <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_mul_div">mul_div</a>($a: u64, $b: u64, $c: u64): u64 {
+    (($a <b>as</b> u128) * ($b <b>as</b> u128) / ($c <b>as</b> u128)) <b>as</b> u64
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="sui_system_staking_pool_calculate_rewards"></a>
+
+## Function `calculate_rewards`
+
+
+
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_calculate_rewards">calculate_rewards</a>(pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">one_system::staking_pool::StakingPool</a>, staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, current_epoch: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool_calculate_rewards">calculate_rewards</a>(
+    pool: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakingPool">StakingPool</a>,
+    staked_oct: &<a href="../sui_system/staking_pool.md#sui_system_staking_pool_StakedOct">StakedOct</a>,
+    current_epoch: u64,
+): u64 {
+    <b>let</b> staked_amount = staked_oct.amount();
+    <b>let</b> pool_token_withdraw_amount = {
+        <b>let</b> exchange_rate_at_staking_epoch = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(staked_oct.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>);
+        exchange_rate_at_staking_epoch.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_token_amount">get_token_amount</a>(staked_amount)
+    };
+    <b>let</b> new_epoch_exchange_rate = pool.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_pool_token_exchange_rate_at_epoch">pool_token_exchange_rate_at_epoch</a>(current_epoch);
+    <b>let</b> total_oct_withdraw_amount = new_epoch_exchange_rate.<a href="../sui_system/staking_pool.md#sui_system_staking_pool_get_sui_amount">get_sui_amount</a>(
+        pool_token_withdraw_amount,
+    );
+    <b>let</b> <b>mut</b> reward_withdraw_amount = <b>if</b> (total_oct_withdraw_amount &gt;= staked_amount) {
+        total_oct_withdraw_amount - staked_amount
+    } <b>else</b> 0;
+    reward_withdraw_amount = reward_withdraw_amount.min(pool.rewards_pool.value());
+    reward_withdraw_amount
 }
 </code></pre>
 

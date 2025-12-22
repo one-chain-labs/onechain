@@ -306,10 +306,10 @@ impl DiscoveryEventLoop {
 
         // Clean out the pending_dials
         self.pending_dials.retain(|_k, v| !v.is_finished());
-        if let Some(abort_handle) = &self.dial_seed_peers_task {
-            if abort_handle.is_finished() {
-                self.dial_seed_peers_task = None;
-            }
+        if let Some(abort_handle) = &self.dial_seed_peers_task
+            && abort_handle.is_finished()
+        {
+            self.dial_seed_peers_task = None;
         }
 
         // Spawn some dials
@@ -468,7 +468,8 @@ fn update_known_peers(
     let our_peer_id = state.read().unwrap().our_info.clone().unwrap().peer_id;
     let known_peers = &mut state.write().unwrap().known_peers;
     // only take the first MAX_PEERS_TO_SEND peers
-    for peer_info in found_peers.into_iter().take(MAX_PEERS_TO_SEND) {
+    for peer_info in found_peers.into_iter().take(MAX_PEERS_TO_SEND + 1) {
+        // +1 to account for the "own_info" of the serving peer
         // Skip peers whose timestamp is too far in the future from our clock
         // or that are too old
         if peer_info.timestamp_ms > now_unix.saturating_add(30 * 1_000) // 30 seconds

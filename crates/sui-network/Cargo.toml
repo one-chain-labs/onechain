@@ -4,7 +4,10 @@ version = "0.0.0"
 authors = ["Mysten Labs <build@mystenlabs.com>"]
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
+
+[lints]
+workspace = true
 
 [dependencies]
 anemo.workspace = true
@@ -12,16 +15,26 @@ anemo-tower.workspace = true
 governor.workspace = true
 serde.workspace = true
 tonic.workspace = true
+tonic-prost.workspace = true
 dashmap.workspace = true
 tower.workspace = true
 shared-crypto.workspace = true
+eyre.workspace = true
+http.workspace = true
+tokio-rustls.workspace = true
+tonic-health.workspace = true
+tower-http.workspace = true
+sui-http.workspace = true
+sui-tls.workspace = true
 
-sui-archival.workspace = true
 sui-macros.workspace = true
 sui-storage.workspace = true
 sui-types.workspace = true
 sui-config.workspace = true
 sui-swarm-config.workspace = true
+sui-simulator.workspace = true
+sui-protocol-config.workspace = true
+sui-data-ingestion-core.workspace = true
 
 arc-swap.workspace = true
 bcs.workspace = true

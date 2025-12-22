@@ -10,11 +10,11 @@ use sui_json_rpc_types::SuiTransactionBlockEffectsAPI;
 use sui_swarm_config::genesis_config::{AccountConfig, DEFAULT_GAS_AMOUNT};
 use sui_test_transaction_builder::{publish_basics_package_and_make_counter, TestTransactionBuilder};
 use sui_types::{
-    base_types::{ObjectRef, SuiAddress},
+    base_types::{FullObjectRef, ObjectRef, SuiAddress},
     coin::{PAY_JOIN_FUNC_NAME, PAY_MODULE_NAME, PAY_SPLIT_VEC_FUNC_NAME},
     gas::GasCostSummary,
     gas_coin::GAS,
-    transaction::{CallArg, ObjectArg, TransactionData},
+    transaction::{CallArg, ObjectArg, SharedObjectMutability, TransactionData},
     SUI_FRAMEWORK_PACKAGE_ID,
 };
 use test_cluster::{TestCluster, TestClusterBuilder};
@@ -63,11 +63,16 @@ async fn split_n_tx(n: u64, coin: ObjectRef, gas: ObjectRef, gas_price: u64, sen
     let type_args = vec![GAS::type_tag()];
 
     TestTransactionBuilder::new(sender, gas, gas_price)
-        .move_call(SUI_FRAMEWORK_PACKAGE_ID, PAY_MODULE_NAME.as_str(), PAY_SPLIT_VEC_FUNC_NAME.as_str(), vec![
-            CallArg::Object(ObjectArg::ImmOrOwnedObject(coin)),
-            CallArg::Pure(bcs::to_bytes(&split_amounts).unwrap()),
-        ])
-        .with_type_args(type_args)
+        .move_call_with_type_args(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            PAY_MODULE_NAME.as_str(),
+            PAY_SPLIT_VEC_FUNC_NAME.as_str(),
+            type_args,
+            vec![
+                CallArg::Object(ObjectArg::ImmOrOwnedObject(coin)),
+                CallArg::Pure(bcs::to_bytes(&split_amounts).unwrap()),
+            ],
+        )
         .build()
 }
 
@@ -107,7 +112,7 @@ async fn create_txes(test_cluster: &TestCluster) -> BTreeMap<CommonTransactionCo
     // Transfer Whole Coin Object
     //
     let whole_coin_tx = TestTransactionBuilder::new(sender, gas_objects.pop().unwrap(), gas_price)
-        .transfer(gas_objects.pop().unwrap(), SuiAddress::default())
+        .transfer(FullObjectRef::from_fastpath_ref(gas_objects.pop().unwrap()), SuiAddress::default())
         .build();
 
     ret.insert(CommonTransactionCosts::TransferWholeCoin, whole_coin_tx);
@@ -119,11 +124,16 @@ async fn create_txes(test_cluster: &TestCluster) -> BTreeMap<CommonTransactionCo
     let type_args = vec![GAS::type_tag()];
 
     let merge_tx = TestTransactionBuilder::new(sender, gas_objects.pop().unwrap(), gas_price)
-        .move_call(SUI_FRAMEWORK_PACKAGE_ID, PAY_MODULE_NAME.as_str(), PAY_JOIN_FUNC_NAME.as_str(), vec![
-            CallArg::Object(ObjectArg::ImmOrOwnedObject(c1)),
-            CallArg::Object(ObjectArg::ImmOrOwnedObject(gas_objects.pop().unwrap())),
-        ])
-        .with_type_args(type_args)
+        .move_call_with_type_args(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            PAY_MODULE_NAME.as_str(),
+            PAY_JOIN_FUNC_NAME.as_str(),
+            type_args,
+            vec![
+                CallArg::Object(ObjectArg::ImmOrOwnedObject(c1)),
+                CallArg::Object(ObjectArg::ImmOrOwnedObject(gas_objects.pop().unwrap())),
+            ],
+        )
         .build();
     ret.insert(CommonTransactionCosts::MergeCoin, merge_tx);
 
@@ -154,7 +164,7 @@ async fn create_txes(test_cluster: &TestCluster) -> BTreeMap<CommonTransactionCo
             CallArg::Object(ObjectArg::SharedObject {
                 id: counter_id,
                 initial_shared_version: counter_initial_shared_version,
-                mutable: true,
+                mutability: SharedObjectMutability::Mutable,
             }),
             CallArg::Pure(0u64.to_le_bytes().to_vec()),
         ])

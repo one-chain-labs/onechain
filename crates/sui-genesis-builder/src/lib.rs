@@ -1,12 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    fs,
-    path::Path,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
 
 use anyhow::{bail, Context};
 use camino::Utf8Path;
@@ -41,6 +36,7 @@ use sui_types::{
     digests::ChainIdentifier,
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     epoch_data::EpochData,
+    execution_params::ExecutionOrEarlyError,
     gas::SuiGasStatus,
     gas_coin::GasCoin,
     governance::StakedOct,
@@ -592,7 +588,9 @@ fn build_unsigned_genesis_data(
     objects: &[Object],
 ) -> UnsignedGenesis {
     if !parameters.allow_insertion_of_extra_objects && !objects.is_empty() {
-        panic!("insertion of extra objects at genesis time is prohibited due to 'allow_insertion_of_extra_objects' parameter");
+        panic!(
+            "insertion of extra objects at genesis time is prohibited due to 'allow_insertion_of_extra_objects' parameter"
+        );
     }
 
     let genesis_chain_parameters = parameters.to_genesis_chain_parameters();
@@ -747,10 +745,9 @@ fn create_genesis_transaction(
         let silent = true;
 
         let executor =
-            sui_execution::executor(protocol_config, silent, None).expect("Creating an executor should not fail here");
+            sui_execution::executor(protocol_config, silent).expect("Creating an executor should not fail here");
 
         let expensive_checks = false;
-        let certificate_deny_set = HashSet::new();
         let transaction_data = &genesis_transaction.data().intent_message().value;
         let (kind, signer, mut gas_data) = transaction_data.execution_parts();
         gas_data.payment = vec![];
@@ -760,7 +757,7 @@ fn create_genesis_transaction(
             protocol_config,
             metrics,
             expensive_checks,
-            &certificate_deny_set,
+            ExecutionOrEarlyError::Ok(()),
             &epoch_data.epoch_id(),
             epoch_data.epoch_start_timestamp(),
             input_objects,
@@ -804,8 +801,7 @@ fn create_genesis_objects(
         ProtocolConfig::get_for_version(ProtocolVersion::new(parameters.protocol_version), Chain::Unknown);
 
     let silent = true;
-    let executor =
-        sui_execution::executor(&protocol_config, silent, None).expect("Creating an executor should not fail here");
+    let executor = sui_execution::executor(&protocol_config, silent).expect("Creating an executor should not fail here");
 
     for system_package in system_packages.into_iter() {
         process_package(
@@ -860,7 +856,8 @@ fn process_package(
     #[cfg(debug_assertions)]
     {
         use move_core_types::account_address::AccountAddress;
-        let to_be_published_addresses: HashSet<_> = modules.iter().map(|module| *module.self_id().address()).collect();
+        let to_be_published_addresses: std::collections::HashSet<_> =
+            modules.iter().map(|module| *module.self_id().address()).collect();
         assert!(
             // An object either exists on-chain, or is one of the packages to be published.
             dependencies.iter().zip(dependency_objects.iter()).all(|(dependency, obj_opt)| obj_opt.is_some()
@@ -960,6 +957,27 @@ pub fn generate_genesis_system_object(
                 vec![],
             )?;
         }
+
+        if protocol_config.enable_accumulators() && protocol_config.create_root_accumulator_object() {
+            builder.move_call(
+                SUI_FRAMEWORK_ADDRESS.into(),
+                ident_str!("accumulator").to_owned(),
+                ident_str!("create").to_owned(),
+                vec![],
+                vec![],
+            )?;
+        }
+
+        if protocol_config.enable_coin_registry() {
+            builder.move_call(
+                SUI_FRAMEWORK_ADDRESS.into(),
+                ident_str!("coin_registry").to_owned(),
+                ident_str!("create").to_owned(),
+                vec![],
+                vec![],
+            )?;
+        }
+
         if protocol_config.enable_coin_deny_list_v1() {
             builder.move_call(
                 SUI_FRAMEWORK_ADDRESS.into(),
@@ -1094,7 +1112,6 @@ mod test {
             protocol_key: key.public().into(),
             worker_key: worker_key.public().clone(),
             account_address: SuiAddress::from(account_key.public()),
-            revenue_receiving_address: SuiAddress::from(account_key.public()),
             network_key: network_key.public().clone(),
             gas_price: DEFAULT_VALIDATOR_GAS_PRICE,
             commission_rate: DEFAULT_COMMISSION_RATE,

@@ -53,7 +53,7 @@ async fn test_get_transaction_block() -> Result<(), anyhow::Error> {
         let oref = obj.object().unwrap();
         let transaction_bytes: TransactionBlockBytes =
             http_client.transfer_object(address, oref.object_id, Some(gas_id), 1_000_000.into(), address).await?;
-        let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+        let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
 
         let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
@@ -122,7 +122,7 @@ async fn test_get_raw_transaction() -> Result<(), anyhow::Error> {
     // Make a transfer transactions
     let transaction_bytes: TransactionBlockBytes =
         http_client.transfer_object(address, object_to_transfer, None, 1_000_000.into(), address).await?;
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
     let original_sender_signed_data = tx.data().clone();
 
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
@@ -176,7 +176,7 @@ async fn test_get_fullnode_transaction() -> Result<(), anyhow::Error> {
                 .transaction_builder()
                 .transfer_object(address, oref.object_id, Some(gas_id), 1_000_000, address)
                 .await?;
-            let tx = cluster.wallet.sign_transaction(&data);
+            let tx = cluster.wallet.sign_transaction(&data).await;
 
             let response = client
                 .quorum_driver_api()
@@ -345,7 +345,7 @@ async fn test_query_transaction_blocks() -> Result<(), anyhow::Error> {
     let pt = pt_builer.finish();
 
     let tx_data = TransactionData::new_programmable(signer, vec![gas], pt, 10_000_000, 1000);
-    let signed_data = cluster.wallet.sign_transaction(&tx_data);
+    let signed_data = cluster.wallet.sign_transaction(&tx_data).await;
     let _response = client
         .quorum_driver_api()
         .execute_transaction_block(

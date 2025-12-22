@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::{
+    account_address::AccountAddress,
     annotated_value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     ident_str,
     identifier::IdentStr,
@@ -13,16 +14,19 @@ use serde::{Deserialize, Serialize};
 use crate::{
     balance::{Balance, Supply},
     base_types::ObjectID,
-    error::{ExecutionError, ExecutionErrorKind, SuiError},
-    id::UID,
+    error::{ExecutionError, ExecutionErrorKind, SuiError, SuiErrorKind},
+    id::{ID, UID},
     object::{Data, Object},
     SUI_FRAMEWORK_ADDRESS,
 };
 
 pub const COIN_MODULE_NAME: &IdentStr = ident_str!("coin");
 pub const COIN_STRUCT_NAME: &IdentStr = ident_str!("Coin");
+pub const RESOLVED_COIN_STRUCT: (&AccountAddress, &IdentStr, &IdentStr) =
+    (&SUI_FRAMEWORK_ADDRESS, COIN_MODULE_NAME, COIN_STRUCT_NAME);
 pub const COIN_METADATA_STRUCT_NAME: &IdentStr = ident_str!("CoinMetadata");
 pub const COIN_TREASURE_CAP_NAME: &IdentStr = ident_str!("TreasuryCap");
+pub const REGULATED_COIN_METADATA_STRUCT_NAME: &IdentStr = ident_str!("RegulatedCoinMetadata");
 
 pub const PAY_MODULE_NAME: &IdentStr = ident_str!("pay");
 pub const PAY_JOIN_FUNC_NAME: &IdentStr = ident_str!("join");
@@ -55,6 +59,18 @@ impl Coin {
         other.address == SUI_FRAMEWORK_ADDRESS
             && other.module.as_ident_str() == COIN_MODULE_NAME
             && other.name.as_ident_str() == COIN_STRUCT_NAME
+    }
+
+    /// Checks if the provided type is `Coin<T>`, returning the type T if so.
+    pub fn is_coin_with_coin_type(other: &StructTag) -> Option<&StructTag> {
+        if Self::is_coin(other) && other.type_params.len() == 1 {
+            match other.type_params.first() {
+                Some(TypeTag::Struct(coin_type)) => Some(coin_type),
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 
     /// Create a coin from BCS bytes
@@ -137,8 +153,11 @@ impl TreasuryCap {
 
     /// Create a TreasuryCap from BCS bytes
     pub fn from_bcs_bytes(content: &[u8]) -> Result<Self, SuiError> {
-        bcs::from_bytes(content).map_err(|err| SuiError::ObjectDeserializationError {
-            error: format!("Unable to deserialize TreasuryCap object: {}", err),
+        bcs::from_bytes(content).map_err(|err| {
+            SuiErrorKind::ObjectDeserializationError {
+                error: format!("Unable to deserialize TreasuryCap object: {}", err),
+            }
+            .into()
         })
     }
 
@@ -177,7 +196,7 @@ impl TryFrom<Object> for TreasuryCap {
             Data::Package(_) => {}
         }
 
-        Err(SuiError::TypeError { error: format!("Object type is not a TreasuryCap: {:?}", object) })
+        Err(SuiErrorKind::TypeError { error: format!("Object type is not a TreasuryCap: {:?}", object) }.into())
     }
 }
 
@@ -207,8 +226,11 @@ impl CoinMetadata {
 
     /// Create a coin from BCS bytes
     pub fn from_bcs_bytes(content: &[u8]) -> Result<Self, SuiError> {
-        bcs::from_bytes(content).map_err(|err| SuiError::ObjectDeserializationError {
-            error: format!("Unable to deserialize CoinMetadata object: {}", err),
+        bcs::from_bytes(content).map_err(|err| {
+            SuiErrorKind::ObjectDeserializationError {
+                error: format!("Unable to deserialize CoinMetadata object: {}", err),
+            }
+            .into()
         })
     }
 
@@ -255,6 +277,82 @@ impl TryFrom<&Object> for CoinMetadata {
             Data::Package(_) => {}
         }
 
-        Err(SuiError::TypeError { error: format!("Object type is not a CoinMetadata: {:?}", object) })
+        Err(SuiErrorKind::TypeError { error: format!("Object type is not a CoinMetadata: {:?}", object) }.into())
+    }
+}
+
+// Rust version of the Move one::coin::RegulatedCoinMetadata type
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct RegulatedCoinMetadata {
+    pub id: UID,
+    /// The ID of the coin's CoinMetadata object.
+    pub coin_metadata_object: ID,
+    /// The ID of the coin's DenyCap object.
+    pub deny_cap_object: ID,
+}
+
+impl RegulatedCoinMetadata {
+    /// Is this other StructTag representing a CoinMetadata?
+    pub fn is_regulated_coin_metadata(other: &StructTag) -> bool {
+        other.address == SUI_FRAMEWORK_ADDRESS
+            && other.module.as_ident_str() == COIN_MODULE_NAME
+            && other.name.as_ident_str() == REGULATED_COIN_METADATA_STRUCT_NAME
+    }
+
+    /// Create a coin from BCS bytes
+    pub fn from_bcs_bytes(content: &[u8]) -> Result<Self, SuiError> {
+        bcs::from_bytes(content).map_err(|err| {
+            SuiErrorKind::ObjectDeserializationError {
+                error: format!("Unable to deserialize RegulatedCoinMetadata object: {}", err),
+            }
+            .into()
+        })
+    }
+
+    pub fn type_(type_param: StructTag) -> StructTag {
+        StructTag {
+            address: SUI_FRAMEWORK_ADDRESS,
+            module: COIN_MODULE_NAME.to_owned(),
+            name: REGULATED_COIN_METADATA_STRUCT_NAME.to_owned(),
+            type_params: vec![TypeTag::Struct(Box::new(type_param))],
+        }
+    }
+
+    /// Checks if the provided type is `CoinMetadata<T>`, returning the type T if so.
+    pub fn is_regulated_coin_metadata_with_coin_type(other: &StructTag) -> Option<&StructTag> {
+        if Self::is_regulated_coin_metadata(other) && other.type_params.len() == 1 {
+            match other.type_params.first() {
+                Some(TypeTag::Struct(coin_type)) => Some(coin_type),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl TryFrom<Object> for RegulatedCoinMetadata {
+    type Error = SuiError;
+
+    fn try_from(object: Object) -> Result<Self, Self::Error> {
+        TryFrom::try_from(&object)
+    }
+}
+
+impl TryFrom<&Object> for RegulatedCoinMetadata {
+    type Error = SuiError;
+
+    fn try_from(object: &Object) -> Result<Self, Self::Error> {
+        match &object.data {
+            Data::Move(o) => {
+                if o.type_().is_regulated_coin_metadata() {
+                    return Self::from_bcs_bytes(o.contents());
+                }
+            }
+            Data::Package(_) => {}
+        }
+
+        Err(SuiErrorKind::TypeError { error: format!("Object type is not a RegulatedCoinMetadata: {:?}", object) }
+            .into())
     }
 }

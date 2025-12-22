@@ -69,6 +69,12 @@ async fn main() -> Result<()> {
     let registry_service = metrics::start_prometheus_server(metrics_listener);
     let prometheus_registry = registry_service.default_registry();
     prometheus_registry.register(mysten_metrics::uptime_metric("one-proxy", VERSION, "unavailable")).unwrap();
+
+    let timeout_secs = match env::var("NODE_CLIENT_TIMEOUT") {
+        Ok(val) => val.parse::<u64>().ok(),
+        Err(_) => None,
+    };
+
     let app = app(
         Labels {
             network: config.network,
@@ -77,6 +83,7 @@ async fn main() -> Result<()> {
         client,
         histogram_relay,
         allower,
+        timeout_secs,
     );
 
     server(listener, app, Some(acceptor)).await.unwrap();

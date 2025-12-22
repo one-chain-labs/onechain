@@ -1,22 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{
-    account_address::AccountAddress,
-    annotated_value as A,
-    language_storage::StructTag,
-    resolver::ResourceResolver,
-};
+use move_core_types::{annotated_value as A, language_storage::StructTag};
 use move_vm_runtime::move_vm::MoveVM;
 use sui_types::{
     base_types::ObjectID,
-    error::{SuiError, SuiResult},
+    error::{SuiError, SuiErrorKind, SuiResult},
     execution::TypeLayoutStore,
     layout_resolver::LayoutResolver,
     storage::{BackingPackageStore, PackageObject},
 };
 
-use crate::programmable_transactions::{context::load_type_from_struct, linkage_view::LinkageView};
+use crate::{
+    data_store::{cached_package_store::CachedPackageStore, legacy::linkage_view::LinkageView},
+    programmable_transactions::context::load_type_from_struct,
+};
 
 /// Retrieve a `MoveStructLayout` from a `Type`.
 /// Invocation into the `Session` to leverage the `LinkageView` implementation
@@ -32,21 +30,21 @@ struct NullSuiResolver<'state>(Box<dyn TypeLayoutStore + 'state>);
 
 impl<'state, 'vm> TypeLayoutResolver<'state, 'vm> {
     pub fn new(vm: &'vm MoveVM, state_view: Box<dyn TypeLayoutStore + 'state>) -> Self {
-        let linkage_view = LinkageView::new(Box::new(NullSuiResolver(state_view)));
+        let linkage_view = LinkageView::new(Box::new(CachedPackageStore::new(Box::new(NullSuiResolver(state_view)))));
         Self { vm, linkage_view }
     }
 }
 
 impl LayoutResolver for TypeLayoutResolver<'_, '_> {
     fn get_annotated_layout(&mut self, struct_tag: &StructTag) -> Result<A::MoveDatatypeLayout, SuiError> {
-        let Ok(ty) = load_type_from_struct(self.vm, &mut self.linkage_view, &[], struct_tag) else {
-            return Err(SuiError::FailObjectLayout { st: format!("{}", struct_tag) });
+        let Ok(ty) = load_type_from_struct(self.vm, &self.linkage_view, &[], struct_tag) else {
+            return Err(SuiErrorKind::FailObjectLayout { st: format!("{}", struct_tag) }.into());
         };
         let layout = self.vm.get_runtime().type_to_fully_annotated_layout(&ty);
         match layout {
             Ok(A::MoveTypeLayout::Struct(s)) => Ok(A::MoveDatatypeLayout::Struct(s)),
             Ok(A::MoveTypeLayout::Enum(e)) => Ok(A::MoveDatatypeLayout::Enum(e)),
-            _ => Err(SuiError::FailObjectLayout { st: format!("{}", struct_tag) }),
+            _ => Err(SuiErrorKind::FailObjectLayout { st: format!("{}", struct_tag) }.into()),
         }
     }
 }
@@ -54,13 +52,5 @@ impl LayoutResolver for TypeLayoutResolver<'_, '_> {
 impl BackingPackageStore for NullSuiResolver<'_> {
     fn get_package_object(&self, package_id: &ObjectID) -> SuiResult<Option<PackageObject>> {
         self.0.get_package_object(package_id)
-    }
-}
-
-impl ResourceResolver for NullSuiResolver<'_> {
-    type Error = SuiError;
-
-    fn get_resource(&self, _address: &AccountAddress, _typ: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
-        Ok(None)
     }
 }

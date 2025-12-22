@@ -4,6 +4,7 @@
 use std::str::FromStr;
 
 use anyhow::ensure;
+use fastcrypto::hash::{Blake2b256, HashFunction};
 use move_core_types::{
     account_address::AccountAddress,
     annotated_value::{MoveDatatypeLayout, MoveValue},
@@ -18,7 +19,8 @@ use serde_with::{serde_as, Bytes};
 
 use crate::{
     base_types::{ObjectID, SuiAddress, TransactionDigest},
-    error::{SuiError, SuiResult},
+    digests::Digest,
+    error::{SuiErrorKind, SuiResult},
     object::bounded_visitor::BoundedVisitor,
     sui_serde::{BigInt, Readable},
     SUI_SYSTEM_ADDRESS,
@@ -114,13 +116,21 @@ impl Event {
 
     pub fn move_event_to_move_value(contents: &[u8], layout: MoveDatatypeLayout) -> SuiResult<MoveValue> {
         BoundedVisitor::deserialize_value(contents, &layout.into_layout())
-            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })
+            .map_err(|e| SuiErrorKind::ObjectSerializationError { error: e.to_string() }.into())
     }
 
     pub fn is_system_epoch_info_event(&self) -> bool {
         self.type_.address == SUI_SYSTEM_ADDRESS
             && self.type_.module.as_ident_str() == ident_str!("sui_system_state_inner")
             && self.type_.name.as_ident_str() == ident_str!("SystemEpochInfoEvent")
+    }
+
+    /// Hash of event contents. Not guaranteed to be unique as event contents can be identical.
+    pub fn digest(&self) -> Digest {
+        let mut h = Blake2b256::new();
+        bcs::serialize_into(&mut h, &self).unwrap();
+        let digest = h.finalize();
+        Digest::new(digest.digest)
     }
 }
 

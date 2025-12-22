@@ -19,7 +19,7 @@ impl Multiaddr {
     }
 
     #[cfg(test)]
-    pub(crate) fn new_internal(inner: ::multiaddr::Multiaddr) -> Self {
+    fn new_internal(inner: ::multiaddr::Multiaddr) -> Self {
         Self(inner)
     }
 
@@ -190,6 +190,20 @@ impl Multiaddr {
         for component in self.iter() {
             if let Protocol::Udp(port) = component {
                 new.push(Protocol::Tcp(port));
+            } else {
+                new.push(component);
+            }
+        }
+
+        new
+    }
+
+    pub fn rewrite_http_to_https(&self) -> Self {
+        let mut new = Self::empty();
+
+        for component in self.iter() {
+            if let Protocol::Http = component {
+                new.push(Protocol::Https);
             } else {
                 new.push(component);
             }
@@ -438,5 +452,16 @@ mod test {
         let multi_addr_dns = Multiaddr(multiaddr!(Dns("mysten.sui"), Tcp(10501u16))).with_localhost_ip();
         assert_eq!(Some("127.0.0.1".to_string()), multi_addr_dns.hostname());
         assert_eq!(Some(10501u16), multi_addr_dns.port());
+    }
+
+    #[test]
+    fn document_multiaddr_limitation_for_unix_protocol() {
+        // You can construct a multiaddr by hand (ie binary format) just fine
+        let path = "/tmp/foo";
+        let addr = Multiaddr::new_internal(multiaddr::multiaddr!(Unix(path), Http));
+
+        // But it doesn't round-trip in the human readable format
+        let s = addr.to_string();
+        assert!(s.parse::<Multiaddr>().is_err());
     }
 }

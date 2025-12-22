@@ -3,15 +3,18 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use sui_pg_db::{self as db, Db};
-use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 
 use self::committer::committer;
 use super::{processor::processor, CommitterConfig, Processor, PIPELINE_BUFFER};
-use crate::{metrics::IndexerMetrics, models::watermarks::CommitterWatermark};
+use crate::{
+    metrics::IndexerMetrics,
+    store::{Store, TransactionalStore},
+    types::full_checkpoint_content::Checkpoint,
+};
 
 mod committer;
 
@@ -32,8 +35,10 @@ mod committer;
 /// for, and in turn the ingestion service will only run ahead by its buffer size. This guarantees
 /// liveness and limits the amount of memory the pipeline can consume, by bounding the number of
 /// checkpoints that can be received before the next checkpoint.
-#[async_trait::async_trait]
+#[async_trait]
 pub trait Handler: Processor {
+    type Store: TransactionalStore;
+
     /// If at least this many rows are pending, the committer will commit them eagerly.
     const MIN_EAGER_ROWS: usize = 50;
 
@@ -48,12 +53,23 @@ pub trait Handler: Processor {
     type Batch: Default + Send + Sync + 'static;
 
     /// Add `values` from processing a checkpoint to the current `batch`. Checkpoints are
-    /// guaranteed to be presented to the batch in checkpoint order.
-    fn batch(batch: &mut Self::Batch, values: Vec<Self::Value>);
+    /// guaranteed to be presented to the batch in checkpoint order. The handler takes ownership
+    /// of the iterator and consumes all values.
+    ///
+    /// Returns `BatchStatus::Ready` if the batch is full and should be committed,
+    /// or `BatchStatus::Pending` if the batch can accept more values.
+    ///
+    /// Note: The handler can signal batch readiness via `BatchStatus::Ready`, but the framework
+    /// may also decide to commit a batch based on the trait parameters above.
+    fn batch(&self, batch: &mut Self::Batch, values: std::vec::IntoIter<Self::Value>);
 
     /// Take a batch of values and commit them to the database, returning the number of rows
     /// affected.
-    async fn commit(batch: &Self::Batch, conn: &mut db::Connection<'_>) -> anyhow::Result<usize>;
+    async fn commit<'a>(
+        &self,
+        batch: &Self::Batch,
+        conn: &mut <Self::Store as Store>::Connection<'a>,
+    ) -> anyhow::Result<usize>;
 }
 
 /// Configuration for a sequential pipeline
@@ -93,24 +109,27 @@ pub struct SequentialConfig {
 /// channels close, or any of its independent tasks fail.
 pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     handler: H,
-    initial_watermark: Option<CommitterWatermark<'static>>,
+    next_checkpoint: u64,
     config: SequentialConfig,
-    db: Db,
-    checkpoint_rx: mpsc::Receiver<Arc<CheckpointData>>,
+    db: H::Store,
+    checkpoint_rx: mpsc::Receiver<Arc<Checkpoint>>,
     watermark_tx: mpsc::UnboundedSender<(&'static str, u64)>,
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {
     let (processor_tx, committer_rx) = mpsc::channel(H::FANOUT + PIPELINE_BUFFER);
 
-    let processor = processor(Arc::new(handler), checkpoint_rx, processor_tx, metrics.clone(), cancel.clone());
+    let handler = Arc::new(handler);
+
+    let processor = processor(handler.clone(), checkpoint_rx, processor_tx, metrics.clone(), cancel.clone());
 
     let committer = committer::<H>(
+        handler,
         config,
-        initial_watermark,
+        next_checkpoint,
         committer_rx,
         watermark_tx,
-        db.clone(),
+        db,
         metrics.clone(),
         cancel.clone(),
     );

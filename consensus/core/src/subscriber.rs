@@ -4,6 +4,7 @@
 use std::{sync::Arc, time::Duration};
 
 use consensus_config::AuthorityIndex;
+use consensus_types::block::Round;
 use futures::StreamExt;
 use mysten_metrics::spawn_monitored_task;
 use parking_lot::{Mutex, RwLock};
@@ -16,7 +17,6 @@ use crate::{
     dag_state::DagState,
     error::ConsensusError,
     network::{NetworkClient, NetworkService},
-    Round,
 };
 
 /// Subscriber manages the block stream subscriptions to other peers, taking care of retrying
@@ -57,15 +57,15 @@ impl<C: NetworkClient, S: NetworkService> Subscriber<C, S> {
         let context = self.context.clone();
         let network_client = self.network_client.clone();
         let authority_service = self.authority_service.clone();
-        let (mut last_received, gc_round, gc_enabled) = {
+        let (mut last_received, gc_round) = {
             let dag_state = self.dag_state.read();
-            (dag_state.get_last_block_for_authority(peer).round(), dag_state.gc_round(), dag_state.gc_enabled())
+            (dag_state.get_last_block_for_authority(peer).round(), dag_state.gc_round())
         };
 
         // If the latest block we have accepted by an authority is older than the current gc round,
         // then do not attempt to fetch any blocks from that point as they will simply be skipped. Instead
         // do attempt to fetch from the gc round.
-        if gc_enabled && last_received < gc_round {
+        if last_received < gc_round {
             info!(
                 "Last received block for peer {peer} is older than GC round, {last_received} < {gc_round}, fetching from GC round"
             );
@@ -108,17 +108,19 @@ impl<C: NetworkClient, S: NetworkService> Subscriber<C, S> {
         last_received: Round,
     ) {
         const IMMEDIATE_RETRIES: i64 = 3;
+        const MIN_TIMEOUT: Duration = Duration::from_millis(500);
         // When not immediately retrying, limit retry delay between 100ms and 10s.
-        const INITIAL_RETRY_INTERVAL: Duration = Duration::from_millis(100);
-        const MAX_RETRY_INTERVAL: Duration = Duration::from_secs(10);
-        const RETRY_INTERVAL_MULTIPLIER: f32 = 1.2;
+        let mut backoff =
+            mysten_common::backoff::ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(10));
+
         let peer_hostname = &context.committee.authority(peer).hostname;
         let mut retries: i64 = 0;
-        let mut delay = INITIAL_RETRY_INTERVAL;
         'subscription: loop {
             context.metrics.node_metrics.subscribed_to.with_label_values(&[peer_hostname]).set(0);
 
+            let mut delay = Duration::ZERO;
             if retries > IMMEDIATE_RETRIES {
+                delay = backoff.next().unwrap();
                 debug!(
                     "Delaying retry {} of peer {} subscription, in {} seconds",
                     retries,
@@ -126,18 +128,15 @@ impl<C: NetworkClient, S: NetworkService> Subscriber<C, S> {
                     delay.as_secs_f32(),
                 );
                 sleep(delay).await;
-                // Update delay for the next retry.
-                delay = delay.mul_f32(RETRY_INTERVAL_MULTIPLIER).min(MAX_RETRY_INTERVAL);
             } else if retries > 0 {
                 // Retry immediately, but still yield to avoid monopolizing the thread.
                 tokio::task::yield_now().await;
-            } else {
-                // First attempt, reset delay for next retries but no waiting.
-                delay = INITIAL_RETRY_INTERVAL;
             }
             retries += 1;
 
-            let mut blocks = match network_client.subscribe_blocks(peer, last_received, MAX_RETRY_INTERVAL).await {
+            // Use longer timeout when retry delay is long, to adapt to slow network.
+            let request_timeout = MIN_TIMEOUT.max(delay);
+            let mut blocks = match network_client.subscribe_blocks(peer, last_received, request_timeout).await {
                 Ok(blocks) => {
                     debug!("Subscribed to peer {} {} after {} attempts", peer, peer_hostname, retries);
                     context
@@ -197,13 +196,13 @@ impl<C: NetworkClient, S: NetworkService> Subscriber<C, S> {
 
 #[cfg(test)]
 mod test {
-    use anemo::async_trait;
+    use async_trait::async_trait;
     use bytes::Bytes;
+    use consensus_types::block::BlockRef;
     use futures::stream;
 
     use super::*;
     use crate::{
-        block::BlockRef,
         commit::CommitRange,
         error::ConsensusResult,
         network::{test_network::TestService, BlockStream, ExtendedSerializedBlock},
@@ -221,8 +220,6 @@ mod test {
 
     #[async_trait]
     impl NetworkClient for SubscriberTestClient {
-        const SUPPORT_STREAMING: bool = true;
-
         async fn send_block(
             &self,
             _peer: AuthorityIndex,
@@ -252,6 +249,7 @@ mod test {
             _peer: AuthorityIndex,
             _block_refs: Vec<BlockRef>,
             _highest_accepted_rounds: Vec<Round>,
+            _breadth_first: bool,
             _timeout: Duration,
         ) -> ConsensusResult<Vec<Bytes>> {
             unimplemented!("Unimplemented")

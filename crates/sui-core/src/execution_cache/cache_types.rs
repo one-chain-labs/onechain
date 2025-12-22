@@ -8,8 +8,8 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
 };
 
-use moka::sync::Cache as MokaCache;
-use mysten_common::debug_fatal;
+use moka::sync::SegmentedCache as MokaCache;
+use mysten_common::{debug_fatal, fatal};
 use parking_lot::Mutex;
 use sui_types::base_types::SequenceNumber;
 
@@ -49,7 +49,9 @@ impl<V> CachedVersionMap<V> {
     pub fn insert(&mut self, version: SequenceNumber, value: V) {
         if !self.values.is_empty() {
             let back = self.values.back().unwrap().0;
-            assert!(back < version, "version must be monotonically increasing ({} < {})", back, version);
+            if back >= version {
+                fatal!("version must be monotonically increasing ({} < {})", back, version);
+            }
         }
         self.values.push_back((version, value));
     }
@@ -111,12 +113,14 @@ impl<V> CachedVersionMap<V> {
 }
 
 // an iterator adapter that asserts that the wrapped iterator yields elements in order
+#[allow(dead_code)]
 pub(super) struct AssertOrdered<I: Iterator> {
     iter: I,
     last: Option<I::Item>,
 }
 
 impl<I: Iterator> AssertOrdered<I> {
+    #[allow(dead_code)]
     fn new(iter: I) -> Self {
         Self { iter, last: None }
     }
@@ -182,12 +186,12 @@ const KEY_GENERATION_SIZE: usize = 1024 * 16;
 
 impl<K, V> MonotonicCache<K, V>
 where
-    K: Hash + Eq + Send + Sync + Copy + 'static,
+    K: Hash + Eq + Send + Sync + Copy + std::fmt::Debug + 'static,
     V: IsNewer + Clone + Send + Sync + 'static,
 {
     pub fn new(cache_size: u64) -> Self {
         Self {
-            cache: MokaCache::builder().max_capacity(cache_size).build(),
+            cache: MokaCache::builder(8).max_capacity(cache_size).build(),
             key_generation: (0 .. KEY_GENERATION_SIZE).map(|_| AtomicU64::new(0)).collect(),
         }
     }
@@ -210,8 +214,8 @@ where
     /// at insert time, they either are inserting the most recent value, or a concurrent
     /// writer will shortly overwrite their value.
     pub fn get_ticket_for_read(&self, key: &K) -> Ticket {
-        let gen = self.generation(key);
-        Ticket::Read(gen.load(std::sync::atomic::Ordering::Acquire))
+        let r#gen = self.generation(key);
+        Ticket::Read(r#gen.load(std::sync::atomic::Ordering::Acquire))
     }
 
     // Update the cache with guaranteed monotonicity. That is, if there are N
@@ -220,19 +224,19 @@ where
     //
     // Caller should log the insert with trace! and increment the appropriate metric.
     pub fn insert(&self, key: &K, value: V, ticket: Ticket) -> Result<(), ()> {
-        let gen = self.generation(key);
+        let r#gen = self.generation(key);
 
         // invalidate other readers as early as possible. If a reader acquires a
         // new ticket after this point, then it will read the new value from
         // the dirty set (or db).
         if matches!(ticket, Ticket::Write) {
-            gen.fetch_add(1, std::sync::atomic::Ordering::Release);
+            r#gen.fetch_add(1, std::sync::atomic::Ordering::Release);
         }
 
         let check_ticket = || -> Result<(), ()> {
             match ticket {
                 Ticket::Read(ticket) => {
-                    if ticket != gen.load(std::sync::atomic::Ordering::Acquire) {
+                    if ticket != r#gen.load(std::sync::atomic::Ordering::Acquire) {
                         return Err(());
                     }
                     Ok(())
@@ -296,7 +300,7 @@ where
 
             // Ticket expiry should make this assert impossible.
             if entry.is_newer_than(&value) {
-                debug_fatal!("entry is newer than value");
+                debug_fatal!("entry is newer than value {:?}", key);
             } else {
                 *entry = value;
             }

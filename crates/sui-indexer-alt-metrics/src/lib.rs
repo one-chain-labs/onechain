@@ -1,10 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Instant};
 
+use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Extension, Router};
-use prometheus::{Registry, TextEncoder};
+use prometheus::{core::Collector, Registry, TextEncoder};
+use prometheus_closure_metric::{ClosureMetric, ValueType};
 use tokio::{net::TcpListener, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -45,7 +47,9 @@ impl MetricsService {
     pub async fn run(self) -> anyhow::Result<JoinHandle<()>> {
         let Self { addr, registry, cancel } = self;
 
-        let listener = TcpListener::bind(&self.addr).await?;
+        let listener =
+            TcpListener::bind(&self.addr).await.with_context(|| format!("Failed to bind metrics at {addr}"))?;
+
         let app = Router::new().route("/metrics", get(metrics)).layer(Extension(registry));
 
         Ok(tokio::spawn(async move {
@@ -65,6 +69,18 @@ impl Default for MetricsArgs {
     fn default() -> Self {
         Self { metrics_address: "0.0.0.0:9184".parse().unwrap() }
     }
+}
+
+/// A metric that tracks the service uptime.
+pub fn uptime(version: &str) -> anyhow::Result<Box<dyn Collector>> {
+    let init = Instant::now();
+    let opts = prometheus::opts!("uptime", "how long the service has been running in seconds").variable_label("version");
+
+    let metric = move || init.elapsed().as_secs();
+    let uptime =
+        ClosureMetric::new(opts, ValueType::Counter, metric, &[version]).context("Failed to create uptime metric")?;
+
+    Ok(Box::new(uptime))
 }
 
 /// Route handler for metrics service

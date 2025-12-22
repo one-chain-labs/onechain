@@ -10,13 +10,11 @@
 
 module raffles::example1;
 
-use one::{
-    balance::{Self, Balance},
-    clock::Clock,
-    coin::{Self, Coin},
-    random::{Random, new_generator},
-    oct::OCT
-};
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::random::{Random, new_generator};
+use one::oct::OCT;
 
 /// Error codes
 const EGameInProgress: u64 = 0;

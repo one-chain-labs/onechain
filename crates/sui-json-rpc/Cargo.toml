@@ -4,7 +4,7 @@ version = "0.0.0"
 authors = ["Mysten Labs <build@mystenlabs.com>"]
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 arc-swap.workspace = true
@@ -43,6 +43,7 @@ base64.workspace = true
 tap.workspace = true
 
 sui-core.workspace = true
+sui-display.workspace = true
 sui-storage.workspace = true
 sui-types.workspace = true
 sui-json.workspace = true

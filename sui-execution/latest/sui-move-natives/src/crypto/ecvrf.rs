@@ -17,7 +17,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 
-use crate::NativesCostTable;
+use crate::{get_extension, NativesCostTable};
 
 pub const INVALID_ECVRF_HASH_LENGTH: u64 = 1;
 pub const INVALID_ECVRF_PUBLIC_KEY: u64 = 2;
@@ -53,7 +53,7 @@ pub fn ecvrf_verify(
 
     // Load the cost parameters from the protocol config
     let ecvrf_ecvrf_verify_cost_params =
-        &context.extensions().get::<NativesCostTable>().ecvrf_ecvrf_verify_cost_params.clone();
+        get_extension!(context, NativesCostTable)?.ecvrf_ecvrf_verify_cost_params.clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(context, ecvrf_ecvrf_verify_cost_params.ecvrf_ecvrf_verify_cost_base);
 

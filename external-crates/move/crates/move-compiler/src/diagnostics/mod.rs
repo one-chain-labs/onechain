@@ -6,6 +6,7 @@ pub mod codes;
 pub mod warning_filters;
 
 use crate::{
+    Flags,
     command_line::COLOR_MODE_ENV_VAR,
     diagnostics::{
         codes::{Category, DiagnosticCode, DiagnosticInfo, DiagnosticsID, Severity},
@@ -17,14 +18,12 @@ use crate::{
         ide::{IDEAnnotation, IDEInfo},
         known_attributes,
     },
-    Flags,
 };
 use codespan_reporting::{
     self as csr,
     term::{
-        emit,
+        Config, emit,
         termcolor::{Buffer, ColorChoice, StandardStream, WriteColor},
-        Config,
     },
 };
 use csr::files::Files;
@@ -37,7 +36,7 @@ use std::{
     iter::FromIterator,
     ops::Range,
     path::PathBuf,
-    sync::RwLock,
+    sync::{Arc, RwLock},
 };
 
 //**************************************************************************************************
@@ -48,8 +47,8 @@ use std::{
 pub struct DiagnosticReporter<'env> {
     flags: &'env Flags,
     known_filter_names: &'env BTreeMap<DiagnosticsID, (FilterPrefix, FilterName)>,
-    diags: &'env RwLock<Diagnostics>,
-    ide_information: &'env RwLock<IDEInfo>,
+    diags: Arc<RwLock<Diagnostics>>,
+    ide_information: Arc<RwLock<IDEInfo>>,
     warning_filters_scope: WarningFiltersScope,
 }
 
@@ -373,8 +372,8 @@ impl<'env> DiagnosticReporter<'env> {
     pub const fn new(
         flags: &'env Flags,
         known_filter_names: &'env BTreeMap<DiagnosticsID, (FilterPrefix, FilterName)>,
-        diags: &'env RwLock<Diagnostics>,
-        ide_information: &'env RwLock<IDEInfo>,
+        diags: Arc<RwLock<Diagnostics>>,
+        ide_information: Arc<RwLock<IDEInfo>>,
         warning_filters_scope: WarningFiltersScope,
     ) -> Self {
         Self {
@@ -382,6 +381,23 @@ impl<'env> DiagnosticReporter<'env> {
             known_filter_names,
             diags,
             ide_information,
+            warning_filters_scope,
+        }
+    }
+
+    /// Creates a dummy reporter -- this can be passed in anywhere a reporter is expected, but will
+    /// not actually report the diagnostics or IDE information. This can be useful to speculatively
+    /// look up information in, e.g., exapsnion or name resolution.
+    pub fn dummy_reporter(
+        flags: &'env Flags,
+        known_filter_names: &'env BTreeMap<DiagnosticsID, (FilterPrefix, FilterName)>,
+        warning_filters_scope: WarningFiltersScope,
+    ) -> Self {
+        Self {
+            flags,
+            known_filter_names,
+            diags: Arc::new(RwLock::new(Diagnostics::new())),
+            ide_information: Arc::new(RwLock::new(IDEInfo::new())),
             warning_filters_scope,
         }
     }
@@ -459,6 +475,10 @@ impl<'env> DiagnosticReporter<'env> {
             .write()
             .unwrap()
             .add_ide_annotation(loc, info);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.diags.read().unwrap().is_empty()
     }
 }
 
@@ -830,8 +850,7 @@ macro_rules! diag {
     }};
 }
 
-pub const ICE_BUG_REPORT_MESSAGE: &str =
-    "The Move compiler has encountered an internal compiler error.\n \
+pub const ICE_BUG_REPORT_MESSAGE: &str = "The Move compiler has encountered an internal compiler error.\n \
     Please report this issue to the Mysten Labs Move language team,\n \
     including this error and any relevant code, to the Mysten Labs issue tracker\n \
     at : https://github.com/one-chain-labs/onechain/issues";

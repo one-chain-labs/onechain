@@ -33,7 +33,7 @@ use sui_types::{
         SuiAddress,
         TransactionDigest,
     },
-    error::{ExecutionError, SuiError, SuiObjectResponseError, SuiResult, UserInputError, UserInputResult},
+    error::{ExecutionError, SuiErrorKind, SuiObjectResponseError, SuiResult, UserInputError, UserInputResult},
     gas_coin::GasCoin,
     messages_checkpoint::CheckpointSequenceNumber,
     move_package::{MovePackage, TypeOrigin, UpgradeInfo},
@@ -208,6 +208,41 @@ impl SuiObjectData {
             None => false,
         }
     }
+
+    pub fn try_into_object(self, protocol_config: &ProtocolConfig) -> Result<Object, anyhow::Error> {
+        let data = match self.bcs {
+            Some(SuiRawData::MoveObject(o)) => Data::Move(unsafe {
+                MoveObject::new_from_execution(
+                    o.type_().clone().into(),
+                    o.has_public_transfer,
+                    o.version,
+                    o.bcs_bytes,
+                    protocol_config,
+                    /* system_mutation */ false,
+                )?
+            }),
+            Some(SuiRawData::Package(p)) => Data::Package(MovePackage::new(
+                p.id,
+                self.version,
+                p.module_map,
+                protocol_config.max_move_package_size(),
+                p.type_origin_table,
+                p.linkage_table,
+            )?),
+            _ => Err(anyhow!("BCS data is required to convert SuiObjectData to Object"))?,
+        };
+        Ok(ObjectInner {
+            data,
+            owner: self.owner.ok_or_else(|| anyhow!("Owner is required to convert SuiObjectData to Object"))?,
+            previous_transaction: self
+                .previous_transaction
+                .ok_or_else(|| anyhow!("previous_transaction is required to convert SuiObjectData to Object"))?,
+            storage_rebate: self
+                .storage_rebate
+                .ok_or_else(|| anyhow!("storage_rebate is required to convert SuiObjectData to Object"))?,
+        }
+        .into())
+    }
 }
 
 impl Display for SuiObjectData {
@@ -259,12 +294,11 @@ impl TryFrom<&SuiMoveStruct> for GasCoin {
     fn try_from(move_struct: &SuiMoveStruct) -> Result<Self, Self::Error> {
         match move_struct {
             SuiMoveStruct::WithFields(fields) | SuiMoveStruct::WithTypes { type_: _, fields } => {
-                if let Some(SuiMoveValue::String(balance)) = fields.get("balance") {
-                    if let Ok(balance) = balance.parse::<u64>() {
-                        if let Some(SuiMoveValue::UID { id }) = fields.get("id") {
-                            return Ok(GasCoin::new(*id, balance));
-                        }
-                    }
+                if let Some(SuiMoveValue::String(balance)) = fields.get("balance")
+                    && let Ok(balance) = balance.parse::<u64>()
+                    && let Some(SuiMoveValue::UID { id }) = fields.get("id")
+                {
+                    return Ok(GasCoin::new(*id, balance));
                 }
             }
             _ => {}
@@ -515,37 +549,7 @@ impl TryInto<Object> for SuiObjectData {
 
     fn try_into(self) -> Result<Object, Self::Error> {
         let protocol_config = ProtocolConfig::get_for_min_version();
-        let data = match self.bcs {
-            Some(SuiRawData::MoveObject(o)) => Data::Move(unsafe {
-                MoveObject::new_from_execution(
-                    o.type_().clone().into(),
-                    o.has_public_transfer,
-                    o.version,
-                    o.bcs_bytes,
-                    &protocol_config,
-                )?
-            }),
-            Some(SuiRawData::Package(p)) => Data::Package(MovePackage::new(
-                p.id,
-                self.version,
-                p.module_map,
-                protocol_config.max_move_package_size(),
-                p.type_origin_table,
-                p.linkage_table,
-            )?),
-            _ => Err(anyhow!("BCS data is required to convert SuiObjectData to Object"))?,
-        };
-        Ok(ObjectInner {
-            data,
-            owner: self.owner.ok_or_else(|| anyhow!("Owner is required to convert SuiObjectData to Object"))?,
-            previous_transaction: self
-                .previous_transaction
-                .ok_or_else(|| anyhow!("previous_transaction is required to convert SuiObjectData to Object"))?,
-            storage_rebate: self
-                .storage_rebate
-                .ok_or_else(|| anyhow!("storage_rebate is required to convert SuiObjectData to Object"))?,
-        }
-        .into())
+        self.try_into_object(&protocol_config)
     }
 }
 
@@ -660,15 +664,15 @@ impl SuiData for SuiParsedData {
             // this function is only from JSON RPC - it is OK to deserialize with max Move binary
             // version
             let module = move_binary_format::CompiledModule::deserialize_with_defaults(bytecode)
-                .map_err(|error| SuiError::ModuleDeserializationFailure { error: error.to_string() })?;
+                .map_err(|error| SuiErrorKind::ModuleDeserializationFailure { error: error.to_string() })?;
             let d = move_disassembler::disassembler::Disassembler::from_module_with_max_size(
                 &module,
                 move_ir_types::location::Spanned::unsafe_no_loc(()).loc,
                 *sui_types::move_package::MAX_DISASSEMBLED_MODULE_SIZE,
             )
-            .map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+            .map_err(|e| SuiErrorKind::ObjectSerializationError { error: e.to_string() })?;
             let bytecode_str =
-                d.disassemble().map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })?;
+                d.disassemble().map_err(|e| SuiErrorKind::ObjectSerializationError { error: e.to_string() })?;
             disassembled.insert(module.name().to_string(), Value::String(bytecode_str));
         }
 
@@ -803,9 +807,10 @@ pub fn type_and_fields_from_move_event_data(event_data: MoveValue) -> SuiResult<
     match event_data.into() {
         SuiMoveValue::Struct(move_struct) => match &move_struct {
             SuiMoveStruct::WithTypes { type_, .. } => Ok((type_.clone(), move_struct.clone().to_json_value())),
-            _ => Err(SuiError::ObjectDeserializationError {
+            _ => Err(SuiErrorKind::ObjectDeserializationError {
                 error: "Found non-type SuiMoveStruct in MoveValue event".to_string(),
-            }),
+            }
+            .into()),
         },
         SuiMoveValue::Variant(v) => Ok((v.type_.clone(), v.clone().to_json_value())),
         SuiMoveValue::Vector(_)
@@ -814,9 +819,10 @@ pub fn type_and_fields_from_move_event_data(event_data: MoveValue) -> SuiResult<
         | SuiMoveValue::Address(_)
         | SuiMoveValue::String(_)
         | SuiMoveValue::UID { .. }
-        | SuiMoveValue::Option(_) => Err(SuiError::ObjectDeserializationError {
+        | SuiMoveValue::Option(_) => Err(SuiErrorKind::ObjectDeserializationError {
             error: "Invalid MoveValue event type -- this should not be possible".to_string(),
-        }),
+        }
+        .into()),
     }
 }
 
@@ -907,6 +913,7 @@ impl SuiRawMovePackage {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, PartialEq, Eq)]
 #[serde(tag = "status", content = "details", rename = "ObjectRead")]
+#[allow(clippy::large_enum_variant)]
 pub enum SuiPastObjectResponse {
     /// The object exists and is found with this version
     VersionFound(SuiObjectData),

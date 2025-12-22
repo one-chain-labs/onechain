@@ -31,6 +31,7 @@ mod checked {
             ObjectReadResultKind,
             ReceivingObjectReadResult,
             ReceivingObjects,
+            SharedObjectMutability,
             TransactionData,
             TransactionDataAPI,
             TransactionKind,
@@ -62,6 +63,7 @@ mod checked {
         protocol_config: &ProtocolConfig,
         reference_gas_price: u64,
         transaction: &TransactionData,
+        gas_paid_from_address_balance: bool,
     ) -> SuiResult<SuiGasStatus> {
         check_gas(
             objects,
@@ -71,6 +73,7 @@ mod checked {
             transaction.gas_budget(),
             transaction.gas_price(),
             transaction.kind(),
+            gas_paid_from_address_balance,
         )
     }
 
@@ -183,7 +186,14 @@ mod checked {
     ) -> SuiResult<SuiGasStatus> {
         let gas = if gas_override.is_empty() { transaction.gas() } else { gas_override };
 
-        let gas_status = get_gas_status(input_objects, gas, protocol_config, reference_gas_price, transaction)?;
+        let gas_status = get_gas_status(
+            input_objects,
+            gas,
+            protocol_config,
+            reference_gas_price,
+            transaction,
+            transaction.is_gas_paid_from_address_balance(),
+        )?;
         check_objects(transaction, input_objects)?;
 
         Ok(gas_status)
@@ -257,7 +267,7 @@ mod checked {
                         }
                         .into())
                     }
-                    Owner::Shared { .. } | Owner::ConsensusV2 { .. } => {
+                    Owner::Shared { .. } | Owner::ConsensusAddressOwner { .. } => {
                         fp_bail!(UserInputError::NotSharedObjectError.into())
                     }
                     Owner::Immutable => {
@@ -284,6 +294,7 @@ mod checked {
         gas_budget: u64,
         gas_price: u64,
         tx_kind: &TransactionKind,
+        gas_paid_from_address_balance: bool,
     ) -> SuiResult<SuiGasStatus> {
         if tx_kind.is_system_tx() {
             Ok(SuiGasStatus::new_unmetered())
@@ -300,7 +311,11 @@ mod checked {
                     *obj.ok_or(UserInputError::ObjectNotFound { object_id: obj_ref.0, version: Some(obj_ref.1) })?;
                 gas_objects.push(obj);
             }
-            gas_status.check_gas_balance(&gas_objects, gas_budget)?;
+            // Skip gas balance check for address balance payments
+            // We reserve gas budget in advance
+            if !gas_paid_from_address_balance {
+                gas_status.check_gas_balance(&gas_objects, gas_budget)?;
+            }
             Ok(gas_status)
         }
     }
@@ -337,8 +352,8 @@ mod checked {
                     let system_transaction = transaction.is_system_tx();
                     check_one_object(&owner_address, input_object_kind, object, system_transaction)?;
                 }
-                // We skip checking a deleted shared object because it no longer exists
-                ObjectReadResultKind::DeletedSharedObject(_, _) => (),
+                // We skip checking a removed consensus object because it no longer exists.
+                ObjectReadResultKind::ObjectConsensusStreamEnded(_, _) => (),
                 // We skip checking shared objects from cancelled transactions since we are not reading it.
                 ObjectReadResultKind::CancelledTransactionSharedObject(_) => (),
             }
@@ -387,12 +402,14 @@ mod checked {
                     }
                     Owner::AddressOwner(actual_owner) => {
                         // Check the owner is correct.
-                        fp_ensure!(owner == &actual_owner, UserInputError::IncorrectUserSignature {
-                            error: format!(
-                                "Object {:?} is owned by account address {:?}, but given owner/signer address is {:?}",
-                                object_id, actual_owner, owner
-                            ),
-                        });
+                        fp_ensure!(
+                            owner == &actual_owner,
+                            UserInputError::IncorrectUserSignature {
+                                error: format!(
+                                    "Object {object_id:?} is owned by account address {actual_owner:?}, but given owner/signer address is {owner:?}"
+                                ),
+                            }
+                        );
                     }
                     Owner::ObjectOwner(owner) => {
                         return Err(UserInputError::InvalidChildObjectArgument {
@@ -400,7 +417,7 @@ mod checked {
                             parent_id: owner.into(),
                         });
                     }
-                    Owner::Shared { .. } | Owner::ConsensusV2 { .. } => {
+                    Owner::Shared { .. } | Owner::ConsensusAddressOwner { .. } => {
                         // This object is a mutable consensus object. However the transaction
                         // specifies it as an owned object. This is inconsistent.
                         return Err(UserInputError::NotOwnedObjectError);
@@ -410,7 +427,7 @@ mod checked {
             InputObjectKind::SharedMoveObject {
                 id: SUI_CLOCK_OBJECT_ID,
                 initial_shared_version: SUI_CLOCK_OBJECT_SHARED_VERSION,
-                mutable: true,
+                mutability: SharedObjectMutability::Mutable,
             } => {
                 // Only system transactions can accept the Clock
                 // object as a mutable parameter.
@@ -429,7 +446,11 @@ mod checked {
                     });
                 }
             }
-            InputObjectKind::SharedMoveObject { id: SUI_RANDOMNESS_STATE_OBJECT_ID, mutable: true, .. } => {
+            InputObjectKind::SharedMoveObject {
+                id: SUI_RANDOMNESS_STATE_OBJECT_ID,
+                mutability: SharedObjectMutability::Mutable,
+                ..
+            } => {
                 // Only system transactions can accept the Random
                 // object as a mutable parameter.
                 if system_transaction {
@@ -440,19 +461,40 @@ mod checked {
                     });
                 }
             }
-            InputObjectKind::SharedMoveObject { initial_shared_version: input_initial_shared_version, .. } => {
+            InputObjectKind::SharedMoveObject {
+                id: object_id,
+                initial_shared_version: input_initial_shared_version,
+                ..
+            } => {
                 fp_ensure!(object.version() < SequenceNumber::MAX, UserInputError::InvalidSequenceNumber);
 
-                match object.owner {
+                match &object.owner {
                     Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => {
                         // When someone locks an object as shared it must be shared already.
                         return Err(UserInputError::NotSharedObjectError);
                     }
-                    Owner::Shared { initial_shared_version: actual_initial_shared_version }
-                    | Owner::ConsensusV2 { start_version: actual_initial_shared_version, .. } => {
+                    Owner::Shared { initial_shared_version: actual_initial_shared_version } => {
                         fp_ensure!(
-                            input_initial_shared_version == actual_initial_shared_version,
+                            input_initial_shared_version == *actual_initial_shared_version,
                             UserInputError::SharedObjectStartingVersionMismatch
+                        )
+                    }
+                    Owner::ConsensusAddressOwner {
+                        start_version: actual_initial_shared_version,
+                        owner: actual_owner,
+                    } => {
+                        fp_ensure!(
+                            input_initial_shared_version == *actual_initial_shared_version,
+                            UserInputError::SharedObjectStartingVersionMismatch
+                        );
+                        // Check the owner is correct.
+                        fp_ensure!(
+                            owner == actual_owner,
+                            UserInputError::IncorrectUserSignature {
+                                error: format!(
+                                    "Object {object_id:?} is owned by account address {actual_owner:?}, but given owner/signer address is {owner:?}"
+                                ),
+                            }
                         )
                     }
                 }

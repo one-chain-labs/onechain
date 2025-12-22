@@ -16,15 +16,16 @@ use crate::{
     collection_types::{Bag, Table, TableVec, VecMap, VecSet},
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     error::SuiError,
+    gas::GasCostSummary,
     storage::ObjectStore,
     sui_system_state::{
         epoch_start_sui_system_state::EpochStartSystemState,
         get_validators_from_table_vec,
-        sui_system_state_inner_v1::{StakeSubsidyV1, StorageFundV1, SuiSupperCommittee, ValidatorSetV1},
+        sui_system_state_inner_v1::{StakeSubsidyV1, StorageFundV1, ValidatorSetV1},
     },
 };
 
-/// Rust version of the Move sui::sui_system::SystemParametersV2 type
+/// Rust version of the Move one::one_system::SystemParametersV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SystemParametersV2 {
     /// The duration of an epoch, in milliseconds.
@@ -59,13 +60,12 @@ pub struct SystemParametersV2 {
     pub extra_fields: Bag,
 }
 
-/// Rust version of the Move sui_system::sui_system::SuiSystemStateInnerV2 type
+/// Rust version of the Move one_system::one_system::SuiSystemStateInnerV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SuiSystemStateInnerV2 {
     pub epoch: u64,
     pub protocol_version: u64,
     pub system_state_version: u64,
-    pub supper_committee: SuiSupperCommittee,
     pub validators: ValidatorSetV1,
     pub storage_fund: StorageFundV1,
     pub parameters: SystemParametersV2,
@@ -109,6 +109,15 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
 
     fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary {
+            computation_cost: self.safe_mode_computation_rewards.value(),
+            storage_cost: self.safe_mode_storage_rewards.value(),
+            storage_rebate: self.safe_mode_storage_rebates,
+            non_refundable_storage_fee: self.safe_mode_non_refundable_storage_fee,
+        }
     }
 
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
@@ -191,7 +200,6 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
             epoch,
             protocol_version,
             system_state_version,
-            supper_committee,
             validators:
                 ValidatorSetV1 {
                     total_stake,
@@ -205,8 +213,6 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
                     inactive_validators: Table { id: inactive_pools_id, size: inactive_pools_size },
                     validator_candidates: Table { id: validator_candidates_id, size: validator_candidates_size },
                     at_risk_validators: VecMap { contents: at_risk_validators },
-                    trusted_validators: VecSet { contents: trusted_validators },
-                    only_trusted_validator,
                     extra_fields: _,
                 },
             storage_fund,
@@ -279,9 +285,6 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
             validator_low_stake_grace_period,
             stake_subsidy_period_length,
             stake_subsidy_decrease_rate,
-            supper_committee: supper_committee.into_supper_committee_summary(),
-            trusted_validators,
-            only_trusted_validator,
         }
     }
 }

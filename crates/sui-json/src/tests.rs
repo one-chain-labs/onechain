@@ -138,46 +138,53 @@ fn test_basic_args_linter_pure_args_bad() {
     let bad_hex_val = "0x1234AB  CD";
 
     let checks = vec![
-            // Although U256 value can be encoded as num, we enforce it must be a string
-            (
-                Value::from(123),
-                MoveTypeLayout::U256,
+        // Although U256 value can be encoded as num, we enforce it must be a string
+        (Value::from(123), MoveTypeLayout::U256),
+        // Space not allowed
+        (Value::from(" 9"), MoveTypeLayout::U8),
+        // Hex must start with 0x
+        (Value::from("AB"), MoveTypeLayout::U8),
+        // Too large
+        (Value::from("123456789"), MoveTypeLayout::U8),
+        // Too large
+        (
+            Value::from("123456789123456789123456789123456789"),
+            MoveTypeLayout::U64,
+        ),
+        // Too large
+        (
+            Value::from(
+                "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789",
             ),
-             // Space not allowed
-             (Value::from(" 9"), MoveTypeLayout::U8),
-             // Hex must start with 0x
-             (Value::from("AB"), MoveTypeLayout::U8),
-             // Too large
-             (Value::from("123456789"), MoveTypeLayout::U8),
-             // Too large
-             (Value::from("123456789123456789123456789123456789"), MoveTypeLayout::U64),
-             // Too large
-             (Value::from("123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"), MoveTypeLayout::U128),
-             // U64 value greater than 255 cannot be used as U8
-             (Value::from(900u64), MoveTypeLayout::U8),
-             // floats cannot be used as U8
-             (Value::from(0.4f32), MoveTypeLayout::U8),
-             // floats cannot be used as U64
-             (Value::from(3.4f32), MoveTypeLayout::U64),
-             // Negative cannot be used as U64
-             (Value::from(-19), MoveTypeLayout::U64),
-             // Negative cannot be used as Unsigned
-             (Value::from(-1), MoveTypeLayout::U8),
-              // u8 vector from bad hex repr
-            (
-                Value::from(bad_hex_val),
-                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-            ),
-            // u8 vector from heterogeneous array
-            (
-                json!([1, 2, 3, true, 5, 6, 7]),
-                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-            ),
-            // U64 deep nest, bad because heterogeneous array
-            (
-                json!([[[9, 53, 434], [0], [300]], [], [300, 4, 5, 6, 7]]),
-                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64)))),
-            ),
+            MoveTypeLayout::U128,
+        ),
+        // U64 value greater than 255 cannot be used as U8
+        (Value::from(900u64), MoveTypeLayout::U8),
+        // floats cannot be used as U8
+        (Value::from(0.4f32), MoveTypeLayout::U8),
+        // floats cannot be used as U64
+        (Value::from(3.4f32), MoveTypeLayout::U64),
+        // Negative cannot be used as U64
+        (Value::from(-19), MoveTypeLayout::U64),
+        // Negative cannot be used as Unsigned
+        (Value::from(-1), MoveTypeLayout::U8),
+        // u8 vector from bad hex repr
+        (
+            Value::from(bad_hex_val),
+            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+        ),
+        // u8 vector from heterogeneous array
+        (
+            json!([1, 2, 3, true, 5, 6, 7]),
+            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+        ),
+        // U64 deep nest, bad because heterogeneous array
+        (
+            json!([[[9, 53, 434], [0], [300]], [], [300, 4, 5, 6, 7]]),
+            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Vector(Box::new(
+                MoveTypeLayout::U64,
+            )))),
+        ),
     ];
 
     // Driver

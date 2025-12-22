@@ -8,18 +8,18 @@ use move_symbol_pool::Symbol;
 
 use crate::{
     diag,
-    diagnostics::{warning_filters::WarningFilters, Diagnostic, DiagnosticReporter, Diagnostics},
+    diagnostics::{Diagnostic, DiagnosticReporter, Diagnostics, warning_filters::WarningFilters},
     editions::Flavor,
     expansion::ast::{AbilitySet, Fields, ModuleIdent, Mutability, Visibility},
     naming::ast::{
-        self as N, BuiltinTypeName_, FunctionSignature, StructFields, Type, TypeName_, Type_, Var,
+        self as N, BuiltinTypeName_, FunctionSignature, StructFields, Type, Type_, TypeName_, Var,
     },
     parser::ast::{Ability_, DatatypeName, DocComment, FunctionName, TargetKind},
-    shared::{program_info::TypingProgramInfo, CompilationEnv, Identifier},
+    shared::{CompilationEnv, Identifier, program_info::TypingProgramInfo},
     sui_mode::*,
     typing::{
         ast::{self as T, ModuleCall},
-        core::{ability_not_satisfied_tips, error_format, error_format_, Subst},
+        core::{Subst, ability_not_satisfied_tips, error_format, error_format_},
         visitor::{TypingVisitorConstructor, TypingVisitorContext},
     },
 };
@@ -727,6 +727,7 @@ fn is_mut_clock(param_ty: &Type) -> bool {
         | Type_::Param(_)
         | Type_::Var(_)
         | Type_::Anything
+        | Type_::Void
         | Type_::UnresolvedError
         | Type_::Fun(_, _) => false,
     }
@@ -745,6 +746,7 @@ fn is_mut_random(param_ty: &Type) -> bool {
         | Type_::Param(_)
         | Type_::Var(_)
         | Type_::Anything
+        | Type_::Void
         | Type_::UnresolvedError
         | Type_::Fun(_, _) => false,
     }
@@ -809,7 +811,11 @@ fn is_entry_primitive_ty(param_ty: &Type) -> bool {
         Type_::Unit => false,
 
         // Error case nothing to do
-        Type_::UnresolvedError | Type_::Anything | Type_::Var(_) | Type_::Fun(_, _) => true,
+        Type_::UnresolvedError
+        | Type_::Anything
+        | Type_::Void
+        | Type_::Var(_)
+        | Type_::Fun(_, _) => true,
     }
 }
 
@@ -841,6 +847,7 @@ fn is_entry_object_ty_inner(param_ty: &Type) -> bool {
         // Error case nothing to do
         Type_::UnresolvedError
         | Type_::Anything
+        | Type_::Void
         | Type_::Var(_)
         | Type_::Unit
         | Type_::Fun(_, _) => true,
@@ -904,7 +911,11 @@ fn entry_return(
             }
         }
         // Error case nothing to do
-        Type_::UnresolvedError | Type_::Anything | Type_::Var(_) | Type_::Fun(_, _) => (),
+        Type_::UnresolvedError
+        | Type_::Anything
+        | Type_::Void
+        | Type_::Var(_)
+        | Type_::Fun(_, _) => (),
         // Unreachable cases
         Type_::Apply(None, _, _) => unreachable!("ICE abilities should have been expanded"),
     }
@@ -962,13 +973,27 @@ fn exp(context: &mut Context, e: &T::Exp) {
                 context.add_diag(diag)
             }
             if module.value.is(&SUI_ADDR_VALUE, EVENT_MODULE_NAME)
-                && name.value() == EVENT_FUNCTION_NAME
+                && (name.value() == EVENT_FUNCTION_NAME
+                    || name.value() == EVENT_AUTHENTICATED_FUNCTION_NAME)
             {
                 check_event_emit(context, e.exp.loc, mcall)
             }
+
+            if module.value.is(&SUI_ADDR_VALUE, COIN_REGISTRY_MODULE_NAME)
+                && name.value() == DYNAMIC_COIN_CREATION_FUNCTION_NAME
+            {
+                check_dynamic_coin_creation(context, e.exp.loc, mcall)
+            }
+
             let is_transfer_module = module.value.is(&SUI_ADDR_VALUE, TRANSFER_MODULE_NAME);
             if is_transfer_module && PRIVATE_TRANSFER_FUNCTIONS.contains(&name.value()) {
                 check_private_transfer(context, e.exp.loc, mcall)
+            }
+
+            if module.value.is(&STD_ADDR_VALUE, INTERNAL_MODULE_NAME)
+                && name.value() == INTERNAL_PERMIT_FUNCTION_NAME
+            {
+                check_internal_permit(context, e.exp.loc, mcall)
             }
         }
         T::UnannotatedExp_::Pack(m, s, _, _) => {
@@ -1025,6 +1050,37 @@ fn check_event_emit(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
         );
         context.add_diag(diag!(
             EVENT_EMIT_CALL_DIAG,
+            (loc, msg),
+            (first_ty.loc, ty_msg)
+        ));
+    }
+}
+
+fn check_dynamic_coin_creation(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
+    let current_module = context.current_module();
+    let ModuleCall {
+        module,
+        name,
+        type_arguments,
+        ..
+    } = mcall;
+    let Some(first_ty) = type_arguments.first() else {
+        // invalid arity
+        debug_assert!(false, "ICE arity should have been expanded for errors");
+        return;
+    };
+    let is_defined_in_current_module = matches!(first_ty.value.type_name(), Some(sp!(_, TypeName_::ModuleType(m, _))) if m == current_module);
+    if !is_defined_in_current_module {
+        let msg = format!(
+            "Invalid coin creation. The function '{}::{}' must be called with a type defined in the current module",
+            module, name
+        );
+        let ty_msg = format!(
+            "The type {} is not declared in the current module",
+            error_format(first_ty, &Subst::empty()),
+        );
+        context.add_diag(diag!(
+            DYNAMIC_COIN_CREATION_CALL_DIAG,
             (loc, msg),
             (first_ty.loc, ty_msg)
         ));
@@ -1101,6 +1157,47 @@ fn check_private_transfer(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
             );
             diag.add_secondary_label((store_loc, store_msg))
         }
+        context.add_diag(diag)
+    }
+}
+
+fn check_internal_permit(context: &mut Context, loc: Loc, mcall: &ModuleCall) {
+    let ModuleCall {
+        module,
+        name,
+        type_arguments,
+        ..
+    } = mcall;
+    let current_module = context.current_module();
+    let Some(first_ty) = type_arguments.first() else {
+        // invalid arity
+        debug_assert!(false, "ICE arity should have been expanded for errors");
+        return;
+    };
+    let (in_current_module, first_ty_tn) = match first_ty.value.type_name() {
+        Some(sp!(_, TypeName_::Multiple(_))) | Some(sp!(_, TypeName_::Builtin(_))) | None => {
+            (false, None)
+        }
+        Some(sp!(_, TypeName_::ModuleType(m, n))) => (m == current_module, Some((m, n))),
+    };
+    if !in_current_module {
+        let mut msg = format!(
+            "Invalid call to an internal function. \
+            The function '{}::{}' is restricted to being called in the module that defines the type",
+            module, name,
+        );
+        if let Some((first_ty_module, _)) = &first_ty_tn {
+            msg = format!("{}, '{}'", msg, first_ty_module);
+        };
+        let ty_msg = format!(
+            "The type {} is not declared in the current module",
+            error_format(first_ty, &Subst::empty()),
+        );
+        let diag = diag!(
+            INTERNAL_PERMIT_CALL_DIAG,
+            (loc, msg),
+            (first_ty.loc, ty_msg)
+        );
         context.add_diag(diag)
     }
 }

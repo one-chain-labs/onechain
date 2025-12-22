@@ -213,7 +213,9 @@ impl TryFrom<i16> for ObjectStatus {
         Ok(match value {
             0 => ObjectStatus::Active,
             1 => ObjectStatus::WrappedOrDeleted,
-            value => return Err(IndexerError::PersistentStorageDataCorruptionError(format!("{value} as ObjectStatus"))),
+            value => {
+                return Err(IndexerError::PersistentStorageDataCorruptionError(format!("{value} as ObjectStatus")));
+            }
         })
     }
 }
@@ -227,7 +229,9 @@ impl TryFrom<i16> for OwnerType {
             1 => OwnerType::Address,
             2 => OwnerType::Object,
             3 => OwnerType::Shared,
-            value => return Err(IndexerError::PersistentStorageDataCorruptionError(format!("{value} as OwnerType"))),
+            value => {
+                return Err(IndexerError::PersistentStorageDataCorruptionError(format!("{value} as OwnerType")));
+            }
         })
     }
 }
@@ -239,9 +243,7 @@ pub fn owner_to_owner_info(owner: &Owner) -> (OwnerType, Option<SuiAddress>) {
         Owner::ObjectOwner(address) => (OwnerType::Object, Some(*address)),
         Owner::Shared { .. } => (OwnerType::Shared, None),
         Owner::Immutable => (OwnerType::Immutable, None),
-        // ConsensusV2 objects are treated as singly-owned for now in indexers.
-        // This will need to be updated if additional Authenticators are added.
-        Owner::ConsensusV2 { authenticator, .. } => (OwnerType::Address, Some(*authenticator.as_single_owner())),
+        Owner::ConsensusAddressOwner { owner, .. } => (OwnerType::Address, Some(*owner)),
     }
 }
 
@@ -500,7 +502,7 @@ impl From<SuiTransactionBlockResponseWithOptions> for SuiTransactionBlockRespons
         SuiTransactionBlockResponse {
             digest: response.digest,
             transaction: options.show_input.then_some(response.transaction).flatten(),
-            raw_transaction: options.show_raw_input.then_some(response.raw_transaction).unwrap_or_default(),
+            raw_transaction: if options.show_raw_input { response.raw_transaction } else { vec![] },
             effects: options.show_effects.then_some(response.effects).flatten(),
             events: options.show_events.then_some(response.events).flatten(),
             object_changes: options.show_object_changes.then_some(response.object_changes).flatten(),
@@ -509,7 +511,7 @@ impl From<SuiTransactionBlockResponseWithOptions> for SuiTransactionBlockRespons
             confirmed_local_execution: response.confirmed_local_execution,
             checkpoint: response.checkpoint,
             errors: vec![],
-            raw_effects: options.show_raw_effects.then_some(response.raw_effects).unwrap_or_default(),
+            raw_effects: if options.show_raw_effects { response.raw_effects } else { vec![] },
         }
     }
 }

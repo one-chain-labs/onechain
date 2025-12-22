@@ -473,7 +473,6 @@ pub fn all_natives(silent: bool) -> NativeFunctionTable {
         ("transfer", "share_object_impl", make_native!(transfer::share_object)),
         ("tx_context", "derive_id", make_native!(tx_context::derive_id)),
         ("types", "is_one_time_witness", make_native!(types::is_one_time_witness)),
-        ("test_utils", "destroy", make_native!(test_utils::destroy)),
         ("test_utils", "create_one_time_witness", make_native!(test_utils::create_one_time_witness)),
     ];
     let sui_framework_natives_iter = sui_framework_natives.iter().cloned().map(|(module_name, func_name, func)| {

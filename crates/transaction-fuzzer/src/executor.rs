@@ -112,7 +112,7 @@ impl Executor {
         let txn = to_sender_signed_transaction(data, &account.initial_data.account.key);
         let effects = self.rt.block_on(send_and_confirm_transaction(&self.state, None, txn)).unwrap().1.into_data();
 
-        assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+        assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
         effects
     }
 

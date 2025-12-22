@@ -5,12 +5,10 @@
 module slot_machine::tests;
 
 use slot_machine::example;
-use one::{
-    coin::{Self, Coin},
-    random::{Self, update_randomness_state_for_testing, Random},
-    oct::OCT,
-    test_scenario as ts
-};
+use one::coin::{Self, Coin};
+use one::random::{Self, update_randomness_state_for_testing, Random};
+use one::oct::OCT;
+use one::test_scenario as ts;
 
 fun mint(addr: address, amount: u64, scenario: &mut ts::Scenario) {
     transfer::public_transfer(coin::mint_for_testing<OCT>(amount, scenario.ctx()), addr);

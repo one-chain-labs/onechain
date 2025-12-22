@@ -4,6 +4,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use consensus_config::AuthorityIndex;
+use consensus_types::block::{BlockRef, Round};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1, take_while_m_n},
@@ -14,11 +15,7 @@ use nom::{
     IResult,
 };
 
-use crate::{
-    block::{BlockRef, Round, Slot},
-    context::Context,
-    test_dag_builder::DagBuilder,
-};
+use crate::{block::Slot, context::Context, test_dag_builder::DagBuilder};
 
 /// DagParser
 ///
@@ -153,12 +150,12 @@ fn parse_specified_connections<'a>(
 
 fn get_blocks(slot: Slot, dag_builder: &DagBuilder) -> Vec<BlockRef> {
     // note: special case for genesis blocks as they are cached separately
-    let block_refs = if slot.round == 0 {
+
+    if slot.round == 0 {
         dag_builder.genesis_block_refs().into_iter().filter(|block| Slot::from(*block) == slot).collect::<Vec<_>>()
     } else {
         dag_builder.get_uncommitted_blocks_at_slot(slot).iter().map(|block| block.reference()).collect::<Vec<_>>()
-    };
-    block_refs
+    }
 }
 
 fn parse_author_and_connections(input: &str) -> IResult<&str, (AuthorityIndex, Vec<&str>)> {

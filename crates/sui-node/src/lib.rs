@@ -3,6 +3,7 @@
 
 #[cfg(msim)]
 use std::sync::atomic::Ordering;
+use sui_core::authority::CHAIN_IDENTIFIER;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt,
@@ -18,21 +19,18 @@ use anemo_tower::{
     callback::CallbackLayer,
     trace::{DefaultMakeSpan, DefaultOnFailure, TraceLayer},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use arc_swap::ArcSwap;
 use fastcrypto_zkp::bn254::zk_login::{JwkId, OIDCProvider, JWK};
-use futures::{future::BoxFuture, TryFutureExt};
+use futures::future::BoxFuture;
 pub use handle::SuiNodeHandle;
 use mysten_common::debug_fatal;
 use mysten_metrics::{spawn_monitored_task, RegistryService};
-use mysten_network::server::{ServerBuilder, SUI_TLS_SERVER_NAME};
 use mysten_service::server_timing::server_timing_middleware;
 use prometheus::Registry;
-use sui_archival::{reader::ArchiveReaderBalancer, writer::ArchiveWriter};
 use sui_config::{
-    node::{DBCheckpointConfig, RunWithRange},
+    node::{DBCheckpointConfig, ForkCrashBehavior, ForkRecoveryConfig, RunWithRange},
     node_config_metrics::NodeConfigMetrics,
-    object_storage_config::{ObjectStoreConfig, ObjectStoreType},
     ConsensusConfig,
     NodeConfig,
 };
@@ -43,8 +41,11 @@ use sui_core::{
         backpressure::BackpressureManager,
         epoch_start_configuration::{EpochFlag, EpochStartConfigTrait, EpochStartConfiguration},
         execution_time_estimator::ExecutionTimeObserver,
+        shared_object_version_manager::Schedulable,
+        submitted_transaction_cache::SubmittedTransactionCacheMetrics,
         AuthorityState,
         AuthorityStore,
+        ExecutionEnv,
         RandomnessRoundReceiver,
     },
     authority_aggregator::{AuthAggMetrics, AuthorityAggregator},
@@ -65,7 +66,7 @@ use sui_core::{
         ConsensusAdapterMetrics,
         ConsensusClient,
     },
-    consensus_manager::{ConsensusManager, ConsensusManagerTrait, UpdatableConsensusClient},
+    consensus_manager::{ConsensusManager, UpdatableConsensusClient},
     consensus_throughput_calculator::{
         ConsensusThroughputCalculator,
         ConsensusThroughputProfiler,
@@ -81,15 +82,15 @@ use sui_core::{
         reconfiguration::ReconfigurationInitiator,
     },
     execution_cache::build_execution_cache,
+    execution_scheduler::SchedulingSource,
+    global_state_hasher::{GlobalStateHashMetrics, GlobalStateHasher},
     jsonrpc_index::IndexStore,
     module_cache_metrics::ResolverMetrics,
     overload_monitor::overload_monitor,
     rpc_index::RpcIndexStore,
     signature_verifier::SignatureVerifierMetrics,
-    state_accumulator::{StateAccumulator, StateAccumulatorMetrics},
     storage::{RestReadStore, RocksDbStore},
-    traffic_controller::metrics::TrafficControllerMetrics,
-    transaction_orchestrator::TransactiondOrchestrator,
+    transaction_orchestrator::TransactionOrchestrator,
 };
 use sui_json_rpc::{
     bridge_api::BridgeReadApi,
@@ -104,25 +105,30 @@ use sui_json_rpc::{
 };
 use sui_json_rpc_api::JsonRpcMetrics;
 use sui_macros::{fail_point, fail_point_async, replay_log};
-use sui_network::{api::ValidatorServer, discovery, discovery::TrustedPeerChangeEvent, randomness, state_sync};
-use sui_protocol_config::{Chain, ProtocolConfig};
-use sui_rpc_api::{subscription::SubscriptionService, RpcMetrics};
+use sui_network::{
+    api::ValidatorServer,
+    discovery,
+    discovery::TrustedPeerChangeEvent,
+    randomness,
+    state_sync,
+    validator::server::{ServerBuilder, SUI_TLS_SERVER_NAME},
+};
+use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+use sui_rpc_api::{subscription::SubscriptionService, RpcMetrics, ServerVersion};
 use sui_snapshot::uploader::StateSnapshotUploader;
 use sui_storage::{
     http_key_value_store::HttpKVStore,
     key_value_store::{FallbackTransactionKVStore, TransactionKeyValueStore},
     key_value_store_metrics::KeyValueStoreMetrics,
-    FileCompression,
-    StorageFormat,
 };
 use sui_types::{
     base_types::{AuthorityName, ConciseableName, EpochId},
     committee::Committee,
     crypto::{KeypairTraits, RandomnessRound},
-    digests::ChainIdentifier,
+    digests::{ChainIdentifier, CheckpointDigest, TransactionDigest, TransactionEffectsDigest},
     error::{SuiError, SuiResult},
     executable_transaction::VerifiedExecutableTransaction,
-    full_checkpoint_content::CheckpointData,
+    full_checkpoint_content::Checkpoint,
     messages_consensus::{
         check_total_jwk_size,
         AuthorityCapabilitiesV1,
@@ -130,7 +136,6 @@ use sui_types::{
         ConsensusTransaction,
         ConsensusTransactionKind,
     },
-    quorum_driver_types::QuorumDriverEffectsQueueResult,
     sui_system_state::{
         epoch_start_sui_system_state::{EpochStartSystemState, EpochStartSystemStateTrait},
         SuiSystemState,
@@ -141,9 +146,8 @@ use sui_types::{
 };
 use tap::tap::TapFallible;
 use tokio::{
-    runtime::Handle,
-    sync::{broadcast, mpsc, watch, Mutex},
-    task::{JoinHandle, JoinSet},
+    sync::{broadcast, mpsc, oneshot, watch, Mutex},
+    task::JoinHandle,
 };
 use tower::ServiceBuilder;
 use tracing::{debug, error, error_span, info, warn, Instrument};
@@ -158,11 +162,9 @@ pub mod metrics;
 pub struct ValidatorComponents {
     validator_server_handle: SpawnOnce,
     validator_overload_monitor_handle: Option<JoinHandle<()>>,
-    consensus_manager: ConsensusManager,
+    consensus_manager: Arc<ConsensusManager>,
     consensus_store_pruner: ConsensusStorePruner,
     consensus_adapter: Arc<ConsensusAdapter>,
-    // Keeping the handle to the checkpoint service tasks to shut them down during reconfiguration.
-    checkpoint_service_tasks: JoinSet<()>,
     checkpoint_metrics: Arc<CheckpointMetrics>,
     sui_tx_validator_metrics: Arc<SuiTxValidatorMetrics>,
 }
@@ -177,6 +179,8 @@ pub struct P2pComponents {
 #[cfg(msim)]
 mod simulator {
     use std::sync::atomic::AtomicBool;
+
+    use sui_types::error::SuiErrorKind;
 
     use super::*;
     pub(super) struct SimState {
@@ -200,8 +204,8 @@ mod simulator {
     fn default_fetch_jwks(_authority: AuthorityName, _provider: &OIDCProvider) -> SuiResult<Vec<(JwkId, JWK)>> {
         use fastcrypto_zkp::bn254::zk_login::parse_jwks;
         // Just load a default Twitch jwk for testing.
-        parse_jwks(sui_types::zk_login_util::DEFAULT_JWK_BYTES, &OIDCProvider::Twitch)
-            .map_err(|_| SuiError::JWKRetrievalError)
+        parse_jwks(sui_types::zk_login_util::DEFAULT_JWK_BYTES, &OIDCProvider::Twitch, true)
+            .map_err(|_| SuiErrorKind::JWKRetrievalError.into())
     }
 
     thread_local! {
@@ -222,29 +226,34 @@ pub use simulator::set_jwk_injector;
 #[cfg(msim)]
 use simulator::*;
 use sui_core::{
-    authority::authority_store_pruner::ObjectsCompactionFilter,
+    authority::authority_store_pruner::{ObjectsCompactionFilter, PrunerWatermarks},
     consensus_handler::ConsensusHandlerInitializer,
     safe_client::SafeClientMetricsBase,
     validator_tx_finalizer::ValidatorTxFinalizer,
 };
-use sui_types::execution_config_utils::to_binary_config;
+
+const DEFAULT_GRPC_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub struct SuiNode {
     config: NodeConfig,
     validator_components: Mutex<Option<ValidatorComponents>>,
-    /// The http server responsible for serving JSON-RPC as well as the experimental rest service
-    _http_server: Option<sui_http::ServerHandle>,
+
+    /// The http servers responsible for serving RPC traffic (gRPC and JSON-RPC)
+    #[allow(unused)]
+    http_servers: HttpServers,
+
     state: Arc<AuthorityState>,
-    transaction_orchestrator: Option<Arc<TransactiondOrchestrator<NetworkAuthorityClient>>>,
+    transaction_orchestrator: Option<Arc<TransactionOrchestrator<NetworkAuthorityClient>>>,
     registry_service: RegistryService,
     metrics: Arc<SuiNodeMetrics>,
+    checkpoint_metrics: Arc<CheckpointMetrics>,
 
     _discovery: discovery::Handle,
-    _connection_monitor_handle: consensus_core::ConnectionMonitorHandle,
+    _connection_monitor_handle: mysten_network::anemo_connection_monitor::ConnectionMonitorHandle,
     state_sync_handle: state_sync::Handle,
     randomness_handle: randomness::Handle,
     checkpoint_store: Arc<CheckpointStore>,
-    accumulator: Mutex<Option<Arc<StateAccumulator>>>,
+    global_state_hasher: Mutex<Option<Arc<GlobalStateHasher>>>,
     connection_monitor_status: Arc<ConnectionMonitorStatus>,
 
     /// Broadcast channel to send the starting system state for the next epoch.
@@ -260,8 +269,6 @@ pub struct SuiNode {
     #[cfg(msim)]
     sim_state: SimState,
 
-    _state_archive_handle: Option<broadcast::Sender<()>>,
-
     _state_snapshot_uploader_handle: Option<broadcast::Sender<()>>,
     // Channel to allow signaling upstream to shutdown one-node
     shutdown_channel_tx: broadcast::Sender<Option<RunWithRange>>,
@@ -272,7 +279,7 @@ pub struct SuiNode {
     // update will automatically propagate to other uses.
     auth_agg: Arc<ArcSwap<AuthorityAggregator<NetworkAuthorityClient>>>,
 
-    subscription_service_checkpoint_sender: Option<tokio::sync::mpsc::Sender<CheckpointData>>,
+    subscription_service_checkpoint_sender: Option<tokio::sync::mpsc::Sender<Checkpoint>>,
 }
 
 impl fmt::Debug for SuiNode {
@@ -284,12 +291,8 @@ impl fmt::Debug for SuiNode {
 static MAX_JWK_KEYS_PER_FETCH: usize = 100;
 
 impl SuiNode {
-    pub async fn start(
-        config: NodeConfig,
-        registry_service: RegistryService,
-        custom_rpc_runtime: Option<Handle>,
-    ) -> Result<Arc<SuiNode>> {
-        Self::start_async(config, registry_service, custom_rpc_runtime, "unknown").await
+    pub async fn start(config: NodeConfig, registry_service: RegistryService) -> Result<Arc<SuiNode>> {
+        Self::start_async(config, registry_service, ServerVersion::new("one-node", "unknown")).await
     }
 
     fn start_jwk_updater(
@@ -390,7 +393,7 @@ impl SuiNode {
 
                                     let txn = ConsensusTransaction::new_jwk_fetched(authority, id, jwk);
                                     consensus_adapter
-                                        .submit(txn, None, &epoch_store)
+                                        .submit(txn, None, &epoch_store, None, None)
                                         .tap_err(|e| warn!("Error when submitting JWKs to consensus {:?}", e))
                                         .ok();
                                 }
@@ -407,8 +410,7 @@ impl SuiNode {
     pub async fn start_async(
         config: NodeConfig,
         registry_service: RegistryService,
-        custom_rpc_runtime: Option<Handle>,
-        software_version: &'static str,
+        server_version: ServerVersion,
     ) -> Result<Arc<SuiNode>> {
         NodeConfigMetrics::new(&registry_service.default_registry()).record_metrics(&config);
         let mut config = config.clone();
@@ -430,7 +432,7 @@ impl SuiNode {
         );
 
         // Initialize metrics to track db usage before creating any stores
-        DBMetrics::init(&prometheus_registry);
+        DBMetrics::init(registry_service.clone());
 
         // Initialize Mysten metrics.
         mysten_metrics::init_metrics(&prometheus_registry);
@@ -444,6 +446,18 @@ impl SuiNode {
         let genesis_committee = genesis.committee()?;
         let committee_store = Arc::new(CommitteeStore::new(config.db_path().join("epochs"), &genesis_committee, None));
 
+        let pruner_watermarks = Arc::new(PrunerWatermarks::default());
+        let checkpoint_store = CheckpointStore::new(&config.db_path().join("checkpoints"), pruner_watermarks.clone());
+        let checkpoint_metrics = CheckpointMetrics::new(&registry_service.default_registry());
+
+        Self::check_and_recover_forks(
+            &checkpoint_store,
+            &checkpoint_metrics,
+            is_validator,
+            config.fork_recovery.as_ref(),
+        )
+        .await?;
+
         let mut pruner_db = None;
         if config.authority_store_pruning_config.enable_compaction_filter {
             pruner_db = Some(Arc::new(AuthorityPrunerTables::open(&config.db_path().join("store"))));
@@ -453,11 +467,13 @@ impl SuiNode {
         // By default, only enable write stall on validators for perpetual db.
         let enable_write_stall = config.enable_db_write_stall.unwrap_or(is_validator);
         let perpetual_tables_options = AuthorityPerpetualTablesOptions { enable_write_stall, compaction_filter };
-        let perpetual_tables =
-            Arc::new(AuthorityPerpetualTables::open(&config.db_path().join("store"), Some(perpetual_tables_options)));
+        let perpetual_tables = Arc::new(AuthorityPerpetualTables::open(
+            &config.db_path().join("store"),
+            Some(perpetual_tables_options),
+            Some(pruner_watermarks.epoch_id.clone()),
+        ));
         let is_genesis = perpetual_tables.database_is_empty().expect("Database read should not fail at init.");
 
-        let checkpoint_store = CheckpointStore::new(&config.db_path().join("checkpoints"));
         let backpressure_manager = BackpressureManager::new_from_checkpoint_store(&checkpoint_store);
 
         let store = AuthorityStore::open(perpetual_tables, &genesis, &config, &prometheus_registry).await?;
@@ -483,6 +499,12 @@ impl SuiNode {
             ))))
         };
 
+        let chain_id = ChainIdentifier::from(*genesis.checkpoint().digest());
+        let chain = match config.chain_override_for_testing {
+            Some(chain) => chain,
+            None => ChainIdentifier::from(*genesis.checkpoint().digest()).chain(),
+        };
+
         let epoch_options = default_db_options().optimize_db_for_write_throughput(4);
         let epoch_store = AuthorityPerEpochStore::new(
             config.protocol_public_key(),
@@ -496,12 +518,13 @@ impl SuiNode {
             cache_metrics,
             signature_verifier_metrics,
             &config.expensive_safety_check_config,
-            ChainIdentifier::from(*genesis.checkpoint().digest()),
+            (chain_id, chain),
             checkpoint_store
                 .get_highest_executed_checkpoint_seq_number()
                 .expect("checkpoint store read cannot fail")
                 .unwrap_or(0),
-        );
+            Arc::new(SubmittedTransactionCacheMetrics::new(&registry_service.default_registry())),
+        )?;
 
         info!("created epoch store");
 
@@ -551,31 +574,34 @@ impl SuiNode {
                 &prometheus_registry,
                 epoch_store.protocol_config().max_move_identifier_len_as_option(),
                 config.remove_deprecated_tables,
-                &store,
             )))
         } else {
             None
         };
 
         let rpc_index = if is_full_node && config.rpc().is_some_and(|rpc| rpc.enable_indexing()) {
-            Some(Arc::new(RpcIndexStore::new(
-                &config.db_path(),
-                &store,
-                &checkpoint_store,
-                &epoch_store,
-                &cache_traits.backing_package_store,
-            )))
+            Some(Arc::new(
+                RpcIndexStore::new(
+                    &config.db_path(),
+                    &store,
+                    &checkpoint_store,
+                    &epoch_store,
+                    &cache_traits.backing_package_store,
+                    pruner_watermarks.checkpoint_id.clone(),
+                    config.rpc().cloned().unwrap_or_default(),
+                )
+                .await,
+            ))
         } else {
             None
         };
 
-        let chain_identifier = ChainIdentifier::from(*genesis.checkpoint().digest());
+        let chain_identifier = epoch_store.get_chain_identifier();
 
         info!("creating archive reader");
         // Create network
         // TODO only configure validators as seed/preferred peers for validators and not for
         // fullnodes once we've had a chance to re-work fullnode configuration generation.
-        let archive_readers = ArchiveReaderBalancer::new(config.archive_reader_config(), &prometheus_registry)?;
         let (trusted_peer_change_tx, trusted_peer_change_rx) = watch::channel(Default::default());
         let (randomness_tx, randomness_rx) =
             mpsc::channel(config.p2p_config.randomness.clone().unwrap_or_default().mailbox_capacity());
@@ -585,7 +611,6 @@ impl SuiNode {
                 state_sync_store.clone(),
                 chain_identifier,
                 trusted_peer_change_rx,
-                archive_readers.clone(),
                 randomness_tx,
                 &prometheus_registry,
             )?;
@@ -594,11 +619,6 @@ impl SuiNode {
         // watch value change, so that state-sync is able to process it.
         send_trusted_peer_change(&config, &trusted_peer_change_tx, epoch_store.epoch_start_state())
             .expect("Initial trusted peers must be set");
-
-        info!("start state archival");
-        // Start archiving local state to remote store
-        let state_archive_handle =
-            Self::start_state_archival(&config, &prometheus_registry, state_sync_store.clone()).await?;
 
         info!("start snapshot upload");
         // Start uploading state snapshot to remote store
@@ -636,10 +656,12 @@ impl SuiNode {
             genesis.objects(),
             &db_checkpoint_config,
             config.clone(),
-            archive_readers,
             validator_tx_finalizer,
             chain_identifier,
             pruner_db,
+            config.policy_config.clone(),
+            config.firewall_config.clone(),
+            pruner_watermarks,
         )
         .await;
         // ensure genesis txn was executed
@@ -652,58 +674,66 @@ impl SuiNode {
                     sui_types::executable_transaction::CertificateProof::Checkpoint(0, 0),
                 ),
             );
-            state.try_execute_immediately(&transaction, None, &epoch_store).instrument(span).await.unwrap();
+            state
+                .try_execute_immediately(
+                    &transaction,
+                    ExecutionEnv::new().with_scheduling_source(SchedulingSource::NonFastPath),
+                    &epoch_store,
+                )
+                .instrument(span)
+                .await
+                .unwrap();
         }
 
         // Start the loop that receives new randomness and generates transactions for it.
         RandomnessRoundReceiver::spawn(state.clone(), randomness_rx);
 
-        if config.expensive_safety_check_config.enable_secondary_index_checks() {
-            if let Some(indexes) = state.indexes.clone() {
-                sui_core::verify_indexes::verify_indexes(state.get_accumulator_store().as_ref(), indexes)
-                    .expect("secondary indexes are inconsistent");
-            }
+        if config.expensive_safety_check_config.enable_secondary_index_checks()
+            && let Some(indexes) = state.indexes.clone()
+        {
+            sui_core::verify_indexes::verify_indexes(state.get_global_state_hash_store().as_ref(), indexes)
+                .expect("secondary indexes are inconsistent");
         }
 
         let (end_of_epoch_channel, end_of_epoch_receiver) =
             broadcast::channel(config.end_of_epoch_broadcast_channel_capacity);
 
         let transaction_orchestrator = if is_full_node && run_with_range.is_none() {
-            Some(Arc::new(TransactiondOrchestrator::new_with_auth_aggregator(
+            Some(Arc::new(TransactionOrchestrator::new_with_auth_aggregator(
                 auth_agg.load_full(),
                 state.clone(),
                 end_of_epoch_receiver,
                 &config.db_path(),
                 &prometheus_registry,
+                &config,
             )))
         } else {
             None
         };
 
-        let (http_server, subscription_service_checkpoint_sender) = build_http_server(
+        let (http_servers, subscription_service_checkpoint_sender) = build_http_servers(
             state.clone(),
             state_sync_store,
             &transaction_orchestrator.clone(),
             &config,
             &prometheus_registry,
-            custom_rpc_runtime,
-            software_version,
+            server_version,
         )
         .await?;
 
-        let accumulator = Arc::new(StateAccumulator::new(
-            cache_traits.accumulator_store.clone(),
-            StateAccumulatorMetrics::new(&prometheus_registry),
+        let global_state_hasher = Arc::new(GlobalStateHasher::new(
+            cache_traits.global_state_hash_store.clone(),
+            GlobalStateHashMetrics::new(&prometheus_registry),
         ));
 
         let authority_names_to_peer_ids = epoch_store.epoch_start_state().get_authority_names_to_peer_ids();
 
         let network_connection_metrics =
-            consensus_core::QuinnConnectionMetrics::new("sui", &registry_service.default_registry());
+            mysten_network::quinn_metrics::QuinnConnectionMetrics::new("sui", &registry_service.default_registry());
 
         let authority_names_to_peer_ids = ArcSwap::from_pointee(authority_names_to_peer_ids);
 
-        let connection_monitor_handle = consensus_core::AnemoConnectionMonitor::spawn(
+        let connection_monitor_handle = mysten_network::anemo_connection_monitor::AnemoConnectionMonitor::spawn(
             p2p_network.downgrade(),
             Arc::new(network_connection_metrics),
             known_peers,
@@ -717,6 +747,11 @@ impl SuiNode {
         let connection_monitor_status = Arc::new(connection_monitor_status);
         let sui_node_metrics = Arc::new(SuiNodeMetrics::new(&registry_service.default_registry()));
 
+        sui_node_metrics.binary_max_protocol_version.set(ProtocolVersion::MAX.as_u64() as i64);
+        sui_node_metrics
+            .configured_max_protocol_version
+            .set(config.supported_protocol_versions.unwrap().max.as_u64() as i64);
+
         let validator_components = if state.is_validator(&epoch_store) {
             let (components, _) = futures::join!(
                 Self::construct_validator_components(
@@ -727,11 +762,12 @@ impl SuiNode {
                     checkpoint_store.clone(),
                     state_sync_handle.clone(),
                     randomness_handle.clone(),
-                    Arc::downgrade(&accumulator),
+                    Arc::downgrade(&global_state_hasher),
                     backpressure_manager.clone(),
                     connection_monitor_status.clone(),
                     &registry_service,
                     sui_node_metrics.clone(),
+                    checkpoint_metrics.clone(),
                 ),
                 Self::reexecute_pending_consensus_certs(&epoch_store, &state,)
             );
@@ -740,7 +776,7 @@ impl SuiNode {
             components.consensus_adapter.submit_recovered(&epoch_store);
 
             // Start the gRPC server
-            components.validator_server_handle = components.validator_server_handle.start();
+            components.validator_server_handle = components.validator_server_handle.start().await;
 
             Some(components)
         } else {
@@ -753,18 +789,19 @@ impl SuiNode {
         let node = Self {
             config,
             validator_components: Mutex::new(validator_components),
-            _http_server: http_server,
+            http_servers,
             state,
             transaction_orchestrator,
             registry_service,
             metrics: sui_node_metrics,
+            checkpoint_metrics,
 
             _discovery: discovery_handle,
             _connection_monitor_handle: connection_monitor_handle,
             state_sync_handle,
             randomness_handle,
             checkpoint_store,
-            accumulator: Mutex::new(Some(accumulator)),
+            global_state_hasher: Mutex::new(Some(global_state_hasher)),
             end_of_epoch_channel,
             connection_monitor_status,
             trusted_peer_change_tx,
@@ -775,7 +812,6 @@ impl SuiNode {
             #[cfg(msim)]
             sim_state: Default::default(),
 
-            _state_archive_handle: state_archive_handle,
             _state_snapshot_uploader_handle: state_snapshot_handle,
             shutdown_channel_tx: shutdown_channel,
 
@@ -840,33 +876,6 @@ impl SuiNode {
         self.close_epoch(&epoch_store).await
     }
 
-    async fn start_state_archival(
-        config: &NodeConfig,
-        prometheus_registry: &Registry,
-        state_sync_store: RocksDbStore,
-    ) -> Result<Option<tokio::sync::broadcast::Sender<()>>> {
-        if let Some(remote_store_config) = &config.state_archive_write_config.object_store_config {
-            let local_store_config = ObjectStoreConfig {
-                object_store: Some(ObjectStoreType::File),
-                directory: Some(config.archive_path()),
-                ..Default::default()
-            };
-            let archive_writer = ArchiveWriter::new(
-                local_store_config,
-                remote_store_config.clone(),
-                FileCompression::Zstd,
-                StorageFormat::Blob,
-                Duration::from_secs(600),
-                256 * 1024 * 1024,
-                prometheus_registry,
-            )
-            .await?;
-            Ok(Some(archive_writer.start(state_sync_store).await?))
-        } else {
-            Ok(None)
-        }
-    }
-
     fn start_state_snapshot(
         config: &NodeConfig,
         prometheus_registry: &Registry,
@@ -882,6 +891,7 @@ impl SuiNode {
                 prometheus_registry,
                 checkpoint_store,
                 chain_identifier,
+                config.state_snapshot_write_config.archive_interval_epochs,
             )?;
             Ok(Some(snapshot_uploader.start()))
         } else {
@@ -936,14 +946,13 @@ impl SuiNode {
         state_sync_store: RocksDbStore,
         chain_identifier: ChainIdentifier,
         trusted_peer_change_rx: watch::Receiver<TrustedPeerChangeEvent>,
-        archive_readers: ArchiveReaderBalancer,
         randomness_tx: mpsc::Sender<(EpochId, RandomnessRound, Vec<u8>)>,
         prometheus_registry: &Registry,
     ) -> Result<P2pComponents> {
         let (state_sync, state_sync_server) = state_sync::Builder::new()
             .config(config.p2p_config.state_sync.clone().unwrap_or_default())
             .store(state_sync_store)
-            .archive_readers(archive_readers)
+            .archive_config(config.archive_reader_config())
             .with_metrics(prometheus_registry)
             .build();
 
@@ -975,9 +984,9 @@ impl SuiNode {
             let routes = routes.merge(randomness_router);
 
             let inbound_network_metrics =
-                consensus_core::NetworkRouteMetrics::new("sui", "inbound", prometheus_registry);
+                mysten_network::metrics::NetworkMetrics::new("sui", "inbound", prometheus_registry);
             let outbound_network_metrics =
-                consensus_core::NetworkRouteMetrics::new("sui", "outbound", prometheus_registry);
+                mysten_network::metrics::NetworkMetrics::new("sui", "outbound", prometheus_registry);
 
             let service = ServiceBuilder::new()
                 .layer(
@@ -985,7 +994,7 @@ impl SuiNode {
                         .make_span_with(DefaultMakeSpan::new().level(tracing::Level::INFO))
                         .on_failure(DefaultOnFailure::new().level(tracing::Level::WARN)),
                 )
-                .layer(CallbackLayer::new(consensus_core::MetricsMakeCallbackHandler::new(
+                .layer(CallbackLayer::new(mysten_network::metrics::MetricsMakeCallbackHandler::new(
                     Arc::new(inbound_network_metrics),
                     config.p2p_config.excessive_message_size(),
                 )))
@@ -997,7 +1006,7 @@ impl SuiNode {
                         .make_span_with(DefaultMakeSpan::new().level(tracing::Level::INFO))
                         .on_failure(DefaultOnFailure::new().level(tracing::Level::WARN)),
                 )
-                .layer(CallbackLayer::new(consensus_core::MetricsMakeCallbackHandler::new(
+                .layer(CallbackLayer::new(mysten_network::metrics::MetricsMakeCallbackHandler::new(
                     Arc::new(outbound_network_metrics),
                     config.p2p_config.excessive_message_size(),
                 )))
@@ -1074,11 +1083,12 @@ impl SuiNode {
         checkpoint_store: Arc<CheckpointStore>,
         state_sync_handle: state_sync::Handle,
         randomness_handle: randomness::Handle,
-        accumulator: Weak<StateAccumulator>,
+        global_state_hasher: Weak<GlobalStateHasher>,
         backpressure_manager: Arc<BackpressureManager>,
         connection_monitor_status: Arc<ConnectionMonitorStatus>,
         registry_service: &RegistryService,
         sui_node_metrics: Arc<SuiNodeMetrics>,
+        checkpoint_metrics: Arc<CheckpointMetrics>,
     ) -> Result<ValidatorComponents> {
         let mut config_clone = config.clone();
         let consensus_config =
@@ -1095,7 +1105,7 @@ impl SuiNode {
             client.clone(),
             checkpoint_store.clone(),
         ));
-        let consensus_manager = ConsensusManager::new(&config, consensus_config, registry_service, client);
+        let consensus_manager = Arc::new(ConsensusManager::new(&config, consensus_config, registry_service, client));
 
         // This only gets started up once, not on every epoch. (Make call to remove every epoch.)
         let consensus_store_pruner = ConsensusStorePruner::new(
@@ -1105,7 +1115,6 @@ impl SuiNode {
             &registry_service.default_registry(),
         );
 
-        let checkpoint_metrics = CheckpointMetrics::new(&registry_service.default_registry());
         let sui_tx_validator_metrics = SuiTxValidatorMetrics::new(&registry_service.default_registry());
 
         let validator_server_handle = Self::start_grpc_validator_service(
@@ -1137,7 +1146,7 @@ impl SuiNode {
             randomness_handle,
             consensus_manager,
             consensus_store_pruner,
-            accumulator,
+            global_state_hasher,
             backpressure_manager,
             validator_server_handle,
             validator_overload_monitor_handle,
@@ -1156,9 +1165,9 @@ impl SuiNode {
         epoch_store: Arc<AuthorityPerEpochStore>,
         state_sync_handle: state_sync::Handle,
         randomness_handle: randomness::Handle,
-        consensus_manager: ConsensusManager,
+        consensus_manager: Arc<ConsensusManager>,
         consensus_store_pruner: ConsensusStorePruner,
-        accumulator: Weak<StateAccumulator>,
+        state_hasher: Weak<GlobalStateHasher>,
         backpressure_manager: Arc<BackpressureManager>,
         validator_server_handle: SpawnOnce,
         validator_overload_monitor_handle: Option<JoinHandle<()>>,
@@ -1173,7 +1182,7 @@ impl SuiNode {
             epoch_store.clone(),
             state.clone(),
             state_sync_handle,
-            accumulator,
+            state_hasher,
             checkpoint_metrics.clone(),
         );
 
@@ -1200,8 +1209,7 @@ impl SuiNode {
         ExecutionTimeObserver::spawn(
             epoch_store.clone(),
             Box::new(consensus_adapter.clone()),
-            config.local_execution_time_channel_capacity,
-            config.local_execution_time_cache_size(),
+            config.execution_time_observer_config.clone().unwrap_or_default(),
         );
 
         let throughput_calculator = Arc::new(ConsensusThroughputCalculator::new(None, state.metrics.clone()));
@@ -1220,34 +1228,30 @@ impl SuiNode {
             state.clone(),
             checkpoint_service.clone(),
             epoch_store.clone(),
+            consensus_adapter.clone(),
             low_scoring_authorities,
             throughput_calculator,
             backpressure_manager,
         );
 
-        info!("Starting consensus manager");
+        info!("Starting consensus manager asynchronously");
 
-        consensus_manager
-            .start(
-                config,
-                epoch_store.clone(),
-                consensus_handler_initializer,
-                SuiTxValidator::new(
-                    state.clone(),
-                    consensus_adapter.clone(),
-                    checkpoint_service.clone(),
-                    state.transaction_manager().clone(),
-                    sui_tx_validator_metrics.clone(),
-                ),
-            )
-            .await;
-
-        if !epoch_store.epoch_start_config().is_data_quarantine_active_from_beginning_of_epoch() {
-            checkpoint_store.reexecute_local_checkpoints(&state, &epoch_store).await;
-        }
+        // Spawn consensus startup asynchronously to avoid blocking other components
+        tokio::spawn({
+            let config = config.clone();
+            let epoch_store = epoch_store.clone();
+            let sui_tx_validator =
+                SuiTxValidator::new(state.clone(), checkpoint_service.clone(), sui_tx_validator_metrics.clone());
+            let consensus_manager = consensus_manager.clone();
+            async move {
+                consensus_manager.start(&config, epoch_store, consensus_handler_initializer, sui_tx_validator).await;
+            }
+        });
+        let replay_waiter = consensus_manager.replay_waiter();
 
         info!("Spawning checkpoint service");
-        let checkpoint_service_tasks = checkpoint_service.spawn().await;
+        let replay_waiter = if std::env::var("DISABLE_REPLAY_WAITER").is_ok() { None } else { Some(replay_waiter) };
+        checkpoint_service.spawn(epoch_store.clone(), replay_waiter).await;
 
         if epoch_store.authenticator_state_enabled() {
             Self::start_jwk_updater(
@@ -1265,7 +1269,6 @@ impl SuiNode {
             consensus_manager,
             consensus_store_pruner,
             consensus_adapter,
-            checkpoint_service_tasks,
             checkpoint_metrics,
             sui_tx_validator_metrics,
         })
@@ -1278,7 +1281,7 @@ impl SuiNode {
         epoch_store: Arc<AuthorityPerEpochStore>,
         state: Arc<AuthorityState>,
         state_sync_handle: state_sync::Handle,
-        accumulator: Weak<StateAccumulator>,
+        state_hasher: Weak<GlobalStateHasher>,
         checkpoint_metrics: Arc<CheckpointMetrics>,
     ) -> Arc<CheckpointService> {
         let epoch_start_timestamp_ms = epoch_store.epoch_start_state().epoch_start_timestamp_ms();
@@ -1309,7 +1312,7 @@ impl SuiNode {
             checkpoint_store,
             epoch_store,
             state.get_transaction_cache_reader().clone(),
-            accumulator,
+            state_hasher,
             checkpoint_output,
             Box::new(certified_checkpoint_output),
             checkpoint_metrics,
@@ -1355,12 +1358,13 @@ impl SuiNode {
             state.clone(),
             consensus_adapter,
             Arc::new(ValidatorServiceMetrics::new(prometheus_registry)),
-            TrafficControllerMetrics::new(prometheus_registry),
-            config.policy_config.clone(),
-            config.firewall_config.clone(),
+            config.policy_config.clone().map(|p| p.client_id_source),
         );
 
         let mut server_conf = mysten_network::config::Config::new();
+        server_conf.connect_timeout = Some(DEFAULT_GRPC_CONNECT_TIMEOUT);
+        server_conf.http2_keepalive_interval = Some(DEFAULT_GRPC_CONNECT_TIMEOUT);
+        server_conf.http2_keepalive_timeout = Some(DEFAULT_GRPC_CONNECT_TIMEOUT);
         server_conf.global_concurrency_limit = config.grpc_concurrency_limit;
         server_conf.load_shed = config.grpc_load_shed;
         let mut server_builder = ServerBuilder::from_config(&server_conf, GrpcMetrics::new(prometheus_registry));
@@ -1371,61 +1375,112 @@ impl SuiNode {
             config.network_key_pair().copy().private(),
             SUI_TLS_SERVER_NAME.to_string(),
         );
-        let server = server_builder
-            .bind(config.network_address(), Some(tls_config))
-            .await
-            .map_err(|err| anyhow!(err.to_string()))?;
-        let local_addr = server.local_addr();
-        info!("Listening to traffic on {local_addr}");
 
-        Ok(SpawnOnce::new(server.serve().map_err(Into::into)))
+        let network_address = config.network_address().clone();
+
+        let (ready_tx, ready_rx) = oneshot::channel();
+
+        Ok(SpawnOnce::new(ready_rx, async move {
+            let server = server_builder
+                .bind(&network_address, Some(tls_config))
+                .await
+                .unwrap_or_else(|err| panic!("Failed to bind to {network_address}: {err}"));
+            let local_addr = server.local_addr();
+            info!("Listening to traffic on {local_addr}");
+            ready_tx.send(()).unwrap();
+            if let Err(err) = server.serve().await {
+                info!("Server stopped: {err}");
+            }
+            info!("Server stopped");
+        }))
     }
 
+    /// Re-executes pending consensus certificates, which may not have been committed to disk
+    /// before the node restarted. This is necessary for the following reasons:
+    ///
+    /// 1. For any transaction for which we returned signed effects to a client, we must ensure
+    ///    that we have re-executed the transaction before we begin accepting grpc requests.
+    ///    Otherwise we would appear to have forgotten about the transaction.
+    /// 2. While this is running, we are concurrently waiting for all previously built checkpoints
+    ///    to be rebuilt. Since there may be dependencies in either direction (from checkpointed
+    ///    consensus transactions to pending consensus transactions, or vice versa), we must
+    ///    re-execute pending consensus transactions to ensure that both processes can complete.
+    /// 3. Also note that for any pending consensus transactions for which we wrote a signed effects
+    ///    digest to disk, we must re-execute using that digest as the expected effects digest,
+    ///    to ensure that we cannot arrive at different effects than what we previously signed.
     async fn reexecute_pending_consensus_certs(epoch_store: &Arc<AuthorityPerEpochStore>, state: &Arc<AuthorityState>) {
-        let pending_consensus_certificates = epoch_store
-            .get_all_pending_consensus_transactions()
-            .into_iter()
-            .filter_map(|tx| {
-                match tx.kind {
-                    // shared object txns will be re-executed by consensus replay
-                    ConsensusTransactionKind::CertifiedTransaction(tx) if !tx.contains_shared_object() => {
-                        let tx = *tx;
-                        // we only need to re-execute if we previously signed the effects (which indicates we
-                        // returned the effects to a client).
-                        if let Some(fx_digest) = epoch_store.get_signed_effects_digest(tx.digest()).expect("db error") {
-                            // new_unchecked is safe because we never submit a transaction to consensus
-                            // without verifying it
-                            let tx = VerifiedExecutableTransaction::new_from_certificate(
-                                VerifiedCertificate::new_unchecked(tx),
-                            );
-                            Some((tx, fx_digest))
-                        } else {
-                            None
-                        }
+        let mut pending_consensus_certificates = Vec::new();
+        let mut additional_certs = Vec::new();
+
+        for tx in epoch_store.get_all_pending_consensus_transactions() {
+            match tx.kind {
+                // Shared object txns cannot be re-executed at this point, because we must wait for
+                // consensus replay to assign shared object versions.
+                ConsensusTransactionKind::CertifiedTransaction(tx) if !tx.is_consensus_tx() => {
+                    let tx = *tx;
+                    // new_unchecked is safe because we never submit a transaction to consensus
+                    // without verifying it
+                    let tx = VerifiedExecutableTransaction::new_from_certificate(VerifiedCertificate::new_unchecked(tx));
+                    // we only need to re-execute if we previously signed the effects (which indicates we
+                    // returned the effects to a client).
+                    if let Some(fx_digest) = epoch_store.get_signed_effects_digest(tx.digest()).expect("db error") {
+                        pending_consensus_certificates.push((
+                            Schedulable::Transaction(tx),
+                            ExecutionEnv::new().with_expected_effects_digest(fx_digest),
+                        ));
+                    } else {
+                        additional_certs.push((
+                            Schedulable::Transaction(tx),
+                            ExecutionEnv::new().with_scheduling_source(SchedulingSource::NonFastPath),
+                        ));
                     }
-                    _ => None,
                 }
-            })
+                _ => (),
+            }
+        }
+
+        let digests = pending_consensus_certificates
+            .iter()
+            // unwrap_digest okay because only user certs are in pending_consensus_certificates
+            .map(|(tx, _)| *tx.key().unwrap_digest())
             .collect::<Vec<_>>();
 
-        let digests = pending_consensus_certificates.iter().map(|(tx, _)| *tx.digest()).collect::<Vec<_>>();
+        info!("reexecuting {} pending consensus certificates: {:?}", digests.len(), digests);
 
-        info!("reexecuting pending consensus certificates: {:?}", digests);
-
-        state.enqueue_with_expected_effects_digest(pending_consensus_certificates, epoch_store);
+        state.execution_scheduler().enqueue(pending_consensus_certificates, epoch_store);
+        state.execution_scheduler().enqueue(additional_certs, epoch_store);
 
         // If this times out, the validator will still almost certainly start up fine. But, it is
         // possible that it may temporarily "forget" about transactions that it had previously
         // executed. This could confuse clients in some circumstances. However, the transactions
         // are still in pending_consensus_certificates, so we cannot lose any finality guarantees.
+        let timeout = if cfg!(msim) { 120 } else { 60 };
         if tokio::time::timeout(
-            std::time::Duration::from_secs(60),
-            state.get_transaction_cache_reader().notify_read_executed_effects_digests(&digests),
+            std::time::Duration::from_secs(timeout),
+            state
+                .get_transaction_cache_reader()
+                .notify_read_executed_effects_digests("SuiNode::notify_read_executed_effects_digests", &digests),
         )
         .await
         .is_err()
         {
-            debug_fatal!("Timed out waiting for effects digests to be executed");
+            // Log all the digests that were not executed to help debugging.
+            let executed_effects_digests =
+                state.get_transaction_cache_reader().multi_get_executed_effects_digests(&digests);
+            let pending_digests = digests
+                .iter()
+                .zip(executed_effects_digests.iter())
+                .filter_map(
+                    |(digest, executed_effects_digest)| {
+                        if executed_effects_digest.is_none() {
+                            Some(digest)
+                        } else {
+                            None
+                        }
+                    },
+                )
+                .collect::<Vec<_>>();
+            debug_fatal!("Timed out waiting for effects digests to be executed: {:?}", pending_digests);
         }
     }
 
@@ -1448,42 +1503,32 @@ impl SuiNode {
     }
     */
 
-    /// Clone an AuthorityAggregator currently used in this node's
-    /// QuorumDriver, if the node is a fullnode. After reconfig,
-    /// QuorumDriver builds a new AuthorityAggregator. The caller
+    /// Clone an AuthorityAggregator currently used in this node, if the node is a fullnode.
+    /// After reconfig, Transaction Driver builds a new AuthorityAggregator. The caller
     /// of this function will mostly likely want to call this again
     /// to get a fresh one.
     pub fn clone_authority_aggregator(&self) -> Option<Arc<AuthorityAggregator<NetworkAuthorityClient>>> {
         self.transaction_orchestrator.as_ref().map(|to| to.clone_authority_aggregator())
     }
 
-    pub fn transaction_orchestrator(&self) -> Option<Arc<TransactiondOrchestrator<NetworkAuthorityClient>>> {
+    pub fn transaction_orchestrator(&self) -> Option<Arc<TransactionOrchestrator<NetworkAuthorityClient>>> {
         self.transaction_orchestrator.clone()
     }
 
-    pub fn subscribe_to_transaction_orchestrator_effects(
-        &self,
-    ) -> Result<tokio::sync::broadcast::Receiver<QuorumDriverEffectsQueueResult>> {
-        self.transaction_orchestrator
-            .as_ref()
-            .map(|to| to.subscribe_to_effects_queue())
-            .ok_or_else(|| anyhow::anyhow!("Transaction Orchestrator is not enabled in this node."))
-    }
-
     /// This function awaits the completion of checkpoint execution of the current epoch,
-    /// after which it iniitiates reconfiguration of the entire system.
+    /// after which it initiates reconfiguration of the entire system.
     pub async fn monitor_reconfiguration(self: Arc<Self>, mut epoch_store: Arc<AuthorityPerEpochStore>) -> Result<()> {
         let checkpoint_executor_metrics = CheckpointExecutorMetrics::new(&self.registry_service.default_registry());
 
         loop {
-            let mut accumulator_guard = self.accumulator.lock().await;
-            let accumulator = accumulator_guard.take().unwrap();
+            let mut hasher_guard = self.global_state_hasher.lock().await;
+            let hasher = hasher_guard.take().unwrap();
             info!("Creating checkpoint executor for epoch {}", epoch_store.epoch());
             let checkpoint_executor = CheckpointExecutor::new(
                 epoch_store.clone(),
                 self.checkpoint_store.clone(),
                 self.state.clone(),
-                accumulator.clone(),
+                hasher.clone(),
                 self.backpressure_manager.clone(),
                 self.config.checkpoint_executor_config.clone(),
                 checkpoint_executor_metrics.clone(),
@@ -1494,22 +1539,43 @@ impl SuiNode {
 
             let cur_epoch_store = self.state.load_epoch_store_one_call_per_task();
 
+            // Update the current protocol version metric.
+            self.metrics.current_protocol_version.set(cur_epoch_store.protocol_config().version.as_u64() as i64);
+
             // Advertise capabilities to committee, if we are a validator.
             if let Some(components) = &*self.validator_components.lock().await {
                 // TODO: without this sleep, the consensus message is not delivered reliably.
                 tokio::time::sleep(Duration::from_millis(1)).await;
 
                 let config = cur_epoch_store.protocol_config();
-                let binary_config = to_binary_config(config);
+                let mut supported_protocol_versions = self
+                    .config
+                    .supported_protocol_versions
+                    .expect("Supported versions should be populated")
+                    // no need to send digests of versions less than the current version
+                    .truncate_below(config.version);
+
+                while supported_protocol_versions.max > config.version {
+                    let proposed_protocol_config =
+                        ProtocolConfig::get_for_version(supported_protocol_versions.max, cur_epoch_store.get_chain());
+
+                    if proposed_protocol_config.enable_accumulators() && !epoch_store.accumulator_root_exists() {
+                        error!(
+                            "cannot upgrade to protocol version {:?} because accumulator root does not exist",
+                            supported_protocol_versions.max
+                        );
+                        supported_protocol_versions.max = supported_protocol_versions.max.prev();
+                    } else {
+                        break;
+                    }
+                }
+
+                let binary_config = config.binary_config(None);
                 let transaction = if config.authority_capabilities_v2() {
                     ConsensusTransaction::new_capability_notification_v2(AuthorityCapabilitiesV2::new(
                         self.state.name,
                         cur_epoch_store.get_chain_identifier().chain(),
-                        self.config
-                                .supported_protocol_versions
-                                .expect("Supported versions should be populated")
-                                // no need to send digests of versions less than the current version
-                                .truncate_below(config.version),
+                        supported_protocol_versions,
                         self.state.get_available_system_packages(&binary_config).await,
                     ))
                 } else {
@@ -1520,7 +1586,7 @@ impl SuiNode {
                     ))
                 };
                 info!(?transaction, "submitting capabilities to consensus");
-                components.consensus_adapter.submit(transaction, None, &cur_epoch_store)?;
+                components.consensus_adapter.submit(transaction, None, &cur_epoch_store, None, None)?;
             }
 
             let stop_condition = checkpoint_executor.run_epoch(run_with_range).await;
@@ -1548,10 +1614,10 @@ impl SuiNode {
             #[cfg(not(msim))]
             debug_assert!(!latest_system_state.safe_mode());
 
-            if let Err(err) = self.end_of_epoch_channel.send(latest_system_state.clone()) {
-                if self.state.is_fullnode(&cur_epoch_store) {
-                    warn!("Failed to send end of epoch notification to subscriber: {:?}", err);
-                }
+            if let Err(err) = self.end_of_epoch_channel.send(latest_system_state.clone())
+                && self.state.is_fullnode(&cur_epoch_store)
+            {
+                warn!("Failed to send end of epoch notification to subscriber: {:?}", err);
             }
 
             cur_epoch_store.record_is_safe_mode_metric(latest_system_state.safe_mode());
@@ -1590,7 +1656,7 @@ impl SuiNode {
                     &cur_epoch_store,
                     next_epoch_committee.clone(),
                     new_epoch_start_state,
-                    accumulator.clone(),
+                    hasher.clone(),
                 )
                 .await;
 
@@ -1600,40 +1666,28 @@ impl SuiNode {
                 consensus_manager,
                 consensus_store_pruner,
                 consensus_adapter,
-                mut checkpoint_service_tasks,
                 checkpoint_metrics,
                 sui_tx_validator_metrics,
             }) = validator_components_lock_guard.take()
             {
                 info!("Reconfiguring the validator.");
-                // Cancel the old checkpoint service tasks.
-                // Waiting for checkpoint builder to finish gracefully is not possible, because it
-                // may wait on transactions while consensus on peers have already shut down.
-                checkpoint_service_tasks.abort_all();
-                while let Some(result) = checkpoint_service_tasks.join_next().await {
-                    if let Err(err) = result {
-                        if err.is_panic() {
-                            std::panic::resume_unwind(err.into_panic());
-                        }
-                        warn!("Error in checkpoint service task: {:?}", err);
-                    }
-                }
-                info!("Checkpoint service has shut down.");
 
                 consensus_manager.shutdown().await;
                 info!("Consensus has shut down.");
 
                 info!("Epoch store finished reconfiguration.");
 
-                // No other components should be holding a strong reference to state accumulator
-                // at this point. Confirm here before we swap in the new accumulator.
-                let accumulator_metrics = Arc::into_inner(accumulator)
-                    .expect("Accumulator should have no other references at this point")
+                // No other components should be holding a strong reference to state hasher
+                // at this point. Confirm here before we swap in the new hasher.
+                let global_state_hasher_metrics = Arc::into_inner(hasher)
+                    .expect("Object state hasher should have no other references at this point")
                     .metrics();
-                let new_accumulator =
-                    Arc::new(StateAccumulator::new(self.state.get_accumulator_store().clone(), accumulator_metrics));
-                let weak_accumulator = Arc::downgrade(&new_accumulator);
-                *accumulator_guard = Some(new_accumulator);
+                let new_hasher = Arc::new(GlobalStateHasher::new(
+                    self.state.get_global_state_hash_store().clone(),
+                    global_state_hasher_metrics,
+                ));
+                let weak_hasher = Arc::downgrade(&new_hasher);
+                *hasher_guard = Some(new_hasher);
 
                 consensus_store_pruner.prune(next_epoch).await;
 
@@ -1650,7 +1704,7 @@ impl SuiNode {
                             self.randomness_handle.clone(),
                             consensus_manager,
                             consensus_store_pruner,
-                            weak_accumulator,
+                            weak_hasher,
                             self.backpressure_manager.clone(),
                             validator_server_handle,
                             validator_overload_monitor_handle,
@@ -1665,15 +1719,17 @@ impl SuiNode {
                     None
                 }
             } else {
-                // No other components should be holding a strong reference to state accumulator
-                // at this point. Confirm here before we swap in the new accumulator.
-                let accumulator_metrics = Arc::into_inner(accumulator)
-                    .expect("Accumulator should have no other references at this point")
+                // No other components should be holding a strong reference to state hasher
+                // at this point. Confirm here before we swap in the new hasher.
+                let global_state_hasher_metrics = Arc::into_inner(hasher)
+                    .expect("Object state hasher should have no other references at this point")
                     .metrics();
-                let new_accumulator =
-                    Arc::new(StateAccumulator::new(self.state.get_accumulator_store().clone(), accumulator_metrics));
-                let weak_accumulator = Arc::downgrade(&new_accumulator);
-                *accumulator_guard = Some(new_accumulator);
+                let new_hasher = Arc::new(GlobalStateHasher::new(
+                    self.state.get_global_state_hash_store().clone(),
+                    global_state_hasher_metrics,
+                ));
+                let weak_hasher = Arc::downgrade(&new_hasher);
+                *hasher_guard = Some(new_hasher);
 
                 if self.state.is_validator(&new_epoch_store) {
                     info!("Promoting the node from fullnode to validator, starting grpc server");
@@ -1686,15 +1742,16 @@ impl SuiNode {
                         self.checkpoint_store.clone(),
                         self.state_sync_handle.clone(),
                         self.randomness_handle.clone(),
-                        weak_accumulator,
+                        weak_hasher,
                         self.backpressure_manager.clone(),
                         self.connection_monitor_status.clone(),
                         &self.registry_service,
                         self.metrics.clone(),
+                        self.checkpoint_metrics.clone(),
                     )
                     .await?;
 
-                    components.validator_server_handle = components.validator_server_handle.start();
+                    components.validator_server_handle = components.validator_server_handle.start().await;
 
                     Some(components)
                 } else {
@@ -1738,7 +1795,7 @@ impl SuiNode {
         cur_epoch_store: &AuthorityPerEpochStore,
         next_epoch_committee: Committee,
         next_epoch_start_system_state: EpochStartSystemState,
-        accumulator: Arc<StateAccumulator>,
+        global_state_hasher: Arc<GlobalStateHasher>,
     ) -> Arc<AuthorityPerEpochStore> {
         let next_epoch = next_epoch_committee.epoch();
 
@@ -1772,7 +1829,7 @@ impl SuiNode {
                 self.config.supported_protocol_versions.unwrap(),
                 next_epoch_committee,
                 epoch_start_configuration,
-                accumulator,
+                global_state_hasher,
                 &self.config.expensive_safety_check_config,
                 last_checkpoint_seq,
             )
@@ -1795,14 +1852,219 @@ impl SuiNode {
     pub fn randomness_handle(&self) -> randomness::Handle {
         self.randomness_handle.clone()
     }
+
+    /// Get a short prefix of a digest for metric labels
+    fn get_digest_prefix(digest: impl std::fmt::Display) -> String {
+        let digest_str = digest.to_string();
+        if digest_str.len() >= 8 {
+            digest_str[0 .. 8].to_string()
+        } else {
+            digest_str
+        }
+    }
+
+    /// Check for previously detected forks and handle them appropriately.
+    /// For validators with fork recovery config, clear the fork if it matches the recovery config.
+    /// For all other cases, block node startup if a fork is detected.
+    async fn check_and_recover_forks(
+        checkpoint_store: &CheckpointStore,
+        checkpoint_metrics: &CheckpointMetrics,
+        is_validator: bool,
+        fork_recovery: Option<&ForkRecoveryConfig>,
+    ) -> Result<()> {
+        // Fork detection and recovery is only relevant for validators
+        // Fullnodes should sync from validators and don't need fork checking
+        if !is_validator {
+            return Ok(());
+        }
+
+        // Try to recover from forks if recovery config is provided
+        if let Some(recovery) = fork_recovery {
+            Self::try_recover_checkpoint_fork(checkpoint_store, recovery)?;
+            Self::try_recover_transaction_fork(checkpoint_store, recovery)?;
+        }
+
+        if let Some((checkpoint_seq, checkpoint_digest)) =
+            checkpoint_store.get_checkpoint_fork_detected().map_err(|e| {
+                error!("Failed to check for checkpoint fork: {:?}", e);
+                e
+            })?
+        {
+            Self::handle_checkpoint_fork(checkpoint_seq, checkpoint_digest, checkpoint_metrics, fork_recovery).await?;
+        }
+        if let Some((tx_digest, expected_effects, actual_effects)) =
+            checkpoint_store.get_transaction_fork_detected().map_err(|e| {
+                error!("Failed to check for transaction fork: {:?}", e);
+                e
+            })?
+        {
+            Self::handle_transaction_fork(
+                tx_digest,
+                expected_effects,
+                actual_effects,
+                checkpoint_metrics,
+                fork_recovery,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    fn try_recover_checkpoint_fork(checkpoint_store: &CheckpointStore, recovery: &ForkRecoveryConfig) -> Result<()> {
+        // If configured overrides include a checkpoint whose locally computed digest mismatches,
+        // clear locally computed checkpoints from that sequence (inclusive).
+        for (seq, expected_digest_str) in &recovery.checkpoint_overrides {
+            let Ok(expected_digest) = CheckpointDigest::from_str(expected_digest_str) else {
+                anyhow::bail!("Invalid checkpoint digest override for seq {}: {}", seq, expected_digest_str);
+            };
+
+            if let Some(local_summary) = checkpoint_store.get_locally_computed_checkpoint(*seq)? {
+                let local_digest = sui_types::message_envelope::Message::digest(&local_summary);
+                if local_digest != expected_digest {
+                    info!(
+                        seq,
+                        local = %Self::get_digest_prefix(local_digest),
+                        expected = %Self::get_digest_prefix(expected_digest),
+                        "Fork recovery: clearing locally_computed_checkpoints from {} due to digest mismatch",
+                        seq
+                    );
+                    checkpoint_store
+                        .clear_locally_computed_checkpoints_from(*seq)
+                        .context("Failed to clear locally computed checkpoints from override seq")?;
+                }
+            }
+        }
+
+        if let Some((checkpoint_seq, checkpoint_digest)) = checkpoint_store.get_checkpoint_fork_detected()?
+            && recovery.checkpoint_overrides.contains_key(&checkpoint_seq)
+        {
+            info!(
+                "Fork recovery enabled: clearing checkpoint fork at seq {} with digest {:?}",
+                checkpoint_seq, checkpoint_digest
+            );
+            checkpoint_store.clear_checkpoint_fork_detected().expect("Failed to clear checkpoint fork detected marker");
+        }
+        Ok(())
+    }
+
+    fn try_recover_transaction_fork(checkpoint_store: &CheckpointStore, recovery: &ForkRecoveryConfig) -> Result<()> {
+        if recovery.transaction_overrides.is_empty() {
+            return Ok(());
+        }
+
+        if let Some((tx_digest, _, _)) = checkpoint_store.get_transaction_fork_detected()?
+            && recovery.transaction_overrides.contains_key(&tx_digest.to_string())
+        {
+            info!("Fork recovery enabled: clearing transaction fork for tx {:?}", tx_digest);
+            checkpoint_store
+                .clear_transaction_fork_detected()
+                .expect("Failed to clear transaction fork detected marker");
+        }
+        Ok(())
+    }
+
+    fn get_current_timestamp() -> u64 {
+        std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs()
+    }
+
+    async fn handle_checkpoint_fork(
+        checkpoint_seq: u64,
+        checkpoint_digest: CheckpointDigest,
+        checkpoint_metrics: &CheckpointMetrics,
+        fork_recovery: Option<&ForkRecoveryConfig>,
+    ) -> Result<()> {
+        checkpoint_metrics
+            .checkpoint_fork_crash_mode
+            .with_label_values(&[
+                &checkpoint_seq.to_string(),
+                &Self::get_digest_prefix(checkpoint_digest),
+                &Self::get_current_timestamp().to_string(),
+            ])
+            .set(1);
+
+        let behavior = fork_recovery.map(|fr| fr.fork_crash_behavior).unwrap_or_default();
+
+        match behavior {
+            ForkCrashBehavior::AwaitForkRecovery => {
+                error!(
+                    checkpoint_seq = checkpoint_seq,
+                    checkpoint_digest = ?checkpoint_digest,
+                    "Checkpoint fork detected! Node startup halted. Sleeping indefinitely."
+                );
+                futures::future::pending::<()>().await;
+                unreachable!("pending() should never return");
+            }
+            ForkCrashBehavior::ReturnError => {
+                error!(
+                    checkpoint_seq = checkpoint_seq,
+                    checkpoint_digest = ?checkpoint_digest,
+                    "Checkpoint fork detected! Returning error."
+                );
+                Err(anyhow::anyhow!(
+                    "Checkpoint fork detected! checkpoint_seq: {}, checkpoint_digest: {:?}",
+                    checkpoint_seq,
+                    checkpoint_digest
+                ))
+            }
+        }
+    }
+
+    async fn handle_transaction_fork(
+        tx_digest: TransactionDigest,
+        expected_effects_digest: TransactionEffectsDigest,
+        actual_effects_digest: TransactionEffectsDigest,
+        checkpoint_metrics: &CheckpointMetrics,
+        fork_recovery: Option<&ForkRecoveryConfig>,
+    ) -> Result<()> {
+        checkpoint_metrics
+            .transaction_fork_crash_mode
+            .with_label_values(&[
+                &Self::get_digest_prefix(tx_digest),
+                &Self::get_digest_prefix(expected_effects_digest),
+                &Self::get_digest_prefix(actual_effects_digest),
+                &Self::get_current_timestamp().to_string(),
+            ])
+            .set(1);
+
+        let behavior = fork_recovery.map(|fr| fr.fork_crash_behavior).unwrap_or_default();
+
+        match behavior {
+            ForkCrashBehavior::AwaitForkRecovery => {
+                error!(
+                    tx_digest = ?tx_digest,
+                    expected_effects_digest = ?expected_effects_digest,
+                    actual_effects_digest = ?actual_effects_digest,
+                    "Transaction fork detected! Node startup halted. Sleeping indefinitely."
+                );
+                futures::future::pending::<()>().await;
+                unreachable!("pending() should never return");
+            }
+            ForkCrashBehavior::ReturnError => {
+                error!(
+                    tx_digest = ?tx_digest,
+                    expected_effects_digest = ?expected_effects_digest,
+                    actual_effects_digest = ?actual_effects_digest,
+                    "Transaction fork detected! Returning error."
+                );
+                Err(anyhow::anyhow!(
+                    "Transaction fork detected! tx_digest: {:?}, expected_effects: {:?}, actual_effects: {:?}",
+                    tx_digest,
+                    expected_effects_digest,
+                    actual_effects_digest
+                ))
+            }
+        }
+    }
 }
 
 #[cfg(not(msim))]
 impl SuiNode {
     async fn fetch_jwks(_authority: AuthorityName, provider: &OIDCProvider) -> SuiResult<Vec<(JwkId, JWK)>> {
         use fastcrypto_zkp::bn254::zk_login::fetch_jwks;
+        use sui_types::error::SuiErrorKind;
         let client = reqwest::Client::new();
-        fetch_jwks(provider, &client).await.map_err(|_| SuiError::JWKRetrievalError)
+        fetch_jwks(provider, &client).await.map_err(|_| SuiErrorKind::JWKRetrievalError.into())
     }
 }
 
@@ -1825,21 +2087,22 @@ impl SuiNode {
 
 enum SpawnOnce {
     // Mutex is only needed to make SpawnOnce Send
-    Unstarted(Mutex<BoxFuture<'static, Result<()>>>),
+    Unstarted(oneshot::Receiver<()>, Mutex<BoxFuture<'static, ()>>),
     #[allow(unused)]
-    Started(JoinHandle<Result<()>>),
+    Started(JoinHandle<()>),
 }
 
 impl SpawnOnce {
-    pub fn new(future: impl Future<Output = Result<()>> + Send + 'static) -> Self {
-        Self::Unstarted(Mutex::new(Box::pin(future)))
+    pub fn new(ready_rx: oneshot::Receiver<()>, future: impl Future<Output = ()> + Send + 'static) -> Self {
+        Self::Unstarted(ready_rx, Mutex::new(Box::pin(future)))
     }
 
-    pub fn start(self) -> Self {
+    pub async fn start(self) -> Self {
         match self {
-            Self::Unstarted(future) => {
+            Self::Unstarted(ready_rx, future) => {
                 let future = future.into_inner();
                 let handle = tokio::spawn(future);
+                ready_rx.await.unwrap();
                 Self::Started(handle)
             }
             Self::Started(_) => self,
@@ -1881,7 +2144,7 @@ fn build_kv_store(
         error!("failed to parse config.transaction_kv_store_config.base_url ({:?}) as url: {}", base_url, e)
     })?;
 
-    let network_str = match state.get_chain_identifier().chain() {
+    let network_str = match CHAIN_IDENTIFIER.get().expect("chain_id should be initialized").chain() {
         Chain::Mainnet => "/mainnet",
         _ => {
             info!("using local db only for kv store");
@@ -1896,28 +2159,28 @@ fn build_kv_store(
     Ok(Arc::new(FallbackTransactionKVStore::new_kv(db_store, http_store, metrics, "json_rpc_fallback")))
 }
 
-pub async fn build_http_server(
+async fn build_http_servers(
     state: Arc<AuthorityState>,
     store: RocksDbStore,
-    transaction_orchestrator: &Option<Arc<TransactiondOrchestrator<NetworkAuthorityClient>>>,
+    transaction_orchestrator: &Option<Arc<TransactionOrchestrator<NetworkAuthorityClient>>>,
     config: &NodeConfig,
     prometheus_registry: &Registry,
-    _custom_runtime: Option<Handle>,
-    software_version: &'static str,
-) -> Result<(Option<sui_http::ServerHandle>, Option<tokio::sync::mpsc::Sender<CheckpointData>>)> {
+    server_version: ServerVersion,
+) -> Result<(HttpServers, Option<tokio::sync::mpsc::Sender<Checkpoint>>)> {
     // Validators do not expose these APIs
     if config.consensus_config().is_some() {
-        return Ok((None, None));
+        return Ok((HttpServers::default(), None));
     }
 
     let mut router = axum::Router::new();
 
     let json_rpc_router = {
+        let traffic_controller = state.traffic_controller.clone();
         let mut server = JsonRpcServerBuilder::new(
             env!("CARGO_PKG_VERSION"),
             prometheus_registry,
+            traffic_controller,
             config.policy_config.clone(),
-            config.firewall_config.clone(),
         );
 
         let kv_store = build_kv_store(&state, config, prometheus_registry)?;
@@ -1949,7 +2212,7 @@ pub async fn build_http_server(
         ) {
             sui_name_service::NameServiceConfig::new(package_address, registry_id, reverse_registry_id)
         } else {
-            match state.get_chain_identifier().chain() {
+            match CHAIN_IDENTIFIER.get().expect("chain_id should be initialized").chain() {
                 Chain::Mainnet => sui_name_service::NameServiceConfig::mainnet(),
                 Chain::Testnet => sui_name_service::NameServiceConfig::testnet(),
                 Chain::Unknown => sui_name_service::NameServiceConfig::default(),
@@ -1976,8 +2239,8 @@ pub async fn build_http_server(
     let (subscription_service_checkpoint_sender, subscription_service_handle) =
         SubscriptionService::build(prometheus_registry);
     let rpc_router = {
-        let mut rpc_service =
-            sui_rpc_api::RpcService::new(Arc::new(RestReadStore::new(state.clone(), store)), software_version);
+        let mut rpc_service = sui_rpc_api::RpcService::new(Arc::new(RestReadStore::new(state.clone(), store)));
+        rpc_service.with_server_version(server_version);
 
         if let Some(config) = config.rpc.clone() {
             rpc_service.with_config(config);
@@ -2012,11 +2275,34 @@ pub async fn build_http_server(
 
     router = router.merge(rpc_router).layer(layers);
 
-    let handle = sui_http::Builder::new().serve(&config.json_rpc_address, router).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let https = if let Some((tls_config, https_address)) =
+        config.rpc().and_then(|config| config.tls_config().map(|tls| (tls, config.https_address())))
+    {
+        let https = sui_http::Builder::new()
+            .tls_single_cert(tls_config.cert(), tls_config.key())
+            .and_then(|builder| builder.serve(https_address, router.clone()))
+            .map_err(|e| anyhow::anyhow!(e))?;
 
-    info!(local_addr =? handle.local_addr(), "Sui JSON-RPC server listening on {}", handle.local_addr());
+        info!(
+            https_address =? https.local_addr(),
+            "HTTPS rpc server listening on {}",
+            https.local_addr()
+        );
 
-    Ok((Some(handle), Some(subscription_service_checkpoint_sender)))
+        Some(https)
+    } else {
+        None
+    };
+
+    let http = sui_http::Builder::new().serve(&config.json_rpc_address, router).map_err(|e| anyhow::anyhow!(e))?;
+
+    info!(
+        http_address =? http.local_addr(),
+        "HTTP rpc server listening on {}",
+        http.local_addr()
+    );
+
+    Ok((HttpServers { http: Some(http), https }, Some(subscription_service_checkpoint_sender)))
 }
 
 #[cfg(not(test))]
@@ -2027,4 +2313,96 @@ fn max_tx_per_checkpoint(protocol_config: &ProtocolConfig) -> usize {
 #[cfg(test)]
 fn max_tx_per_checkpoint(_: &ProtocolConfig) -> usize {
     2
+}
+
+#[derive(Default)]
+struct HttpServers {
+    #[allow(unused)]
+    http: Option<sui_http::ServerHandle>,
+    #[allow(unused)]
+    https: Option<sui_http::ServerHandle>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use prometheus::Registry;
+    use sui_config::node::{ForkCrashBehavior, ForkRecoveryConfig};
+    use sui_core::checkpoints::{CheckpointMetrics, CheckpointStore};
+    use sui_types::digests::{CheckpointDigest, TransactionDigest, TransactionEffectsDigest};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_fork_error_and_recovery_both_paths() {
+        let checkpoint_store = CheckpointStore::new_for_tests();
+        let checkpoint_metrics = CheckpointMetrics::new(&Registry::new());
+
+        // ---------- Checkpoint fork path ----------
+        let seq_num = 42;
+        let digest = CheckpointDigest::random();
+        checkpoint_store.record_checkpoint_fork_detected(seq_num, digest).unwrap();
+
+        let fork_recovery = ForkRecoveryConfig {
+            transaction_overrides: Default::default(),
+            checkpoint_overrides: Default::default(),
+            fork_crash_behavior: ForkCrashBehavior::ReturnError,
+        };
+
+        let r =
+            SuiNode::check_and_recover_forks(&checkpoint_store, &checkpoint_metrics, true, Some(&fork_recovery)).await;
+        assert!(r.is_err());
+        assert!(r.unwrap_err().to_string().contains("Checkpoint fork detected"));
+
+        let mut checkpoint_overrides = BTreeMap::new();
+        checkpoint_overrides.insert(seq_num, digest.to_string());
+        let fork_recovery_with_override = ForkRecoveryConfig {
+            transaction_overrides: Default::default(),
+            checkpoint_overrides,
+            fork_crash_behavior: ForkCrashBehavior::ReturnError,
+        };
+        let r = SuiNode::check_and_recover_forks(
+            &checkpoint_store,
+            &checkpoint_metrics,
+            true,
+            Some(&fork_recovery_with_override),
+        )
+        .await;
+        assert!(r.is_ok());
+        assert!(checkpoint_store.get_checkpoint_fork_detected().unwrap().is_none());
+
+        // ---------- Transaction fork path ----------
+        let tx_digest = TransactionDigest::random();
+        let expected_effects = TransactionEffectsDigest::random();
+        let actual_effects = TransactionEffectsDigest::random();
+        checkpoint_store.record_transaction_fork_detected(tx_digest, expected_effects, actual_effects).unwrap();
+
+        let fork_recovery = ForkRecoveryConfig {
+            transaction_overrides: Default::default(),
+            checkpoint_overrides: Default::default(),
+            fork_crash_behavior: ForkCrashBehavior::ReturnError,
+        };
+        let r =
+            SuiNode::check_and_recover_forks(&checkpoint_store, &checkpoint_metrics, true, Some(&fork_recovery)).await;
+        assert!(r.is_err());
+        assert!(r.unwrap_err().to_string().contains("Transaction fork detected"));
+
+        let mut transaction_overrides = BTreeMap::new();
+        transaction_overrides.insert(tx_digest.to_string(), actual_effects.to_string());
+        let fork_recovery_with_override = ForkRecoveryConfig {
+            transaction_overrides,
+            checkpoint_overrides: Default::default(),
+            fork_crash_behavior: ForkCrashBehavior::ReturnError,
+        };
+        let r = SuiNode::check_and_recover_forks(
+            &checkpoint_store,
+            &checkpoint_metrics,
+            true,
+            Some(&fork_recovery_with_override),
+        )
+        .await;
+        assert!(r.is_ok());
+        assert!(checkpoint_store.get_transaction_fork_detected().unwrap().is_none());
+    }
 }

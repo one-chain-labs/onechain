@@ -20,19 +20,17 @@ macro_rules! open_initial_frame {
                     $link_context,
                 )
             });
-            move_vm_profiler::profile_open_frame!($gas_meter, $function.pretty_string());
         }
     };
 }
 
 #[macro_export]
-macro_rules! close_initial_frame {
+macro_rules! close_initial_native_frame {
     ($tracer: expr, $function: expr, $return_values: expr, $gas_meter: expr) => {
         if $crate::tracing2::TRACING_ENABLED {
             $tracer.as_mut().map(|tracer| {
-                tracer.close_initial_frame($return_values, $gas_meter.remaining_gas().into())
+                tracer.close_initial_native_frame($return_values, $gas_meter.remaining_gas().into())
             });
-            move_vm_profiler::profile_close_frame!($gas_meter, $function.pretty_string());
         }
     };
 }
@@ -52,7 +50,6 @@ macro_rules! close_frame {
                     $call_err,
                 )
             });
-            move_vm_profiler::profile_close_frame!($gas_meter, $function.pretty_string());
         }
     };
 }
@@ -72,7 +69,6 @@ macro_rules! open_frame {
                     $link_context,
                 )
             });
-            move_vm_profiler::profile_open_frame!($gas_meter, $function.pretty_string());
         }
     };
 }
@@ -84,7 +80,6 @@ macro_rules! open_instruction {
             $tracer.as_mut().map(|tracer| {
                 tracer.open_instruction($frame, $interp, $loader, $gas_meter.remaining_gas().into())
             });
-            move_vm_profiler::profile_open_instr!($gas_meter, format!("{:?}", $instruction));
         }
     };
 }
@@ -102,7 +97,6 @@ macro_rules! close_instruction {
                     $result,
                 )
             });
-            move_vm_profiler::profile_close_instr!($gas_meter, format!("{:?}", $instruction));
         }
     };
 }

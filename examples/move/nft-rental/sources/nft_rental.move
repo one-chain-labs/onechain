@@ -8,17 +8,15 @@
 module nft_rental::rentables_ext;
 
 use kiosk::kiosk_lock_rule::Rule as LockRule;
-use one::{
-    bag,
-    balance::{Self, Balance},
-    clock::Clock,
-    coin::{Self, Coin},
-    kiosk::{Kiosk, KioskOwnerCap},
-    kiosk_extension,
-    package::Publisher,
-    oct::OCT,
-    transfer_policy::{Self, TransferPolicy, TransferPolicyCap, has_rule}
-};
+use one::bag;
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::kiosk::{Kiosk, KioskOwnerCap};
+use one::kiosk_extension;
+use one::package::Publisher;
+use one::oct::OCT;
+use one::transfer_policy::{Self, TransferPolicy, TransferPolicyCap, has_rule};
 
 // === Imports ===
 
@@ -44,11 +42,11 @@ public struct Rentables has drop {}
 
 /// Struct representing a rented item.
 /// Used as a key for the Rentable that's placed in the Extension's Bag.
-public struct Rented has store, copy, drop { id: ID }
+public struct Rented has copy, drop, store { id: ID }
 
 /// Struct representing a listed item.
 /// Used as a key for the Rentable that's placed in the Extension's Bag.
-public struct Listed has store, copy, drop { id: ID }
+public struct Listed has copy, drop, store { id: ID }
 
 /// Promise struct for borrowing by value.
 public struct Promise {
@@ -137,7 +135,7 @@ public fun setup_renting<T>(publisher: &Publisher, amount_bp: u64, ctx: &mut TxC
 
 /// Enables someone to list an asset within the Rentables extension's Bag,
 /// creating a Bag entry with the asset's ID as the key and a Rentable wrapper object as the value.
-/// Requires the existance of a ProtectedTP which can only be created by the creator of type T.
+/// Requires the existence of a ProtectedTP which can only be created by the creator of type T.
 /// Assumes item is already placed (& optionally locked) in a Kiosk.
 public fun list<T: key + store>(
     kiosk: &mut Kiosk,

@@ -5,6 +5,7 @@ use std::{num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use bytes::Bytes;
+use futures::StreamExt;
 use object_store::DynObjectStore;
 use prometheus::{register_int_counter_with_registry, register_int_gauge_with_registry, IntCounter, IntGauge, Registry};
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
@@ -14,12 +15,16 @@ use sui_core::{
     db_checkpoint_handler::{STATE_SNAPSHOT_COMPLETED_MARKER, SUCCESS_MARKER},
 };
 use sui_storage::{
-    object_store::util::{
-        find_all_dirs_with_epoch_prefix,
-        find_missing_epochs_dirs,
-        path_to_filesystem,
-        put,
-        run_manifest_update_loop,
+    object_store::{
+        util::{
+            find_all_dirs_with_epoch_prefix,
+            find_missing_epochs_dirs,
+            get,
+            path_to_filesystem,
+            put,
+            run_manifest_update_loop,
+        },
+        ObjectStoreListExt,
     },
     FileCompression,
 };
@@ -72,6 +77,8 @@ pub struct StateSnapshotUploader {
     /// The chain identifier is derived from the genesis checkpoint and used to identify the
     /// network.
     chain_identifier: ChainIdentifier,
+    /// Archive snapshots every N epochs (0 = disabled)
+    archive_interval_epochs: u64,
 }
 
 impl StateSnapshotUploader {
@@ -83,6 +90,7 @@ impl StateSnapshotUploader {
         registry: &Registry,
         checkpoint_store: Arc<CheckpointStore>,
         chain_identifier: ChainIdentifier,
+        archive_interval_epochs: u64,
     ) -> Result<Arc<Self>> {
         let db_checkpoint_store_config = ObjectStoreConfig {
             object_store: Some(ObjectStoreType::File),
@@ -104,6 +112,7 @@ impl StateSnapshotUploader {
             interval: Duration::from_secs(interval_s),
             metrics: StateSnapshotUploaderMetrics::new(registry),
             chain_identifier,
+            archive_interval_epochs,
         }))
     }
 
@@ -133,14 +142,17 @@ impl StateSnapshotUploader {
                 let db = Arc::new(AuthorityPerpetualTables::open(
                     &path_to_filesystem(self.db_checkpoint_path.clone(), &db_path.child("store"))?,
                     None,
+                    None,
                 ));
                 let commitments = self
                     .checkpoint_store
                     .get_epoch_state_commitments(*epoch)
                     .expect("Expected last checkpoint of epoch to have end of epoch data")
                     .expect("Expected end of epoch data to be present");
-                let ECMHLiveObjectSetDigest(state_hash_commitment) =
-                    commitments.last().expect("Expected at least one commitment").clone();
+                let state_hash_commitment = match commitments.last().expect("Expected at least one commitment").clone() {
+                    ECMHLiveObjectSetDigest(digest) => digest,
+                    _ => return Err(anyhow::anyhow!("Expected ECMHLiveObjectSetDigest")),
+                };
                 state_snapshot_writer.write(*epoch, db, state_hash_commitment, self.chain_identifier).await?;
                 info!("State snapshot creation successful for epoch: {}", *epoch);
                 // Drop marker in the output directory that upload completed successfully
@@ -151,6 +163,11 @@ impl StateSnapshotUploader {
                 let state_snapshot_completed_marker = db_path.child(STATE_SNAPSHOT_COMPLETED_MARKER);
                 put(&self.db_checkpoint_store.clone(), &state_snapshot_completed_marker, bytes.clone()).await?;
                 info!("State snapshot completed for epoch: {epoch}");
+
+                // Archive snapshot if epoch meets archival criteria
+                if let Err(e) = self.archive_epoch_if_needed(*epoch).await {
+                    error!("Failed to archive epoch {} (non-fatal, continuing): {:?}", epoch, e);
+                }
             } else {
                 let bytes = Bytes::from_static(b"success");
                 let state_snapshot_completed_marker = db_path.child(STATE_SNAPSHOT_COMPLETED_MARKER);
@@ -193,5 +210,53 @@ impl StateSnapshotUploader {
     async fn get_missing_epochs(&self) -> Result<Vec<u64>> {
         let missing_epochs = find_missing_epochs_dirs(&self.snapshot_store, SUCCESS_MARKER).await?;
         Ok(missing_epochs.to_vec())
+    }
+
+    pub(crate) async fn archive_epoch_if_needed(&self, epoch: u64) -> Result<()> {
+        if self.archive_interval_epochs == 0 {
+            return Ok(());
+        }
+
+        if !epoch.is_multiple_of(self.archive_interval_epochs) {
+            debug!(
+                "Epoch {} is not divisible by archive interval {}, skipping archival",
+                epoch, self.archive_interval_epochs
+            );
+            return Ok(());
+        }
+
+        info!("Epoch {} is divisible by {}, archiving to archive/ subdirectory", epoch, self.archive_interval_epochs);
+
+        let source_prefix = object_store::path::Path::from(format!("epoch_{}", epoch));
+
+        info!("Listing files in {} for archival", source_prefix);
+
+        let mut paths = self.snapshot_store.list_objects(Some(&source_prefix)).await;
+        let mut files_copied = 0;
+
+        while let Some(res) = paths.next().await {
+            match res {
+                Ok(object_metadata) => {
+                    let source_path = &object_metadata.location;
+                    let relative_path =
+                        source_path.as_ref().strip_prefix(&format!("epoch_{}/", epoch)).unwrap_or(source_path.as_ref());
+                    let dest_path = object_store::path::Path::from(format!("archive/epoch_{}/{}", epoch, relative_path));
+
+                    debug!("Copying {} to {}", source_path, dest_path);
+
+                    let bytes = get(&self.snapshot_store, source_path).await?;
+                    put(&self.snapshot_store, &dest_path, bytes).await?;
+
+                    files_copied += 1;
+                }
+                Err(e) => {
+                    error!("Failed to list objects for archival: {:?}", e);
+                    return Err(e.into());
+                }
+            }
+        }
+
+        info!("Successfully archived epoch {} ({} files copied to archive/epoch_{})", epoch, files_copied, epoch);
+        Ok(())
     }
 }

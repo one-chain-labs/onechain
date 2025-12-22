@@ -45,6 +45,9 @@ pub async fn build_eth_transaction(
         BridgeAction::SuiToEthBridgeAction(_) => {
             unreachable!()
         }
+        BridgeAction::SuiToEthTokenTransfer(_) => {
+            unreachable!()
+        }
         BridgeAction::EthToSuiBridgeAction(_) => {
             unreachable!()
         }
@@ -80,7 +83,7 @@ pub async fn build_emergency_op_approve_transaction(
 ) -> BridgeResult<ContractCall<EthSigner, ()>> {
     let contract = EthSuiBridge::new(contract_address, signer.into());
 
-    let message: eth_sui_bridge::Message = action.clone().into();
+    let message: eth_sui_bridge::Message = action.clone().try_into()?;
     let signatures = sigs.signatures.values().map(|sig| Bytes::from(sig.as_ref().to_vec())).collect::<Vec<_>>();
     Ok(contract.execute_emergency_op_with_signatures(signatures, message))
 }
@@ -93,7 +96,7 @@ pub async fn build_committee_blocklist_approve_transaction(
 ) -> BridgeResult<ContractCall<EthSigner, ()>> {
     let contract = EthBridgeCommittee::new(contract_address, signer.into());
 
-    let message: eth_bridge_committee::Message = action.clone().into();
+    let message: eth_bridge_committee::Message = action.clone().try_into()?;
     let signatures = sigs.signatures.values().map(|sig| Bytes::from(sig.as_ref().to_vec())).collect::<Vec<_>>();
     Ok(contract.update_blocklist_with_signatures(signatures, message))
 }
@@ -106,7 +109,7 @@ pub async fn build_limit_update_approve_transaction(
 ) -> BridgeResult<ContractCall<EthSigner, ()>> {
     let contract = EthBridgeLimiter::new(contract_address, signer.into());
 
-    let message: eth_bridge_limiter::Message = action.clone().into();
+    let message: eth_bridge_limiter::Message = action.clone().try_into()?;
     let signatures = sigs.signatures.values().map(|sig| Bytes::from(sig.as_ref().to_vec())).collect::<Vec<_>>();
     Ok(contract.update_limit_with_signatures(signatures, message))
 }
@@ -118,7 +121,7 @@ pub async fn build_asset_price_update_approve_transaction(
     sigs: &BridgeCommitteeValiditySignInfo,
 ) -> BridgeResult<ContractCall<EthSigner, ()>> {
     let contract = EthBridgeConfig::new(contract_address, signer.into());
-    let message: eth_bridge_config::Message = action.clone().into();
+    let message: eth_bridge_config::Message = action.clone().try_into()?;
     let signatures = sigs.signatures.values().map(|sig| Bytes::from(sig.as_ref().to_vec())).collect::<Vec<_>>();
     Ok(contract.update_token_price_with_signatures(signatures, message))
 }
@@ -130,7 +133,7 @@ pub async fn build_add_tokens_on_evm_transaction(
     sigs: &BridgeCommitteeValiditySignInfo,
 ) -> BridgeResult<ContractCall<EthSigner, ()>> {
     let contract = EthBridgeConfig::new(contract_address, signer.into());
-    let message: eth_bridge_config::Message = action.clone().into();
+    let message: eth_bridge_config::Message = action.clone().try_into()?;
     let signatures = sigs.signatures.values().map(|sig| Bytes::from(sig.as_ref().to_vec())).collect::<Vec<_>>();
     Ok(contract.add_tokens_with_signatures(signatures, message))
 }
@@ -142,7 +145,7 @@ pub async fn build_evm_upgrade_transaction(
 ) -> BridgeResult<ContractCall<EthSigner, ()>> {
     let contract_address = action.proxy_address;
     let contract = EthCommitteeUpgradeableContract::new(contract_address, signer.into());
-    let message: eth_committee_upgradeable_contract::Message = action.clone().into();
+    let message: eth_committee_upgradeable_contract::Message = action.clone().try_into()?;
     let signatures = sigs.signatures.values().map(|sig| Bytes::from(sig.as_ref().to_vec())).collect::<Vec<_>>();
     Ok(contract.upgrade_with_signatures(signatures, message))
 }

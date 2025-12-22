@@ -30,7 +30,7 @@ use sui_types::{
     parse_sui_type_tag,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     quorum_driver_types::NON_RECOVERABLE_ERROR_MSG,
-    transaction::{Argument, CallArg, Command, ObjectArg, Transaction, TransactionData},
+    transaction::{Argument, CallArg, Command, ObjectArg, SharedObjectMutability, Transaction, TransactionData},
     Identifier,
 };
 use tap::tap::TapFallible;
@@ -300,14 +300,14 @@ impl OnChainDataUploader {
         loop {
             read_interval.tick().await;
             let data_points = self.collect().await;
-            if !data_points.is_empty() {
-                if let Err(err) = self.upload(data_points).await {
-                    error!("Upload failure: {err}. About to resting for {UPLOAD_FAILURE_RECOVER_SEC} sec.");
-                    tokio::time::sleep(Duration::from_secs(UPLOAD_FAILURE_RECOVER_SEC)).await;
-                    self.gas_obj_ref =
-                        get_gas_obj_ref(self.client.read_api(), self.gas_obj_ref.0, self.signer_address).await;
-                    error!("Updated gas object reference: {:?}", self.gas_obj_ref);
-                }
+            if !data_points.is_empty()
+                && let Err(err) = self.upload(data_points).await
+            {
+                error!("Upload failure: {err}. About to resting for {UPLOAD_FAILURE_RECOVER_SEC} sec.");
+                tokio::time::sleep(Duration::from_secs(UPLOAD_FAILURE_RECOVER_SEC)).await;
+                self.gas_obj_ref =
+                    get_gas_obj_ref(self.client.read_api(), self.gas_obj_ref.0, self.signer_address).await;
+                error!("Updated gas object reference: {:?}", self.gas_obj_ref);
             }
         }
     }
@@ -404,7 +404,7 @@ impl OnChainDataUploader {
             rgp,
         );
 
-        let signed_tx = self.wallet_ctx.sign_transaction(&tx);
+        let signed_tx = self.wallet_ctx.sign_transaction(&tx).await;
         let tx_digest = *signed_tx.digest();
 
         let timer_start = Instant::now();
@@ -581,9 +581,11 @@ async fn get_object_arg(read_api: &ReadApi, id: ObjectID, is_mutable_ref: bool) 
     let owner = obj.owner.clone();
     Ok(match owner {
         Owner::Shared { initial_shared_version }
-        | Owner::ConsensusV2 { start_version: initial_shared_version, authenticator: _ } => {
-            ObjectArg::SharedObject { id, initial_shared_version, mutable: is_mutable_ref }
-        }
+        | Owner::ConsensusAddressOwner { start_version: initial_shared_version, .. } => ObjectArg::SharedObject {
+            id,
+            initial_shared_version,
+            mutability: if is_mutable_ref { SharedObjectMutability::Mutable } else { SharedObjectMutability::Immutable },
+        },
         Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => ObjectArg::ImmOrOwnedObject(obj_ref),
     })
 }

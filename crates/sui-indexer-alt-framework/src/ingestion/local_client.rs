@@ -3,9 +3,10 @@
 
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 use axum::body::Bytes;
 
-use crate::ingestion::client::{FetchError, FetchResult, IngestionClientTrait};
+use crate::ingestion::ingestion_client::{FetchData, FetchError, FetchResult, IngestionClientTrait};
 
 // FIXME: To productionize this, we need to add garbage collection to remove old checkpoint files.
 
@@ -19,7 +20,7 @@ impl LocalIngestionClient {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl IngestionClientTrait for LocalIngestionClient {
     async fn fetch(&self, checkpoint: u64) -> FetchResult {
         let path = self.path.join(format!("{}.chk", checkpoint));
@@ -30,29 +31,31 @@ impl IngestionClientTrait for LocalIngestionClient {
                 FetchError::Transient { reason: "io_error", error: e.into() }
             }
         })?;
-        Ok(Bytes::from(bytes))
+        Ok(FetchData::Raw(Bytes::from(bytes)))
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use sui_storage::blob::{Blob, BlobEncoding};
-    use tokio_util::sync::CancellationToken;
 
     use crate::{
-        ingestion::{client::IngestionClient, test_utils::test_checkpoint_data},
-        metrics::tests::test_metrics,
+        ingestion::{ingestion_client::IngestionClient, test_utils::test_checkpoint_data},
+        metrics::tests::test_ingestion_metrics,
     };
 
     #[tokio::test]
     async fn local_test_fetch() {
-        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let tempdir = tempfile::tempdir().unwrap().keep();
         let path = tempdir.join("1.chk");
-        let test_checkpoint = test_checkpoint_data(1);
-        tokio::fs::write(&path, &test_checkpoint).await.unwrap();
+        let test_checkpoint_data = test_checkpoint_data(1);
+        tokio::fs::write(&path, &test_checkpoint_data).await.unwrap();
 
-        let local_client = IngestionClient::new_local(tempdir, test_metrics());
-        let checkpoint = local_client.fetch(1, &CancellationToken::new()).await.unwrap();
-        assert_eq!(Blob::encode(&*checkpoint, BlobEncoding::Bcs).unwrap().to_bytes(), test_checkpoint);
+        let local_client = IngestionClient::new_local(tempdir, test_ingestion_metrics());
+        let checkpoint = local_client.fetch(1).await.unwrap();
+
+        // Convert checkpoint back to CheckpointData for serialization comparison
+        let checkpoint: crate::types::full_checkpoint_content::CheckpointData = (*checkpoint).clone().into();
+        assert_eq!(Blob::encode(&checkpoint, BlobEncoding::Bcs).unwrap().to_bytes(), test_checkpoint_data);
     }
 }

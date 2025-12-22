@@ -6,7 +6,6 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 use sui_types::{event::EventID, Identifier};
 use typed_store::{
     rocks::{DBMap, MetricConf},
-    traits::{TableSummary, TypedStoreDebug},
     DBMapUtils,
     Map,
 };
@@ -70,7 +69,10 @@ impl BridgeOrchestratorTables {
     }
 
     pub fn get_all_pending_actions(&self) -> HashMap<BridgeActionDigest, BridgeAction> {
-        self.pending_actions.unbounded_iter().collect()
+        self.pending_actions
+            .safe_iter()
+            .collect::<Result<HashMap<_, _>, _>>()
+            .expect("failed to get all pending actions")
     }
 
     pub fn get_sui_event_cursors(&self, identifiers: &[Identifier]) -> BridgeResult<Vec<Option<EventID>>> {
@@ -124,7 +126,7 @@ mod tests {
         );
 
         // insert an existing action is ok
-        store.insert_pending_actions(&[action1.clone()]).unwrap();
+        store.insert_pending_actions(std::slice::from_ref(&action1)).unwrap();
         let actions = store.get_all_pending_actions();
         assert_eq!(
             actions,
@@ -151,8 +153,8 @@ mod tests {
         // update sui event cursor
         let sui_module = Identifier::from_str("test").unwrap();
         let sui_cursor = EventID { tx_digest: TransactionDigest::random(), event_seq: 1 };
-        assert!(store.get_sui_event_cursors(&[sui_module.clone()]).unwrap()[0].is_none());
+        assert!(store.get_sui_event_cursors(std::slice::from_ref(&sui_module)).unwrap()[0].is_none());
         store.update_sui_event_cursor(sui_module.clone(), sui_cursor).unwrap();
-        assert_eq!(store.get_sui_event_cursors(&[sui_module.clone()]).unwrap()[0].unwrap(), sui_cursor);
+        assert_eq!(store.get_sui_event_cursors(std::slice::from_ref(&sui_module)).unwrap()[0].unwrap(), sui_cursor);
     }
 }

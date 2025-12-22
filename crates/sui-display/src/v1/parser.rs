@@ -5,7 +5,7 @@ use std::{borrow::Cow, fmt, iter::Peekable};
 
 use move_core_types::{annotated_extractor::Element, identifier};
 
-use super::lexer::{Lexeme as L, Lexer, OwnedLexeme, Token as T, TokenSet};
+use crate::v1::lexer::{Lexeme as L, Lexer, OwnedLexeme, Token as T, TokenSet};
 
 /// A strand is a single component of a format string, it can either be a piece of literal text
 /// that needs to be preserved in the output, or a reference to a nested field (as a sequence of

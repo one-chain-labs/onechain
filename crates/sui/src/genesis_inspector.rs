@@ -250,7 +250,7 @@ fn display_validator(validator: &SuiValidatorGenesis) {
     println!("Staking Pool ID: {}", validator.staking_pool.id);
     println!("Staking Pool Activation Epoch: {:?}", validator.staking_pool.activation_epoch);
     println!("Staking Pool Deactivation Epoch: {:?}", validator.staking_pool.deactivation_epoch);
-    println!("Staking Pool Sui Balance: {:?}", validator.staking_pool.oct_balance);
+    println!("Staking Pool Sui Balance: {:?}", validator.staking_pool.sui_balance);
     println!("Rewards Pool: {}", validator.staking_pool.rewards_pool.value());
     println!("Pool Token Balance: {}", validator.staking_pool.pool_token_balance);
     println!("Pending Delegation: {}", validator.staking_pool.pending_stake);

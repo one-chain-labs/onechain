@@ -3,7 +3,7 @@
 
 use std::{fmt::Formatter, sync::LazyLock};
 
-use move_binary_format::{binary_config::BinaryConfig, compatibility::Compatibility, CompiledModule};
+use move_binary_format::{binary_config::BinaryConfig, compatibility::Compatibility, normalized, CompiledModule};
 use move_core_types::gas_algebra::InternalGas;
 use serde::{Deserialize, Serialize};
 use sui_types::{
@@ -211,14 +211,15 @@ pub async fn compare_system_package<S: ObjectStore>(
 
     let new_pkg = new_object.data.try_as_package_mut().expect("Created as package");
 
-    let cur_normalized = match cur_pkg.normalize(binary_config) {
+    let pool = &mut normalized::RcPool::new();
+    let cur_normalized = match cur_pkg.normalize(pool, binary_config, /* include code */ false) {
         Ok(v) => v,
         Err(e) => {
             error!("Could not normalize existing package: {e:?}");
             return None;
         }
     };
-    let mut new_normalized = new_pkg.normalize(binary_config).ok()?;
+    let mut new_normalized = new_pkg.normalize(pool, binary_config, /* include code */ false).ok()?;
 
     for (name, cur_module) in cur_normalized {
         let new_module = new_normalized.remove(&name)?;

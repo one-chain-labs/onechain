@@ -11,13 +11,25 @@ use sui_indexer_alt::{
     config::{IndexerConfig, Merge},
     setup_indexer,
 };
-use sui_indexer_alt_framework::Indexer;
-use sui_indexer_alt_metrics::MetricsService;
+use sui_indexer_alt_framework::postgres::reset_database;
+use sui_indexer_alt_metrics::{uptime, MetricsService};
 use sui_indexer_alt_schema::MIGRATIONS;
-use sui_pg_db::reset_database;
-use tokio::fs;
+use tokio::{fs, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
+
+// Define the `GIT_REVISION` const
+bin_version::git_revision!();
+
+static VERSION: &str = const_str::concat!(
+    env!("CARGO_PKG_VERSION_MAJOR"),
+    ".",
+    env!("CARGO_PKG_VERSION_MINOR"),
+    ".",
+    env!("CARGO_PKG_VERSION_PATCH"),
+    "-",
+    GIT_REVISION
+);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -27,9 +39,9 @@ async fn main() -> Result<()> {
     let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
 
     match args.command {
-        Command::Indexer { client_args, indexer_args, metrics_args, config } => {
+        Command::Indexer { database_url, db_args, client_args, indexer_args, metrics_args, config } => {
             let indexer_config = read_config(&config).await?;
-            info!("Starting indexer with config: {:?}", indexer_config);
+            info!("Starting indexer with config: {:#?}", indexer_config);
 
             let cancel = CancellationToken::new();
 
@@ -38,12 +50,28 @@ async fn main() -> Result<()> {
 
             let metrics = MetricsService::new(metrics_args, registry, cancel.child_token());
 
+            let h_ctrl_c = tokio::spawn({
+                let cancel = cancel.clone();
+                async move {
+                    tokio::select! {
+                        _ = cancel.cancelled() => {}
+                        _ = signal::ctrl_c() => {
+                            info!("Received Ctrl-C, shutting down...");
+                            cancel.cancel();
+                        }
+                    }
+                }
+            });
+
+            metrics.registry().register(uptime(VERSION)?).context("Failed to register uptime metric.")?;
+
             let h_indexer = setup_indexer(
-                args.db_args,
+                database_url,
+                db_args,
                 indexer_args,
                 client_args,
                 indexer_config,
-                true,
+                None,
                 metrics.registry(),
                 cancel.child_token(),
             )
@@ -59,6 +87,7 @@ async fn main() -> Result<()> {
             let _ = h_indexer.await;
             cancel.cancel();
             let _ = h_metrics.await;
+            let _ = h_ctrl_c.await;
         }
 
         Command::GenerateConfig => {
@@ -82,7 +111,7 @@ async fn main() -> Result<()> {
                     read_config(&file)
                         .await
                         .with_context(|| format!("Failed to read configuration file: {}", file.display()))?,
-                );
+                )?;
             }
 
             let config_toml =
@@ -91,14 +120,14 @@ async fn main() -> Result<()> {
             println!("{config_toml}");
         }
 
-        Command::ResetDatabase { skip_migrations } => {
-            reset_database(args.db_args, (!skip_migrations).then(|| Indexer::migrations(Some(&MIGRATIONS)))).await?;
+        Command::ResetDatabase { database_url, db_args, skip_migrations } => {
+            reset_database(database_url, db_args, if !skip_migrations { Some(&MIGRATIONS) } else { None }).await?;
         }
 
         #[cfg(feature = "benchmark")]
-        Command::Benchmark { benchmark_args, config } => {
+        Command::Benchmark { database_url, db_args, benchmark_args, config } => {
             let indexer_config = read_config(&config).await?;
-            sui_indexer_alt::benchmark::run_benchmark(args.db_args, benchmark_args, indexer_config).await?;
+            sui_indexer_alt::benchmark::run_benchmark(database_url, db_args, benchmark_args, indexer_config).await?;
         }
     }
 
