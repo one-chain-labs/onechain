@@ -17,7 +17,7 @@ public struct GenesisValidatorMetadata has copy, drop {
     image_url: vector<u8>,
     project_url: vector<u8>,
     sui_address: address,
-        revenue_receiving_address:address,
+    revenue_receiving_address:address,
     gas_price: u64,
     commission_rate: u64,
     protocol_public_key: vector<u8>,
@@ -89,7 +89,7 @@ fun create(
             image_url,
             project_url,
             sui_address,
-                revenue_receiving_address,
+            revenue_receiving_address,
             gas_price,
             commission_rate,
             protocol_public_key,
@@ -104,6 +104,7 @@ fun create(
 
         let validator = validator::new(
             sui_address,
+            revenue_receiving_address,
             protocol_public_key,
             network_public_key,
             worker_public_key,
