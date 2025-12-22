@@ -238,7 +238,7 @@ public fun list<T: key + store>(
   kiosk.list<T>(cap, item_id, 0);
 
   // Constructs a zero coin.
-  let coin = coin::zero<SUI>(ctx);
+  let coin = coin::zero<OCT>(ctx);
   // Purchases the item with 0 SUI.
   let (object, request) = kiosk.purchase<T>(item_id, coin);
 
