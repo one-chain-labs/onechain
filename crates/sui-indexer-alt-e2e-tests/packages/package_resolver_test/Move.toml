@@ -3,7 +3,7 @@ name = "package_resolver_test"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { local = "../../../sui-framework/packages/one-framework" }
+One = { local = "../../../sui-framework/packages/one-framework" }
 
 [addresses]
 package_resolver_test = "0x0"

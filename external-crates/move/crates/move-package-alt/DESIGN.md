@@ -512,7 +512,7 @@ for each environment.
 TODO: maybe this isn't necessary; we can just disable local deps in the monorepo and put them in explicitly:
 > The default system deps for Sui would be `sui` and `std`. The available system deps are `std`,
 > `sui`, `system`, `deepbook-v2`, `bridge`, `monorepo-sui`, `monorepo-std`. The `monorepo` deps are
-> converted to local dependencies are are used for our internal tests (they would expand to `sui = {
+> converted to local dependencies are are used for our internal tests (they would expand to `One = {
 > local = "path_to_monorepo/crates/sui-framework/packages/sui" }` and would fail if they are used
 > outside the monorepo.
 

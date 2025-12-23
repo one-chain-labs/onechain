@@ -37,7 +37,7 @@ build-config = "..."
 
 [published.testnet.dependencies]
 std = { git = "", rev = "7a8d873f5a190aede5876fd0ccca79ac1e8bd2b0" }
-sui = { git = "", rev = "7a8d873f5a190aede5876fd0ccca79ac1e8bd2b0" }
+One = { git = "", rev = "7a8d873f5a190aede5876fd0ccca79ac1e8bd2b0" }
 
 [unpublished.dep-overrides.mainnet.pinned]
 foo = { git = "", rev = "7a8d873f5a190aede5876fd0ccca79ac1e8bd2b0" } # pinned versions of the dep-overrides

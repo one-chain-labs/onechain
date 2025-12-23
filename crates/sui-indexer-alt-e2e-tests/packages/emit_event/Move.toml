@@ -3,7 +3,7 @@ name = "emit_event"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { local = "../../../sui-framework/packages/one-framework" }
+One = { local = "../../../sui-framework/packages/one-framework" }
 
 [addresses]
 emit_event = "0x0"

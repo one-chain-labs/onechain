@@ -3,7 +3,7 @@ name = "command_results"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { local = "../../../sui-framework/packages/one-framework" }
+One = { local = "../../../sui-framework/packages/one-framework" }
 
 [addresses]
 command_results = "0x0"
