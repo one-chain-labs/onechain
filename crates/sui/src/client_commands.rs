@@ -2988,7 +2988,7 @@ fn find_faucet_url(address: SuiAddress, rpc: &str) -> anyhow::Result<String> {
     }
 
     if host == testnet_host {
-        bail!("For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas");
+        return Ok("https://faucet-testnet.onelabs.cc/v1/gas".to_string());
     }
 
     if host == localhost || host == localhost_0 {

@@ -162,6 +162,7 @@ fn main() {
         one_node::admin::run_admin_server(node, admin_interface_port, filter_handle).await
     });
 
+     /*
     runtimes.metrics.spawn(async move {
         let node = node_once_cell.get().await;
         let state = node.state();
@@ -170,7 +171,8 @@ fn main() {
             sleep(Duration::from_secs(3600)).await;
         }
     });
-
+    */
+    
     // wait for SIGINT on the main thread
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
