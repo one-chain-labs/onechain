@@ -11,7 +11,7 @@ use one::oct::OCT;
 use one::table::{Self, Table};
 use one::table_vec::{Self, TableVec};
 use one::vec_map::{Self, VecMap};
-use one::vec_set::VecSet;
+use one::vec_set::{Self,VecSet};
 use one_system::staking_pool::{
     PoolTokenExchangeRate,
     StakedOct,
@@ -23,6 +23,8 @@ use one_system::validator::{Validator, staking_pool_id, sui_address};
 use one_system::validator_cap::{UnverifiedValidatorOperationCap, ValidatorOperationCap};
 use one_system::validator_wrapper::ValidatorWrapper;
 use one_system::voting_power;
+use one::coin_vesting::CoinVesting;
+
 
 // Errors
 const ENonValidatorInReportRecords: u64 = 0;
@@ -182,6 +184,7 @@ public(package) fun new(
         inactive_validators: table::new(ctx),
         validator_candidates: table::new(ctx),
         at_risk_validators: vec_map::empty(),
+        only_trusted_validator: true,
         trusted_validators,
         extra_fields: bag::new(ctx),
     };
@@ -376,7 +379,7 @@ public(package) fun assert_no_pending_or_active_duplicates(
 
 public(package) fun request_remove_validator(
     self: &mut ValidatorSet,
-    ctx: &TxCntext,
+    ctx: &TxContext,
 ) {
     let validator_address = ctx.sender();
     self.remove_validator(validator_address)
@@ -424,7 +427,7 @@ public(package) fun request_withdraw_stake(
     self: &mut ValidatorSet,
     staked_oct: StakedOct,
     ctx: &TxContext,
-): Balance<OCT> {
+) : (Balance<OCT>,Option<CoinVesting<OCT>>) {
     let staking_pool_id = staked_oct.pool_id();
     let validator = if (self.staking_pool_mappings.contains(staking_pool_id)) {
         // This is an active validator.

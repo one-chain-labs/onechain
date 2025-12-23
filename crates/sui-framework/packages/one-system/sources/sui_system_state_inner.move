@@ -368,12 +368,14 @@ public(package) fun request_add_validator_candidate(
     p2p_address: vector<u8>,
     primary_address: vector<u8>,
     worker_address: vector<u8>,
+    revenue_receiving_address:address,
     gas_price: u64,
     commission_rate: u64,
     ctx: &mut TxContext,
 ) {
     let validator = validator::new(
         ctx.sender(),
+        revenue_receiving_address,
         pubkey_bytes,
         network_pubkey_bytes,
         worker_pubkey_bytes,
@@ -543,7 +545,7 @@ public(package) fun request_add_stake_mul_coin(
     ctx: &mut TxContext,
 ): StakedOct {
     let balance = extract_coin_balance(stakes, stake_amount, ctx);
-    self.validators.request_add_stake(validator_address, balance, ctx)
+    self.validators.request_add_stake(validator_address, balance, false,ctx)
 }
 
 public(package) fun request_add_val_stake_mul_coin(
