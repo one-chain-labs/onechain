@@ -516,7 +516,7 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                         GlobalStateHashV2EnabledConfig::Global(enabled) => *enabled,
                         GlobalStateHashV2EnabledConfig::PerValidator(func) => func(idx),
                     };
-                    builder = // builder.with_global_state_hash_v2_enabled(global_state_hash_v2_enabled);
+                    builder = builder.with_global_state_hash_v2_enabled(global_state_hash_v2_enabled);
                 }
                 if let Some(num_unpruned_validators) = self.num_unpruned_validators
                     && idx < num_unpruned_validators
