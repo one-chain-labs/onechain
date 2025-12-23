@@ -3,7 +3,7 @@
 
 syntax = "proto3";
 
-package oct.rpc.consistent.v1alpha;
+package sui.rpc.consistent.v1alpha;
 
 service ConsistentService {
   rpc AvailableRange(AvailableRangeRequest) returns (AvailableRangeResponse);
@@ -142,13 +142,13 @@ message ListOwnedObjectsRequest {
   //  - `0x2`
   //  - `0x2::coin`
   //  - `0x2::coin::Coin`
-  //  - `0x2::coin::Coin<0x2::oct::OCT>`
+  //  - `0x2::coin::Coin<0x2::sui::SUI>`
   optional string object_type = 2;
 
   // The maximum number of entries to return. The service may return fewer than
   // this value.
   //
-  // Consult `oct.rpc.consistent.v1alpha/ServiceConfig` for default and maximum
+  // Consult `sui.rpc.consistent.v1alpha/ServiceConfig` for default and maximum
   // page sizes.
   optional uint32 page_size = 100;
 
@@ -218,7 +218,7 @@ message Balance {
   optional string owner = 1;
 
   // The marker type for the coins being aggregated into this balance, e.g.
-  // `0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT`.
+  // `0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI`.
   optional string coin_type = 2;
 
   /// The total balance for coins of this type, owned by one address,

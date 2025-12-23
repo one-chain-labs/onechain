@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
-package oct.rpc.alpha;
+package sui.rpc.alpha;
 
-import "oct/rpc/v2/object_reference.proto";
+import "sui/rpc/v2/object_reference.proto";
 
 // ProofService provides cryptographic proofs for blockchain objects.
 service ProofService {
@@ -36,7 +36,7 @@ message GetObjectInclusionProofRequest {
 // Response containing object inclusion proof and object data.
 message GetObjectInclusionProofResponse {
   // Object reference being proven (object_id, version, digest).
-  optional oct.rpc.v2.ObjectReference object_ref = 1;
+  optional sui.rpc.v2.ObjectReference object_ref = 1;
 
   // Object inclusion proof.
   optional OCSInclusionProof inclusion_proof = 2;

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
-package oct.rpc.alpha;
+package sui.rpc.alpha;
 
 import "google/protobuf/empty.proto";
-import "oct/rpc/v2/event.proto";
+import "sui/rpc/v2/event.proto";
 
 // EventService provides paginated access to authenticated events per stream.
 service EventService {
@@ -15,7 +15,7 @@ service EventService {
 
 // Request authenticated events for a stream starting from a checkpoint.
 message ListAuthenticatedEventsRequest {
-  // Required. Stream identifier (Oct address) of the event stream.
+  // Required. Stream identifier (Sui address) of the event stream.
   optional string stream_id = 1;
 
   // Inclusive start checkpoint. Must not yet be pruned. (default: 0)
@@ -52,7 +52,7 @@ message AuthenticatedEvent {
   optional uint32 event_idx = 4;
 
   // The event payload.
-  optional oct.rpc.v2.Event event = 5;
+  optional sui.rpc.v2.Event event = 5;
 
   // The stream identifier (owner address) for which this event is authenticated.
   optional string stream_id = 6;

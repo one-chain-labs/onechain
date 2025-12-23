@@ -55,7 +55,7 @@ enum LaunchStage {
   // Beta is the point at which we are ready to open a release for any
   // customer to use. There are no SLA or technical support obligations in a
   // Beta release. Products will be complete from a feature perspective, but
-  // may have some open outstanding issues. Beta releases are octtable for
+  // may have some open outstanding issues. Beta releases are suitable for
   // limited production use cases.
   BETA = 3;
 
