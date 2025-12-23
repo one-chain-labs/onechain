@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     epoch_start_sui_system_state::EpochStartValidatorInfoV1,
     get_validators_from_table_vec,
-    sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
+    sui_system_state_summary::{SuiSupperCommitteeSummary,SuiSystemStateSummary, SuiValidatorSummary},
     AdvanceEpochParams,
     SuiSystemStateTrait,
 };
