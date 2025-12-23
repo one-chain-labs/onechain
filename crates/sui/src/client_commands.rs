@@ -1364,10 +1364,6 @@ impl SuiClientCommands {
             SuiClientCommands::Faucet { address, url } => {
                 let address = context.get_identity_address(address)?;
                 let url = if let Some(url) = url {
-                    ensure!(
-                        !url.starts_with("https://faucet.testnet.sui.io"),
-                        "For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas"
-                    );
                     url
                 } else {
                     let active_env = context.get_active_env();
