@@ -214,6 +214,7 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
                     validator_candidates: Table { id: validator_candidates_id, size: validator_candidates_size },
                     at_risk_validators: VecMap { contents: at_risk_validators },
                     extra_fields: _,
+                    ..
                 },
             storage_fund,
             parameters:
