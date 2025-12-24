@@ -21,7 +21,7 @@ use crate::{
     sui_system_state::{
         epoch_start_sui_system_state::EpochStartSystemState,
         get_validators_from_table_vec,
-        sui_system_state_inner_v1::{StakeSubsidyV1, StorageFundV1, ValidatorSetV1,SuiSupperCommittee},
+        sui_system_state_inner_v1::{StakeSubsidyV1, StorageFundV1, SuiSupperCommittee, ValidatorSetV1},
     },
 };
 

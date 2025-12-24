@@ -1364,6 +1364,10 @@ impl SuiClientCommands {
             SuiClientCommands::Faucet { address, url } => {
                 let address = context.get_identity_address(address)?;
                 let url = if let Some(url) = url {
+                    ensure!(
+                        !url.starts_with("https://faucet-testnet.onelabs.cc"),
+                        "For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas"
+                    );
                     url
                 } else {
                     let active_env = context.get_active_env();
@@ -2984,7 +2988,7 @@ fn find_faucet_url(address: SuiAddress, rpc: &str) -> anyhow::Result<String> {
     }
 
     if host == testnet_host {
-        return Ok("https://faucet-testnet.onelabs.cc/v1/gas".to_string());
+        bail!("For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas");
     }
 
     if host == localhost || host == localhost_0 {

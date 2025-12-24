@@ -36,7 +36,7 @@ struct FaucetResponse {
 // const SUI_FAUCET: &str = "https://faucet.devnet.sui.io/v2/gas"; // devnet faucet
 
 // Testnet faucet is under heavy rate limit, we recommend using devnet for these examples
-pub const SUI_FAUCET: &str = "https://faucet.testnet.sui.io/v2/gas"; // testnet faucet
+pub const SUI_FAUCET: &str = "https://faucet-testnet.onelabs.cc/v2/gas"; // testnet faucet
 
 // const SUI_FAUCET: &str = "http://127.0.0.1:9123/v2/gas";
 
@@ -114,7 +114,7 @@ pub async fn request_tokens_from_faucet(address: SuiAddress, sui_client: &SuiCli
     // wait for the faucet to finish the batch of token requests
     loop {
         let resp = client
-            .get("https://faucet.testnet.sui.io/v1/status")
+            .get("https://faucet-testnet.onelabs.cc/v1/status")
             .header("Content-Type", "application/json")
             .json(&json_body)
             .send()

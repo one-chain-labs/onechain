@@ -7093,7 +7093,7 @@ dependencies = [
 [[package]]
 name = "sui-crypto"
 version = "0.0.5"
-source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=d3334e5a8b1127f2e197d85750f1fb78c7084ae1#d3334e5a8b1127f2e197d85750f1fb78c7084ae1"
+source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=d3334e5a8b1127f2e197d85750f1fb78c7084ae1#d3334e5a8b1127f2e197d85750f1fb78c7084ae1"
 dependencies = [
  "ark-bn254",
  "ark-ff",
@@ -7395,7 +7395,7 @@ dependencies = [
 [[package]]
 name = "sui-rpc"
 version = "0.0.0"
-source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=d3334e5a8b1127f2e197d85750f1fb78c7084ae1#d3334e5a8b1127f2e197d85750f1fb78c7084ae1"
+source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=d3334e5a8b1127f2e197d85750f1fb78c7084ae1#d3334e5a8b1127f2e197d85750f1fb78c7084ae1"
 dependencies = [
  "base64 0.22.1",
  "bcs",
@@ -7461,7 +7461,7 @@ dependencies = [
 [[package]]
 name = "sui-sdk-types"
 version = "0.0.5"
-source = "git+https://github.com/one-chain-labs/onechain-rust-sdk.git?rev=d3334e5a8b1127f2e197d85750f1fb78c7084ae1#d3334e5a8b1127f2e197d85750f1fb78c7084ae1"
+source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=d3334e5a8b1127f2e197d85750f1fb78c7084ae1#d3334e5a8b1127f2e197d85750f1fb78c7084ae1"
 dependencies = [
  "base64ct",
  "bcs",

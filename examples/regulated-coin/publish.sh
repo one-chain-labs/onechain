@@ -17,7 +17,7 @@ MOVE_PACKAGE_PATH=./move
 one client switch --env testnet
 
 NETWORK="https://rpc.testnet.sui.io:443"
-FAUCET="https://faucet.testnet.sui.io/gas"
+FAUCET="https://faucet-testnet.onelabs.cc/gas"
     
 one client switch --env testnet
 
