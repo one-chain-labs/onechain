@@ -482,6 +482,7 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::SuiSystemStateInne
             epoch,
             protocol_version,
             system_state_version,
+            supper_committee: _,
             validators,
             storage_fund,
             parameters,
@@ -536,6 +537,7 @@ impl From<crate::sui_system_state::sui_system_state_inner_v2::SuiSystemStateInne
             epoch,
             protocol_version,
             system_state_version,
+            supper_committee: _,
             validators,
             storage_fund,
             parameters,
@@ -710,6 +712,8 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::ValidatorSetV1> fo
             inactive_validators,
             validator_candidates,
             at_risk_validators,
+            only_trusted_validator: _,
+            trusted_validators: _,
             extra_fields,
         }: crate::sui_system_state::sui_system_state_inner_v1::ValidatorSetV1,
     ) -> Self {
@@ -736,12 +740,12 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1> for
             id,
             activation_epoch,
             deactivation_epoch,
-            sui_balance,
+            oct_balance,
             rewards_pool,
             pool_token_balance,
             exchange_rates,
             pending_stake,
-            pending_total_sui_withdraw,
+            pending_total_oct_withdraw,
             pending_pool_token_withdraw,
             extra_fields,
         }: crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1,
@@ -750,12 +754,12 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1> for
         message.id = Some(id.to_canonical_string(true));
         message.activation_epoch = activation_epoch;
         message.deactivation_epoch = deactivation_epoch;
-        message.sui_balance = Some(sui_balance);
+        message.sui_balance = Some(oct_balance);
         message.rewards_pool = Some(rewards_pool.value());
         message.pool_token_balance = Some(pool_token_balance);
         message.exchange_rates = Some(exchange_rates.into());
         message.pending_stake = Some(pending_stake);
-        message.pending_total_sui_withdraw = Some(pending_total_sui_withdraw);
+        message.pending_total_sui_withdraw = Some(pending_total_oct_withdraw);
         message.pending_pool_token_withdraw = Some(pending_pool_token_withdraw);
         message.extra_fields = Some(extra_fields.into());
         message

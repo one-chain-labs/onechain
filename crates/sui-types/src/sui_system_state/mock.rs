@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_protocol_config::ProtocolConfig;
-use x509_parser::der_parser::asn1_rs::Boolean;
 
 use crate::{
     balance::Balance,
@@ -15,9 +14,10 @@ use crate::{
         sui_system_state_inner_v1::{
             StakeSubsidyV1,
             StorageFundV1,
+            SuiSupperCommittee,
             SuiSystemStateInnerV1,
             SystemParametersV1,
-            ValidatorSetV1
+            ValidatorSetV1,
         },
         sui_system_state_inner_v2::{SuiSystemStateInnerV2, SystemParametersV2},
         SuiSystemState,
@@ -26,7 +26,6 @@ use crate::{
     MoveTypeTagTrait,
     SUI_SYSTEM_STATE_OBJECT_ID,
 };
-
 
 pub fn validator_set_v1() -> ValidatorSetV1 {
     ValidatorSetV1 {
@@ -38,8 +37,8 @@ pub fn validator_set_v1() -> ValidatorSetV1 {
         inactive_validators: Default::default(),
         validator_candidates: Default::default(),
         at_risk_validators: VecMap { contents: vec![] },
-        only_trusted_validator:Default::default(),
-        trusted_validators:VecSet{ contents: vec![] },
+        only_trusted_validator: false,
+        trusted_validators: VecSet { contents: vec![] },
         extra_fields: Default::default(),
     }
 }
@@ -78,7 +77,7 @@ pub fn sui_system_state_inner_v1() -> SuiSystemStateInnerV1 {
         protocol_version: 0,
         // must be 1
         system_state_version: 1,
-        supper_committee,
+        supper_committee: SuiSupperCommittee { proposal_list: vec![], extra_fields: Default::default() },
         validators: validator_set_v1(),
         storage_fund: storage_fund_v1(),
         parameters: system_parameters_v1(),
@@ -115,7 +114,7 @@ pub fn sui_system_state_inner_v2() -> SuiSystemStateInnerV2 {
         protocol_version: 0,
         // must be 2
         system_state_version: 2,
-        supper_committee,
+        supper_committee: SuiSupperCommittee { proposal_list: vec![], extra_fields: Default::default() },
         validators: validator_set_v1(),
         storage_fund: storage_fund_v1(),
         parameters: system_parameters_v2(),
