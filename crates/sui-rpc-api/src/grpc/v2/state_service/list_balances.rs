@@ -4,7 +4,7 @@
 use bytes::Bytes;
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{Balance, ListBalancesRequest, ListBalancesResponse},
+    sui::rpc::v2::{Balance, ListBalancesRequest, ListBalancesResponse},
 };
 use sui_sdk_types::Address;
 use sui_types::storage::BalanceInfo;

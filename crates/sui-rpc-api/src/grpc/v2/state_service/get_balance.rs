@@ -3,7 +3,7 @@
 
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{Balance, GetBalanceRequest, GetBalanceResponse},
+    sui::rpc::v2::{Balance, GetBalanceRequest, GetBalanceResponse},
 };
 use sui_sdk_types::StructTag;
 use sui_types::{base_types::SuiAddress, sui_sdk_types_conversions::struct_tag_sdk_to_core};

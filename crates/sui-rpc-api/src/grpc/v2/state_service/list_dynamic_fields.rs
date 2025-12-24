@@ -9,7 +9,7 @@ use sui_rpc::{
     merge::Merge,
     proto::{
         google::rpc::bad_request::FieldViolation,
-        one::rpc::v2::{
+        sui::rpc::v2::{
             dynamic_field::DynamicFieldKind,
             Bcs,
             DynamicField,

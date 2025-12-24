@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use move_binary_format::normalized;
 use sui_protocol_config::ProtocolConfig;
-use sui_rpc::proto::{google::rpc::bad_request::FieldViolation, one::rpc::v2::Transaction};
+use sui_rpc::proto::{google::rpc::bad_request::FieldViolation, sui::rpc::v2::Transaction};
 use sui_sdk_types::{Address, Argument, Command};
 use sui_types::{
     base_types::ObjectRef,

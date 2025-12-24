@@ -4,7 +4,7 @@
 use sui_name_service::{Domain, NameRecord, NameServiceConfig};
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{
+    sui::rpc::v2::{
         name_service_server::NameService,
         LookupNameRequest,
         LookupNameResponse,

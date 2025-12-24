@@ -4,7 +4,7 @@
 use bytes::Bytes;
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{ListPackageVersionsRequest, ListPackageVersionsResponse, PackageVersion},
+    sui::rpc::v2::{ListPackageVersionsRequest, ListPackageVersionsResponse, PackageVersion},
 };
 use sui_types::base_types::ObjectID;
 use tap::Pipe;

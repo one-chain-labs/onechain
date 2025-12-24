@@ -5,7 +5,7 @@ use prost_types::FieldMask;
 pub use sui_rpc::client::{HeadersInterceptor, ResponseExt};
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::{one::rpc::v2 as proto, TryFromProtoError},
+    proto::{sui::rpc::v2 as proto, TryFromProtoError},
 };
 use sui_types::{
     base_types::{ObjectID, SequenceNumber},

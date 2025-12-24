@@ -8,7 +8,7 @@ use sui_rpc::{
     merge::Merge,
     proto::{
         google::rpc::bad_request::FieldViolation,
-        one::rpc::v2::{Epoch, GetEpochRequest, GetEpochResponse, ProtocolConfig},
+        sui::rpc::v2::{Epoch, GetEpochRequest, GetEpochResponse, ProtocolConfig},
         timestamp_ms_to_proto,
     },
 };

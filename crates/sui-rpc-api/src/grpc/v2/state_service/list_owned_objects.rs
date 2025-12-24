@@ -8,7 +8,7 @@ use sui_rpc::{
     field::{FieldMaskTree, FieldMaskUtil},
     proto::{
         google::rpc::bad_request::FieldViolation,
-        one::rpc::v2::{ErrorReason, ListOwnedObjectsRequest, ListOwnedObjectsResponse, Object},
+        sui::rpc::v2::{ErrorReason, ListOwnedObjectsRequest, ListOwnedObjectsResponse, Object},
     },
 };
 use sui_sdk_types::Address;

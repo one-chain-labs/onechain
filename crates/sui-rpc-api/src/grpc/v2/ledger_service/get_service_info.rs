@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use sui_rpc::proto::{one::rpc::v2::GetServiceInfoResponse, timestamp_ms_to_proto};
+use sui_rpc::proto::{sui::rpc::v2::GetServiceInfoResponse, timestamp_ms_to_proto};
 use sui_sdk_types::Digest;
 use tap::Pipe;
 

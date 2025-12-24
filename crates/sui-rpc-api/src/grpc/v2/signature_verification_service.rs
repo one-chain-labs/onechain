@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use sui_crypto::Verifier;
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{
+    sui::rpc::v2::{
         signature_verification_service_server::SignatureVerificationService,
         VerifySignatureRequest,
         VerifySignatureResponse,

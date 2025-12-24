@@ -6,7 +6,7 @@ use std::pin::Pin;
 use sui_rpc::{
     field::FieldMaskTree,
     merge::Merge,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         subscription_service_server::SubscriptionService,
         Checkpoint,
         SubscribeCheckpointsRequest,

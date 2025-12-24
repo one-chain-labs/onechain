@@ -3,7 +3,7 @@
 
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{
+    sui::rpc::v2::{
         move_package_service_server::MovePackageService,
         GetDatatypeRequest,
         GetDatatypeResponse,

@@ -3,7 +3,7 @@
 
 use sui_rpc::proto::{
     google::rpc::bad_request::FieldViolation,
-    one::rpc::v2::{GetFunctionRequest, GetFunctionResponse},
+    sui::rpc::v2::{GetFunctionRequest, GetFunctionResponse},
 };
 
 use crate::{
