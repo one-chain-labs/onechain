@@ -6,7 +6,7 @@ use sui_kvstore::{BigTableClient, KeyValueStoreReader};
 use sui_rpc::{
     field::{FieldMask, FieldMaskTree, FieldMaskUtil},
     merge::Merge,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         get_checkpoint_request::CheckpointId,
         Checkpoint,
         GetCheckpointRequest,

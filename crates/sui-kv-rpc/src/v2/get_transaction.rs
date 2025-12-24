@@ -7,7 +7,7 @@ use sui_kvstore::{BigTableClient, KeyValueStoreReader, TransactionData};
 use sui_rpc::{
     field::{FieldMask, FieldMaskTree, FieldMaskUtil},
     merge::Merge,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         BatchGetTransactionsRequest,
         BatchGetTransactionsResponse,
         ExecutedTransaction,

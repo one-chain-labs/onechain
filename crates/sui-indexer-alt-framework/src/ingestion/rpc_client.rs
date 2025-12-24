@@ -4,7 +4,7 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use prost_types::FieldMask;
-use sui_rpc::{field::FieldMaskUtil, proto::one::rpc::v2::GetCheckpointRequest, Client as RpcClient};
+use sui_rpc::{field::FieldMaskUtil, proto::sui::rpc::v2::GetCheckpointRequest, Client as RpcClient};
 use sui_types::full_checkpoint_content::Checkpoint;
 use tonic::Code;
 

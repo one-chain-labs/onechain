@@ -8,7 +8,7 @@ use async_graphql::dataloader::Loader;
 use diesel::{ExpressionMethods, QueryDsl};
 use prost_types::FieldMask;
 use sui_indexer_alt_schema::{checkpoints::StoredCheckpoint, schema::kv_checkpoints};
-use sui_rpc::{field::FieldMaskUtil, proto::one::rpc::v2 as proto};
+use sui_rpc::{field::FieldMaskUtil, proto::sui::rpc::v2 as proto};
 use sui_types::{
     crypto::AuthorityQuorumSignInfo,
     messages_checkpoint::{CheckpointContents, CheckpointSummary},

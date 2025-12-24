@@ -8,7 +8,7 @@ use prometheus::Registry;
 use prost_types::FieldMask;
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::one::rpc::{v2 as proto, v2::transaction_execution_service_client::TransactionExecutionServiceClient},
+    proto::sui::rpc::{v2 as proto, v2::transaction_execution_service_client::TransactionExecutionServiceClient},
 };
 use sui_types::{
     signature::GenericSignature,

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use sui_kvstore::{BigTableClient, KeyValueStoreReader};
 use sui_rpc::{
     merge::Merge,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         BatchGetObjectsRequest,
         BatchGetObjectsResponse,
         GetObjectRequest,

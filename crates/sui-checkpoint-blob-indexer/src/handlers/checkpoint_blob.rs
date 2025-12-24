@@ -17,7 +17,7 @@ use sui_indexer_alt_object_store::ObjectStore;
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
     merge::Merge,
-    proto::one::rpc,
+    proto::sui::rpc,
 };
 use sui_types::full_checkpoint_content::Checkpoint;
 

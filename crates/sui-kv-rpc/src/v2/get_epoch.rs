@@ -6,7 +6,7 @@ use sui_protocol_config::{Chain, ProtocolConfig};
 use sui_rpc::{
     field::{FieldMask, FieldMaskTree, FieldMaskUtil},
     merge::Merge,
-    proto::one::rpc::v2::{Epoch, GetEpochRequest, GetEpochResponse, ProtocolConfig as RpcProtocolConfig},
+    proto::sui::rpc::v2::{Epoch, GetEpochRequest, GetEpochResponse, ProtocolConfig as RpcProtocolConfig},
 };
 use sui_rpc_api::{
     grpc::v2::protocol_config_to_proto,

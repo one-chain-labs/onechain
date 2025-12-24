@@ -19,7 +19,7 @@ use sui_json_rpc_types::{
 };
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         Checkpoint,
         ExecutedTransaction,
         GetCheckpointRequest,

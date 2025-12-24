@@ -11,7 +11,7 @@ use sui_indexer_alt_schema::schema::kv_transactions;
 use sui_kvstore::TransactionEventsData;
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::{proto_to_timestamp_ms, one::rpc::v2 as proto},
+    proto::{proto_to_timestamp_ms, sui::rpc::v2 as proto},
 };
 use sui_types::{digests::TransactionDigest, effects::TransactionEvents};
 

@@ -8,7 +8,7 @@ use async_graphql::dataloader::Loader;
 use diesel::{BoolExpressionMethods, ExpressionMethods, QueryDsl};
 use prost_types::FieldMask;
 use sui_indexer_alt_schema::{objects::StoredObject, schema::kv_objects};
-use sui_rpc::{field::FieldMaskUtil, proto::one::rpc::v2 as proto};
+use sui_rpc::{field::FieldMaskUtil, proto::sui::rpc::v2 as proto};
 use sui_types::{base_types::ObjectID, object::Object, storage::ObjectKey};
 
 use crate::{bigtable_reader::BigtableReader, error::Error, ledger_grpc_reader::LedgerGrpcReader, pg_reader::PgReader};
