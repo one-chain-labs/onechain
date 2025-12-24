@@ -142,7 +142,7 @@ impl ConfigBuilder {
     }
 
     pub fn new_with_temp_dir() -> Self {
-        Self::new(tempfile::tempdir().unwrap().keep())
+        Self::new(mysten_common::tempdir().unwrap().keep())
     }
 }
 
@@ -469,7 +469,7 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     .with_firewall_config(self.firewall_config.clone());
 
                 if let Some(chain) = self.chain_override {
-                    // builder = builder.with_chain_override(chain);
+                    builder = builder.with_chain_override(chain);
                 }
 
                 if let Some(max_submit_position) = self.max_submit_position {
