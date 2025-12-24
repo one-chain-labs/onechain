@@ -29,7 +29,7 @@ use sui_rosetta::{
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{GetCheckpointRequest, GetEpochRequest, GetTransactionRequest},
+    proto::sui::rpc::v2::{GetCheckpointRequest, GetEpochRequest, GetTransactionRequest},
 };
 
 mod test_utils;

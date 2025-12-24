@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use sui_rpc::{
     client::Client,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{GetObjectRequest, ListOwnedObjectsRequest},
+    proto::sui::rpc::v2::{GetObjectRequest, ListOwnedObjectsRequest},
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},

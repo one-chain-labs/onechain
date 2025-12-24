@@ -7,7 +7,7 @@ use axum::{routing::post, Extension, Router};
 use lru::LruCache;
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
-use sui_rpc::{client::Client, proto::one::rpc::v2::GetCoinInfoRequest};
+use sui_rpc::{client::Client, proto::sui::rpc::v2::GetCoinInfoRequest};
 use sui_sdk_types::{StructTag, TypeTag as SDKTypeTag};
 use tokio::sync::Mutex;
 use tracing::info;

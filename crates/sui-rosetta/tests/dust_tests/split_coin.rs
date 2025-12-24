@@ -8,7 +8,7 @@ use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         changed_object::IdOperation,
         get_object_result,
         BatchGetObjectsRequest,

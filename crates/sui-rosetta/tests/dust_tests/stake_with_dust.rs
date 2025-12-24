@@ -12,7 +12,7 @@ use sui_rosetta::{operations::Operations, CoinMetadataCache};
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{BatchGetObjectsRequest, GetEpochRequest, GetObjectRequest, GetTransactionRequest},
+    proto::sui::rpc::v2::{BatchGetObjectsRequest, GetEpochRequest, GetObjectRequest, GetTransactionRequest},
 };
 use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,

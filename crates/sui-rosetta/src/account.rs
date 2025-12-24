@@ -8,7 +8,7 @@ use prost_types::FieldMask;
 use sui_rpc::{
     client::Client,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{GetBalanceRequest, GetCheckpointRequest, GetEpochRequest, ListOwnedObjectsRequest},
+    proto::sui::rpc::v2::{GetBalanceRequest, GetCheckpointRequest, GetEpochRequest, ListOwnedObjectsRequest},
 };
 use sui_sdk_types::{Address, StructTag};
 use sui_types::{

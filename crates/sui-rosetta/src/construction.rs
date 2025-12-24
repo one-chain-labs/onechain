@@ -13,7 +13,7 @@ use prost_types::FieldMask;
 use shared_crypto::intent::{Intent, IntentMessage};
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         simulate_transaction_request::TransactionChecks,
         Bcs,
         ExecuteTransactionRequest,

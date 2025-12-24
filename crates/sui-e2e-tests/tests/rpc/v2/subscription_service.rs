@@ -4,7 +4,7 @@
 use sui_macros::sim_test;
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
-    proto::one::rpc::v2::{subscription_service_client::SubscriptionServiceClient, SubscribeCheckpointsRequest},
+    proto::sui::rpc::v2::{subscription_service_client::SubscriptionServiceClient, SubscribeCheckpointsRequest},
 };
 use test_cluster::TestClusterBuilder;
 use tokio_stream::StreamExt;

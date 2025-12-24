@@ -13,7 +13,7 @@ use sui_rosetta::{operations::Operations, types::PreprocessMetadata, CoinMetadat
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{BatchGetObjectsRequest, GetObjectRequest, GetTransactionRequest},
+    proto::sui::rpc::v2::{BatchGetObjectsRequest, GetObjectRequest, GetTransactionRequest},
 };
 use sui_types::{
     effects::TransactionEffectsAPI,

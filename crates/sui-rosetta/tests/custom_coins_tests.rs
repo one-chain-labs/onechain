@@ -11,7 +11,7 @@ use std::num::NonZeroUsize;
 use prost_types::FieldMask;
 use serde_json::json;
 use sui_rosetta::operations::Operations;
-use sui_rpc::{client::Client as GrpcClient, field::FieldMaskUtil, proto::one::rpc::v2::GetTransactionRequest};
+use sui_rpc::{client::Client as GrpcClient, field::FieldMaskUtil, proto::sui::rpc::v2::GetTransactionRequest};
 mod test_utils;
 use sui_rosetta::{
     types::{

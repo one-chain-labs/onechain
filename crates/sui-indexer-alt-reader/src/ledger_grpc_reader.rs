@@ -65,7 +65,7 @@ impl LedgerGrpcReader {
 
     pub async fn checkpoint_watermark(&self) -> anyhow::Result<CheckpointSummary> {
         use prost_types::FieldMask;
-        use sui_rpc::{field::FieldMaskUtil, proto::one::rpc::v2::GetCheckpointRequest};
+        use sui_rpc::{field::FieldMaskUtil, proto::sui::rpc::v2::GetCheckpointRequest};
 
         let request = GetCheckpointRequest::default().with_read_mask(FieldMask::from_paths(["summary.bcs"]));
 

@@ -6,7 +6,7 @@ use std::{num::NonZeroUsize, path::Path};
 use prost_types::FieldMask;
 use serde_json::json;
 use sui_rosetta::{operations::Operations, CoinMetadataCache};
-use sui_rpc::{client::Client as GrpcClient, field::FieldMaskUtil, proto::one::rpc::v2::GetTransactionRequest};
+use sui_rpc::{client::Client as GrpcClient, field::FieldMaskUtil, proto::sui::rpc::v2::GetTransactionRequest};
 use test_cluster::TestClusterBuilder;
 
 use super::rosetta_client::{start_rosetta_test_server, RosettaError};

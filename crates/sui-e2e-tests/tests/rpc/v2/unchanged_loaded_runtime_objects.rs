@@ -7,7 +7,7 @@ use sui_macros::sim_test;
 use sui_move_build::BuildConfig;
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         changed_object::{IdOperation, OutputObjectState},
         GetCheckpointRequest,
         GetObjectRequest,

@@ -4,7 +4,7 @@
 use sui_macros::sim_test;
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         ledger_service_client::LedgerServiceClient,
         BatchGetObjectsRequest,
         BatchGetObjectsResponse,

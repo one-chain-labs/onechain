@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use shared_crypto::intent::Intent;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_move_build::BuildConfig;
-use sui_rpc::{client::Client as GrpcClient, proto::one::rpc::v2::ExecutedTransaction};
+use sui_rpc::{client::Client as GrpcClient, proto::sui::rpc::v2::ExecutedTransaction};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     coin::COIN_MODULE_NAME,

@@ -7,7 +7,7 @@ use prost_types::FieldMask;
 use sui_move_build::BuildConfig;
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{Bcs, ExecuteTransactionRequest, ExecutedTransaction, Transaction, UserSignature},
+    proto::sui::rpc::v2::{Bcs, ExecuteTransactionRequest, ExecutedTransaction, Transaction, UserSignature},
     Client,
 };
 use sui_types::{

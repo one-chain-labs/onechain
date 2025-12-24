@@ -14,7 +14,7 @@ use sui_rosetta::errors::Error;
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         Bcs,
         ChangedObject,
         ExecuteTransactionRequest,

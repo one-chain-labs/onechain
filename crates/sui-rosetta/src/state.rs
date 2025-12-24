@@ -10,7 +10,7 @@ use prost_types::FieldMask;
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{get_checkpoint_request, Checkpoint, GetCheckpointRequest},
+    proto::sui::rpc::v2::{get_checkpoint_request, Checkpoint, GetCheckpointRequest},
 };
 use sui_types::{
     base_types::TransactionDigest,

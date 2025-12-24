@@ -5,7 +5,7 @@ use prost_types::FieldMask;
 use sui_macros::sim_test;
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         transaction_execution_service_client::TransactionExecutionServiceClient,
         Bcs,
         ExecuteTransactionRequest,

@@ -502,7 +502,7 @@ async fn party_object_read() {
 async fn party_object_grpc() {
     use sui_rpc::{
         field::{FieldMask, FieldMaskUtil},
-        proto::one::rpc::v2::{
+        proto::sui::rpc::v2::{
             ledger_service_client::LedgerServiceClient,
             owner::OwnerKind,
             state_service_client::StateServiceClient,
@@ -629,7 +629,7 @@ async fn party_object_grpc() {
 async fn party_coin_grpc() {
     use sui_rpc::{
         field::{FieldMask, FieldMaskUtil},
-        proto::one::rpc::v2::{
+        proto::sui::rpc::v2::{
             ledger_service_client::LedgerServiceClient,
             owner::OwnerKind,
             state_service_client::StateServiceClient,

@@ -9,7 +9,7 @@ use serde_json::json;
 use strum::IntoEnumIterator;
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{GetCheckpointRequest, GetEpochRequest},
+    proto::sui::rpc::v2::{GetCheckpointRequest, GetEpochRequest},
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
 

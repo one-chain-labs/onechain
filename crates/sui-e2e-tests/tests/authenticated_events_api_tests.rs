@@ -18,7 +18,7 @@ use sui_macros::sim_test;
 use sui_protocol_config::ProtocolConfig;
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
-    proto::one::rpc::v2::{ledger_service_client::LedgerServiceClient, Event, GetCheckpointRequest, GetEpochRequest},
+    proto::sui::rpc::v2::{ledger_service_client::LedgerServiceClient, Event, GetCheckpointRequest, GetEpochRequest},
 };
 use sui_rpc_api::grpc::alpha::{
     event_service_proto::{

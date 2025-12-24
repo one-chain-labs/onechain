@@ -4,7 +4,7 @@
 use sui_macros::sim_test;
 use sui_rpc::{
     field::{FieldMask, FieldMaskUtil},
-    proto::one::rpc::v2::{ledger_service_client::LedgerServiceClient, GetEpochRequest},
+    proto::sui::rpc::v2::{ledger_service_client::LedgerServiceClient, GetEpochRequest},
 };
 use test_cluster::TestClusterBuilder;
 

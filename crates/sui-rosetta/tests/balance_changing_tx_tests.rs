@@ -27,7 +27,7 @@ use sui_rosetta::{
 use sui_rpc::{
     client::Client as GrpcClient,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{ExecutedTransaction, GetBalanceRequest, GetEpochRequest, GetTransactionRequest},
+    proto::sui::rpc::v2::{ExecutedTransaction, GetBalanceRequest, GetEpochRequest, GetTransactionRequest},
 };
 use sui_types::{
     base_types::{FullObjectRef, ObjectRef, SuiAddress},

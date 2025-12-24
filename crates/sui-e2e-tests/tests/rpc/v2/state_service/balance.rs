@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use sui_macros::sim_test;
 use sui_rpc::{
-    proto::one::rpc::v2::{ExecutedTransaction, GasCostSummary, GetBalanceRequest, ListBalancesRequest},
+    proto::sui::rpc::v2::{ExecutedTransaction, GasCostSummary, GetBalanceRequest, ListBalancesRequest},
     Client,
 };
 use sui_test_transaction_builder::TestTransactionBuilder;

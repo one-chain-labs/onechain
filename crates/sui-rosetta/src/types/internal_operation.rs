@@ -15,7 +15,7 @@ pub use stake::Stake;
 use sui_rpc::{
     client::Client,
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         get_object_result,
         simulate_transaction_request::TransactionChecks,
         transaction_kind,

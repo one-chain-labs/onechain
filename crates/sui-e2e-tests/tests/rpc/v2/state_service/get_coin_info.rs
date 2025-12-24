@@ -7,7 +7,7 @@ use prost_types::FieldMask;
 use sui_macros::sim_test;
 use sui_rpc::{
     field::FieldMaskUtil,
-    proto::one::rpc::v2::{
+    proto::sui::rpc::v2::{
         coin_metadata::MetadataCapState,
         coin_treasury::SupplyState,
         regulated_coin_metadata::CoinRegulatedState,

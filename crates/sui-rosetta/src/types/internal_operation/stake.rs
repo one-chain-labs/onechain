@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sui_rpc::{
     client::Client,
-    proto::one::rpc::v2::{owner::OwnerKind, Object},
+    proto::sui::rpc::v2::{owner::OwnerKind, Object},
 };
 use sui_sdk_types::{Address, StructTag};
 use sui_types::{

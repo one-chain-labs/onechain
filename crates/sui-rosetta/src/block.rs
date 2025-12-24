@@ -4,7 +4,7 @@
 use axum::{extract::State, Extension, Json};
 use axum_extra::extract::WithRejection;
 use prost_types::FieldMask;
-use sui_rpc::{field::FieldMaskUtil, proto::one::rpc::v2::GetTransactionRequest};
+use sui_rpc::{field::FieldMaskUtil, proto::sui::rpc::v2::GetTransactionRequest};
 use tracing::debug;
 
 use crate::{
