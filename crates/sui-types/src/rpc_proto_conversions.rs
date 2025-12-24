@@ -7,7 +7,7 @@ use fastcrypto::traits::ToFromBytes;
 use sui_rpc::{
     field::FieldMaskTree,
     merge::Merge,
-    proto::{one::rpc::v2::*, TryFromProtoError},
+    proto::{sui::rpc::v2::*, TryFromProtoError},
 };
 
 use crate::{crypto::SuiSignature, message_envelope::Message as _};
@@ -741,7 +741,7 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1> for
             pool_token_balance,
             exchange_rates,
             pending_stake,
-            pending_total_oct_withdraw,
+            pending_total_sui_withdraw,
             pending_pool_token_withdraw,
             extra_fields,
         }: crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1,
@@ -755,7 +755,7 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1> for
         message.pool_token_balance = Some(pool_token_balance);
         message.exchange_rates = Some(exchange_rates.into());
         message.pending_stake = Some(pending_stake);
-        message.pending_total_oct_withdraw = Some(pending_total_oct_withdraw);
+        message.pending_total_sui_withdraw = Some(pending_total_sui_withdraw);
         message.pending_pool_token_withdraw = Some(pending_pool_token_withdraw);
         message.extra_fields = Some(extra_fields.into());
         message
