@@ -2063,7 +2063,7 @@ impl SuiNode {
         use fastcrypto_zkp::bn254::zk_login::fetch_jwks;
         use sui_types::error::SuiErrorKind;
         let client = reqwest::Client::new();
-        fetch_jwks(provider, &client).await.map_err(|_| SuiErrorKind::JWKRetrievalError.into())
+        fetch_jwks(provider, &client, true).await.map_err(|_| SuiErrorKind::JWKRetrievalError.into())
     }
 }
 
