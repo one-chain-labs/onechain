@@ -32,17 +32,17 @@ title: Module `deepbook::critbit`
 
 
 <pre><code><b>use</b> <a href="../deepbook/math.md#deepbook_math">deepbook::math</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
+<b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/table.md#one_table">one::table</a>;
+<b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
-<b>use</b> <a href="../sui/table.md#sui_table">one::table</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -146,12 +146,12 @@ title: Module `deepbook::critbit`
 <dd>
 </dd>
 <dt>
-<code>internal_nodes: <a href="../sui/table.md#sui_table_Table">one::table::Table</a>&lt;u64, <a href="../deepbook/critbit.md#deepbook_critbit_InternalNode">deepbook::critbit::InternalNode</a>&gt;</code>
+<code>internal_nodes: <a href="../one/table.md#one_table_Table">one::table::Table</a>&lt;u64, <a href="../deepbook/critbit.md#deepbook_critbit_InternalNode">deepbook::critbit::InternalNode</a>&gt;</code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>leaves: <a href="../sui/table.md#sui_table_Table">one::table::Table</a>&lt;u64, <a href="../deepbook/critbit.md#deepbook_critbit_Leaf">deepbook::critbit::Leaf</a>&lt;V&gt;&gt;</code>
+<code>leaves: <a href="../one/table.md#one_table_Table">one::table::Table</a>&lt;u64, <a href="../deepbook/critbit.md#deepbook_critbit_Leaf">deepbook::critbit::Leaf</a>&lt;V&gt;&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -272,7 +272,7 @@ title: Module `deepbook::critbit`
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../deepbook/critbit.md#deepbook_critbit_new">new</a>&lt;V: store&gt;(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../deepbook/critbit.md#deepbook_critbit_CritbitTree">deepbook::critbit::CritbitTree</a>&lt;V&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../deepbook/critbit.md#deepbook_critbit_new">new</a>&lt;V: store&gt;(ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../deepbook/critbit.md#deepbook_critbit_CritbitTree">deepbook::critbit::CritbitTree</a>&lt;V&gt;
 </code></pre>
 
 
