@@ -334,6 +334,7 @@ impl SuiValidatorCommand {
                         protocol_key: keypair.public().into(),
                         worker_key: worker_keypair.public().clone(),
                         account_address: SuiAddress::from(&account_keypair.public()),
+                        revenue_receiving_address: SuiAddress::from(&account_keypair.public()),
                         network_key: network_keypair.public().clone(),
                         gas_price,
                         commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
@@ -377,6 +378,7 @@ impl SuiValidatorCommand {
                     CallArg::Pure(bcs::to_bytes(validator.p2p_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_primary_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_worker_address()).unwrap()),
+                    CallArg::Pure(bcs::to_bytes(&validator.revenue_receiving_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
@@ -777,7 +779,7 @@ async fn construct_unsigned_0x5_txn(
     )
 }
 
-async fn call_0x5(
+pub(crate) async fn call_0x5(
     context: &mut WalletContext,
     function: &'static str,
     call_args: Vec<CallArg>,
