@@ -807,6 +807,28 @@ pub(crate) async fn call_0x5(
     Ok((Some(response), None))
 }
 
+pub(crate)async fn call_0x5_new(
+    context: &mut WalletContext,
+    function: &'static str,
+    call_args: Vec<CallArg>,
+    gas_budget: u64,
+) -> anyhow::Result<SuiTransactionBlockResponse> {
+    let sender = context.active_address()?;
+    let tx_data = construct_unsigned_0x5_txn(context, sender, function, call_args, gas_budget).await?;
+    let signature = context.config.keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction()).await?;
+    let transaction = Transaction::from_data(tx_data, vec![signature]);
+    let sui_client = context.get_client().await?;
+    sui_client
+        .quorum_driver_api()
+        .execute_transaction_block(
+            transaction,
+            SuiTransactionBlockResponseOptions::new().with_input().with_effects(),
+            Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution),
+        )
+        .await
+        .map_err(|err| anyhow::anyhow!(err.to_string()))
+}
+
 impl Display for SuiValidatorCommandResponse {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut writer = String::new();

@@ -1,4 +1,4 @@
-use crate::validator_commands::{call_0x5, get_cap_object_ref, write_transaction_response};
+use crate::validator_commands::{call_0x5_new, get_cap_object_ref, write_transaction_response};
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -12,7 +12,7 @@ use sui_sdk::wallet_context::WalletContext;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     object::Owner::Shared,
-    transaction::{CallArg, ObjectArg},
+    transaction::{CallArg, ObjectArg,SharedObjectMutability},
 };
 use tracing::info;
 
@@ -97,7 +97,7 @@ impl SuiSupperCommitteeCommand {
                     CallArg::Pure(bcs::to_bytes(&validator).unwrap()),
                     CallArg::CLOCK_IMM,
                 ];
-                let response = call_0x5(context, "create_update_trusted_validator_proposal", args, gas_budget).await?;
+                let response = call_0x5_new(context, "create_update_trusted_validator_proposal", args, gas_budget).await?;
                 SuiSupperCommitteeResponse::CreateUpdateTrustedValidatorProposal(response)
             }
             SuiSupperCommitteeCommand::CreateUpdateOnlyTrustedValidatorProposal {
@@ -116,7 +116,7 @@ impl SuiSupperCommitteeCommand {
                     CallArg::CLOCK_IMM,
                 ];
                 let response =
-                    call_0x5(context, "create_update_only_trusted_validator_proposal", args, gas_budget).await?;
+                    call_0x5_new(context, "create_update_only_trusted_validator_proposal", args, gas_budget).await?;
                 SuiSupperCommitteeResponse::CreateUpdateOnlyTrustedValidatorProposal(response)
             }
             SuiSupperCommitteeCommand::CreateUpdateOnlyValidatorStakingProposal {
@@ -135,7 +135,7 @@ impl SuiSupperCommitteeCommand {
                     CallArg::CLOCK_IMM,
                 ];
                 let response =
-                    call_0x5(context, "create_update_only_validator_staking_proposal", args, gas_budget).await?;
+                    call_0x5_new(context, "create_update_only_validator_staking_proposal", args, gas_budget).await?;
                 SuiSupperCommitteeResponse::CreateUpdateOnlyValidatorStakingProposal(response)
             }
             SuiSupperCommitteeCommand::VoteProposal { operation_cap_id, proposal_id, agree, gas_budget } => {
@@ -150,7 +150,7 @@ impl SuiSupperCommitteeCommand {
                     CallArg::Pure(bcs::to_bytes(&agree).unwrap()),
                     CallArg::CLOCK_IMM,
                 ];
-                let response = call_0x5(context, "vote_proposal", args, gas_budget).await?;
+                let response = call_0x5_new(context, "vote_proposal", args, gas_budget).await?;
 
                 SuiSupperCommitteeResponse::VoteProposal(response)
             }
@@ -169,7 +169,7 @@ async fn get_proposal_mut(context: &mut WalletContext, proposal_id: ObjectID) ->
         .ok_or_else(|| anyhow!("OperationCap {} does not exist", proposal_id))?;
 
     if let Shared { initial_shared_version } = proposal_obj_owner {
-        Ok(ObjectArg::SharedObject { id: proposal_id, initial_shared_version, mutable: true })
+        Ok(ObjectArg::SharedObject { id: proposal_id, initial_shared_version, mutability: SharedObjectMutability::Mutable })
     } else {
         Err(anyhow!("Proposal object {} is not a shared object", proposal_id))
     }
