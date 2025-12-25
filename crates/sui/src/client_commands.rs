@@ -2976,7 +2976,7 @@ fn url_to_host(url: &str) -> anyhow::Result<String> {
 
 /// Find the faucet URL based on the RPC URL. It maps the public networks to their faucet URLs, for
 /// devnet and localnet. For testnet, it instructs the user to use the web UI.
-fn find_faucet_url(address: SuiAddress, rpc: &str) -> anyhow::Result<String> {
+fn find_faucet_url(_address: SuiAddress, rpc: &str) -> anyhow::Result<String> {
     let host = url_to_host(rpc)?;
     let devnet_host = url_to_host(SUI_DEVNET_URL)?;
     let testnet_host = url_to_host(SUI_TESTNET_URL)?;
