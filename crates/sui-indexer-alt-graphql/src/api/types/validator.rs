@@ -198,7 +198,7 @@ impl Validator {
 
     /// The total number of SUI tokens in this pool.
     async fn staking_pool_oct_balance(&self) -> Option<BigInt> {
-        Some(BigInt::from(self.validator().staking_pool.sui_balance))
+        Some(BigInt::from(self.validator().staking_pool.oct_balance))
     }
 
     /// The epoch stake rewards will be added here at the end of each epoch.
