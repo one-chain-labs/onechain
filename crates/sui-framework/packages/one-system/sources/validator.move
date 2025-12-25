@@ -417,12 +417,12 @@ public(package) fun request_add_stake_at_genesis(
 public(package) fun request_withdraw_stake(
     self: &mut Validator,
     staked_oct: StakedOct,
-    ctx: &TxContext,
+    ctx: &mut TxContext,
 ): (Balance<OCT>, Option<CoinVesting<OCT>>) {
     let lock = staked_oct.lock();
     let principal_amount = staked_oct.amount();
     let stake_activation_epoch = staked_oct.activation_epoch();
-    let withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx);
+    let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx);
     let withdraw_amount = withdrawn_stake.value();
     let reward_amount = withdraw_amount - principal_amount;
     self.next_epoch_stake = self.next_epoch_stake - withdraw_amount;

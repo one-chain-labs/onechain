@@ -564,7 +564,7 @@ public(package) fun request_add_val_stake_mul_coin(
 public(package) fun request_withdraw_stake(
     self: &mut SuiSystemStateInnerV2,
     staked_oct: StakedOct,
-    ctx: &TxContext,
+    ctx: &mut TxContext,
 ) :  (Balance<OCT>,Option<CoinVesting<OCT>>){
     self.validators.request_withdraw_stake(staked_oct, ctx)
 }
@@ -731,13 +731,13 @@ public(package) fun vote_proposal(
     );
     if(proposal.proposal_status(clock) == supper_committee::proposal_status_pass()){
         let action_type = proposal.proposal_action_type();
-        if (action_type == type_name::get<UpdateOnlyTrustedValidatorAction>().into_string()){
+        if (action_type == type_name::with_defining_ids<UpdateOnlyTrustedValidatorAction>().into_string()){
             let action = proposal.action<UpdateOnlyTrustedValidatorAction>();
             self.validators.execute_update_only_trusted_validator_action(action);
-        }else if (action_type == type_name::get<UpdateTrustedValidatorsAction>().into_string()){
+        }else if (action_type == type_name::with_defining_ids<UpdateTrustedValidatorsAction>().into_string()){
             let action = proposal.action<UpdateTrustedValidatorsAction>();
             self.validators.execute_update_trusted_validators_action(action);
-        }else if (action_type == type_name::get<UpdateOnlyValidatorStakingAction>().into_string()){
+        }else if (action_type == type_name::with_defining_ids<UpdateOnlyValidatorStakingAction>().into_string()){
             let action = proposal.action<UpdateOnlyValidatorStakingAction>();
             self.validators.execute_update_only_validator_staking_action(action);
         }else {

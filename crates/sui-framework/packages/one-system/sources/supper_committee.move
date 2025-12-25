@@ -146,9 +146,9 @@ module one_system::supper_committee{
         clock: &Clock,
         ctx: &mut TxContext,
     ){
-        let action_type = type_name::get<Action>();
+        let action_type = type_name::with_defining_ids<Action>();
         // only sui_system action struct types
-        assert!(action_type.get_address() == address::to_ascii_string(@0x3),ENotSupportStructType);
+        assert!(action_type.address_string() == address::to_ascii_string(@0x3),ENotSupportStructType);
 
         let mut proposal = Proposal{
             id: object::new(ctx),
