@@ -57,9 +57,9 @@ use sui_types::{
     dynamic_field::Field,
     multiaddr::Multiaddr,
     object::Owner,
-    one_system_state::{
-        one_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
-        one_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
+    sui_system_state::{
+        sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
+        sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
         SUI_SYSTEM_MODULE_NAME
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
@@ -334,7 +334,6 @@ impl SuiValidatorCommand {
                         protocol_key: keypair.public().into(),
                         worker_key: worker_keypair.public().clone(),
                         account_address: SuiAddress::from(&account_keypair.public()),
-                        revenue_receiving_address: SuiAddress::from(&account_keypair.public()),
                         network_key: network_keypair.public().clone(),
                         gas_price,
                         commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
@@ -378,7 +377,6 @@ impl SuiValidatorCommand {
                     CallArg::Pure(bcs::to_bytes(validator.p2p_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_primary_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_worker_address()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.revenue_receiving_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
@@ -515,7 +513,7 @@ impl SuiValidatorCommand {
                 // Make sure the address is a validator
                 let sui_client = context.get_client().await?;
                 let active_validators =
-                    sui_client.governance_api().get_latest_one_system_state().await?.active_validators;
+                    sui_client.governance_api().get_latest_sui_system_state().await?.active_validators;
                 if !active_validators.into_iter().any(|s| s.sui_address == address) {
                     bail!("Address {} is not in the committee", address);
                 }
@@ -907,7 +905,7 @@ pub async fn get_validator_summary(
     validator_address: SuiAddress,
 ) -> anyhow::Result<Option<(ValidatorStatus, SuiValidatorSummary)>> {
     let SuiSystemStateSummary { active_validators, pending_active_validators_id, .. } =
-        client.governance_api().get_latest_one_system_state().await?;
+        client.governance_api().get_latest_sui_system_state().await?;
     let mut status = None;
     let mut active_validators = active_validators.into_iter().map(|s| (s.sui_address, s)).collect::<BTreeMap<_, _>>();
     let validator_info = if active_validators.contains_key(&validator_address) {
