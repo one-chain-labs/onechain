@@ -50,23 +50,23 @@ use sui_config::{
     SUI_NETWORK_CONFIG,
 };
 use sui_faucet::{create_wallet_context, start_faucet, AppState, FaucetConfig, LocalFaucet};
-use one_indexer_alt::{config::IndexerConfig, setup_indexer};
-use one_indexer_alt_consistent_store::{
+use sui_indexer_alt::{config::IndexerConfig, setup_indexer};
+use sui_indexer_alt_consistent_store::{
     args::RpcArgs as ConsistentArgs,
     config::ServiceConfig as ConsistentConfig,
     start_service as start_consistent_store,
 };
-use one_indexer_alt_framework::{
+use sui_indexer_alt_framework::{
     ingestion::{ingestion_client::IngestionClientArgs, ClientArgs},
     IndexerArgs,
 };
-use one_indexer_alt_graphql::{
+use sui_indexer_alt_graphql::{
     args::KvArgs as GraphQlKvArgs,
     config::RpcConfig as GraphQlConfig,
     start_rpc as start_graphql,
     RpcArgs as GraphQlArgs,
 };
-use one_indexer_alt_reader::{
+use sui_indexer_alt_reader::{
     consistent_reader::ConsistentReaderArgs,
     fullnode_client::FullnodeArgs,
     system_package_task::SystemPackageTaskArgs,
@@ -741,7 +741,7 @@ impl SuiCommand {
             SuiCommand::FireDrill { fire_drill } => run_fire_drill(fire_drill).await,
             SuiCommand::Analyzer => {
                 let sui_implicit_deps = implicit_deps(latest_system_packages());
-                let flavor = Flavor::OneChain;
+                let flavor = Flavor::Sui;
                 let sui_pkg_hooks = Box::new(SuiPackageHooks);
                 analyzer::run(sui_implicit_deps, Some(flavor), Some(sui_pkg_hooks));
                 Ok(())
@@ -1059,7 +1059,7 @@ async fn start(
         let fullnode_args = FullnodeArgs { fullnode_rpc_url: Some(fullnode_rpc_url.clone()) };
 
         let mut graphql_config = GraphQlConfig::default();
-        graphql_config.zklogin.env = one_indexer_alt_graphql::config::ZkLoginEnv::Test;
+        graphql_config.zklogin.env = sui_indexer_alt_graphql::config::ZkLoginEnv::Test;
 
         let handle = start_graphql(
             database_url.clone(),
