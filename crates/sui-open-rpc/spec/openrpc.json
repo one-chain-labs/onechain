@@ -1,18 +1,18 @@
 {
   "openrpc": "1.2.6",
   "info": {
-    "title": "Sui JSON-RPC",
-    "description": "Sui JSON-RPC API for interaction with Sui Full node. Make RPC calls using https://fullnode.NETWORK.sui.io:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
+    "title": "OneChain JSON-RPC",
+    "description": "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
     "contact": {
-      "name": "Mysten Labs",
-      "url": "https://mystenlabs.com",
-      "email": "build@mystenlabs.com"
+      "name": "OneChain Labs",
+      "url": "https://onelabs.cc",
+      "email": "build@onelabs.cc"
     },
     "license": {
       "name": "Apache-2.0",
-      "url": "https://raw.githubusercontent.com/MystenLabs/sui/main/LICENSE"
+      "url": "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE"
     },
-    "version": "1.62.1"
+    "version": "1.1.1"
   },
   "methods": [
     {
@@ -3980,6 +3980,7 @@
                     "stakeRequestEpoch": "62",
                     "stakeActiveEpoch": "63",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Active",
                     "estimatedReward": "520000000"
                   },
@@ -3988,6 +3989,7 @@
                     "stakeRequestEpoch": "142",
                     "stakeActiveEpoch": "143",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Pending"
                   }
                 ]
@@ -4001,6 +4003,7 @@
                     "stakeRequestEpoch": "244",
                     "stakeActiveEpoch": "245",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Unstaked"
                   }
                 ]
@@ -4063,6 +4066,7 @@
                   "stakeRequestEpoch": "62",
                   "stakeActiveEpoch": "63",
                   "principal": "200000000000",
+                  "lock": false,
                   "status": "Active",
                   "estimatedReward": "520000000"
                 },
@@ -4071,6 +4075,7 @@
                   "stakeRequestEpoch": "244",
                   "stakeActiveEpoch": "245",
                   "principal": "200000000000",
+                  "lock": false,
                   "status": "Unstaked"
                 }
               ]
@@ -8661,12 +8666,16 @@
           }
         ],
         "required": [
+          "lock",
           "principal",
           "stakeActiveEpoch",
           "stakeRequestEpoch",
           "stakedOctId"
         ],
         "properties": {
+          "lock": {
+            "type": "boolean"
+          },
           "principal": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -9782,8 +9791,22 @@
           }
         ]
       },
+      "SuiSupperCommitteeSummary": {
+        "description": "This is the JSON-RPC type for the OCT system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the OCT system state type.",
+        "type": "object",
+        "required": [
+          "proposalList"
+        ],
+        "properties": {
+          "proposalList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectID"
+            }
+          }
+        }
+      },
       "SuiSystemStateSummary": {
-        "description": "This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the SUI system state type.",
         "type": "object",
         "required": [
           "activeValidators",
@@ -9795,6 +9818,7 @@
           "inactivePoolsSize",
           "maxValidatorCount",
           "minValidatorJoiningStake",
+          "onlyTrustedValidator",
           "pendingActiveValidatorsId",
           "pendingActiveValidatorsSize",
           "pendingRemovals",
@@ -9815,8 +9839,10 @@
           "stakingPoolMappingsSize",
           "storageFundNonRefundableBalance",
           "storageFundTotalObjectStorageRebates",
+          "supperCommittee",
           "systemStateVersion",
           "totalStake",
+          "trustedValidators",
           "validatorCandidatesId",
           "validatorCandidatesSize",
           "validatorLowStakeGracePeriod",
@@ -9905,6 +9931,9 @@
               }
             ]
           },
+          "onlyTrustedValidator": {
+            "type": "boolean"
+          },
           "pendingActiveValidatorsId": {
             "description": "ID of the object that contains the list of new validators that will join at the end of the epoch.",
             "allOf": [
@@ -9981,7 +10010,7 @@
             ]
           },
           "stakeSubsidyBalance": {
-            "description": "Balance of SUI set aside for stake subsidies that will be drawn down over time.",
+            "description": "Balance of OCT set aside for stake subsidies that will be drawn down over time.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
@@ -10027,7 +10056,7 @@
             ]
           },
           "stakingPoolMappingsId": {
-            "description": "ID of the object that maps from staking pool's ID to the sui address of a validator.",
+            "description": "ID of the object that maps from staking pool's ID to the OneChain address of a validator.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ObjectID"
@@ -10058,6 +10087,9 @@
               }
             ]
           },
+          "supperCommittee": {
+            "$ref": "#/components/schemas/SuiSupperCommitteeSummary"
+          },
           "systemStateVersion": {
             "description": "The current version of the system state data structure type.",
             "allOf": [
@@ -10073,6 +10105,12 @@
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
             ]
+          },
+          "trustedValidators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuiAddress"
+            }
           },
           "validatorCandidatesId": {
             "description": "ID of the object that stores preactive validators, mapping their addresses to their `Validator` structs.",
@@ -10325,7 +10363,7 @@
         ]
       },
       "SuiValidatorSummary": {
-        "description": "This is the JSON-RPC type for the SUI validator. It flattens all inner structures to top-level fields so that they are decoupled from the internal definitions.",
+        "description": "This is the JSON-RPC type for the OCT validator. It flattens all inner structures to top-level fields so that they are decoupled from the internal definitions.",
         "type": "object",
         "required": [
           "commissionRate",
@@ -10340,19 +10378,21 @@
           "nextEpochCommissionRate",
           "nextEpochGasPrice",
           "nextEpochStake",
+          "onlyValidatorStaking",
           "operationCapId",
           "p2pAddress",
           "pendingPoolTokenWithdraw",
           "pendingStake",
-          "pendingTotalSuiWithdraw",
+          "pendingTotalOctWithdraw",
           "poolTokenBalance",
           "primaryAddress",
           "projectUrl",
           "proofOfPossessionBytes",
           "protocolPubkeyBytes",
+          "revenueReceivingAddress",
           "rewardsPool",
           "stakingPoolId",
-          "stakingPoolSuiBalance",
+          "stakingPoolOctBalance",
           "suiAddress",
           "votingPower",
           "workerAddress",
@@ -10473,6 +10513,9 @@
               }
             ]
           },
+          "onlyValidatorStaking": {
+            "type": "boolean"
+          },
           "operationCapId": {
             "$ref": "#/components/schemas/ObjectID"
           },
@@ -10495,7 +10538,7 @@
               }
             ]
           },
-          "pendingTotalSuiWithdraw": {
+          "pendingTotalOctWithdraw": {
             "description": "Pending stake withdrawn during the current epoch, emptied at epoch boundaries.",
             "allOf": [
               {
@@ -10522,6 +10565,9 @@
           },
           "protocolPubkeyBytes": {
             "$ref": "#/components/schemas/Base64"
+          },
+          "revenueReceivingAddress": {
+            "$ref": "#/components/schemas/SuiAddress"
           },
           "rewardsPool": {
             "description": "The epoch stake rewards will be added here at the end of each epoch.",
@@ -10563,8 +10609,8 @@
               }
             ]
           },
-          "stakingPoolSuiBalance": {
-            "description": "The total number of SUI tokens in this pool.",
+          "stakingPoolOctBalance": {
+            "description": "The total number of OCT tokens in this pool.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
