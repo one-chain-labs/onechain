@@ -413,7 +413,7 @@ impl RpcStateReader for RestReadStore {
     }
 
     fn get_chain_identifier(&self) -> Result<sui_types::digests::ChainIdentifier> {
-        self.state.get_chain_identifier().ok_or_else(|| StorageError::missing("unable to query chain identifier"))
+        Ok(self.state.get_chain_identifier())
     }
 
     fn indexes(&self) -> Option<&dyn RpcIndexes> {
