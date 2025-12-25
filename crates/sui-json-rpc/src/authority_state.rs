@@ -7,7 +7,6 @@ use std::{
 };
 
 use arc_swap::Guard;
-use anyhow::anyhow;
 use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
