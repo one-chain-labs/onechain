@@ -15,7 +15,7 @@ use sui_types::{
     multiaddr::Multiaddr,
     supported_protocol_versions::SupportedProtocolVersions,
 };
-use tokio::{sync::broadcast, time::sleep};
+use tokio::sync::broadcast;
 use tracing::{error, info};
 
 // Define the `GIT_REVISION` and `VERSION` consts
@@ -172,7 +172,7 @@ fn main() {
         }
     });
     */
-    
+
     // wait for SIGINT on the main thread
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
