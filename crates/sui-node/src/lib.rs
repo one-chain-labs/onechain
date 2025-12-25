@@ -3,7 +3,6 @@
 
 #[cfg(msim)]
 use std::sync::atomic::Ordering;
-use sui_core::authority::CHAIN_IDENTIFIER;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt,
@@ -2144,7 +2143,7 @@ fn build_kv_store(
         error!("failed to parse config.transaction_kv_store_config.base_url ({:?}) as url: {}", base_url, e)
     })?;
 
-    let network_str = match CHAIN_IDENTIFIER.get().expect("chain_id should be initialized").chain() {
+    let network_str = match state.get_chain_identifier().chain() {
         Chain::Mainnet => "/mainnet",
         _ => {
             info!("using local db only for kv store");
@@ -2212,7 +2211,7 @@ async fn build_http_servers(
         ) {
             sui_name_service::NameServiceConfig::new(package_address, registry_id, reverse_registry_id)
         } else {
-            match CHAIN_IDENTIFIER.get().expect("chain_id should be initialized").chain() {
+            match state.get_chain_identifier().chain() {
                 Chain::Mainnet => sui_name_service::NameServiceConfig::mainnet(),
                 Chain::Testnet => sui_name_service::NameServiceConfig::testnet(),
                 Chain::Unknown => sui_name_service::NameServiceConfig::default(),
