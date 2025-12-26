@@ -1,7 +1,7 @@
 // invalid, a mutable reference to vector of objects
 
 module a::m {
-    use sui::object;
+    use one::object;
 
     struct S has key { id: object::UID }
 

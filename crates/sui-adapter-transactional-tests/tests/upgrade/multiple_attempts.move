@@ -21,9 +21,9 @@ module v1_0::n {
 }
 
 //# programmable --sender A --inputs 10 @A object(1,1) 0u8 digest(v1_0)
-//> 0: sui::package::authorize_upgrade(Input(2), Input(3), Input(4));
+//> 0: one::package::authorize_upgrade(Input(2), Input(3), Input(4));
 //> 1: Upgrade(v1_0, [sui,std], v0, Result(0));
-//> 2: sui::package::commit_upgrade(Input(2), Result(1));
+//> 2: one::package::commit_upgrade(Input(2), Result(1));
 //> 3: MakeMoveVec<u64>([]);
 //> 4: std::vector::pop_back<u64>(Result(3));
 

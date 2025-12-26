@@ -4,18 +4,18 @@
 /// Oct object identifiers
 module oct::object {
     use std::bcs;
-    use sui::address;
-    use sui::tx_context::{Self, TxContext};
+    use one::address;
+    use one::tx_context::{Self, TxContext};
 
-    friend sui::clock;
-    friend sui::dynamic_field;
-    friend sui::dynamic_object_field;
-    friend sui::transfer;
-    friend sui::authenticator_state;
-    friend sui::random;
+    friend one::clock;
+    friend one::dynamic_field;
+    friend one::dynamic_object_field;
+    friend one::transfer;
+    friend one::authenticator_state;
+    friend one::random;
 
     #[test_only]
-    friend sui::test_scenario;
+    friend one::test_scenario;
 
     /// The hardcoded ID for the singleton Sui System State Object.
     const SUI_SYSTEM_STATE_OBJECT_ID: address = @0x5;

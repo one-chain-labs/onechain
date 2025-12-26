@@ -27,29 +27,29 @@ title: Module `bridge::limiter`
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/u64.md#std_u64">std::u64</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/accumulator.md#sui_accumulator">sui::accumulator</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/bag.md#sui_bag">sui::bag</a>;
-<b>use</b> <a href="../sui/balance.md#sui_balance">sui::balance</a>;
-<b>use</b> <a href="../sui/clock.md#sui_clock">sui::clock</a>;
-<b>use</b> <a href="../sui/coin.md#sui_coin">sui::coin</a>;
-<b>use</b> <a href="../sui/config.md#sui_config">sui::config</a>;
-<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">sui::deny_list</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">sui::dynamic_object_field</a>;
-<b>use</b> <a href="../sui/event.md#sui_event">sui::event</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/object_bag.md#sui_object_bag">sui::object_bag</a>;
-<b>use</b> <a href="../sui/package.md#sui_package">sui::package</a>;
-<b>use</b> <a href="../sui/party.md#sui_party">sui::party</a>;
-<b>use</b> <a href="../sui/table.md#sui_table">sui::table</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/types.md#sui_types">sui::types</a>;
-<b>use</b> <a href="../sui/url.md#sui_url">sui::url</a>;
-<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">sui::vec_map</a>;
-<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">sui::vec_set</a>;
+<b>use</b> <a href="../sui/accumulator.md#sui_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bag.md#sui_bag">one::bag</a>;
+<b>use</b> <a href="../sui/balance.md#sui_balance">one::balance</a>;
+<b>use</b> <a href="../sui/clock.md#sui_clock">one::clock</a>;
+<b>use</b> <a href="../sui/coin.md#sui_coin">one::coin</a>;
+<b>use</b> <a href="../sui/config.md#sui_config">one::config</a>;
+<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">one::deny_list</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/event.md#sui_event">one::event</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/object_bag.md#sui_object_bag">one::object_bag</a>;
+<b>use</b> <a href="../sui/package.md#sui_package">one::package</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/table.md#sui_table">one::table</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/types.md#sui_types">one::types</a>;
+<b>use</b> <a href="../sui/url.md#sui_url">one::url</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
+<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">one::vec_set</a>;
 </code></pre>
 
 
@@ -71,12 +71,12 @@ title: Module `bridge::limiter`
 
 <dl>
 <dt>
-<code>transfer_limits: <a href="../sui/vec_map.md#sui_vec_map_VecMap">sui::vec_map::VecMap</a>&lt;<a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, u64&gt;</code>
+<code>transfer_limits: <a href="../sui/vec_map.md#sui_vec_map_VecMap">one::vec_map::VecMap</a>&lt;<a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, u64&gt;</code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>transfer_records: <a href="../sui/vec_map.md#sui_vec_map_VecMap">sui::vec_map::VecMap</a>&lt;<a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, <a href="../bridge/limiter.md#bridge_limiter_TransferRecord">bridge::limiter::TransferRecord</a>&gt;</code>
+<code>transfer_records: <a href="../sui/vec_map.md#sui_vec_map_VecMap">one::vec_map::VecMap</a>&lt;<a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, <a href="../bridge/limiter.md#bridge_limiter_TransferRecord">bridge::limiter::TransferRecord</a>&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -252,7 +252,7 @@ title: Module `bridge::limiter`
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../bridge/limiter.md#bridge_limiter_check_and_record_sending_transfer">check_and_record_sending_transfer</a>&lt;T&gt;(self: &<b>mut</b> <a href="../bridge/limiter.md#bridge_limiter_TransferLimiter">bridge::limiter::TransferLimiter</a>, <a href="../bridge/treasury.md#bridge_treasury">treasury</a>: &<a href="../bridge/treasury.md#bridge_treasury_BridgeTreasury">bridge::treasury::BridgeTreasury</a>, clock: &<a href="../sui/clock.md#sui_clock_Clock">sui::clock::Clock</a>, route: <a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, amount: u64): bool
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../bridge/limiter.md#bridge_limiter_check_and_record_sending_transfer">check_and_record_sending_transfer</a>&lt;T&gt;(self: &<b>mut</b> <a href="../bridge/limiter.md#bridge_limiter_TransferLimiter">bridge::limiter::TransferLimiter</a>, <a href="../bridge/treasury.md#bridge_treasury">treasury</a>: &<a href="../bridge/treasury.md#bridge_treasury_BridgeTreasury">bridge::treasury::BridgeTreasury</a>, clock: &<a href="../sui/clock.md#sui_clock_Clock">one::clock::Clock</a>, route: <a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, amount: u64): bool
 </code></pre>
 
 
@@ -364,7 +364,7 @@ title: Module `bridge::limiter`
 
 
 
-<pre><code><b>fun</b> <a href="../bridge/limiter.md#bridge_limiter_current_hour_since_epoch">current_hour_since_epoch</a>(clock: &<a href="../sui/clock.md#sui_clock_Clock">sui::clock::Clock</a>): u64
+<pre><code><b>fun</b> <a href="../bridge/limiter.md#bridge_limiter_current_hour_since_epoch">current_hour_since_epoch</a>(clock: &<a href="../sui/clock.md#sui_clock_Clock">one::clock::Clock</a>): u64
 </code></pre>
 
 
@@ -437,7 +437,7 @@ title: Module `bridge::limiter`
 
 
 
-<pre><code><b>fun</b> <a href="../bridge/limiter.md#bridge_limiter_initial_transfer_limits">initial_transfer_limits</a>(): <a href="../sui/vec_map.md#sui_vec_map_VecMap">sui::vec_map::VecMap</a>&lt;<a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, u64&gt;
+<pre><code><b>fun</b> <a href="../bridge/limiter.md#bridge_limiter_initial_transfer_limits">initial_transfer_limits</a>(): <a href="../sui/vec_map.md#sui_vec_map_VecMap">one::vec_map::VecMap</a>&lt;<a href="../bridge/chain_ids.md#bridge_chain_ids_BridgeRoute">bridge::chain_ids::BridgeRoute</a>, u64&gt;
 </code></pre>
 
 

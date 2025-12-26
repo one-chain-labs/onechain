@@ -7,8 +7,8 @@
 
 //# publish --sender A
 module P::coin {
-  use sui::coin::{Self, CoinMetadata, DenyCapV2, TreasuryCap};
-  use sui::deny_list::DenyList;
+  use one::coin::{Self, CoinMetadata, DenyCapV2, TreasuryCap};
+  use one::deny_list::DenyList;
 
   public struct COIN() has drop;
 

@@ -4,11 +4,11 @@
 #[allow(unused_const)]
 module oct::transfer {
 
-    use sui::object::{Self, ID, UID};
-    use sui::prover;
+    use one::object::{Self, ID, UID};
+    use one::prover;
 
     #[test_only]
-    friend sui::test_scenario;
+    friend one::test_scenario;
 
     /// This represents the ability to `receive` an object of type `T`.
     /// This type is ephemeral per-transaction and cannot be stored on-chain.
@@ -138,7 +138,7 @@ module oct::transfer {
         // aborts if shared object:
         // - it's OK to freeze whether object is fresh or owned
         // - immutable object cannot be passed by value
-        aborts_if [abstract] sui::prover::shared(obj);
+        aborts_if [abstract] one::prover::shared(obj);
         modifies [abstract] global<object::Ownership>(object::id(obj).bytes);
         ensures [abstract] exists<object::Ownership>(object::id(obj).bytes);
         ensures [abstract] global<object::Ownership>(object::id(obj).bytes).status == prover::IMMUTABLE;
@@ -148,7 +148,7 @@ module oct::transfer {
 
     spec share_object_impl {
         pragma opaque;
-        aborts_if [abstract] sui::prover::owned(obj);
+        aborts_if [abstract] one::prover::owned(obj);
         modifies [abstract] global<object::Ownership>(object::id(obj).bytes);
         ensures [abstract] exists<object::Ownership>(object::id(obj).bytes);
         ensures [abstract] global<object::Ownership>(object::id(obj).bytes).status == prover::SHARED;
@@ -162,7 +162,7 @@ module oct::transfer {
         // aborts if shared object:
         // - it's OK to transfer whether object is fresh or already owned
         // - immutable object cannot be passed by value
-        aborts_if [abstract] sui::prover::shared(obj);
+        aborts_if [abstract] one::prover::shared(obj);
         modifies [abstract] global<object::Ownership>(object::id(obj).bytes);
         ensures [abstract] exists<object::Ownership>(object::id(obj).bytes);
         ensures [abstract] global<object::Ownership>(object::id(obj).bytes).owner == recipient;

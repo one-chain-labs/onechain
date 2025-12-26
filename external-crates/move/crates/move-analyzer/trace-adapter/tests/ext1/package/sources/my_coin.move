@@ -1,8 +1,8 @@
 /// Module: my_coin
 module package::my_coin;
 
-use sui::balance;
-use sui::coin::{Self, TreasuryCap, Coin};
+use one::balance;
+use one::coin::{Self, TreasuryCap, Coin};
 
 public struct MY_COIN has drop {}
 

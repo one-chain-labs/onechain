@@ -4,7 +4,7 @@
 #[test_only]
 module oct::hex_tests;
 
-use sui::hex;
+use one::hex;
 
 #[test]
 fun test_hex_encode_string_literal() {

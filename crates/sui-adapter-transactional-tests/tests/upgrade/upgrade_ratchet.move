@@ -15,7 +15,7 @@ module V1::M1 {
     public fun f1() { }
 }
 
-//# run sui::package::only_additive_upgrades --args object(1,1) --sender A
+//# run one::package::only_additive_upgrades --args object(1,1) --sender A
 
 // Fails now since we've updated the package to only allow additive (or more restrictive) upgrades
 //# upgrade --package V1 --upgrade-capability 1,1 --sender A --policy compatible
@@ -35,7 +35,7 @@ module V3::M1 {
     public fun f1() { }
 }
 
-//# run sui::package::only_dep_upgrades --args object(1,1) --sender A
+//# run one::package::only_dep_upgrades --args object(1,1) --sender A
 
 // Fails now since we've updated the package to only allow dep_only  upgrades
 //# upgrade --package V3 --upgrade-capability 1,1 --sender A --policy compatible
@@ -56,10 +56,10 @@ module V4::M1 {
 }
 
 // Can't go back to a less restrictive policy
-//# run sui::package::only_additive_upgrades --args object(1,1) --sender A
+//# run one::package::only_additive_upgrades --args object(1,1) --sender A
 
 // Can make it immutable though
-//# run sui::package::make_immutable --args object(1,1) --sender A
+//# run one::package::make_immutable --args object(1,1) --sender A
 
 //# view-object 1,1
 

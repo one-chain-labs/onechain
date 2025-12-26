@@ -6,8 +6,8 @@
 /// `Kiosk` can be any.
 module oct::item_locked_policy;
 
-use sui::kiosk::{Self, Kiosk};
-use sui::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
+use one::kiosk::{Self, Kiosk};
+use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
 
 /// Item is not in the `Kiosk`.
 const ENotInKiosk: u64 = 0;

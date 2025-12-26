@@ -16,5 +16,5 @@ module v1::m {
 module v1::has_otw {
     public struct HAS_OTW has drop {
     }
-    fun init(_: &mut sui::tx_context::TxContext) {}
+    fun init(_: &mut one::tx_context::TxContext) {}
 }

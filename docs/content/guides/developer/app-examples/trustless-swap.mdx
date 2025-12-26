@@ -142,7 +142,7 @@ The test starts with a helper function for creating an object, it doesn't matter
 {@inject: examples/trading/contracts/escrow/sources/lock.move#fun=test_coin noComments}
 
 - All test-related functions and imports are annotated with `#[test_only]` to make sure they don't show up in the published package. This can also be done by separating tests into their own module – e.g. `lock_tests.move` – and marking that module as `#[test_only]`.
-- The `test_scenario` module is used to provide access to a `&mut TxContext` in the test (necessary for creating new objects). Tests that don't need to simulate multiple transactions but still need access to a `TxContext` can use `sui::tx_context::dummy` to create a test context instead.
+- The `test_scenario` module is used to provide access to a `&mut TxContext` in the test (necessary for creating new objects). Tests that don't need to simulate multiple transactions but still need access to a `TxContext` can use `one::tx_context::dummy` to create a test context instead.
 
 The first test works by creating an object to test, locking it and unlocking it – this should finish executing without aborting.
 The last two lines exist to keep the Move compiler happy by cleaning up the test coin and test scenario objects, because values in Move are not implicitly cleaned up unless they have the `drop` ability.
@@ -306,7 +306,7 @@ Functions responsible for various aspects of the escrow's lifecycle emit these e
 <summary>
 `emit` events included in functions from `shared.move`
 </summary>
-{@inject: examples/trading/contracts/escrow/sources/shared.move#use=sui::event}
+{@inject: examples/trading/contracts/escrow/sources/shared.move#use=one::event}
 {@inject: examples/trading/contracts/escrow/sources/shared.move#fun=create,swap,return_to_sender noTitle noComments}
 </details>
 

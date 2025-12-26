@@ -5,8 +5,8 @@
 
 //# publish
 module P::M {
-  use sui::dynamic_field as df;
-  use sui::dynamic_object_field as dof;
+  use one::dynamic_field as df;
+  use one::dynamic_object_field as dof;
 
   public struct O has key, store {
     id: UID,

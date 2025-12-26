@@ -4,7 +4,7 @@
 #[test_only]
 module oct::hash_tests;
 
-use sui::hash;
+use one::hash;
 
 #[test]
 fun test_keccak256_hash() {

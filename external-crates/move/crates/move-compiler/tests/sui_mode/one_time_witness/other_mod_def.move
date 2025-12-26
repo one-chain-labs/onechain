@@ -2,7 +2,7 @@
 
 module a::n {
     use oct::oct;
-    use sui::tx_context;
+    use one::tx_context;
 
     fun init(_otw: oct::OCT, _ctx: &mut tx_context::TxContext) {
     }

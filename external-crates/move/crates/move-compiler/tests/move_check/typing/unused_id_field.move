@@ -2,7 +2,7 @@
 // tests that the example which is allowed in sui mode is not allowed outside of that mode
 
 module a::m {
-    struct Obj has key { id: sui::object::UID }
+    struct Obj has key { id: one::object::UID }
 }
 
 module oct::object {

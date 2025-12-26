@@ -8,11 +8,11 @@ module oct::coin {
     use std::string;
     use std::ascii;
     use std::option::{Self, Option};
-    use sui::balance::{Self, Balance, Supply};
-    use sui::tx_context::TxContext;
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::url::{Self, Url};
+    use one::balance::{Self, Balance, Supply};
+    use one::tx_context::TxContext;
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::url::{Self, Url};
     use std::vector;
 
     /// A type passed to create_supply is not a one-time witness.
@@ -242,7 +242,7 @@ module oct::coin {
         ctx: &mut TxContext
     ): (TreasuryCap<T>, CoinMetadata<T>) {
         // Make sure there's only one instance of the type T
-        assert!(sui::types::is_one_time_witness(&witness), EBadWitness);
+        assert!(one::types::is_one_time_witness(&witness), EBadWitness);
 
         (
             TreasuryCap {

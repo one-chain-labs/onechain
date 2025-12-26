@@ -378,7 +378,7 @@ impl ProcessTransactionState {
     ) -> bool {
         // In some edge cases, the client may send the same transaction multiple times but with different user signatures.
         // When this happens, the "minority" tx will fail in safe_client because the certificate verification would fail
-        // and return Sui::FailedToVerifyTxCertWithExecutedEffects.
+        // and return one::FailedToVerifyTxCertWithExecutedEffects.
         // Here, we check if there are f+1 validators return this error. If so, the transaction is already finalized
         // with a different set of user signatures. It's not trivial to return the results of that successful transaction
         // because we don't want fullnode to store the transaction with non-canonical user signatures. Given that this is

@@ -8,8 +8,8 @@
 
 //# publish
 module test::m1 {
-    use sui::coin::Coin;
-    use sui::oct::OCT;
+    use one::coin::Coin;
+    use one::oct::OCT;
 
     public struct R has key, store { id: UID }
     public fun r(ctx: &mut TxContext): R { R { id: object::new(ctx) } }

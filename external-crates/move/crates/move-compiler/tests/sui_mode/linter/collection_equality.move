@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module a::test {
-    use sui::bag::Bag;
-    use sui::object_bag::ObjectBag;
-    use sui::table::Table;
-    use sui::object_table::ObjectTable;
-    use sui::linked_table::LinkedTable;
-    use sui::table_vec::TableVec;
-    use sui::vec_map::VecMap;
-    use sui::vec_set::VecSet;
+    use one::bag::Bag;
+    use one::object_bag::ObjectBag;
+    use one::table::Table;
+    use one::object_table::ObjectTable;
+    use one::linked_table::LinkedTable;
+    use one::table_vec::TableVec;
+    use one::vec_map::VecMap;
+    use one::vec_set::VecSet;
 
 
 
@@ -56,7 +56,7 @@ module oct::object {
 }
 
 module oct::bag {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Bag has key, store {
         id: UID
@@ -64,7 +64,7 @@ module oct::bag {
 }
 
 module oct::object_bag {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct ObjectBag has key, store {
         id: UID
@@ -72,7 +72,7 @@ module oct::object_bag {
 }
 
 module oct::table {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Table<phantom K: copy + drop + store, phantom V: store> has key, store {
         id: UID
@@ -80,7 +80,7 @@ module oct::table {
 }
 
 module oct::object_table {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct ObjectTable<phantom K: copy + drop + store, phantom V: key + store> has key, store {
         id: UID
@@ -88,7 +88,7 @@ module oct::object_table {
 }
 
 module oct::linked_table {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct LinkedTable<phantom K: copy + drop + store, phantom V: store> has key, store {
         id: UID
@@ -96,7 +96,7 @@ module oct::linked_table {
 }
 
 module oct::table_vec {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct TableVec<phantom Element: store> has key, store {
         id: UID
@@ -104,7 +104,7 @@ module oct::table_vec {
 }
 
 module oct::vec_map {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct VecMap<phantom K: copy, phantom V> has key, store {
         id: UID
@@ -112,7 +112,7 @@ module oct::vec_map {
 }
 
 module oct::vec_set {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct VecSet<phantom K: copy + drop> has key, store {
         id: UID

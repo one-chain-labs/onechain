@@ -9,17 +9,17 @@
 // state to the chain for auditability + restore from snapshot purposes.
 module oct::authenticator_state {
     // friend bar;
-    // friend sui::coin;
+    // friend one::coin;
 
     use std::string;
     use std::option::{Self, Option};
     use std::vector;
-    use sui::dynamic_field;
+    use one::dynamic_field;
     use std::string::{String, utf8};
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
-    use sui::math;
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::math;
 
     /// Sender is not @0x0 the system address.
     const ENotSystemAddress: u64 = 0;

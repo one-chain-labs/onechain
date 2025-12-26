@@ -1,5 +1,5 @@
 ---
-title: Module `sui::transfer`
+title: Module `one::transfer`
 ---
 
 
@@ -29,12 +29,12 @@ title: Module `sui::transfer`
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/party.md#sui_party">sui::party</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">sui::vec_map</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
 </code></pre>
 
 
@@ -63,7 +63,7 @@ Internals of this struct are opaque outside this module.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -232,7 +232,7 @@ is an object defined in the module where <code><a href="../sui/transfer.md#sui_t
 to transfer an object with <code>store</code> outside of its module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_party_transfer">party_transfer</a>&lt;T: key&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_party_transfer">party_transfer</a>&lt;T: key&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>)
 </code></pre>
 
 
@@ -241,7 +241,7 @@ to transfer an object with <code>store</code> outside of its module.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_party_transfer">party_transfer</a>&lt;T: key&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_party_transfer">party_transfer</a>&lt;T: key&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>) {
     <b>assert</b>!(<a href="../sui/party.md#sui_party">party</a>.is_single_owner(), <a href="../sui/transfer.md#sui_transfer_EInvalidPartyPermissions">EInvalidPartyPermissions</a>);
     <b>let</b> (default, addresses, permissions) = <a href="../sui/party.md#sui_party">party</a>.into_native();
     <a href="../sui/transfer.md#sui_transfer_party_transfer_impl">party_transfer_impl</a>(obj, default, addresses, permissions)
@@ -268,7 +268,7 @@ used in the fast path.
 The object must have <code>store</code> to be transferred outside of its module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_public_party_transfer">public_party_transfer</a>&lt;T: key, store&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_public_party_transfer">public_party_transfer</a>&lt;T: key, store&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>)
 </code></pre>
 
 
@@ -277,7 +277,7 @@ The object must have <code>store</code> to be transferred outside of its module.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_public_party_transfer">public_party_transfer</a>&lt;T: key + store&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_public_party_transfer">public_party_transfer</a>&lt;T: key + store&gt;(obj: T, <a href="../sui/party.md#sui_party">party</a>: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>) {
     <b>assert</b>!(<a href="../sui/party.md#sui_party">party</a>.is_single_owner(), <a href="../sui/transfer.md#sui_transfer_EInvalidPartyPermissions">EInvalidPartyPermissions</a>);
     <b>let</b> (default, addresses, permissions) = <a href="../sui/party.md#sui_party">party</a>.into_native();
     <a href="../sui/transfer.md#sui_transfer_party_transfer_impl">party_transfer_impl</a>(obj, default, addresses, permissions)
@@ -416,7 +416,7 @@ that <code>T</code> is an object defined in the module where <code><a href="../s
 <code><a href="../sui/transfer.md#sui_transfer_public_receive">public_receive</a></code> to receivne an object with <code>store</code> outside of its module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_receive">receive</a>&lt;T: key&gt;(parent: &<b>mut</b> <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>, to_receive: <a href="../sui/transfer.md#sui_transfer_Receiving">sui::transfer::Receiving</a>&lt;T&gt;): T
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_receive">receive</a>&lt;T: key&gt;(parent: &<b>mut</b> <a href="../sui/object.md#sui_object_UID">one::object::UID</a>, to_receive: <a href="../sui/transfer.md#sui_transfer_Receiving">one::transfer::Receiving</a>&lt;T&gt;): T
 </code></pre>
 
 
@@ -445,7 +445,7 @@ argument to receive and return the referenced owned object of type <code>T</code
 The object must have <code>store</code> to be received outside of its defining module.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_public_receive">public_receive</a>&lt;T: key, store&gt;(parent: &<b>mut</b> <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>, to_receive: <a href="../sui/transfer.md#sui_transfer_Receiving">sui::transfer::Receiving</a>&lt;T&gt;): T
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_public_receive">public_receive</a>&lt;T: key, store&gt;(parent: &<b>mut</b> <a href="../sui/object.md#sui_object_UID">one::object::UID</a>, to_receive: <a href="../sui/transfer.md#sui_transfer_Receiving">one::transfer::Receiving</a>&lt;T&gt;): T
 </code></pre>
 
 
@@ -471,7 +471,7 @@ The object must have <code>store</code> to be received outside of its defining m
 Return the object ID that the given <code><a href="../sui/transfer.md#sui_transfer_Receiving">Receiving</a></code> argument references.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_receiving_object_id">receiving_object_id</a>&lt;T: key&gt;(receiving: &<a href="../sui/transfer.md#sui_transfer_Receiving">sui::transfer::Receiving</a>&lt;T&gt;): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer_receiving_object_id">receiving_object_id</a>&lt;T: key&gt;(receiving: &<a href="../sui/transfer.md#sui_transfer_Receiving">one::transfer::Receiving</a>&lt;T&gt;): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -588,7 +588,7 @@ Return the object ID that the given <code><a href="../sui/transfer.md#sui_transf
 
 
 
-<pre><code><b>fun</b> <a href="../sui/transfer.md#sui_transfer_receive_impl">receive_impl</a>&lt;T: key&gt;(parent: <b>address</b>, to_receive: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>, version: u64): T
+<pre><code><b>fun</b> <a href="../sui/transfer.md#sui_transfer_receive_impl">receive_impl</a>&lt;T: key&gt;(parent: <b>address</b>, to_receive: <a href="../sui/object.md#sui_object_ID">one::object::ID</a>, version: u64): T
 </code></pre>
 
 

@@ -4,7 +4,7 @@
 #[test_only]
 module oct::test_scenario;
 
-use sui::vec_map::VecMap;
+use one::vec_map::VecMap;
 
 #[allow(unused_const)]
 /// the transaction failed when generating these effects. For example, a circular ownership
@@ -450,7 +450,7 @@ public fun take_from_address<T: key>(scenario: &Scenario, account: address): T {
 public fun return_to_address<T: key>(account: address, t: T) {
     let id = object::id(&t);
     assert!(was_taken_from_address(account, id), ECantReturnObject);
-    sui::transfer::transfer_impl(t, account)
+    one::transfer::transfer_impl(t, account)
 }
 
 /// Returns true if the object with `ID` id was in the inventory for `account`
@@ -519,7 +519,7 @@ public fun take_immutable<T: key>(scenario: &Scenario): T {
 public fun return_immutable<T: key>(t: T) {
     let id = object::id(&t);
     assert!(was_taken_immutable(id), ECantReturnObject);
-    sui::transfer::freeze_object_impl(t)
+    one::transfer::freeze_object_impl(t)
 }
 
 /// Returns true if the object with `ID` id was an immutable object in the global inventory
@@ -551,7 +551,7 @@ public fun take_shared<T: key>(scenario: &Scenario): T {
 public fun return_shared<T: key>(t: T) {
     let id = object::id(&t);
     assert!(was_taken_shared(id), ECantReturnObject);
-    sui::transfer::share_object_impl(t)
+    one::transfer::share_object_impl(t)
 }
 
 /// Return the IDs of the receivalbe objects that `object` owns.
@@ -561,7 +561,7 @@ public fun receivable_object_ids_for_owner_id<T: key>(object: ID): vector<ID> {
 
 /// Create a `Receiving<T>` receiving ticket for the most recent
 /// object of type `T` that is owned by the `owner` object ID.
-public fun most_recent_receiving_ticket<T: key>(owner: &ID): sui::transfer::Receiving<T> {
+public fun most_recent_receiving_ticket<T: key>(owner: &ID): one::transfer::Receiving<T> {
     let id_opt = most_recent_id_for_address<T>(object::id_to_address(owner));
     assert!(option::is_some(&id_opt), EEmptyInventory);
     let id = option::destroy_some(id_opt);
@@ -570,16 +570,16 @@ public fun most_recent_receiving_ticket<T: key>(owner: &ID): sui::transfer::Rece
 
 /// Create a `Receiving<T>` receiving ticket for the object of type
 /// `T` with the given `object_id`.
-public fun receiving_ticket_by_id<T: key>(object_id: ID): sui::transfer::Receiving<T> {
+public fun receiving_ticket_by_id<T: key>(object_id: ID): one::transfer::Receiving<T> {
     let version = allocate_receiving_ticket_for_object<T>(object_id);
-    sui::transfer::make_receiver(object_id, version)
+    one::transfer::make_receiver(object_id, version)
 }
 
 /// Deallocate a `Receiving<T>` receiving ticket. This must be done in
 /// order to use the object further (unless the object was received) in a
 /// test scenario.
-public fun return_receiving_ticket<T: key>(ticket: sui::transfer::Receiving<T>) {
-    let id = sui::transfer::receiving_id(&ticket);
+public fun return_receiving_ticket<T: key>(ticket: one::transfer::Receiving<T>) {
+    let id = one::transfer::receiving_id(&ticket);
     deallocate_receiving_ticket_for_object(id);
 }
 

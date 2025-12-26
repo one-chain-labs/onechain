@@ -4,7 +4,7 @@
 #[test_only]
 module oct::ecvrf_tests;
 
-use sui::ecvrf;
+use one::ecvrf;
 
 #[test]
 fun test_ecvrf_verify() {

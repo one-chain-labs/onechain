@@ -5,9 +5,9 @@ module bridge::limiter;
 
 use bridge::chain_ids::{Self, BridgeRoute};
 use bridge::treasury::BridgeTreasury;
-use sui::clock::{Self, Clock};
-use sui::event;
-use sui::vec_map::{Self, VecMap};
+use one::clock::{Self, Clock};
+use one::event;
+use one::vec_map::{Self, VecMap};
 
 const ELimitNotFoundForRoute: u64 = 0;
 

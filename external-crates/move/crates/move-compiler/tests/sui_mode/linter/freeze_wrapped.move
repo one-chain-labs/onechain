@@ -3,8 +3,8 @@
 
 #[allow(unused_field)]
 module a::test {
-    use sui::object::UID;
-    use sui::transfer;
+    use one::object::UID;
+    use one::transfer;
 
     struct Inner has key, store {
         id: UID

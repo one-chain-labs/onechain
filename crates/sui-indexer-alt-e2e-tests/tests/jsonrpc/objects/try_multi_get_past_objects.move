@@ -16,21 +16,21 @@
 
 //# programmable --sender A --inputs 44
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: sui::transfer::public_share_object<sui::coin::Coin<sui::oct::OCT>>(Result(0))
+//> 1: one::transfer::public_share_object<one::coin::Coin<one::oct::OCT>>(Result(0))
 
 //# programmable --sender A --inputs 45
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: sui::transfer::public_freeze_object<sui::coin::Coin<sui::oct::OCT>>(Result(0))
+//> 1: one::transfer::public_freeze_object<one::coin::Coin<one::oct::OCT>>(Result(0))
 
 //# programmable --sender A --inputs @A
-//> 0: sui::table::new<u64, u64>();
+//> 0: one::table::new<u64, u64>();
 //> 1: TransferObjects([Result(0)], Input(0))
 
 //# programmable --sender A --inputs object(5,0) 46 47
-//> 0: sui::table::add<u64, u64>(Input(0), Input(1), Input(2))
+//> 0: one::table::add<u64, u64>(Input(0), Input(1), Input(2))
 
 //# programmable --sender A --inputs object(5,0) 46
-//> 0: sui::table::remove<u64, u64>(Input(0), Input(1))
+//> 0: one::table::remove<u64, u64>(Input(0), Input(1))
 
 //# create-checkpoint
 

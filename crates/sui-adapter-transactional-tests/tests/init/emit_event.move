@@ -10,7 +10,7 @@ module Test::M1 {
    }
 
    fun init(_ctx: &mut TxContext) { 
-       sui::event::emit(Event { x: 1 });
+       one::event::emit(Event { x: 1 });
    }
 }
 

@@ -4,8 +4,8 @@
 #[test_only]
 module oct::zklogin_verified_issuer_tests;
 
-use sui::test_scenario;
-use sui::zklogin_verified_issuer::{
+use one::test_scenario;
+use one::zklogin_verified_issuer::{
     check_zklogin_issuer,
     delete,
     verify_zklogin_issuer,
@@ -53,7 +53,7 @@ fun test_verified_issuer() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::zklogin_verified_issuer::EInvalidProof)]
+#[expected_failure(abort_code = one::zklogin_verified_issuer::EInvalidProof)]
 fun test_invalid_verified_issuer() {
     let other_address = @0x1;
     let iss = b"https://accounts.google.com".to_string();

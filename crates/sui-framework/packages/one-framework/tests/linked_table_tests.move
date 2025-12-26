@@ -4,8 +4,8 @@
 #[test_only]
 module oct::linked_table_tests;
 
-use sui::linked_table::{Self, LinkedTable};
-use sui::test_scenario;
+use one::linked_table::{Self, LinkedTable};
+use one::test_scenario;
 
 #[test]
 fun simple_all_functions() {
@@ -102,7 +102,7 @@ fun push_back_singleton() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
 fun push_front_duplicate() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -113,7 +113,7 @@ fun push_front_duplicate() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
 fun push_back_duplicate() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -124,7 +124,7 @@ fun push_back_duplicate() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
 fun push_mixed_duplicate() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -135,7 +135,7 @@ fun push_mixed_duplicate() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun borrow_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -145,7 +145,7 @@ fun borrow_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun borrow_mut_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -155,7 +155,7 @@ fun borrow_mut_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun remove_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);

@@ -5,7 +5,7 @@
 module oct_system::rewards_distribution_tests;
 
 use std::unit_test::assert_eq;
-use sui::address;
+use one::address;
 use one_system::one_system::SuiSystemState;
 use one_system::test_runner;
 use one_system::validator_builder;

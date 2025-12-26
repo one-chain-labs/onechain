@@ -4,7 +4,7 @@
 #[test_only]
 module oct::vec_set_tests;
 
-use sui::vec_set;
+use one::vec_set;
 
 #[test]
 #[expected_failure(abort_code = vec_set::EKeyAlreadyExists)]

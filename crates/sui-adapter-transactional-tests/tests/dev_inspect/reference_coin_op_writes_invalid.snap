@@ -66,7 +66,7 @@ gas summary: computation_cost: 500000, storage_cost: 1976000,  storage_rebate: 1
 task 7, lines 54-61:
 //# programmable --dev-inspect --inputs 10 @A
 // Cannot write to borrowed fresh coin via split coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: SplitCoins(Result(0), [Input(0)]);
 //> 3: TransferObjects([Result(2)], Input(1));
@@ -78,7 +78,7 @@ Execution Error: InsufficientCoinBalance in command 2
 task 8, lines 63-69:
 //# programmable --dev-inspect --inputs 10 @A object(2,0)
 // Cannot write to borrowed fresh coin via Merge coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: MergeCoins(Result(0), [Input(2)]);
 //> 3: test::m::borrow_mut(Result(1));

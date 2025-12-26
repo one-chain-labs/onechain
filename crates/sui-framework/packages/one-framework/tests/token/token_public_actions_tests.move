@@ -5,8 +5,8 @@
 /// This module tests `join`, `split`, `zero` and `destroy_zero` functions
 module oct::token_public_actions_tests;
 
-use sui::token;
-use sui::token_test_utils::{Self as test, TEST};
+use one::token;
+use one::token_test_utils::{Self as test, TEST};
 
 #[test]
 /// Scenario: mint a Token, split it, merge back, then issue a zero and

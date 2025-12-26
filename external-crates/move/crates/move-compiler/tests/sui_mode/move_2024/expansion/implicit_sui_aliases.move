@@ -1,7 +1,7 @@
 // sui mode has the implicit asliases:
-// use sui::object::{Self, ID, UID};
-// use sui::transfer;
-// use sui::tx_context::{Self, TxContext};
+// use one::object::{Self, ID, UID};
+// use one::transfer;
+// use one::tx_context::{Self, TxContext};
 module a::m {
     public struct S has key { id: UID, other: ID }
     public fun create(ctx: &mut TxContext) {

@@ -6,7 +6,7 @@
 //# publish
 module ex::m;
 
-use sui::dynamic_object_field as ofield;
+use one::dynamic_object_field as ofield;
 
 public struct Parent has key, store {
     id: UID,
@@ -21,7 +21,7 @@ public fun mint(ctx: &mut TxContext) {
     transfer::transfer(parent, ctx.sender());
 
     let child = Child { id: object::new(ctx) };
-    transfer::party_transfer(child, sui::party::single_owner(ctx.sender()))
+    transfer::party_transfer(child, one::party::single_owner(ctx.sender()))
 }
 
 public fun add_df(parent: &mut Parent, child: Child) {
@@ -53,8 +53,8 @@ public fun remove_df(parent: &mut Parent, ctx: &mut TxContext) {
 
 // Verify the dynamic field child object can't be transferred.
 //# programmable --inputs object(2,0) @A --sender A
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::A>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::A>(Input(0), Result(0))
 
 // Pull the object back out.
 //# programmable --sender A --inputs object(2,1)
@@ -62,7 +62,7 @@ public fun remove_df(parent: &mut Parent, ctx: &mut TxContext) {
 
 // Verify it can again be transferred to a different party.
 //# programmable --inputs object(2,0) @B --sender A
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::Child>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::Child>(Input(0), Result(0))
 
 //# view-object 2,0

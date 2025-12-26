@@ -23,8 +23,8 @@ task 3, line 22:
 Owner: Immutable
 Version: 2
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -40,8 +40,8 @@ task 5, line 26:
 Owner: Immutable
 Version: 2
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },

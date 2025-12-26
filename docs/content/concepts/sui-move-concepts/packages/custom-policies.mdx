@@ -25,7 +25,7 @@ Each of these policies, in the order listed, is a superset of the previous one i
 
 When you publish a package, by default it adopts the most relaxed, compatible policy. You can publish a package as part of a transaction that can change the policy before the transaction successfully completes, making the package available on chain for the first time at the desired policy level, rather than at the default one.
 
-You can change the current policy by calling one of the functions in `sui::package` (`only_additive_upgrades`, `only_dep_upgrades`, `make_immutable`) on the package's `UpgradeCap` and a policy can become only more restrictive. For example, after you call `sui::package::only_dep_upgrades` to restrict the policy to become additive, calling `sui::package::only_additive_upgrades` on the `UpgradeCap` of the same package results in an error.
+You can change the current policy by calling one of the functions in `one::package` (`only_additive_upgrades`, `only_dep_upgrades`, `make_immutable`) on the package's `UpgradeCap` and a policy can become only more restrictive. For example, after you call `one::package::only_dep_upgrades` to restrict the policy to become additive, calling `one::package::only_additive_upgrades` on the `UpgradeCap` of the same package results in an error.
 
 ## Upgrade overview {#upgrade-overview}
 
@@ -149,7 +149,7 @@ In the `sources` folder, create a source file named `day_of_week.move`. Copy and
 ```move
 module policy::day_of_week;
 
-use sui::package;
+use one::package;
 
 /// Day is not a week day (number in range 0 <= day < 7).
 const ENotWeekDay: u64 = 1;
@@ -209,9 +209,9 @@ public fun authorize_upgrade(
 }
 ```
 
-The signature of a custom `authorize_upgrade` can be different from the signature of `sui::package::authorize_upgrade` as long as it returns an `UpgradeTicket`.
+The signature of a custom `authorize_upgrade` can be different from the signature of `one::package::authorize_upgrade` as long as it returns an `UpgradeTicket`.
 
-Finally, provide implementations of `commit_upgrade` and `make_immutable` that delegate to their respective functions in `sui::package`:
+Finally, provide implementations of `commit_upgrade` and `make_immutable` that delegate to their respective functions in `one::package`:
 
 ```move
 public fun commit_upgrade(
@@ -233,7 +233,7 @@ The final code in your `day_of_week.move` file should resemble the following:
 ```move
 module policy::day_of_week;
 
-use sui::package;
+use one::package;
 
 // Day is not a week day (number in range 0 <= day < 7).
 const ENotWeekDay: u64 = 1;
@@ -442,7 +442,7 @@ Transaction Digest: 5BzYX5iV6GP2RaSkZ7JPBRmListD5cEVC7REoKsNoCYc
 
 </details>
 
-Following best practices, use the Sui Client CLI to call `sui::package::make_immutable` on the `UpgradeCap` to make the policy immutable. In your shell, create a variable `upgradecap` and set its value to the `UpgradeCap` object ID listed in the *Object Changes* section of your publish response. Of course, the object ID for your upgrade capability is different than the following example.
+Following best practices, use the Sui Client CLI to call `one::package::make_immutable` on the `UpgradeCap` to make the policy immutable. In your shell, create a variable `upgradecap` and set its value to the `UpgradeCap` object ID listed in the *Object Changes* section of your publish response. Of course, the object ID for your upgrade capability is different than the following example.
 
 ```sh
 $ upgradecap=0x4de927a10f97520311239cadb7159d4b893275bc74ab4e0af1b16c41ba8275a0
@@ -582,7 +582,7 @@ In the `example/sources` directory, create an `example.move` file with the follo
 module example::example {
     struct Event has copy, drop { x: u64 }
     entry fun nudge() {
-        sui::event::emit(Event { x: 41 })
+        one::event::emit(Event { x: 41 })
     }
 }
 ```

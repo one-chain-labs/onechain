@@ -26,7 +26,7 @@ pub const RESOLVED_RECEIVING_STRUCT: (&AccountAddress, &IdentStr, &IdentStr) = (
     RECEIVING_STRUCT_NAME,
 );
 
-/// Rust version of the Move sui::transfer::Receiving type
+/// Rust version of the Move one::transfer::Receiving type
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Receiving {
     pub id: ID,

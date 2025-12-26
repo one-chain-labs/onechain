@@ -33,8 +33,8 @@ task 4, line 26:
 Owner: Account Address ( A )
 Version: 2
 Contents: P::M::T {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -46,8 +46,8 @@ task 5, line 28:
 Owner: Account Address ( A )
 Version: 3
 Contents: P::M::T {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(3,0),
         },
     },

@@ -5,8 +5,8 @@
 module oct::config_tests;
 
 use std::unit_test::assert_eq;
-use sui::config::{Self, Config};
-use sui::test_scenario as ts;
+use one::config::{Self, Config};
+use one::test_scenario as ts;
 
 const SENDER: address = @42;
 
@@ -14,7 +14,7 @@ public struct WriteCap() has drop;
 public struct Wrapped<T>(T) has copy, drop, store;
 
 fun config_create<WriteCap>(cap: &mut WriteCap, ctx: &mut TxContext) {
-    sui::config::share(sui::config::new(cap, ctx))
+    one::config::share(one::config::new(cap, ctx))
 }
 
 #[test]
@@ -134,7 +134,7 @@ fun test_all() {
     ts.end();
 }
 
-#[test, expected_failure(abort_code = sui::config::EAlreadySetForEpoch)]
+#[test, expected_failure(abort_code = one::config::EAlreadySetForEpoch)]
 fun add_for_next_epoch_aborts_in_same_epoch() {
     let mut ts = ts::begin(SENDER);
     config_create(&mut WriteCap(), ts.ctx());
@@ -145,7 +145,7 @@ fun add_for_next_epoch_aborts_in_same_epoch() {
     abort 0
 }
 
-#[test, expected_failure(abort_code = sui::config::ENotSetForEpoch)]
+#[test, expected_failure(abort_code = one::config::ENotSetForEpoch)]
 fun borrow_for_next_epoch_mut_aborts_in_new_epoch() {
     let mut ts = ts::begin(SENDER);
     config_create(&mut WriteCap(), ts.ctx());
@@ -342,7 +342,7 @@ fun test_remove_doesnt_fail_on_duplicate() {
     ts.end();
 }
 
-#[test, expected_failure(abort_code = sui::dynamic_field::EFieldTypeMismatch)]
+#[test, expected_failure(abort_code = one::dynamic_field::EFieldTypeMismatch)]
 fun test_remove_fail_on_type_mismatch() {
     let mut ts = ts::begin(SENDER);
     config_create(&mut WriteCap(), ts.ctx());
@@ -356,7 +356,7 @@ fun test_remove_fail_on_type_mismatch() {
     abort 0
 }
 
-#[test, expected_failure(abort_code = sui::dynamic_field::EFieldTypeMismatch)]
+#[test, expected_failure(abort_code = one::dynamic_field::EFieldTypeMismatch)]
 fun test_add_fail_on_type_mismatch() {
     let mut ts = ts::begin(SENDER);
     config_create(&mut WriteCap(), ts.ctx());

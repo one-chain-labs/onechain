@@ -24,7 +24,7 @@ gas summary: computation_cost: 1000000, storage_cost: 3952000,  storage_rebate: 
 task 3, lines 28-35:
 //# programmable --dev-inspect --inputs 10 @A
 // Can write to same coin ref via split coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: SplitCoins(Result(1), [Input(0)]);
 //> 3: TransferObjects([Result(2)], Input(1));
@@ -36,7 +36,7 @@ Execution Error: InsufficientCoinBalance in command 2
 task 4, lines 37-43:
 //# programmable --dev-inspect --inputs 10 @A object(2,0)
 // Can write to same coin ref via Merge coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: MergeCoins(Result(1), [Input(2)]);
 //> 3: test::m::borrow_mut(Result(1));
@@ -49,7 +49,7 @@ gas summary: computation_cost: 500000, storage_cost: 1976000,  storage_rebate: 9
 task 5, lines 45-52:
 //# programmable --dev-inspect --inputs 10 @A
 // Can write to same coin via split coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: SplitCoins(Result(0), [Input(0)]);
 //> 3: TransferObjects([Result(2)], Input(1));
@@ -61,7 +61,7 @@ Execution Error: InsufficientCoinBalance in command 2
 task 6, lines 54-60:
 //# programmable --dev-inspect --inputs 10 @A object(2,0)
 // Can write to same coin r via Merge coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: MergeCoins(Result(0), [Input(2)]);
 //> 3: test::m::borrow_mut(Result(0));

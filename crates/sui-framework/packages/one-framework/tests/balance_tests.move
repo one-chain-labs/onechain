@@ -4,12 +4,12 @@
 #[test_only]
 module oct::coin_balance_tests;
 
-use sui::balance;
-use sui::coin;
-use sui::pay;
-use sui::oct::OCT;
-use sui::test_scenario;
-use sui::test_utils;
+use one::balance;
+use one::coin;
+use one::pay;
+use one::oct::OCT;
+use one::test_scenario;
+use one::test_utils;
 
 #[test]
 fun type_morphing() {

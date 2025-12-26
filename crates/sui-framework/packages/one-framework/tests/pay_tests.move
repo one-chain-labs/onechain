@@ -4,12 +4,12 @@
 #[test_only]
 module oct::pay_tests;
 
-use sui::balance;
-use sui::coin::{Self, Coin};
-use sui::pay;
-use sui::oct::OCT;
-use sui::test_scenario;
-use sui::test_utils;
+use one::balance;
+use one::coin::{Self, Coin};
+use one::pay;
+use one::oct::OCT;
+use one::test_scenario;
+use one::test_utils;
 
 const TEST_SENDER_ADDR: address = @0xA11CE;
 

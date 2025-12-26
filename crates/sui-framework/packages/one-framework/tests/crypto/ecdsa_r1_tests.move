@@ -4,7 +4,7 @@
 #[test_only]
 module oct::ecdsa_r1_tests;
 
-use sui::ecdsa_r1;
+use one::ecdsa_r1;
 
 #[test]
 fun test_ecrecover_pubkey() {

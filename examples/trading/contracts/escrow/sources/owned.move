@@ -155,11 +155,11 @@ public fun return_to_sender<T: key + store>(obj: Escrow<T>) {
 
 // === Tests ===
 #[test_only]
-use sui::coin::{Self, Coin};
+use one::coin::{Self, Coin};
 #[test_only]
-use sui::oct::OCT;
+use one::oct::OCT;
 #[test_only]
-use sui::test_scenario::{Self as ts, Scenario};
+use one::test_scenario::{Self as ts, Scenario};
 
 #[test_only]
 use escrow::lock;

@@ -18,27 +18,27 @@ title: Module `one_system::storage_fund`
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/accumulator.md#sui_accumulator">sui::accumulator</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/bag.md#sui_bag">sui::bag</a>;
-<b>use</b> <a href="../sui/balance.md#sui_balance">sui::balance</a>;
-<b>use</b> <a href="../sui/coin.md#sui_coin">sui::coin</a>;
-<b>use</b> <a href="../sui/config.md#sui_config">sui::config</a>;
-<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">sui::deny_list</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">sui::dynamic_object_field</a>;
-<b>use</b> <a href="../sui/event.md#sui_event">sui::event</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/party.md#sui_party">sui::party</a>;
-<b>use</b> <a href="../sui/sui.md#sui_sui">sui::sui</a>;
-<b>use</b> <a href="../sui/table.md#sui_table">sui::table</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/types.md#sui_types">sui::types</a>;
-<b>use</b> <a href="../sui/url.md#sui_url">sui::url</a>;
-<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">sui::vec_map</a>;
-<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">sui::vec_set</a>;
+<b>use</b> <a href="../sui/accumulator.md#sui_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bag.md#sui_bag">one::bag</a>;
+<b>use</b> <a href="../sui/balance.md#sui_balance">one::balance</a>;
+<b>use</b> <a href="../sui/coin.md#sui_coin">one::coin</a>;
+<b>use</b> <a href="../sui/config.md#sui_config">one::config</a>;
+<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">one::deny_list</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/event.md#sui_event">one::event</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/sui.md#sui_sui">one::sui</a>;
+<b>use</b> <a href="../sui/table.md#sui_table">one::table</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/types.md#sui_types">one::types</a>;
+<b>use</b> <a href="../sui/url.md#sui_url">one::url</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
+<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">one::vec_set</a>;
 </code></pre>
 
 
@@ -68,12 +68,12 @@ be taken out of the fund.
 
 <dl>
 <dt>
-<code><a href="../sui_system/storage_fund.md#sui_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;</code>
+<code><a href="../sui_system/storage_fund.md#sui_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;</code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>non_refundable_balance: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;</code>
+<code>non_refundable_balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -89,7 +89,7 @@ be taken out of the fund.
 Called by <code><a href="../sui_system/sui_system.md#sui_system_sui_system">sui_system</a></code> at genesis time.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_new">new</a>(initial_fund: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;): <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_new">new</a>(initial_fund: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;): <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>
 </code></pre>
 
 
@@ -118,7 +118,7 @@ Called by <code><a href="../sui_system/sui_system.md#sui_system_sui_system">sui_
 Called by <code><a href="../sui_system/sui_system.md#sui_system_sui_system">sui_system</a></code> at epoch change times to process the inflows and outflows of storage fund.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_advance_epoch">advance_epoch</a>(self: &<b>mut</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>, storage_charges: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;, storage_fund_reinvestment: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;, leftover_staking_rewards: <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;, storage_rebate_amount: u64, non_refundable_storage_fee_amount: u64): <a href="../sui/balance.md#sui_balance_Balance">sui::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">sui::sui::SUI</a>&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_advance_epoch">advance_epoch</a>(self: &<b>mut</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>, storage_charges: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, storage_fund_reinvestment: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, leftover_staking_rewards: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, storage_rebate_amount: u64, non_refundable_storage_fee_amount: u64): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;
 </code></pre>
 
 

@@ -269,7 +269,7 @@ pub(super) async fn owned_objects(
 }
 
 /// Fetch ObjectIDs for a page of dynamic fields owned by parent object `owner`. The returned IDs
-/// all point to `sui::dynamic_field::Field<K, V>` objects. Returns the IDs and a cursor pointing
+/// all point to `one::dynamic_field::Field<K, V>` objects. Returns the IDs and a cursor pointing
 /// to the last result (if there are any results).
 pub(crate) async fn dynamic_fields(
     ctx: &Context,

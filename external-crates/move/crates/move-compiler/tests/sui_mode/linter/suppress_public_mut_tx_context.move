@@ -1,5 +1,5 @@
 module 0x42::suppress_cases {
-    use sui::tx_context::TxContext;
+    use one::tx_context::TxContext;
 
     #[allow(lint(prefer_mut_tx_context))]
     public fun suppressed_function(_ctx: &TxContext) {
@@ -14,7 +14,7 @@ module 0x42::suppress_cases {
     }
 }
 
-// Mocking the sui::tx_context module
+// Mocking the one::tx_context module
 module oct::tx_context {
     struct TxContext has drop {}
 }

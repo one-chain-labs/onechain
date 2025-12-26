@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module oct::address {
-    use sui::hex;
+    use one::hex;
     use std::ascii;
     use std::bcs;
     use std::string;

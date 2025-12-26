@@ -65,9 +65,9 @@ title: Module `bridge::message`
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/bcs.md#sui_bcs">sui::bcs</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bcs.md#sui_bcs">one::bcs</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
 </code></pre>
 
 
@@ -1771,7 +1771,7 @@ Return the required signature threshold for the message, values are voting power
 
 
 
-<pre><code><b>fun</b> <a href="../bridge/message.md#bridge_message_peel_u64_be">peel_u64_be</a>(bcs: &<b>mut</b> <a href="../sui/bcs.md#sui_bcs_BCS">sui::bcs::BCS</a>): u64
+<pre><code><b>fun</b> <a href="../bridge/message.md#bridge_message_peel_u64_be">peel_u64_be</a>(bcs: &<b>mut</b> <a href="../sui/bcs.md#sui_bcs_BCS">one::bcs::BCS</a>): u64
 </code></pre>
 
 

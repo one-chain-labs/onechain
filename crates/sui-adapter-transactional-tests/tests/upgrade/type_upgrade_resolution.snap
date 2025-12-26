@@ -38,7 +38,7 @@ gas summary: computation_cost: 1000000, storage_cost: 6437200,  storage_rebate: 
 
 task 7, lines 39-41:
 //# programmable
-//> M::m::g<sui::coin::Coin<A1::a::Base>>();
-//> M::m::g<sui::coin::Coin<B2::b::BB<A2::a::Base>>>();
+//> M::m::g<one::coin::Coin<A1::a::Base>>();
+//> M::m::g<one::coin::Coin<B2::b::BB<A2::a::Base>>>();
 mutated: object(0,1)
 gas summary: computation_cost: 1000000, storage_cost: 988000,  storage_rebate: 0, non_refundable_storage_fee: 0

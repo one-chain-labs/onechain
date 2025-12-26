@@ -28,10 +28,10 @@ module examples::regulated_token {
     use examples::allowlist_rule::Allowlist;
     use examples::denylist_rule::Denylist;
     use examples::limiter_rule::{Self as limiter, Limiter};
-    use sui::coin::{Self, TreasuryCap};
-    use sui::token::{Self, TokenPolicy, TokenPolicyCap};
-    use sui::tx_context::sender;
-    use sui::vec_map;
+    use one::coin::{Self, TreasuryCap};
+    use one::token::{Self, TokenPolicy, TokenPolicyCap};
+    use one::tx_context::sender;
+    use one::vec_map;
 
     /// OTW and the type for the Token.
     public struct REGULATED_TOKEN has drop {}
@@ -112,9 +112,9 @@ module examples::regulated_token_tests {
     use examples::denylist_rule as denylist;
     use examples::limiter_rule as limiter;
     use examples::regulated_token::set_rules;
-    use sui::coin;
-    use sui::token::{Self, TokenPolicy, TokenPolicyCap};
-    use sui::token_test_utils::{Self as test, TEST};
+    use one::coin;
+    use one::token::{Self, TokenPolicy, TokenPolicyCap};
+    use one::token_test_utils::{Self as test, TEST};
 
     const ALICE: address = @0x0;
     const BOB: address = @0x1;

@@ -71,16 +71,16 @@ task 10, line 40:
 Owner: Account Address ( C )
 Version: 3
 Contents: sui_system::staking_pool::StakedOct {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(3,1),
         },
     },
-    pool_id: sui::object::ID {
+    pool_id: one::object::ID {
         bytes: _,
     },
     stake_activation_epoch: 1u64,
-    principal: sui::balance::Balance<sui::oct::OCT> {
+    principal: one::balance::Balance<one::oct::OCT> {
         value: 10000000000u64,
     },
 }
@@ -90,16 +90,16 @@ task 11, line 42:
 Owner: Account Address ( C )
 Version: 5
 Contents: sui_system::staking_pool::StakedOct {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(7,0),
         },
     },
-    pool_id: sui::object::ID {
+    pool_id: one::object::ID {
         bytes: _,
     },
     stake_activation_epoch: 2u64,
-    principal: sui::balance::Balance<sui::oct::OCT> {
+    principal: one::balance::Balance<one::oct::OCT> {
         value: 10000000000u64,
     },
 }

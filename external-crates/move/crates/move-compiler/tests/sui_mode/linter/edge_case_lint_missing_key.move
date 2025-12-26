@@ -2,7 +2,7 @@ module a::edge_cases {
     struct UID {}
     // Test case with a different UID type
     struct DifferentUID {
-        id: sui::another::UID,
+        id: one::another::UID,
     }
 
     struct NotAnObject {

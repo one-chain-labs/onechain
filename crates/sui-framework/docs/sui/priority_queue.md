@@ -1,5 +1,5 @@
 ---
-title: Module `sui::priority_queue`
+title: Module `one::priority_queue`
 ---
 
 Priority queue implemented using a max heap.
@@ -45,7 +45,7 @@ that the parent node's priority is always higher than its child nodes' prioritie
 
 <dl>
 <dt>
-<code>entries: vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">sui::priority_queue::Entry</a>&lt;T&gt;&gt;</code>
+<code>entries: vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">one::priority_queue::Entry</a>&lt;T&gt;&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -107,7 +107,7 @@ For when heap is empty and there's no data to pop.
 Create a new priority queue from the input entry vectors.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_new">new</a>&lt;T: drop&gt;(entries: vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">sui::priority_queue::Entry</a>&lt;T&gt;&gt;): <a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">sui::priority_queue::PriorityQueue</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_new">new</a>&lt;T: drop&gt;(entries: vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">one::priority_queue::Entry</a>&lt;T&gt;&gt;): <a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">one::priority_queue::PriorityQueue</a>&lt;T&gt;
 </code></pre>
 
 
@@ -139,7 +139,7 @@ Create a new priority queue from the input entry vectors.
 Pop the entry with the highest priority value.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_pop_max">pop_max</a>&lt;T: drop&gt;(pq: &<b>mut</b> <a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">sui::priority_queue::PriorityQueue</a>&lt;T&gt;): (u64, T)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_pop_max">pop_max</a>&lt;T: drop&gt;(pq: &<b>mut</b> <a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">one::priority_queue::PriorityQueue</a>&lt;T&gt;): (u64, T)
 </code></pre>
 
 
@@ -171,7 +171,7 @@ Pop the entry with the highest priority value.
 Insert a new entry into the queue.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_insert">insert</a>&lt;T: drop&gt;(pq: &<b>mut</b> <a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">sui::priority_queue::PriorityQueue</a>&lt;T&gt;, priority: u64, value: T)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_insert">insert</a>&lt;T: drop&gt;(pq: &<b>mut</b> <a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">one::priority_queue::PriorityQueue</a>&lt;T&gt;, priority: u64, value: T)
 </code></pre>
 
 
@@ -197,7 +197,7 @@ Insert a new entry into the queue.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_new_entry">new_entry</a>&lt;T: drop&gt;(priority: u64, value: T): <a href="../sui/priority_queue.md#sui_priority_queue_Entry">sui::priority_queue::Entry</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_new_entry">new_entry</a>&lt;T: drop&gt;(priority: u64, value: T): <a href="../sui/priority_queue.md#sui_priority_queue_Entry">one::priority_queue::Entry</a>&lt;T&gt;
 </code></pre>
 
 
@@ -221,7 +221,7 @@ Insert a new entry into the queue.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_create_entries">create_entries</a>&lt;T: drop&gt;(p: vector&lt;u64&gt;, v: vector&lt;T&gt;): vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">sui::priority_queue::Entry</a>&lt;T&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_create_entries">create_entries</a>&lt;T: drop&gt;(p: vector&lt;u64&gt;, v: vector&lt;T&gt;): vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">one::priority_queue::Entry</a>&lt;T&gt;&gt;
 </code></pre>
 
 
@@ -255,7 +255,7 @@ Insert a new entry into the queue.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_restore_heap_recursive">restore_heap_recursive</a>&lt;T: drop&gt;(v: &<b>mut</b> vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">sui::priority_queue::Entry</a>&lt;T&gt;&gt;, i: u64)
+<pre><code><b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_restore_heap_recursive">restore_heap_recursive</a>&lt;T: drop&gt;(v: &<b>mut</b> vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">one::priority_queue::Entry</a>&lt;T&gt;&gt;, i: u64)
 </code></pre>
 
 
@@ -293,7 +293,7 @@ This function assumes that all the other nodes in the subtree (nodes other than 
 do satisfy the max heap property.
 
 
-<pre><code><b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_max_heapify_recursive">max_heapify_recursive</a>&lt;T: drop&gt;(v: &<b>mut</b> vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">sui::priority_queue::Entry</a>&lt;T&gt;&gt;, len: u64, i: u64)
+<pre><code><b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_max_heapify_recursive">max_heapify_recursive</a>&lt;T: drop&gt;(v: &<b>mut</b> vector&lt;<a href="../sui/priority_queue.md#sui_priority_queue_Entry">one::priority_queue::Entry</a>&lt;T&gt;&gt;, len: u64, i: u64)
 </code></pre>
 
 
@@ -339,7 +339,7 @@ do satisfy the max heap property.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_priorities">priorities</a>&lt;T: drop&gt;(pq: &<a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">sui::priority_queue::PriorityQueue</a>&lt;T&gt;): vector&lt;u64&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/priority_queue.md#sui_priority_queue_priorities">priorities</a>&lt;T: drop&gt;(pq: &<a href="../sui/priority_queue.md#sui_priority_queue_PriorityQueue">one::priority_queue::PriorityQueue</a>&lt;T&gt;): vector&lt;u64&gt;
 </code></pre>
 
 

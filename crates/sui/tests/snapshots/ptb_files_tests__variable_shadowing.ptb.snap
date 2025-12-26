@@ -9,7 +9,7 @@ expression: "results.join(\"\\n\")"
 │ command       │ values                                   │
 ├───────────────┼──────────────────────────────────────────┤
 │ assign        │ s @0x1                                   │
-│ move-call     │ sui::coin::destroy_zero<sui::oct::OCT> s │
+│ move-call     │ one::coin::destroy_zero<one::oct::OCT> s │
 │ assign        │ s @0x2                                   │
 │ make-move-vec │ <address> [s]                            │
 ╰───────────────┴──────────────────────────────────────────╯

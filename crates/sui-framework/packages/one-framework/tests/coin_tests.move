@@ -4,11 +4,11 @@
 #[test_only, allow(deprecated_usage)]
 module oct::coin_tests;
 
-use sui::coin::{Self, Coin};
-use sui::deny_list;
-use sui::pay;
-use sui::test_scenario;
-use sui::url;
+use one::coin::{Self, Coin};
+use one::deny_list;
+use one::pay;
+use one::test_scenario;
+use one::url;
 
 public struct COIN_TESTS has drop {}
 
@@ -21,7 +21,7 @@ fun assert_status(
     contains_next_epoch: bool,
     ctx: &TxContext,
 ) {
-    use sui::coin::{
+    use one::coin::{
         deny_list_v2_contains_next_epoch as contains_next_epoch,
         deny_list_v2_contains_current_epoch as contains_current_epoch,
     };
@@ -35,7 +35,7 @@ fun assert_global(
     paused_next_epoch: bool,
     ctx: &TxContext,
 ) {
-    use sui::coin::{
+    use one::coin::{
         deny_list_v2_is_global_pause_enabled_next_epoch as is_global_pause_enabled_next_epoch,
         deny_list_v2_is_global_pause_enabled_current_epoch as is_global_pause_enabled_current_epoch,
     };
@@ -212,7 +212,7 @@ fun deny_list_v1_double_add() {
 
 #[test]
 fun deny_list_v2() {
-    use sui::coin::{deny_list_v2_add as add, deny_list_v2_remove as remove};
+    use one::coin::{deny_list_v2_add as add, deny_list_v2_remove as remove};
     let mut scenario = test_scenario::begin(@0);
     deny_list::create_for_test(scenario.ctx());
     scenario.next_tx(TEST_ADDR);
@@ -284,7 +284,7 @@ fun deny_list_v2() {
 
 #[test]
 fun deny_list_v2_global_pause() {
-    use sui::coin::{
+    use one::coin::{
         deny_list_v2_add as add,
         deny_list_v2_remove as remove,
         deny_list_v2_enable_global_pause as enable_global_pause,
@@ -361,7 +361,7 @@ fun deny_list_v2_global_pause() {
 
 #[test]
 fun deny_list_v2_double_add() {
-    use sui::coin::{deny_list_v2_add as add, deny_list_v2_remove as remove};
+    use one::coin::{deny_list_v2_add as add, deny_list_v2_remove as remove};
     let mut scenario = test_scenario::begin(@0);
     deny_list::create_for_test(scenario.ctx());
     scenario.next_tx(TEST_ADDR);
@@ -396,7 +396,7 @@ fun deny_list_v2_double_add() {
     scenario.end();
 }
 
-#[test, expected_failure(abort_code = sui::coin::EGlobalPauseNotAllowed)]
+#[test, expected_failure(abort_code = one::coin::EGlobalPauseNotAllowed)]
 fun deny_list_v2_global_pause_not_allowed_enable() {
     let mut scenario = test_scenario::begin(@0);
     deny_list::create_for_test(scenario.ctx());
@@ -418,7 +418,7 @@ fun deny_list_v2_global_pause_not_allowed_enable() {
     abort 0
 }
 
-#[test, expected_failure(abort_code = sui::coin::EGlobalPauseNotAllowed)]
+#[test, expected_failure(abort_code = one::coin::EGlobalPauseNotAllowed)]
 fun deny_list_v2_global_pause_not_allowed_disable() {
     let mut scenario = test_scenario::begin(@0);
     deny_list::create_for_test(scenario.ctx());
@@ -504,7 +504,7 @@ fun migrate_regulated_currency_to_v2() {
     scenario.end();
 }
 
-#[test, expected_failure(abort_code = sui::coin::EGlobalPauseNotAllowed)]
+#[test, expected_failure(abort_code = one::coin::EGlobalPauseNotAllowed)]
 fun migrate_regulated_currency_to_v2_disallow_global_pause() {
     let mut scenario = test_scenario::begin(@0);
     deny_list::create_for_test(scenario.ctx());
@@ -556,7 +556,7 @@ fun migrate_regulated_currency_to_v2_disallow_global_pause() {
 
 #[test]
 fun deny_list_v2_add_remove() {
-    use sui::coin::{deny_list_v2_add as add, deny_list_v2_remove as remove};
+    use one::coin::{deny_list_v2_add as add, deny_list_v2_remove as remove};
     let mut scenario = test_scenario::begin(@0);
     deny_list::create_for_test(scenario.ctx());
     scenario.next_tx(TEST_ADDR);

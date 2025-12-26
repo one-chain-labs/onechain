@@ -10,7 +10,7 @@ module Test::M1 {
    }
 
    fun init(ctx: &mut TxContext) { 
-       sui::transfer::transfer(X { id: object::new(ctx) }, ctx.sender());
+       one::transfer::transfer(X { id: object::new(ctx) }, ctx.sender());
    }
 }
 

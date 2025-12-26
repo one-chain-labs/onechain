@@ -9,8 +9,8 @@
 /// 3) Verify a Secp256k1 signature, produce an event for whether it is verified.
 module ecdsa_k1::example;
 
-use sui::ecdsa_k1;
-use sui::event;
+use one::ecdsa_k1;
+use one::event;
 
 // === Object Types ===
 
@@ -33,7 +33,7 @@ public struct VerifiedEvent has copy, drop {
 public fun keccak256(data: vector<u8>, recipient: address, ctx: &mut TxContext) {
     let hashed = Output {
         id: object::new(ctx),
-        value: sui::hash::keccak256(&data),
+        value: one::hash::keccak256(&data),
     };
     // Transfer an output data object holding the hashed data to the recipient.
     transfer::public_transfer(hashed, recipient)
@@ -89,7 +89,7 @@ public fun ecrecover_to_eth_address(
     };
 
     // Take the last 20 bytes of the hash of the 64-bytes uncompressed pubkey.
-    let hashed = sui::hash::keccak256(&uncompressed_64);
+    let hashed = one::hash::keccak256(&uncompressed_64);
     let mut addr = vector[];
     let mut i = 12;
     while (i < 32) {

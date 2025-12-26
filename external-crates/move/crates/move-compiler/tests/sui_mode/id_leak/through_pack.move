@@ -1,7 +1,7 @@
 // not allowed since C is not packed with a fresh UID
 module b::test {
-    use sui::object::UID;
-    use sui::transfer::transfer;
+    use one::object::UID;
+    use one::transfer::transfer;
 
     struct A has key {
         id: UID
@@ -26,7 +26,7 @@ module b::test {
 
 // allowed since Bar does not have key
 module a::m {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Foo has key {
         id: UID,

@@ -1,5 +1,5 @@
 ---
-title: Module `sui::types`
+title: Module `one::types`
 ---
 
 Sui types helpers and utilities

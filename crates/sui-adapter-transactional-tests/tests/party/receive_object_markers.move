@@ -24,7 +24,7 @@ public fun mint(ctx: &mut TxContext) {
     transfer::public_transfer(b2, a_address);
 }
 
-public fun receive(parent: &mut A, x: sui::transfer::Receiving<B>, addr: address) {
+public fun receive(parent: &mut A, x: one::transfer::Receiving<B>, addr: address) {
     let b = transfer::receive(&mut parent.id, x);
     transfer::public_transfer(b, addr);
 }
@@ -56,8 +56,8 @@ public fun delete(b: B) {
 //# run ex::m::receive --args object(2,0) receiving(2,1) @A
 
 //# programmable --inputs object(2,1) @A --sender A
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::B>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::B>(Input(0), Result(0))
 
 
 //# run ex::m::receive --args object(2,0) receiving(2,1)@3 @A
@@ -74,8 +74,8 @@ public fun delete(b: B) {
 //# run ex::m::receive --args object(2,0) receiving(2,2) @A
 
 //# programmable --inputs object(2,2) @A --sender A
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::B>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::B>(Input(0), Result(0))
 
 //# run ex::m::delete --args object(2,2) --sender A
 

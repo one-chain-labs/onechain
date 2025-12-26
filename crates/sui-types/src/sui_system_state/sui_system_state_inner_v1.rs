@@ -39,7 +39,7 @@ const E_METADATA_INVALID_P2P_ADDR: u64 = 5;
 const E_METADATA_INVALID_PRIMARY_ADDR: u64 = 6;
 const E_METADATA_INVALID_WORKER_ADDR: u64 = 7;
 
-/// Rust version of the Move sui::sui_system::SystemParameters type
+/// Rust version of the Move one::sui_system::SystemParameters type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SystemParametersV1 {
     /// The duration of an epoch, in milliseconds.
@@ -264,7 +264,7 @@ impl ValidatorMetadataV1 {
     }
 }
 
-/// Rust version of the Move sui::validator::Validator type
+/// Rust version of the Move one::validator::Validator type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ValidatorV1 {
     //metadata: ValidatorMetadataV1,

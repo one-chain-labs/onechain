@@ -6,7 +6,7 @@
 module oct::authenticator_state_tests;
 
 use std::string::String;
-use sui::authenticator_state::{
+use one::authenticator_state::{
     Self,
     AuthenticatorState,
     create_active_jwk,
@@ -15,7 +15,7 @@ use sui::authenticator_state::{
     expire_jwks_for_testing,
     ActiveJwk
 };
-use sui::test_scenario;
+use one::test_scenario;
 
 #[test]
 fun authenticator_state_tests_basic() {

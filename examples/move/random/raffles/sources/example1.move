@@ -10,11 +10,11 @@
 
 module raffles::example1;
 
-use sui::balance::{Self, Balance};
-use sui::clock::Clock;
-use sui::coin::{Self, Coin};
-use sui::random::{Random, new_generator};
-use sui::oct::OCT;
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::random::{Random, new_generator};
+use one::oct::OCT;
 
 /// Error codes
 const EGameInProgress: u64 = 0;

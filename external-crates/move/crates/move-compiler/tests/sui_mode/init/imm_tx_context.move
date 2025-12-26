@@ -1,6 +1,6 @@
 // TxContext can be immutable, even for init
 module a::m {
-    use sui::tx_context;
+    use one::tx_context;
     fun init(_ctx: &tx_context::TxContext) {
         abort 0
     }

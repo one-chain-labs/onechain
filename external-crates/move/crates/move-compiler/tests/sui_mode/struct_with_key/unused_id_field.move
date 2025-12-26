@@ -1,5 +1,5 @@
 module a::m {
-    struct Obj has key { id: sui::object::UID }
+    struct Obj has key { id: one::object::UID }
 }
 
 module oct::object {

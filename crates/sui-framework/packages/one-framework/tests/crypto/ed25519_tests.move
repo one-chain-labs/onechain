@@ -4,7 +4,7 @@
 #[test_only]
 module oct::ed25519_tests;
 
-use sui::ed25519;
+use one::ed25519;
 
 #[test]
 fun test_ed25519_valid_sig() {

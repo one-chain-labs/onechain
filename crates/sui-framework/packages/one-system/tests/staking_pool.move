@@ -5,9 +5,9 @@
 module oct_system::staking_pool_tests;
 
 use std::unit_test::assert_eq;
-use sui::balance;
-use sui::test_scenario::{Self, Scenario};
-use sui::test_utils::destroy;
+use one::balance;
+use one::test_scenario::{Self, Scenario};
+use one::test_utils::destroy;
 use one_system::staking_pool::{Self, StakingPool};
 
 #[test]
@@ -430,9 +430,9 @@ fun distribute_rewards_and_advance_epoch(
     scenario: &mut Scenario,
     reward_amount: u64,
 ): u64 {
-    use sui::tx_context::{epoch};
-    use sui::coin::{Self};
-    use sui::oct::OCT;
+    use one::tx_context::{epoch};
+    use one::coin::{Self};
+    use one::oct::OCT;
 
     let rewards = coin::mint_for_testing<SUI>(reward_amount, scenario.ctx());
     staking_pool.deposit_rewards(coin::into_balance(rewards));

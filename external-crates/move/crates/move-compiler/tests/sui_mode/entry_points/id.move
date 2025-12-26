@@ -1,7 +1,7 @@
 // valid, ID is allowed
 
 module a::m {
-    use sui::object;
+    use one::object;
 
     public entry fun yes<T>(
         _: object::ID,

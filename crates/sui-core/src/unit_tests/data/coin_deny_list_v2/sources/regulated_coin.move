@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module coin_deny_list_v2::regulated_coin {
-    use sui::coin;
+    use one::coin;
 
     public struct REGULATED_COIN has drop {}
 

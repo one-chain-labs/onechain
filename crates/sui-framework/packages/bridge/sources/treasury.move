@@ -5,14 +5,14 @@ module bridge::treasury;
 
 use std::ascii::{Self, String};
 use std::type_name::{Self, TypeName};
-use sui::address;
-use sui::bag::{Self, Bag};
-use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
-use sui::event;
-use sui::hex;
-use sui::object_bag::{Self, ObjectBag};
-use sui::package::{Self, UpgradeCap};
-use sui::vec_map::{Self, VecMap};
+use one::address;
+use one::bag::{Self, Bag};
+use one::coin::{Self, Coin, TreasuryCap, CoinMetadata};
+use one::event;
+use one::hex;
+use one::object_bag::{Self, ObjectBag};
+use one::package::{Self, UpgradeCap};
+use one::vec_map::{Self, VecMap};
 
 const EUnsupportedTokenType: u64 = 1;
 const EInvalidUpgradeCap: u64 = 2;

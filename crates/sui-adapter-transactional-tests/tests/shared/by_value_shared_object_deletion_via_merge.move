@@ -13,10 +13,10 @@
 //# publish
 
 module t2::o2 {
-    use sui::dynamic_field as df;
-    use sui::dynamic_object_field as dof;
-    use sui::oct::OCT;
-    use sui::coin::{Self, Coin};
+    use one::dynamic_field as df;
+    use one::dynamic_object_field as dof;
+    use one::oct::OCT;
+    use one::coin::{Self, Coin};
 
     public struct Obj2 has key, store {
         id: UID,

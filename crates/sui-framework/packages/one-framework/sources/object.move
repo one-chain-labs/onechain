@@ -5,7 +5,7 @@
 module oct::object;
 
 use std::bcs;
-use sui::address;
+use one::address;
 
 /// Allows calling `.to_address` on an `ID` to get an `address`.
 public use fun id_to_address as ID.to_address;

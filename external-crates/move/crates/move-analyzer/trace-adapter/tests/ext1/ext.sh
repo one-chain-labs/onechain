@@ -8,7 +8,7 @@ T_CAP=0x7c7a911c304caebdca09a4df1cc8e47a328c066baa9bec4711fe0c7f46b406c7
 
 
 sui client ptb \
-    --move-call sui::tx_context::sender \
+    --move-call one::tx_context::sender \
     --assign sender \
     --publish "../package_with_init" \
     --assign upgrade_cap \
@@ -20,6 +20,6 @@ sui client ptb \
     --split-coins coin "[100,100,100,100,100]" \
     --assign new_coins \
     --merge-coins new_coins.0 "[new_coins.1,new_coins.2]" \
-    --make-move-vec "<sui::coin::Coin<$PKG_ID::my_coin::MY_COIN>>" "[coin,new_coins.0,new_coins.3,new_coins.4]" \
+    --make-move-vec "<one::coin::Coin<$PKG_ID::my_coin::MY_COIN>>" "[coin,new_coins.0,new_coins.3,new_coins.4]" \
     --assign coins_to_burn \
     --move-call $PKG_ID::my_coin::burn @$T_CAP coins_to_burn

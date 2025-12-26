@@ -11,7 +11,7 @@
 /// struct is created which can be used to prove that the `T` was placed
 /// to the `Kiosk`.
 module oct::witness_policy {
-    use sui::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
+    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
 
     /// When a Proof does not find its Rule<Proof>.
     const ERuleNotFound: u64 = 0;
@@ -42,9 +42,9 @@ module oct::witness_policy {
 
 #[test_only]
 module oct::witness_policy_tests {
-    use sui::transfer_policy as policy;
-    use sui::transfer_policy_tests::{Self as test, Asset};
-    use sui::witness_policy;
+    use one::transfer_policy as policy;
+    use one::transfer_policy_tests::{Self as test, Asset};
+    use one::witness_policy;
 
     /// Confirmation of an action to use in Policy.
     public struct Proof has drop {}
@@ -68,7 +68,7 @@ module oct::witness_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::transfer_policy::EPolicyNotSatisfied)]
+    #[expected_failure(abort_code = one::transfer_policy::EPolicyNotSatisfied)]
     fun test_no_proof() {
         let ctx = &mut tx_context::dummy();
         let (mut policy, cap) = test::prepare(ctx);
@@ -82,7 +82,7 @@ module oct::witness_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::witness_policy::ERuleNotFound)]
+    #[expected_failure(abort_code = one::witness_policy::ERuleNotFound)]
     fun test_wrong_proof() {
         let ctx = &mut tx_context::dummy();
         let (mut policy, cap) = test::prepare(ctx);

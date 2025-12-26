@@ -3943,7 +3943,7 @@
                 "stakingPool": "0x9a95cf69368e31b4dbe8ee9bdb3c0587bbc79d8fc6edf4007e185a962fd906df",
                 "stakes": [
                   {
-                    "stakedSuiId": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
+                    "StakedOctId": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
                     "stakeRequestEpoch": "62",
                     "stakeActiveEpoch": "63",
                     "principal": "200000000000",
@@ -3951,7 +3951,7 @@
                     "estimatedReward": "520000000"
                   },
                   {
-                    "stakedSuiId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
+                    "StakedOctId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
                     "stakeRequestEpoch": "142",
                     "stakeActiveEpoch": "143",
                     "principal": "200000000000",
@@ -3964,7 +3964,7 @@
                 "stakingPool": "0x14cc7fee4100fdcabda6d15c63c4b49c45ae23f2b936495cd38b1a4b04010295",
                 "stakes": [
                   {
-                    "stakedSuiId": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
+                    "StakedOctId": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
                     "stakeRequestEpoch": "244",
                     "stakeActiveEpoch": "245",
                     "principal": "200000000000",
@@ -4026,7 +4026,7 @@
               "stakingPool": "0x63ee67e81398729f87d81d62f399c041b0f8d0938923ea7e3917608ee62df437",
               "stakes": [
                 {
-                  "stakedSuiId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
+                  "StakedOctId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
                   "stakeRequestEpoch": "62",
                   "stakeActiveEpoch": "63",
                   "principal": "200000000000",
@@ -4034,7 +4034,7 @@
                   "estimatedReward": "520000000"
                 },
                 {
-                  "stakedSuiId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
+                  "StakedOctId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
                   "stakeRequestEpoch": "244",
                   "stakeActiveEpoch": "245",
                   "principal": "200000000000",
@@ -8511,7 +8511,7 @@
           "principal",
           "stakeActiveEpoch",
           "stakeRequestEpoch",
-          "stakedSuiId"
+          "StakedOctId"
         ],
         "properties": {
           "principal": {
@@ -8523,7 +8523,7 @@
           "stakeRequestEpoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
-          "stakedSuiId": {
+          "StakedOctId": {
             "description": "ID of the StakedOct receipt object.",
             "allOf": [
               {

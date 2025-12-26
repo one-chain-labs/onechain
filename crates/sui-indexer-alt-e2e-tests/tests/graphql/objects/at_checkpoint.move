@@ -5,8 +5,8 @@
 
 //# publish
 module P::M {
-  use sui::coin::Coin;
-  use sui::oct::OCT;
+  use one::coin::Coin;
+  use one::oct::OCT;
 
   public struct Wrapper has key, store {
     id: UID,

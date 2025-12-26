@@ -22,16 +22,16 @@ StakingPool
 PoolTokenExchangeRate
 	public struct
 	0x3::staking_pool
-StakedSui
+StakedOct
 	public struct
 	0x3::staking_pool
-FungibleStakedSui
+FungibleStakedOct
 	public struct
 	0x3::staking_pool
-FungibleStakedSuiData
+FungibleStakedOctData
 	public struct
 	0x3::staking_pool
-FungibleStakedSuiDataKey
+FungibleStakedOctDataKey
 	public struct
 	0x3::staking_pool
 new
@@ -172,10 +172,10 @@ StakingRequestEvent
 UnstakingRequestEvent
 	public struct
 	0x3::validator
-ConvertingToFungibleStakedSuiEvent
+ConvertingToFungibleStakedOctEvent
 	public struct
 	0x3::validator
-RedeemingFungibleStakedSuiEvent
+RedeemingFungibleStakedOctEvent
 	public struct
 	0x3::validator
 new_metadata

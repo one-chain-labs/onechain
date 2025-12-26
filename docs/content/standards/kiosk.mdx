@@ -163,7 +163,7 @@ There's no limitations on which assets you can place in your kiosk. However, you
 
 ### Place an item in your kiosk
 
-To place an item to the kiosk, the owner needs to call the `sui::kiosk::place` function on the `Kiosk` object and pass the `KioskOwnerCap` and the `Item` as arguments.
+To place an item to the kiosk, the owner needs to call the `one::kiosk::place` function on the `Kiosk` object and pass the `KioskOwnerCap` and the `Item` as arguments.
 
 `ITEM_TYPE` in the following examples represents the full type of the item.
 
@@ -197,7 +197,7 @@ $ sui client call \
 
 ## Take items from a kiosk
 
-To take an item from a kiosk you must be the kiosk owner. As the owner, call the `sui::kiosk::take` function on the `Kiosk` object, and pass the `KioskOwnerCap` and `ID` of the item as arguments.
+To take an item from a kiosk you must be the kiosk owner. As the owner, call the `one::kiosk::take` function on the `Kiosk` object, and pass the `KioskOwnerCap` and `ID` of the item as arguments.
 
 `ITEM_TYPE` in the following examples represents the full type of the item.
 
@@ -225,7 +225,7 @@ The `kiosk::take` function is built to be PTB friendly and returns the asset. Th
 
 Some policies require that assets never get removed from a kiosk, such as for strong royalty enforcement. To support this, Sui Kiosk provides a locking mechanism. Locking is similar to placing except that you can't take a locked asset out of the kiosk.
 
-To lock an asset in a kiosk, call the `sui::kiosk::lock` function. To ensure that you can later unlock the asset you must associate a `TransferPolicy` with the asset.
+To lock an asset in a kiosk, call the `one::kiosk::lock` function. To ensure that you can later unlock the asset you must associate a `TransferPolicy` with the asset.
 
 :::info
 
@@ -374,7 +374,7 @@ You can always borrow an asset from a kiosk immutably. You can use the `kiosk::b
 ```move
 module examples::immutable_borrow;
 
-use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
+use one::kiosk::{Self, Kiosk, KioskOwnerCap};
 
 public fun immutable_borrow_example<T>(self: &Kiosk, cap: &KioskOwnerCap, item_id: ID): &T {
     self.borrow(cap, item_id)
@@ -390,7 +390,7 @@ You can mutably borrow an asset from a kiosk if it is not listed. You can use th
 ```move
 module examples::mutable_borrow;
 
-use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
+use one::kiosk::{Self, Kiosk, KioskOwnerCap};
 
 public fun mutable_borrow_example<T>(
     self: &mut Kiosk, cap: &KioskOwnerCap, item_id: ID

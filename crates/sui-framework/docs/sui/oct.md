@@ -100,12 +100,12 @@ The amount of Mist per Oct token based on the fact that mist is
 
 
 
-<a name="sui_sui_TOTAL_SUPPLY_SUI"></a>
+<a name="sui_sui_TOTAL_SUPPLY_OCT"></a>
 
 The total supply of Oct denominated in whole Oct tokens (10 Billion)
 
 
-<pre><code><b>const</b> <a href="../oct/oct.md#sui_sui_TOTAL_SUPPLY_SUI">TOTAL_SUPPLY_SUI</a>: u64 = 10000000000;
+<pre><code><b>const</b> <a href="../oct/oct.md#sui_sui_TOTAL_SUPPLY_OCT">TOTAL_SUPPLY_OCT</a>: u64 = 10000000000;
 </code></pre>
 
 

@@ -5,7 +5,7 @@
 
 //# publish
 module test::events_test {
-    use sui::event;
+    use one::event;
 
     public struct TestEvent has copy, drop {
         message: vector<u8>,

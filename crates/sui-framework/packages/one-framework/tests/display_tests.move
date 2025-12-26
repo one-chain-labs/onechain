@@ -5,9 +5,9 @@
 module oct::display_tests;
 
 use std::string::String;
-use sui::display;
-use sui::package;
-use sui::test_scenario as test;
+use one::display;
+use one::package;
+use one::test_scenario as test;
 
 #[allow(unused_field)]
 /// An example object.

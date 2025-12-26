@@ -4,7 +4,7 @@
 #[test_only]
 module oct::hmac_tests;
 
-use sui::hmac;
+use one::hmac;
 
 #[test]
 fun test_hmac_sha3_256() {

@@ -23,14 +23,14 @@ public fun mint(ctx: &mut TxContext) {
 
 public fun create_party(ctx: &mut TxContext) {
     let p = Pub { id: object::new(ctx) };
-    transfer::public_party_transfer(p, sui::party::single_owner(@0))
+    transfer::public_party_transfer(p, one::party::single_owner(@0))
 }
 
-public fun pub_party(obj: Pub, p: sui::party::Party) {
+public fun pub_party(obj: Pub, p: one::party::Party) {
     transfer::public_party_transfer(obj, p)
 }
 
-public fun priv_party(obj: Priv, p: sui::party::Party) {
+public fun priv_party(obj: Priv, p: one::party::Party) {
     transfer::party_transfer(obj, p)
 }
 
@@ -51,34 +51,34 @@ public fun priv_fastpath(obj: Priv, addr: address) {
 
 // Transfers from fastpath to party via `party_transfer` on a struct without store
 //# programmable --inputs object(2,0) @A
-//> 0: sui::party::single_owner(Input(1));
+//> 0: one::party::single_owner(Input(1));
 //> ex::m::priv_party(Input(0), Result(0))
 
 //# view-object 2,0
 
 // Transfers from fastpath to party via `public_party_transfer` on a struct with store
 //# programmable --inputs object(2,1) @A
-//> 0: sui::party::single_owner(Input(1));
+//> 0: one::party::single_owner(Input(1));
 //> ex::m::pub_party(Input(0), Result(0))
 
 //# view-object 2,1
 
 // Transfers a party object with wrong sender; should fail
 //# programmable --inputs object(2,1) @A --sender B
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::Pub>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::Pub>(Input(0), Result(0))
 
 // Transfers an existing party object back to party again
 //# programmable --inputs object(2,1) @A --sender A
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::Pub>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::Pub>(Input(0), Result(0))
 
 //# view-object 2,1
 
 // Transfers an existing party object to a different owner; start_version should update
 //# programmable --inputs object(2,1) @B --sender A
-//> 0: sui::party::single_owner(Input(1));
-//> sui::transfer::public_party_transfer<ex::m::Pub>(Input(0), Result(0))
+//> 0: one::party::single_owner(Input(1));
+//> one::transfer::public_party_transfer<ex::m::Pub>(Input(0), Result(0))
 
 //# view-object 2,1
 

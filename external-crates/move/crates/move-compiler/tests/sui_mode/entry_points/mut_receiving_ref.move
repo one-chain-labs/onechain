@@ -1,8 +1,8 @@
 // valid, Receiving type by mut ref with object type param
 
 module a::m {
-    use sui::object;
-    use sui::transfer::Receiving;
+    use one::object;
+    use one::transfer::Receiving;
 
     struct S has key { id: object::UID }
 

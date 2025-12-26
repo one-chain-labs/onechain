@@ -22,7 +22,7 @@ mutated: object(0,0)
 gas summary: computation_cost: 1000000, storage_cost: 1976000,  storage_rebate: 0, non_refundable_storage_fee: 0
 
 task 3, line 31:
-//# run sui::pay::split_and_transfer --type-args sui::oct::OCT --args object(2,0) 1000 @A --sender A
+//# run one::pay::split_and_transfer --type-args one::oct::OCT --args object(2,0) 1000 @A --sender A
 created: object(3,0)
 mutated: object(0,0), object(2,0)
 gas summary: computation_cost: 1000000, storage_cost: 2964000,  storage_rebate: 1956240, non_refundable_storage_fee: 19760
@@ -31,13 +31,13 @@ task 4, lines 33-35:
 //# view-object 3,0
 Owner: Account Address ( A )
 Version: 3
-Contents: sui::coin::Coin<sui::oct::OCT> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<one::oct::OCT> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(3,0),
         },
     },
-    balance: sui::balance::Balance<sui::oct::OCT> {
+    balance: one::balance::Balance<one::oct::OCT> {
         value: 1000u64,
     },
 }

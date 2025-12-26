@@ -3,8 +3,8 @@
 
 module oct_system::storage_fund;
 
-use sui::balance::{Self, Balance};
-use sui::oct::OCT;
+use one::balance::{Self, Balance};
+use one::oct::OCT;
 
 /// Struct representing the storage fund, containing two `Balance`s:
 /// - `total_object_storage_rebates` has the invariant that it's the sum of `storage_rebate` of

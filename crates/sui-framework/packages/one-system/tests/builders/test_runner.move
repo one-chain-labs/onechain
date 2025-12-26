@@ -6,10 +6,10 @@
 /// provides a set of convenience methods for testing the Sui System.
 module oct_system::test_runner;
 
-use sui::balance::{Self, Balance};
-use sui::coin::{Self, Coin};
-use sui::oct::OCT;
-use sui::test_scenario::{Self, Scenario};
+use one::balance::{Self, Balance};
+use one::coin::{Self, Coin};
+use one::oct::OCT;
+use one::test_scenario::{Self, Scenario};
 use one_system::stake_subsidy;
 use one_system::staking_pool::StakedOct;
 use one_system::one_system::{Self, SuiSystemState};
@@ -333,7 +333,7 @@ public fun mint(amount: u64): Balance<OCT> {
 
 /// Destroy an object.
 public fun destroy<T>(v: T) {
-    sui::test_utils::destroy(v);
+    one::test_utils::destroy(v);
 }
 
 /// Finish the test runner.

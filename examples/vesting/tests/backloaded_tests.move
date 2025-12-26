@@ -4,10 +4,10 @@
 #[test_only]
 module vesting::backloaded_tests;
 
-use sui::clock;
-use sui::coin;
-use sui::oct::OCT;
-use sui::test_scenario as ts;
+use one::clock;
+use one::coin;
+use one::oct::OCT;
+use one::test_scenario as ts;
 use vesting::backloaded::{Self, new_wallet, Wallet};
 
 public struct Token has key, store { id: UID }
@@ -136,7 +136,7 @@ fun test_backloaded_claimable() {
     now.increment_for_testing(100);
     assert!(wallet.claimable(&now) == FULLY_VESTED_AMOUNT - coin.value());
 
-    sui::test_utils::destroy(coin);
+    one::test_utils::destroy(coin);
     ts.return_to_sender(wallet);
     now.destroy_for_testing();
     let _end = ts::end(ts);

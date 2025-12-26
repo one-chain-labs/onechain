@@ -4,7 +4,7 @@
 #[test_only]
 module oct::clock_tests;
 
-use sui::clock;
+use one::clock;
 
 #[test]
 fun creating_a_clock_and_incrementing_it() {

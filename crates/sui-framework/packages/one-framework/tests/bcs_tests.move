@@ -5,7 +5,7 @@
 module oct::bcs_tests;
 
 use std::unit_test::assert_eq;
-use sui::bcs::{Self, BCS, to_bytes, new};
+use one::bcs::{Self, BCS, to_bytes, new};
 
 const U8_MAX: u8 = 0xFF;
 const U16_MAX: u16 = 0xFFFF;

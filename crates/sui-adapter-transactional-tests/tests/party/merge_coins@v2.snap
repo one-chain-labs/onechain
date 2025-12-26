@@ -14,11 +14,11 @@ gas summary: computation_cost: 1000000, storage_cost: 10366400,  storage_rebate:
 
 task 2, lines 20-25:
 //# programmable --sender A --inputs object(1,2) 100 @A
-//> 0: sui::coin::mint<ex::m::M>(Input(0), Input(1));
-//> 1: sui::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 0: one::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 1: one::coin::mint<ex::m::M>(Input(0), Input(1));
 //> 2: TransferObjects([Result(0)], Input(2));
-//> 3: sui::party::single_owner(Input(2));
-//> sui::transfer::public_party_transfer<sui::coin::Coin<ex::m::M>>(Result(1), Result(3))
+//> 3: one::party::single_owner(Input(2));
+//> one::transfer::public_party_transfer<one::coin::Coin<ex::m::M>>(Result(1), Result(3))
 created: object(2,0), object(2,1)
 mutated: object(0,0), object(1,2)
 unchanged_shared: 0x0000000000000000000000000000000000000000000000000000000000000403
@@ -36,24 +36,24 @@ task 4, lines 30-32:
 //# view-object 2,1
 Owner: Account Address ( A )
 Version: 4
-Contents: sui::coin::Coin<ex::m::M> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<ex::m::M> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },
-    balance: sui::balance::Balance<ex::m::M> {
+    balance: one::balance::Balance<ex::m::M> {
         value: 200u64,
     },
 }
 
 task 5, lines 33-38:
 //# programmable --sender A --inputs object(1,2) 100 @A
-//> 0: sui::coin::mint<ex::m::M>(Input(0), Input(1));
-//> 1: sui::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 0: one::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 1: one::coin::mint<ex::m::M>(Input(0), Input(1));
 //> 2: TransferObjects([Result(0)], Input(2));
-//> 3: sui::party::single_owner(Input(2));
-//> sui::transfer::public_party_transfer<sui::coin::Coin<ex::m::M>>(Result(1), Result(3))
+//> 3: one::party::single_owner(Input(2));
+//> one::transfer::public_party_transfer<one::coin::Coin<ex::m::M>>(Result(1), Result(3))
 created: object(5,0), object(5,1)
 mutated: object(0,0), object(1,2)
 unchanged_shared: 0x0000000000000000000000000000000000000000000000000000000000000403
@@ -70,13 +70,13 @@ task 7, line 43:
 //# view-object 5,0
 Owner: ConsensusAddressOwner( 5, A )
 Version: 6
-Contents: sui::coin::Coin<ex::m::M> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::coin::Coin<ex::m::M> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(5,0),
         },
     },
-    balance: sui::balance::Balance<ex::m::M> {
+    balance: one::balance::Balance<ex::m::M> {
         value: 200u64,
     },
 }

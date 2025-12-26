@@ -19,14 +19,14 @@ use bridge::message::{
 };
 use bridge::message_types;
 use bridge::treasury::{Self, BridgeTreasury};
-use sui::address;
-use sui::clock::Clock;
-use sui::coin::{Coin, TreasuryCap, CoinMetadata};
-use sui::event;
-use sui::linked_table::{Self, LinkedTable};
-use sui::package::UpgradeCap;
-use sui::vec_map::{Self, VecMap};
-use sui::versioned::{Self, Versioned};
+use one::address;
+use one::clock::Clock;
+use one::coin::{Coin, TreasuryCap, CoinMetadata};
+use one::event;
+use one::linked_table::{Self, LinkedTable};
+use one::package::UpgradeCap;
+use one::vec_map::{Self, VecMap};
+use one::versioned::{Self, Versioned};
 use one_system::one_system::SuiSystemState;
 
 const MESSAGE_VERSION: u8 = 1;

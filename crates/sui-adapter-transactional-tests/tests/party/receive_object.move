@@ -21,22 +21,22 @@ public fun mint(ctx: &mut TxContext) {
     let party_address = object::id_address(&party_parent);
 
     transfer::public_transfer(fastpath_parent, tx_context::sender(ctx));
-    transfer::public_party_transfer(party_parent, sui::party::single_owner(tx_context::sender(ctx)));
+    transfer::public_party_transfer(party_parent, one::party::single_owner(tx_context::sender(ctx)));
 
     let fastpath_child_fastpath_parent = PubB { id: object::new(ctx) };
     let fastpath_child_party_parent = PubB { id: object::new(ctx) };
 
     transfer::public_transfer(fastpath_child_fastpath_parent, fastpath_address);
-    transfer::public_party_transfer(fastpath_child_party_parent, sui::party::single_owner(fastpath_address));
+    transfer::public_party_transfer(fastpath_child_party_parent, one::party::single_owner(fastpath_address));
 
     let party_child_fastpath_parent = PubB { id: object::new(ctx) };
     let party_child_party_parent = PubB { id: object::new(ctx) };
 
     transfer::public_transfer(party_child_fastpath_parent, party_address);
-    transfer::public_party_transfer(party_child_party_parent, sui::party::single_owner(party_address));
+    transfer::public_party_transfer(party_child_party_parent, one::party::single_owner(party_address));
 }
 
-public entry fun receiver(parent: &mut PubA, x: sui::transfer::Receiving<PubB>) {
+public entry fun receiver(parent: &mut PubA, x: one::transfer::Receiving<PubB>) {
     let b = transfer::receive(&mut parent.id, x);
     transfer::public_transfer(b, @ex);
 }

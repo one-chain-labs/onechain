@@ -71,7 +71,7 @@ On Sui, you can include one object inside of another (dynamic fields). For examp
 
 {@inject: examples/move/dynamic_fields/sources/example.move#struct=Parent,Child}
 
-The function to add child objects to a parent might resemble the following. In this case, `ofield` is an alias for the `sui::dynamic_object_field` package.
+The function to add child objects to a parent might resemble the following. In this case, `ofield` is an alias for the `one::dynamic_object_field` package.
 
 {@inject: examples/move/dynamic_fields/sources/example.move#fun=add_child}
 
@@ -123,7 +123,7 @@ There are a few limitations to be aware of. First, the current structure of Sui 
 
 At a high level, you implement this feature using the following steps:
 
-1. Use a `Publisher` object you own to set `sui::display` for a specific type.
+1. Use a `Publisher` object you own to set `one::display` for a specific type.
 2. Sui Move's `Display<T>` defines how different types look. For example, `Display<0x2::capy::Capy>` shapes the appearance of a type.
 3. Sui Full nodes use Display definitions to organize data when requested with `{ showDisplay: true }` in queries.
 

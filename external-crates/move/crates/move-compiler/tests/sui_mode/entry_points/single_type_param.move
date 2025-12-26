@@ -1,5 +1,5 @@
 module a::m {
-    use sui::tx_context;
+    use one::tx_context;
 
     public entry fun foo<T>(_: T, _: &mut tx_context::TxContext) {
         abort 0

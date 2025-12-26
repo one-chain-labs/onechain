@@ -4,8 +4,8 @@
 #[test_only]
 module oct::object_bag_tests;
 
-use sui::object_bag;
-use sui::test_scenario;
+use one::object_bag;
+use one::test_scenario;
 
 public struct Counter has key, store {
     id: UID,
@@ -56,7 +56,7 @@ fun simple_all_functions() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
 fun add_duplicate() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -67,7 +67,7 @@ fun add_duplicate() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun borrow_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -77,7 +77,7 @@ fun borrow_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun borrow_mut_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -87,7 +87,7 @@ fun borrow_mut_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun remove_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -97,7 +97,7 @@ fun remove_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::object_bag::EBagNotEmpty)]
+#[expected_failure(abort_code = one::object_bag::EBagNotEmpty)]
 fun destroy_non_empty() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);

@@ -7,13 +7,13 @@ module oct::verifier_tests;
 
 public struct VERIFIER_TESTS has drop {}
 
-fun init(otw: VERIFIER_TESTS, _: &mut sui::tx_context::TxContext) {
-    assert!(sui::types::is_one_time_witness(&otw));
+fun init(otw: VERIFIER_TESTS, _: &mut one::tx_context::TxContext) {
+    assert!(one::types::is_one_time_witness(&otw));
 }
 
 #[test]
 fun test_init() {
-    use sui::test_scenario;
+    use one::test_scenario;
     let admin = @0xBABE;
 
     let mut scenario = test_scenario::begin(admin);
@@ -23,7 +23,7 @@ fun test_init() {
 }
 
 fun is_otw(witness: VERIFIER_TESTS): bool {
-    sui::types::is_one_time_witness(&witness)
+    one::types::is_one_time_witness(&witness)
 }
 
 #[test]

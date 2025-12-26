@@ -12,7 +12,7 @@ All updates to the Sui database happen via transactions. This topic describes th
 All Sui transactions have the following common metadata:
 
 - **Sender address:** The [address](guides/developer/getting-started/get-address.mdx) of the user sending this transaction.
-- **Gas input:** An object reference pointing to the object that will be used to pay for this transaction's execution and storage. This object must be owned by the user and must be of type `sui::coin::Coin<OCT>` (i.e., the Sui native currency).
+- **Gas input:** An object reference pointing to the object that will be used to pay for this transaction's execution and storage. This object must be owned by the user and must be of type `one::coin::Coin<OCT>` (i.e., the Sui native currency).
 - **Gas price:** An unsigned integer specifying the number of native tokens per gas unit this transaction will pay. The gas price must always be nonzero.
 - **Maximum gas budget:** The maximum number of gas units that can be expended by executing this transaction. If this budget is exceeded, transaction execution will abort and have no effects other than debiting the gas input object. Consequently, the gas input object must have a value higher than the gas price multiplied by the max gas, and this product is the maximum amount that the gas input object will be debited for the transaction.
 - **Epoch:** The Sui epoch this transaction is intended for.

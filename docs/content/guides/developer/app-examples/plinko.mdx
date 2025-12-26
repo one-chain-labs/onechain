@@ -59,13 +59,13 @@ The `plinko::plinko` module combines various Sui blockchain features, such as co
 ```move title="plinko.move"
 module plinko::plinko {
 // === Imports ===
-use sui::coin::{Self, Coin};
-use sui::balance::Balance;
-use sui::sui::SUI;
-use sui::bls12381::bls12381_min_pk_verify;
-use sui::event::emit;
-use sui::hash::{blake2b256};
-use sui::dynamic_object_field::{Self as dof};
+use one::coin::{Self, Coin};
+use one::balance::Balance;
+use one::one::SUI;
+use one::bls12381::bls12381_min_pk_verify;
+use one::event::emit;
+use one::hash::{blake2b256};
+use one::dynamic_object_field::{Self as dof};
 
 // Import Counter NFT module
 use plinko::counter_nft::Counter;
@@ -360,10 +360,10 @@ The `plinko::house_data` module in the Plinko game is designed to manage the gam
 ```move title="house_data.move"
 module plinko::house_data {
 // === Imports ===
-use sui::balance::{Self, Balance};
-use sui::sui::SUI;
-use sui::coin::{Self, Coin};
-use sui::package::{Self};
+use one::balance::{Self, Balance};
+use one::one::SUI;
+use one::coin::{Self, Coin};
+use one::package::{Self};
 
 // === Errors ===
 const ECallerNotHouse: u64 = 0;
@@ -628,7 +628,7 @@ Unlike traditional NFTs, the Counter NFT is non-transferable, ensuring it remain
 ```move title="counter_nft.move"
 module plinko::counter_nft {
 // === Imports ===
-use sui::bcs::{Self};
+use one::bcs::{Self};
 
 // === Structs ===
 

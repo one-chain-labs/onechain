@@ -9,12 +9,12 @@
 module test::m {
 
     public fun borrow_mut(
-        c: &mut sui::coin::Coin<sui::oct::OCT>,
-    ): &mut sui::coin::Coin<sui::oct::OCT> {
+        c: &mut one::coin::Coin<one::oct::OCT>,
+    ): &mut one::coin::Coin<one::oct::OCT> {
         c
     }
 
-    public fun new_mut(): &mut sui::coin::Coin<sui::oct::OCT> {
+    public fun new_mut(): &mut one::coin::Coin<one::oct::OCT> {
         abort 0
     }
 
@@ -53,7 +53,7 @@ module test::m {
 
 //# programmable --dev-inspect --inputs 10 @A
 // Cannot write to borrowed fresh coin via split coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: SplitCoins(Result(0), [Input(0)]);
 //> 3: TransferObjects([Result(2)], Input(1));
@@ -62,7 +62,7 @@ module test::m {
 
 //# programmable --dev-inspect --inputs 10 @A object(2,0)
 // Cannot write to borrowed fresh coin via Merge coins
-//> 0: sui::coin::zero<sui::oct::OCT>();
+//> 0: one::coin::zero<one::oct::OCT>();
 //> 1: test::m::borrow_mut(Result(0));
 //> 2: MergeCoins(Result(0), [Input(2)]);
 //> 3: test::m::borrow_mut(Result(1));

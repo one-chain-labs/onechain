@@ -1,6 +1,6 @@
 // type parameters can have key
 module a::m {
-    use sui::tx_context;
+    use one::tx_context;
 
     public entry fun t1<T: key>(_: T, _: &mut tx_context::TxContext) {
         abort 0

@@ -3,13 +3,13 @@
 
 module oct::accumulator_settlement;
 
-use sui::accumulator::{AccumulatorRoot, accumulator_key, U128, create_u128, destroy_u128};
+use one::accumulator::{AccumulatorRoot, accumulator_key, U128, create_u128, destroy_u128};
 
 const ENotSystemAddress: u64 = 0;
 const EInvalidSplitAmount: u64 = 1;
 
-use fun sui::accumulator_metadata::remove_accumulator_metadata as AccumulatorRoot.remove_metadata;
-use fun sui::accumulator_metadata::create_accumulator_metadata as AccumulatorRoot.create_metadata;
+use fun one::accumulator_metadata::remove_accumulator_metadata as AccumulatorRoot.remove_metadata;
+use fun one::accumulator_metadata::create_accumulator_metadata as AccumulatorRoot.create_metadata;
 
 // === Settlement storage types and entry points ===
 

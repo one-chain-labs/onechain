@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module base_addr::base {
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer;
+    use one::object::{Self, UID};
+    use one::tx_context::{Self, TxContext};
+    use one::transfer;
     use base_addr::friend_module::{Self, X, Y, Z};
 
     public struct A has store, drop {

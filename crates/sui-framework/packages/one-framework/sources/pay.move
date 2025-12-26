@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// This module provides handy functionality for wallets and `sui::Coin` management.
+/// This module provides handy functionality for wallets and `one::Coin` management.
 module oct::pay;
 
-use sui::coin::Coin;
+use one::coin::Coin;
 
 /// For when empty vector is supplied into join function.
 const ENoCoins: u64 = 0;
@@ -31,7 +31,7 @@ public entry fun split_vec<T>(self: &mut Coin<T>, split_amounts: vector<u64>, ct
 
 #[allow(lint(public_entry))]
 /// Send `amount` units of `c` to `recipient`
-/// Aborts with `sui::balance::ENotEnough` if `amount` is greater than the balance in `c`
+/// Aborts with `one::balance::ENotEnough` if `amount` is greater than the balance in `c`
 public entry fun split_and_transfer<T>(
     c: &mut Coin<T>,
     amount: u64,

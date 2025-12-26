@@ -1,7 +1,7 @@
 // structs are always given a field in the source language
 
 module a::m {
-    use sui::tx_context;
+    use one::tx_context;
 
     struct M has drop {}
 

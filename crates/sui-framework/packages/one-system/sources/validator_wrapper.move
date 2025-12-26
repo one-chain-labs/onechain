@@ -3,7 +3,7 @@
 
 module oct_system::validator_wrapper;
 
-use sui::versioned::{Self, Versioned};
+use one::versioned::{Self, Versioned};
 use one_system::validator::Validator;
 
 const EInvalidVersion: u64 = 0;

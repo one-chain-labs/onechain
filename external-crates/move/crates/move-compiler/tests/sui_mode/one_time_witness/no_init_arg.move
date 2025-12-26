@@ -1,7 +1,7 @@
 // invalid, no one-time witness type parameter in init
 
 module a::m {
-    use sui::tx_context;
+    use one::tx_context;
 
     struct M has drop { dummy: bool }
 

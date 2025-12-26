@@ -1,5 +1,5 @@
 ---
-title: Module `sui::tx_context`
+title: Module `one::tx_context`
 ---
 
 
@@ -95,7 +95,7 @@ Return the address of the user that signed the current
 transaction
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_sender">sender</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_sender">sender</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <b>address</b>
 </code></pre>
 
 
@@ -143,7 +143,7 @@ Return the transaction digest (hash of transaction inputs).
 Please do not use as a source of randomness.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_digest">digest</a>(self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): &vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_digest">digest</a>(self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): &vector&lt;u8&gt;
 </code></pre>
 
 
@@ -168,7 +168,7 @@ Please do not use as a source of randomness.
 Return the current epoch
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_epoch">epoch</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_epoch">epoch</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): u64
 </code></pre>
 
 
@@ -215,7 +215,7 @@ Return the current epoch
 Return the epoch start time as a unix timestamp in milliseconds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): u64
 </code></pre>
 
 
@@ -262,7 +262,7 @@ Return the epoch start time as a unix timestamp in milliseconds.
 Return the adress of the transaction sponsor or <code>None</code> if there was no sponsor.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_sponsor">sponsor</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<b>address</b>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_sponsor">sponsor</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -289,7 +289,7 @@ occur as the address for a user.
 In other words, the generated address is a globally unique object ID.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_fresh_object_address">fresh_object_address</a>(_ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_fresh_object_address">fresh_object_address</a>(_ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <b>address</b>
 </code></pre>
 
 
@@ -337,7 +337,7 @@ Return the reference gas price in effect for the epoch the transaction
 is being executed in.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_reference_gas_price">reference_gas_price</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_reference_gas_price">reference_gas_price</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): u64
 </code></pre>
 
 
@@ -385,7 +385,7 @@ Return the gas price submitted for the current transaction.
 That is the value the user submitted with the transaction data.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_gas_price">gas_price</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/tx_context.md#sui_tx_context_gas_price">gas_price</a>(_self: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): u64
 </code></pre>
 
 

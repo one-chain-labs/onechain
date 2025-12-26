@@ -4,12 +4,12 @@
 #[test_only]
 module oct_system::governance_test_utils;
 
-use sui::address;
-use sui::balance::{Self, Balance};
-use sui::coin::{Self, Coin};
-use sui::oct::OCT;
-use sui::test_scenario::{Self, Scenario};
-use sui::test_utils::{Self, assert_eq};
+use one::address;
+use one::balance::{Self, Balance};
+use one::coin::{Self, Coin};
+use one::oct::OCT;
+use one::test_scenario::{Self, Scenario};
+use one::test_utils::{Self, assert_eq};
 use one_system::stake_subsidy;
 use one_system::staking_pool::{StakedOct, StakingPool};
 use one_system::one_system::{Self, SuiSystemState};

@@ -16,7 +16,7 @@ module v1::has_otw {
     public struct HAS_OTW has drop {
     }
     fun init(otw: HAS_OTW, ctx: &mut TxContext) {
-        let (cap, metadata) = sui::coin::create_currency(
+        let (cap, metadata) = one::coin::create_currency(
             otw,
             2,
             b"has_otw",

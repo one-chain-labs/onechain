@@ -76,7 +76,7 @@ public fun public_transfer<T: key + store>(obj: T, recipient: address) {
 /// This function has custom rules performed by the Sui Move bytecode verifier that ensures that `T`
 /// is an object defined in the module where `transfer` is invoked. Use `public_party_transfer`
 /// to transfer an object with `store` outside of its module.
-public fun party_transfer<T: key>(obj: T, party: sui::party::Party) {
+public fun party_transfer<T: key>(obj: T, party: one::party::Party) {
     assert!(party.is_single_owner(), EInvalidPartyPermissions);
     let (default, addresses, permissions) = party.into_native();
     party_transfer_impl(obj, default, addresses, permissions)
@@ -92,7 +92,7 @@ public fun party_transfer<T: key>(obj: T, party: sui::party::Party) {
 /// the `Party` value. The other in that the object must be used in consensus and cannot be
 /// used in the fast path.
 /// The object must have `store` to be transferred outside of its module.
-public fun public_party_transfer<T: key + store>(obj: T, party: sui::party::Party) {
+public fun public_party_transfer<T: key + store>(obj: T, party: one::party::Party) {
     assert!(party.is_single_owner(), EInvalidPartyPermissions);
     let (default, addresses, permissions) = party.into_native();
     party_transfer_impl(obj, default, addresses, permissions)

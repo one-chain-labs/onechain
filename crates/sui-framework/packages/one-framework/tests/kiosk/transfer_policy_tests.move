@@ -3,7 +3,7 @@
 
 #[test_only]
 module oct::malicious_policy {
-    use sui::transfer_policy::{Self as policy, TransferRequest};
+    use one::transfer_policy::{Self as policy, TransferRequest};
 
     public struct Rule has drop {}
 
@@ -14,11 +14,11 @@ module oct::malicious_policy {
 
 #[test_only]
 module oct::transfer_policy_tests {
-    use sui::coin;
-    use sui::dummy_policy;
-    use sui::malicious_policy;
-    use sui::package;
-    use sui::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
+    use one::coin;
+    use one::dummy_policy;
+    use one::malicious_policy;
+    use one::package;
+    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
 
     public struct OTW has drop {}
     public struct Asset has key, store { id: UID }
@@ -85,7 +85,7 @@ module oct::transfer_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::transfer_policy::EPolicyNotSatisfied)]
+    #[expected_failure(abort_code = one::transfer_policy::EPolicyNotSatisfied)]
     /// Policy set but not satisfied;
     fun test_rule_ignored() {
         let ctx = &mut tx_context::dummy();
@@ -101,7 +101,7 @@ module oct::transfer_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::transfer_policy::ERuleAlreadySet)]
+    #[expected_failure(abort_code = one::transfer_policy::ERuleAlreadySet)]
     /// Attempt to add another policy;
     fun test_rule_exists() {
         let ctx = &mut tx_context::dummy();
@@ -118,7 +118,7 @@ module oct::transfer_policy_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = sui::transfer_policy::EIllegalRule)]
+    #[expected_failure(abort_code = one::transfer_policy::EIllegalRule)]
     /// Attempt to cheat by using another rule approval;
     fun test_rule_swap() {
         let ctx = &mut tx_context::dummy();

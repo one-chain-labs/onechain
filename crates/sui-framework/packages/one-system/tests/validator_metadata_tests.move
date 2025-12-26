@@ -4,10 +4,10 @@
 #[test_only]
 module oct_system::validator_metadata_tests;
 
-use sui::balance;
-use sui::coin;
-use sui::test_scenario::{Self, Scenario};
-use sui::url;
+use one::balance;
+use one::coin;
+use one::test_scenario::{Self, Scenario};
+use one::url;
 use one_system::governance_test_utils::{advance_epoch, create_sui_system_state_for_testing};
 use one_system::one_system::SuiSystemState;
 use one_system::test_runner::{Self, TestRunner};

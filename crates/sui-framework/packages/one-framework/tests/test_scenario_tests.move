@@ -4,9 +4,9 @@
 #[test_only]
 module oct::test_scenario_tests;
 
-use sui::dynamic_field;
-use sui::dynamic_object_field;
-use sui::test_scenario;
+use one::dynamic_field;
+use one::dynamic_object_field;
+use one::test_scenario;
 
 public struct Object has key, store {
     id: UID,
@@ -1096,8 +1096,8 @@ public struct E1(u64) has copy, drop;
 
 #[test]
 fun test_events() {
-    use sui::event;
-    use sui::test_utils::assert_eq;
+    use one::event;
+    use one::test_utils::assert_eq;
 
     // calling test_scenario::end should dump events emitted during previous txes
     let sender = @0x0;

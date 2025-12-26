@@ -4,7 +4,7 @@
 #[test_only]
 module oct::poseidon_tests;
 
-use sui::poseidon::poseidon_bn254;
+use one::poseidon::poseidon_bn254;
 
 #[test]
 fun test_poseidon_bn254_hash() {
@@ -129,7 +129,7 @@ fun test_poseidon_bn254_canonical_input() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::poseidon::ENonCanonicalInput)]
+#[expected_failure(abort_code = one::poseidon::ENonCanonicalInput)]
 fun test_poseidon_bn254_non_canonical_input() {
     // Scalar field size.
     let msg = vector[
@@ -139,7 +139,7 @@ fun test_poseidon_bn254_non_canonical_input() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::poseidon::EEmptyInput)]
+#[expected_failure(abort_code = one::poseidon::EEmptyInput)]
 fun test_poseidon_bn254_empty_input() {
     let msg = vector[];
     poseidon_bn254(&msg);

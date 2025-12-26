@@ -10,7 +10,7 @@
 module oct::authenticator_state;
 
 use std::string::{Self, String, utf8};
-use sui::dynamic_field;
+use one::dynamic_field;
 
 /// Sender is not @0x0 the system address.
 const ENotSystemAddress: u64 = 0;

@@ -5,12 +5,12 @@
 module oct::deny_list_tests;
 
 use std::type_name;
-use sui::deny_list;
-use sui::test_scenario;
+use one::deny_list;
+use one::test_scenario;
 
 public struct X()
 
-#[test, expected_failure(abort_code = sui::deny_list::EInvalidAddress)]
+#[test, expected_failure(abort_code = one::deny_list::EInvalidAddress)]
 fun add_zero() {
     let mut ctx = tx_context::dummy();
     let mut dl = deny_list::new_for_testing(&mut ctx);
@@ -19,7 +19,7 @@ fun add_zero() {
     abort 0 // should not be reached
 }
 
-#[test, expected_failure(abort_code = sui::deny_list::EInvalidAddress)]
+#[test, expected_failure(abort_code = one::deny_list::EInvalidAddress)]
 fun remove_zero() {
     let mut ctx = tx_context::dummy();
     let mut dl = deny_list::new_for_testing(&mut ctx);

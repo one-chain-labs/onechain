@@ -1,15 +1,15 @@
 // object has store, might be transferred elsewhere
 module a::has_store {
-    use sui::transfer;
-    use sui::tx_context::TxContext;
-    use sui::object::UID;
+    use one::transfer;
+    use one::tx_context::TxContext;
+    use one::object::UID;
 
     struct Obj has key, store {
         id: UID
     }
 
     public fun make_obj(ctx: &mut TxContext): Obj {
-        Obj { id: sui::object::new(ctx) }
+        Obj { id: one::object::new(ctx) }
     }
 
     public fun share(o: Obj) {
@@ -20,16 +20,16 @@ module a::has_store {
 
 // object does not have store and is transferred
 module a::is_transferred {
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
-    use sui::object::UID;
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::object::UID;
 
     struct Obj has key {
         id: UID
     }
 
     public fun make_obj(ctx: &mut TxContext): Obj {
-        Obj { id: sui::object::new(ctx) }
+        Obj { id: one::object::new(ctx) }
     }
 
     public fun transfer(o: Obj, ctx: &mut TxContext) {
@@ -58,7 +58,7 @@ module oct::object {
     public fun delete(_: UID) {
         abort ZERO
     }
-    public fun new(_: &mut sui::tx_context::TxContext): UID {
+    public fun new(_: &mut one::tx_context::TxContext): UID {
         abort ZERO
     }
 }

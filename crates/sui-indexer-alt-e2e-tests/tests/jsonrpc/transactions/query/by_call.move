@@ -13,22 +13,22 @@
 module P0::M {
   public struct P0MFoo() has copy, drop, store;
 
-  public fun foo() { sui::event::emit(P0MFoo()) }
+  public fun foo() { one::event::emit(P0MFoo()) }
 }
 
 module P0::N {
   public struct P0NBar() has copy, drop, store;
   public struct P0NBaz() has copy, drop, store;
 
-  public fun bar() { sui::event::emit(P0NBar()) }
-  public fun baz() { sui::event::emit(P0NBaz()) }
+  public fun bar() { one::event::emit(P0NBar()) }
+  public fun baz() { one::event::emit(P0NBaz()) }
 }
 
 //# publish
 module P1::M {
   public struct P1MQux() has copy, drop, store;
 
-  public fun qux() { sui::event::emit(P1MQux()) }
+  public fun qux() { one::event::emit(P1MQux()) }
 }
 
 //# programmable

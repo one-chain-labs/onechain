@@ -1,5 +1,5 @@
 ---
-title: Module `sui::group_ops`
+title: Module `one::group_ops`
 ---
 
 Generic Move and native functions for group operations.
@@ -37,9 +37,9 @@ Generic Move and native functions for group operations.
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/bcs.md#sui_bcs">sui::bcs</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bcs.md#sui_bcs">one::bcs</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
 </code></pre>
 
 
@@ -117,7 +117,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_bytes">bytes</a>&lt;G&gt;(e: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;): &vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_bytes">bytes</a>&lt;G&gt;(e: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;): &vector&lt;u8&gt;
 </code></pre>
 
 
@@ -141,7 +141,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_equal">equal</a>&lt;G&gt;(e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_equal">equal</a>&lt;G&gt;(e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;): bool
 </code></pre>
 
 
@@ -165,7 +165,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_from_bytes">from_bytes</a>&lt;G&gt;(type_: u8, <a href="../sui/group_ops.md#sui_group_ops_bytes">bytes</a>: &vector&lt;u8&gt;, is_trusted: bool): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_from_bytes">from_bytes</a>&lt;G&gt;(type_: u8, <a href="../sui/group_ops.md#sui_group_ops_bytes">bytes</a>: &vector&lt;u8&gt;, is_trusted: bool): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -190,7 +190,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_add">add</a>&lt;G&gt;(type_: u8, e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_add">add</a>&lt;G&gt;(type_: u8, e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -214,7 +214,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_sub">sub</a>&lt;G&gt;(type_: u8, e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_sub">sub</a>&lt;G&gt;(type_: u8, e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -238,7 +238,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_mul">mul</a>&lt;S, G&gt;(type_: u8, scalar: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;S&gt;, e: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_mul">mul</a>&lt;S, G&gt;(type_: u8, scalar: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;S&gt;, e: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -263,7 +263,7 @@ Generic Move and native functions for group operations.
 Fails if scalar = 0. Else returns 1/scalar * e.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_div">div</a>&lt;S, G&gt;(type_: u8, scalar: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;S&gt;, e: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_div">div</a>&lt;S, G&gt;(type_: u8, scalar: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;S&gt;, e: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -287,7 +287,7 @@ Fails if scalar = 0. Else returns 1/scalar * e.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_hash_to">hash_to</a>&lt;G&gt;(type_: u8, m: &vector&lt;u8&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_hash_to">hash_to</a>&lt;G&gt;(type_: u8, m: &vector&lt;u8&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -314,7 +314,7 @@ Aborts with <code><a href="../sui/group_ops.md#sui_group_ops_EInputTooLong">EInp
 This function is currently only enabled on Devnet.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_multi_scalar_multiplication">multi_scalar_multiplication</a>&lt;S, G&gt;(type_: u8, scalars: &vector&lt;<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;S&gt;&gt;, elements: &vector&lt;<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_multi_scalar_multiplication">multi_scalar_multiplication</a>&lt;S, G&gt;(type_: u8, scalars: &vector&lt;<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;S&gt;&gt;, elements: &vector&lt;<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -354,7 +354,7 @@ This function is currently only enabled on Devnet.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_pairing">pairing</a>&lt;G1, G2, G3&gt;(type_: u8, e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G1&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G2&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G3&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_pairing">pairing</a>&lt;G1, G2, G3&gt;(type_: u8, e1: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G1&gt;, e2: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G2&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G3&gt;
 </code></pre>
 
 
@@ -382,7 +382,7 @@ This function is currently only enabled on Devnet.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_convert">convert</a>&lt;From, To&gt;(from_type_: u8, to_type_: u8, e: &<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;From&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;To&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_convert">convert</a>&lt;From, To&gt;(from_type_: u8, to_type_: u8, e: &<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;From&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;To&gt;
 </code></pre>
 
 
@@ -410,7 +410,7 @@ This function is currently only enabled on Devnet.
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_sum">sum</a>&lt;G&gt;(type_: u8, terms: &vector&lt;<a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">sui::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/group_ops.md#sui_group_ops_sum">sum</a>&lt;G&gt;(type_: u8, terms: &vector&lt;<a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;&gt;): <a href="../sui/group_ops.md#sui_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 

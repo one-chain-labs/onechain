@@ -24,10 +24,10 @@ An event object in Sui consists of the following attributes:
 
 ## Emit events in Move
 
-To create an event in your Move modules, add the `sui::event` dependency.
+To create an event in your Move modules, add the `one::event` dependency.
 
 ```move
-use sui::event;
+use one::event;
 ```
 
 With the dependency added, you can use the `emit` function to trigger an event whenever the action you want to monitor fires. For example, the following code is part of an example application that enables the locking of objects. The `lock` function handles the locking of objects and emits an event whenever the function is called.

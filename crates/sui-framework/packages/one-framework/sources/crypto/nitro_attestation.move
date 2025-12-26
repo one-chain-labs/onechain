@@ -3,7 +3,7 @@
 
 module oct::nitro_attestation;
 
-use sui::clock::{Self, Clock};
+use one::clock::{Self, Clock};
 
 #[allow(unused_const)]
 /// Error that the feature is not available on this network.

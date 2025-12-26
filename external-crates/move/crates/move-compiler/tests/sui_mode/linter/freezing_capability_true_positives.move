@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module a::test_true_positives {
-    use sui::object::UID;
-    use sui::transfer;
+    use one::object::UID;
+    use one::transfer;
 
     struct AdminCap has key {
        id: UID

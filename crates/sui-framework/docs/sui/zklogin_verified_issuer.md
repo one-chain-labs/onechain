@@ -1,5 +1,5 @@
 ---
-title: Module `sui::zklogin_verified_issuer`
+title: Module `one::zklogin_verified_issuer`
 ---
 
 
@@ -19,13 +19,13 @@ title: Module `sui::zklogin_verified_issuer`
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/party.md#sui_party">sui::party</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">sui::vec_map</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
 </code></pre>
 
 
@@ -49,7 +49,7 @@ Possession of a VerifiedIssuer proves that the user's address was created using 
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
  The ID of this VerifiedIssuer
@@ -103,7 +103,7 @@ Error if the proof consisting of the inputs provided to the verification functio
 Returns the address associated with the given VerifiedIssuer
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_owner">owner</a>(verified_issuer: &<a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_VerifiedIssuer">sui::zklogin_verified_issuer::VerifiedIssuer</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_owner">owner</a>(verified_issuer: &<a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_VerifiedIssuer">one::zklogin_verified_issuer::VerifiedIssuer</a>): <b>address</b>
 </code></pre>
 
 
@@ -128,7 +128,7 @@ Returns the address associated with the given VerifiedIssuer
 Returns the issuer associated with the given VerifiedIssuer
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_issuer">issuer</a>(verified_issuer: &<a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_VerifiedIssuer">sui::zklogin_verified_issuer::VerifiedIssuer</a>): &<a href="../std/string.md#std_string_String">std::string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_issuer">issuer</a>(verified_issuer: &<a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_VerifiedIssuer">one::zklogin_verified_issuer::VerifiedIssuer</a>): &<a href="../std/string.md#std_string_String">std::string::String</a>
 </code></pre>
 
 
@@ -153,7 +153,7 @@ Returns the issuer associated with the given VerifiedIssuer
 Delete a VerifiedIssuer
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_delete">delete</a>(verified_issuer: <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_VerifiedIssuer">sui::zklogin_verified_issuer::VerifiedIssuer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_delete">delete</a>(verified_issuer: <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_VerifiedIssuer">one::zklogin_verified_issuer::VerifiedIssuer</a>)
 </code></pre>
 
 
@@ -182,7 +182,7 @@ with the issuers id transferred to the caller.
 Aborts with <code><a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_EInvalidProof">EInvalidProof</a></code> if the verification fails.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_verify_zklogin_issuer">verify_zklogin_issuer</a>(address_seed: u256, <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_issuer">issuer</a>: <a href="../std/string.md#std_string_String">std::string::String</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_verify_zklogin_issuer">verify_zklogin_issuer</a>(address_seed: u256, <a href="../sui/zklogin_verified_issuer.md#sui_zklogin_verified_issuer_issuer">issuer</a>: <a href="../std/string.md#std_string_String">std::string::String</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 

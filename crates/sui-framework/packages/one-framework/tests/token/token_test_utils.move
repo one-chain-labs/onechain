@@ -5,8 +5,8 @@
 /// This module defines base testing utilities for the
 module oct::token_test_utils;
 
-use sui::coin::{Self, TreasuryCap};
-use sui::token::{Self, Token, TokenPolicy, TokenPolicyCap};
+use one::coin::{Self, TreasuryCap};
+use one::token::{Self, Token, TokenPolicy, TokenPolicyCap};
 
 /// The type of the test Token.
 public struct TEST has drop {}
@@ -24,7 +24,7 @@ public fun get_treasury_cap(ctx: &mut TxContext): TreasuryCap<TEST> {
 
 /// Return `TreasuryCap` (shares it for now).
 public fun return_treasury_cap(treasury_cap: TreasuryCap<TEST>) {
-    sui::transfer::public_share_object(treasury_cap)
+    one::transfer::public_share_object(treasury_cap)
 }
 
 /// Get a policy for testing.

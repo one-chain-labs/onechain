@@ -8,8 +8,8 @@
 /// It also tests custom actions which can be implemented by policy owner.
 module oct::token_actions_tests;
 
-use sui::token;
-use sui::token_test_utils as test;
+use one::token;
+use one::token_test_utils as test;
 
 #[test]
 /// Scenario: perform a transfer operation, and confirm that the request

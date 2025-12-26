@@ -7,7 +7,7 @@
 // 2. Parent ID exists, but the field does not
 
 //# programmable --sender A --inputs @A
-//> 0: sui::bag::new();
+//> 0: one::bag::new();
 //> 1: TransferObjects([Result(0)], Input(0))
 
 //# create-checkpoint

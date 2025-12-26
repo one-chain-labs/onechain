@@ -4,11 +4,11 @@
 #[test_only]
 module oct::kiosk_test_utils;
 
-use sui::coin::{Self, Coin};
-use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
-use sui::package::{Self, Publisher};
-use sui::oct::OCT;
-use sui::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
+use one::coin::{Self, Coin};
+use one::kiosk::{Self, Kiosk, KioskOwnerCap};
+use one::package::{Self, Publisher};
+use one::oct::OCT;
+use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
 
 public struct OTW has drop {}
 public struct Asset has key, store { id: UID }

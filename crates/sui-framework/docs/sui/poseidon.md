@@ -1,5 +1,5 @@
 ---
-title: Module `sui::poseidon`
+title: Module `one::poseidon`
 ---
 
 Module which defines instances of the poseidon hash functions. Available in Devnet only.
@@ -15,9 +15,9 @@ Module which defines instances of the poseidon hash functions. Available in Devn
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/bcs.md#sui_bcs">sui::bcs</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bcs.md#sui_bcs">one::bcs</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
 </code></pre>
 
 

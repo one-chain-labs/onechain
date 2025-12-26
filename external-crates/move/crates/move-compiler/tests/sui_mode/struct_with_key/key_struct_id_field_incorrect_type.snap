@@ -13,4 +13,4 @@ error[Sui E02007]: invalid object declaration
 4 │         id: bool
   │         ^^  ---- But found type: 'bool'
   │         │    
-  │         Invalid object 'S'. Structs with the 'key' ability must have 'id: sui::object::UID' as their first field
+  │         Invalid object 'S'. Structs with the 'key' ability must have 'id: one::object::UID' as their first field

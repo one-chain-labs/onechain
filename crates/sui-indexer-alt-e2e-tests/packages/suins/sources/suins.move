@@ -8,8 +8,8 @@
 module octns::suins;
 
 use std::string::String;
-use sui::table::{Self, Table};
-use sui::vec_map::{Self, VecMap};
+use one::table::{Self, Table};
+use one::vec_map::{Self, VecMap};
 
 use suins::domain::{Self, Domain};
 

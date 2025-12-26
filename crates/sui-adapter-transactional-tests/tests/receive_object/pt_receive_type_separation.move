@@ -7,7 +7,7 @@
 
 //# publish
 module tto::m1 {
-    use sui::transfer::Receiving;
+    use one::transfer::Receiving;
 
     public struct A has key, store {
         id: UID,

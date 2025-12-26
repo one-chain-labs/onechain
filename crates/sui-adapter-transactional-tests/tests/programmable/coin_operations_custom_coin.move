@@ -7,7 +7,7 @@
 
 //# publish --sender A
 module test::fake {
-    use sui::coin;
+    use one::coin;
 
     public struct FAKE has drop {}
 
@@ -20,14 +20,14 @@ module test::fake {
 }
 
 //# programmable --sender A --inputs object(1,2) 100 @A
-//> 0: sui::coin::mint<test::fake::FAKE>(Input(0), Input(1));
+//> 0: one::coin::mint<test::fake::FAKE>(Input(0), Input(1));
 //> TransferObjects([Result(0)], Input(2))
 
 //# view-object 2,0
 
 //# programmable --sender A --inputs object(1,2) 100 object(2,0) 1 @A
-//> 0: sui::coin::mint<test::fake::FAKE>(Input(0), Input(1));
-//> 1: sui::coin::mint<test::fake::FAKE>(Input(0), Input(1));
+//> 0: one::coin::mint<test::fake::FAKE>(Input(0), Input(1));
+//> 1: one::coin::mint<test::fake::FAKE>(Input(0), Input(1));
 //> 2: SplitCoins(Result(0), [Input(3)]);
 //> 3: SplitCoins(Input(2), [Input(3)]);
 //> MergeCoins(Result(1), [Result(0), Input(2), Result(2), Result(3)]);

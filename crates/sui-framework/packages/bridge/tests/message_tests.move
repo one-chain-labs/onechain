@@ -36,13 +36,13 @@ use bridge::message::{
 };
 use bridge::treasury::{Self, BTC, ETH, USDC};
 use std::ascii;
-use sui::address;
-use sui::balance;
-use sui::bcs;
-use sui::coin::{Self, Coin};
-use sui::hex;
-use sui::test_scenario;
-use sui::test_utils::{assert_eq, destroy};
+use one::address;
+use one::balance;
+use one::bcs;
+use one::coin::{Self, Coin};
+use one::hex;
+use one::test_scenario;
+use one::test_utils::{assert_eq, destroy};
 
 const INVALID_CHAIN: u8 = 42;
 
@@ -460,7 +460,7 @@ fun test_add_tokens_on_sui_message_serialization_2() {
     let mut message_bytes = b"SUI_BRIDGE_MESSAGE";
     message_bytes.append(message);
 
-    let pubkey = sui::ecdsa_k1::secp256k1_ecrecover(
+    let pubkey = one::ecdsa_k1::secp256k1_ecrecover(
         &x"b75e64b040eef6fa510e4b9be853f0d35183de635c6456c190714f9546b163ba12583e615a2e9944ec2d21b520aebd9b14e181dcae0fcc6cdaefc0aa235b3abe00",
         &message_bytes,
         0,

@@ -7,10 +7,10 @@
 // Randomness is currently write-only, until user-facing API is implemented.
 module oct::random {
     use std::vector;
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
-    use sui::versioned::{Self, Versioned};
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::versioned::{Self, Versioned};
 
     // Sender is not @0x0 the system address.
     const ENotSystemAddress: u64 = 0;

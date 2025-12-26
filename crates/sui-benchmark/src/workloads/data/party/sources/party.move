@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module party::party {
-    use sui::party;
+    use one::party;
 
     public struct Obj has key {
         id: object::UID,

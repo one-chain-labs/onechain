@@ -13,7 +13,7 @@
 // 8. Fetching an upgraded package
 
 //# programmable --sender A --inputs @A
-//> 0: sui::table::new<u64, sui::coin::Coin<sui::oct::OCT>>();
+//> 0: one::table::new<u64, one::coin::Coin<one::oct::OCT>>();
 //> 1: TransferObjects([Result(0)], Input(0))
 
 //# programmable --sender A --inputs 42 @A
@@ -41,7 +41,7 @@
 }
 
 //# programmable --sender A --inputs object(1,0) 0 object(2,0)
-//> 0: sui::table::add<u64, sui::coin::Coin<sui::oct::OCT>>(Input(0), Input(1), Input(2));
+//> 0: one::table::add<u64, one::coin::Coin<one::oct::OCT>>(Input(0), Input(1), Input(2));
 
 //# create-checkpoint
 
@@ -52,7 +52,7 @@
 }
 
 //# programmable --sender A --inputs object(1,0) 0 @A
-//> 0: sui::table::remove<u64, sui::coin::Coin<sui::oct::OCT>>(Input(0), Input(1));
+//> 0: one::table::remove<u64, one::coin::Coin<one::oct::OCT>>(Input(0), Input(1));
 //> 1: TransferObjects([Result(0)], Input(2))
 
 //# create-checkpoint

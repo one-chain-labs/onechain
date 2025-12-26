@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Similar to `sui::table` but the values are linked together, allowing for ordered insertion and
+/// Similar to `one::table` but the values are linked together, allowing for ordered insertion and
 /// removal
 module oct::linked_table;
 
-use sui::dynamic_field as field;
+use one::dynamic_field as field;
 
 // Attempted to destroy a non-empty table
 const ETableNotEmpty: u64 = 0;
@@ -54,7 +54,7 @@ public fun back<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>): &O
 
 /// Inserts a key-value pair at the front of the table, i.e. the newly inserted pair will be
 /// the first element in the table
-/// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
+/// Aborts with `one::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
 /// that key `k: K`.
 public fun push_front<K: copy + drop + store, V: store>(
     table: &mut LinkedTable<K, V>,
@@ -77,7 +77,7 @@ public fun push_front<K: copy + drop + store, V: store>(
 
 /// Inserts a key-value pair at the back of the table, i.e. the newly inserted pair will be
 /// the last element in the table
-/// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
+/// Aborts with `one::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
 /// that key `k: K`.
 public fun push_back<K: copy + drop + store, V: store>(
     table: &mut LinkedTable<K, V>,
@@ -100,7 +100,7 @@ public fun push_back<K: copy + drop + store, V: store>(
 
 #[syntax(index)]
 /// Immutable borrows the value associated with the key in the table `table: &LinkedTable<K, V>`.
-/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`.
 public fun borrow<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>, k: K): &V {
     &field::borrow<K, Node<K, V>>(&table.id, k).value
@@ -108,7 +108,7 @@ public fun borrow<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>, k
 
 #[syntax(index)]
 /// Mutably borrows the value associated with the key in the table `table: &mut LinkedTable<K, V>`.
-/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`.
 public fun borrow_mut<K: copy + drop + store, V: store>(
     table: &mut LinkedTable<K, V>,
@@ -119,7 +119,7 @@ public fun borrow_mut<K: copy + drop + store, V: store>(
 
 /// Borrows the key for the previous entry of the specified key `k: K` in the table
 /// `table: &LinkedTable<K, V>`. Returns None if the entry does not have a predecessor.
-/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`
 public fun prev<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>, k: K): &Option<K> {
     &field::borrow<K, Node<K, V>>(&table.id, k).prev
@@ -127,7 +127,7 @@ public fun prev<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>, k: 
 
 /// Borrows the key for the next entry of the specified key `k: K` in the table
 /// `table: &LinkedTable<K, V>`. Returns None if the entry does not have a predecessor.
-/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`
 public fun next<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>, k: K): &Option<K> {
     &field::borrow<K, Node<K, V>>(&table.id, k).next
@@ -135,7 +135,7 @@ public fun next<K: copy + drop + store, V: store>(table: &LinkedTable<K, V>, k: 
 
 /// Removes the key-value pair in the table `table: &mut LinkedTable<K, V>` and returns the value.
 /// This splices the element out of the ordering.
-/// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+/// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
 /// that key `k: K`. Note: this is also what happens when the table is empty.
 public fun remove<K: copy + drop + store, V: store>(table: &mut LinkedTable<K, V>, k: K): V {
     let Node<K, V> { prev, next, value } = field::remove(&mut table.id, k);

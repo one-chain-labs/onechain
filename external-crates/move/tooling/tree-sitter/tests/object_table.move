@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Similar to `sui::table`, an `ObjectTable<K, V>` is a map-like collection. But unlike
-/// `sui::table`, the values bound to these dynamic fields _must_ be objects themselves. This allows
+/// Similar to `one::table`, an `ObjectTable<K, V>` is a map-like collection. But unlike
+/// `one::table`, the values bound to these dynamic fields _must_ be objects themselves. This allows
 /// for the objects to still exist within in storage, which may be important for external tools.
 /// The difference is otherwise not observable from within Move.
 module oct::object_table {
     use std::option::Option;
-    use sui::object::{Self, ID, UID};
-    use sui::dynamic_object_field as ofield;
-    use sui::tx_context::TxContext;
+    use one::object::{Self, ID, UID};
+    use one::dynamic_object_field as ofield;
+    use one::tx_context::TxContext;
 
     // Attempted to destroy a non-empty table
     const ETableNotEmpty: u64 = 0;
@@ -30,7 +30,7 @@ module oct::object_table {
     }
 
     /// Adds a key-value pair to the table `table: &mut ObjectTable<K, V>`
-    /// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
+    /// Aborts with `one::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
     /// that key `k: K`.
     public fun add<K: copy + drop + store, V: key + store>(table: &mut ObjectTable<K, V>, k: K, v: V) {
         ofield::add(&mut table.id, k, v);
@@ -38,14 +38,14 @@ module oct::object_table {
     }
 
     /// Immutable borrows the value associated with the key in the table `table: &ObjectTable<K, V>`.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+    /// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
     /// that key `k: K`.
     public fun borrow<K: copy + drop + store, V: key + store>(table: &ObjectTable<K, V>, k: K): &V {
         ofield::borrow(&table.id, k)
     }
 
     /// Mutably borrows the value associated with the key in the table `table: &mut ObjectTable<K, V>`.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+    /// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
     /// that key `k: K`.
     public fun borrow_mut<K: copy + drop + store, V: key + store>(
         table: &mut ObjectTable<K, V>,
@@ -55,7 +55,7 @@ module oct::object_table {
     }
 
     /// Removes the key-value pair in the table `table: &mut ObjectTable<K, V>` and returns the value.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
+    /// Aborts with `one::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
     /// that key `k: K`.
     public fun remove<K: copy + drop + store, V: key + store>(table: &mut ObjectTable<K, V>, k: K): V {
         let v = ofield::remove(&mut table.id, k);

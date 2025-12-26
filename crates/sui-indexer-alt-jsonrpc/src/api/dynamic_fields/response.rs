@@ -63,7 +63,7 @@ pub(super) async fn dynamic_field_object(
 }
 
 /// Fetch the latest version of the object identified by `object_id`, treat it as if it is a
-/// `sui::dynamic_field::Field<K, V>`, and extract the name and value from it.
+/// `one::dynamic_field::Field<K, V>`, and extract the name and value from it.
 pub(super) async fn dynamic_field_info(
     ctx: &Context,
     object_id: ObjectID,

@@ -1,8 +1,8 @@
 ---
-title: Module `sui::linked_table`
+title: Module `one::linked_table`
 ---
 
-Similar to <code><a href="../sui/table.md#sui_table">sui::table</a></code> but the values are linked together, allowing for ordered insertion and
+Similar to <code><a href="../sui/table.md#sui_table">one::table</a></code> but the values are linked together, allowing for ordered insertion and
 removal
 
 
@@ -33,11 +33,11 @@ removal
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -59,7 +59,7 @@ removal
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
  the ID of this table
@@ -156,7 +156,7 @@ removal
 Creates a new, empty table
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_new">new</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_new">new</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -186,7 +186,7 @@ Creates a new, empty table
 Returns the key for the first element in the table, or None if the table is empty
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_front">front</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_front">front</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
 </code></pre>
 
 
@@ -211,7 +211,7 @@ Returns the key for the first element in the table, or None if the table is empt
 Returns the key for the last element in the table, or None if the table is empty
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_back">back</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_back">back</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
 </code></pre>
 
 
@@ -235,11 +235,11 @@ Returns the key for the last element in the table, or None if the table is empty
 
 Inserts a key-value pair at the front of the table, i.e. the newly inserted pair will be
 the first element in the table
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">sui::dynamic_field::EFieldAlreadyExists</a></code> if the table already has an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">one::dynamic_field::EFieldAlreadyExists</a></code> if the table already has an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_push_front">push_front</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K, value: V)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_push_front">push_front</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K, value: V)
 </code></pre>
 
 
@@ -278,11 +278,11 @@ that key <code>k: K</code>.
 
 Inserts a key-value pair at the back of the table, i.e. the newly inserted pair will be
 the last element in the table
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">sui::dynamic_field::EFieldAlreadyExists</a></code> if the table already has an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">one::dynamic_field::EFieldAlreadyExists</a></code> if the table already has an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_push_back">push_back</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K, value: V)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_push_back">push_back</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K, value: V)
 </code></pre>
 
 
@@ -320,11 +320,11 @@ that key <code>k: K</code>.
 ## Function `borrow`
 
 Immutable borrows the value associated with the key in the table <code><a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &V
 </code></pre>
 
 
@@ -347,11 +347,11 @@ that key <code>k: K</code>.
 ## Function `borrow_mut`
 
 Mutably borrows the value associated with the key in the table <code><a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &<b>mut</b> V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &<b>mut</b> V
 </code></pre>
 
 
@@ -378,11 +378,11 @@ that key <code>k: K</code>.
 
 Borrows the key for the previous entry of the specified key <code>k: K</code> in the table
 <code><a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>. Returns None if the entry does not have a predecessor.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_prev">prev</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_prev">prev</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
 </code></pre>
 
 
@@ -406,11 +406,11 @@ that key <code>k: K</code>
 
 Borrows the key for the next entry of the specified key <code>k: K</code> in the table
 <code><a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>. Returns None if the entry does not have a predecessor.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_next">next</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_next">next</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): &<a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;K&gt;
 </code></pre>
 
 
@@ -434,11 +434,11 @@ that key <code>k: K</code>
 
 Removes the key-value pair in the table <code><a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code> and returns the value.
 This splices the element out of the ordering.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>. Note: this is also what happens when the table is empty.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_remove">remove</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_remove">remove</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): V
 </code></pre>
 
 
@@ -474,7 +474,7 @@ Removes the front of the table <code><a href="../sui/table.md#sui_table">table</
 Aborts with <code><a href="../sui/linked_table.md#sui_linked_table_ETableIsEmpty">ETableIsEmpty</a></code> if the table is empty
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_pop_front">pop_front</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;): (K, V)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_pop_front">pop_front</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): (K, V)
 </code></pre>
 
 
@@ -502,7 +502,7 @@ Removes the back of the table <code><a href="../sui/table.md#sui_table">table</a
 Aborts with <code><a href="../sui/linked_table.md#sui_linked_table_ETableIsEmpty">ETableIsEmpty</a></code> if the table is empty
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_pop_back">pop_back</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;): (K, V)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_pop_back">pop_back</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): (K, V)
 </code></pre>
 
 
@@ -530,7 +530,7 @@ Returns true iff there is a value associated with the key <code>k: K</code> in t
 <code><a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_contains">contains</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_contains">contains</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;, k: K): bool
 </code></pre>
 
 
@@ -555,7 +555,7 @@ Returns true iff there is a value associated with the key <code>k: K</code> in t
 Returns the size of the table, the number of key-value pairs
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_length">length</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_length">length</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): u64
 </code></pre>
 
 
@@ -580,7 +580,7 @@ Returns the size of the table, the number of key-value pairs
 Returns true iff the table is empty (if <code><a href="../sui/linked_table.md#sui_linked_table_length">length</a></code> returns <code>0</code>)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_is_empty">is_empty</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_is_empty">is_empty</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -606,7 +606,7 @@ Destroys an empty table
 Aborts with <code><a href="../sui/linked_table.md#sui_linked_table_ETableNotEmpty">ETableNotEmpty</a></code> if the table still contains values
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../sui/table.md#sui_table">table</a>: <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -634,7 +634,7 @@ Drop a possibly non-empty table.
 Usable only if the value type <code>V</code> has the <code><a href="../sui/linked_table.md#sui_linked_table_drop">drop</a></code> ability
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store&gt;(<a href="../sui/table.md#sui_table">table</a>: <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">sui::linked_table::LinkedTable</a>&lt;K, V&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>&lt;K: <b>copy</b>, <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store, V: <a href="../sui/linked_table.md#sui_linked_table_drop">drop</a>, store&gt;(<a href="../sui/table.md#sui_table">table</a>: <a href="../sui/linked_table.md#sui_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;)
 </code></pre>
 
 

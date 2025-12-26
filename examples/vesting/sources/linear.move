@@ -11,9 +11,9 @@
 /// ===========================================================================================
 module vesting::linear;
 
-use sui::balance::Balance;
-use sui::clock::Clock;
-use sui::coin::{Self, Coin};
+use one::balance::Balance;
+use one::clock::Clock;
+use one::coin::{Self, Coin};
 
 // === Errors ===
 #[error]

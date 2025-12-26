@@ -4,10 +4,10 @@
 #[test_only]
 module vesting::linear_tests;
 
-use sui::clock;
-use sui::coin;
-use sui::oct::OCT;
-use sui::test_scenario as ts;
+use one::clock;
+use one::coin;
+use one::oct::OCT;
+use one::test_scenario as ts;
 use vesting::linear::{Self, new_wallet, Wallet};
 
 public struct Token has key, store { id: UID }

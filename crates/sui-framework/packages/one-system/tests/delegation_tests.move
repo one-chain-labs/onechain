@@ -5,7 +5,7 @@
 module oct_system::delegation_tests;
 
 use std::unit_test::assert_eq;
-use sui::table::Table;
+use one::table::Table;
 use one_system::staking_pool::{Self, StakedOct, PoolTokenExchangeRate};
 use one_system::test_runner;
 use one_system::validator_builder;

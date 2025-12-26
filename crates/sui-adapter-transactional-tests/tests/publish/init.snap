@@ -14,8 +14,8 @@ task 2, line 21:
 Owner: Account Address ( _ )
 Version: 2
 Contents: Test::M1::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(1,1),
         },
     },

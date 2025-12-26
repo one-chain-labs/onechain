@@ -6,7 +6,7 @@
 module prettier::misc;
 
 use std::{string::String, type_name::{Self, TypeName}};
-use sui::{
+use one::{
     clock::Clock,
     coin::Coin,
     dynamic_field as df,

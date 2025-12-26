@@ -3,7 +3,7 @@
 
 #[allow(lint(public_entry))]
 module a::test {
-    use sui::random::{Random, RandomGenerator};
+    use one::random::{Random, RandomGenerator};
 
     public fun not_allowed1(_x: u64, _r: &Random) {}
     public fun not_allowed2(_rg: &RandomGenerator, _x: u64) {}
@@ -18,7 +18,7 @@ module oct::object {
 }
 
 module oct::random {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Random has key { id: UID }
     struct RandomGenerator has drop {}

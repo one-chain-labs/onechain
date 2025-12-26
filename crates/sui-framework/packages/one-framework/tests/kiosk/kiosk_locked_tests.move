@@ -5,8 +5,8 @@
 /// Test illustrating how an asset can be forever locked in the Kiosk.
 module oct::kiosk_locked_test;
 
-use sui::item_locked_policy as locked_policy;
-use sui::kiosk_test_utils::{Self as test, Asset};
+use one::item_locked_policy as locked_policy;
+use one::kiosk_test_utils::{Self as test, Asset};
 
 #[test]
 fun test_item_always_locked() {

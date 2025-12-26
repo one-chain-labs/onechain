@@ -4,7 +4,7 @@
 #[test_only]
 module oct::url_tests;
 
-use sui::url;
+use one::url;
 
 const EUrlStringMismatch: u64 = 1;
 

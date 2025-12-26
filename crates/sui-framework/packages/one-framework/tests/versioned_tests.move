@@ -4,7 +4,7 @@
 #[test_only]
 module oct::versioned_tests;
 
-use sui::versioned;
+use one::versioned;
 
 #[test]
 fun test_upgrade() {

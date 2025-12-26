@@ -1,6 +1,6 @@
 module a::m {
-    use sui::object;
-    use sui::tx_context;
+    use one::object;
+    use one::tx_context;
     struct Obj<T> has key {
         id: object::UID,
         value: T,

@@ -1,5 +1,5 @@
 ---
-title: Module `sui::ecdsa_k1`
+title: Module `one::ecdsa_k1`
 ---
 
 

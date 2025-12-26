@@ -3,8 +3,8 @@
 
 module oct::accumulator;
 
-use sui::dynamic_field;
-use sui::object::sui_accumulator_root_address;
+use one::dynamic_field;
+use one::object::sui_accumulator_root_address;
 
 const ENotSystemAddress: u64 = 0;
 

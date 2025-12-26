@@ -3,7 +3,7 @@
 
 
 module move_test_code::events_queries {
-    use sui::event;
+    use one::event;
 
     public struct EventA has copy, drop {
         new_value: u64

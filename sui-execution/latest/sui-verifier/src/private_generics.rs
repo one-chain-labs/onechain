@@ -35,7 +35,7 @@ pub const PRIVATE_TRANSFER_FUNCTIONS: &[&IdentStr] = &[
     ident_str!("party_transfer"),
 ];
 
-/// All transfer functions (the functions in `sui::transfer`) are "private" in that they are
+/// All transfer functions (the functions in `one::transfer`) are "private" in that they are
 /// restricted to the module.
 /// For example, with `transfer::transfer<T>(...)`, either:
 /// - `T` must be a type declared in the current module or
@@ -56,7 +56,7 @@ pub fn verify_module(
         // transactional execution and needs to allow test code to bypass private generics
         return Ok(());
     }
-    // do not need to check the sui::transfer module itself
+    // do not need to check the one::transfer module itself
     for func_def in &module.function_defs {
         verify_function(module, func_def, verifier_config.allow_receiving_object_id).map_err(
             |error| {

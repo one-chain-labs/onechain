@@ -55,8 +55,8 @@ task 6, line 70:
 Owner: Account Address ( A )
 Version: 5
 Contents: test::m1::Pub {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(5,0),
         },
     },

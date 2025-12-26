@@ -4,8 +4,8 @@
 #[test_only]
 module oct::table_vec_tests;
 
-use sui::table_vec;
-use sui::test_scenario;
+use one::table_vec;
+use one::test_scenario;
 
 const TEST_SENDER_ADDR: address = @0x1;
 
@@ -35,7 +35,7 @@ fun simple_all_functions() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table_vec::ETableNonEmpty)]
+#[expected_failure(abort_code = one::table_vec::ETableNonEmpty)]
 fun destroy_non_empty_aborts() {
     let mut scenario = test_scenario::begin(TEST_SENDER_ADDR);
     let table_vec = table_vec::singleton(1, scenario.ctx());
@@ -44,7 +44,7 @@ fun destroy_non_empty_aborts() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table_vec::EIndexOutOfBound)]
+#[expected_failure(abort_code = one::table_vec::EIndexOutOfBound)]
 fun pop_back_empty_aborts() {
     let mut scenario = test_scenario::begin(TEST_SENDER_ADDR);
     let mut table_vec = table_vec::empty<u64>(scenario.ctx());
@@ -54,7 +54,7 @@ fun pop_back_empty_aborts() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table_vec::EIndexOutOfBound)]
+#[expected_failure(abort_code = one::table_vec::EIndexOutOfBound)]
 fun borrow_out_of_bounds_aborts() {
     let mut scenario = test_scenario::begin(TEST_SENDER_ADDR);
     let table_vec = table_vec::singleton(1, scenario.ctx());
@@ -64,7 +64,7 @@ fun borrow_out_of_bounds_aborts() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table_vec::EIndexOutOfBound)]
+#[expected_failure(abort_code = one::table_vec::EIndexOutOfBound)]
 fun borrow_mut_out_of_bounds_aborts() {
     let mut scenario = test_scenario::begin(TEST_SENDER_ADDR);
     let mut table_vec = table_vec::singleton(1, scenario.ctx());
@@ -74,7 +74,7 @@ fun borrow_mut_out_of_bounds_aborts() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table_vec::EIndexOutOfBound)]
+#[expected_failure(abort_code = one::table_vec::EIndexOutOfBound)]
 fun swap_out_of_bounds_aborts() {
     let mut scenario = test_scenario::begin(TEST_SENDER_ADDR);
     let mut table_vec = table_vec::singleton(1, scenario.ctx());
@@ -94,7 +94,7 @@ fun swap_same_index_succeeds() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table_vec::EIndexOutOfBound)]
+#[expected_failure(abort_code = one::table_vec::EIndexOutOfBound)]
 fun swap_same_index_out_of_bounds_aborts() {
     let mut scenario = test_scenario::begin(TEST_SENDER_ADDR);
     let mut table_vec = table_vec::singleton(1, scenario.ctx());

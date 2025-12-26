@@ -1,8 +1,8 @@
 // allowed, even though a bit pointless
 module a::m {
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer::transfer;
+    use one::object::{Self, UID};
+    use one::tx_context::{Self, TxContext};
+    use one::transfer::transfer;
 
     struct Obj has key {
         id: UID
@@ -26,7 +26,7 @@ module oct::object {
     struct UID has store {
         id: address,
     }
-    public fun new(_: &mut sui::tx_context::TxContext): UID {
+    public fun new(_: &mut one::tx_context::TxContext): UID {
         abort 0
     }
     public fun delete(_: UID) {

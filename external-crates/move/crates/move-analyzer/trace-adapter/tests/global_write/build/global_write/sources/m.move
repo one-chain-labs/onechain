@@ -2,7 +2,7 @@
 // correctly.
 module global_write::m;
 
-use sui::linked_table;
+use one::linked_table;
 
 #[test]
 fun test() {

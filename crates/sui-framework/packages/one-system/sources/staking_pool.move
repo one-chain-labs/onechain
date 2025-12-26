@@ -261,9 +261,9 @@ fun calculate_fungible_staked_oct_withdraw_amount(
     );
 
     // invariant check, just in case
-    let expected_sui_amount = latest_exchange_rate.get_sui_amount(fungible_staked_oct_value);
+    let expected_oct_amount = latest_exchange_rate.get_sui_amount(fungible_staked_oct_value);
     assert!(
-        principal_withdraw_amount + rewards_withdraw_amount <= expected_sui_amount,
+        principal_withdraw_amount + rewards_withdraw_amount <= expected_oct_amount,
         EInvariantFailure,
     );
 

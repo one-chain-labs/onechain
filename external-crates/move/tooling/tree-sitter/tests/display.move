@@ -11,12 +11,12 @@
 ///
 /// More entry functions might be added in the future depending on the use cases.
 module oct::display {
-    use sui::package::{from_package, Publisher};
-    use sui::tx_context::{sender, TxContext};
-    use sui::vec_map::{Self, VecMap};
-    use sui::object::{Self, ID, UID};
-    use sui::transfer;
-    use sui::event;
+    use one::package::{from_package, Publisher};
+    use one::tx_context::{sender, TxContext};
+    use one::vec_map::{Self, VecMap};
+    use one::object::{Self, ID, UID};
+    use one::transfer;
+    use one::event;
     use std::vector;
     use std::string::String;
 
@@ -195,12 +195,12 @@ module oct::display {
 
 #[test_only]
 module oct::display_tests {
-    use sui::object::UID;
-    use sui::test_scenario as test;
-    use sui::transfer;
+    use one::object::UID;
+    use one::test_scenario as test;
+    use one::transfer;
     use std::string::{utf8, String};
-    use sui::package;
-    use sui::display;
+    use one::package;
+    use one::display;
 
     #[allow(unused_field)]
     /// An example object.

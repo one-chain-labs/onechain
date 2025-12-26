@@ -6,7 +6,7 @@ module bridge::message;
 use bridge::chain_ids;
 use bridge::message_types;
 use std::ascii::{Self, String};
-use sui::bcs::{Self, BCS};
+use one::bcs::{Self, BCS};
 
 const CURRENT_MESSAGE_VERSION: u8 = 1;
 const ECDSA_ADDRESS_LENGTH: u64 = 20;

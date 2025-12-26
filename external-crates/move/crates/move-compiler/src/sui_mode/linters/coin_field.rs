@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This analysis flags uses of the one::coin::Coin struct in fields of other structs. In most cases
-//! it's preferable to use sui::balance::Balance instead to save space.
+//! it's preferable to use one::balance::Balance instead to save space.
 
 use crate::{
     diag,
@@ -48,7 +48,7 @@ simple_visitor!(
             for (_floc, _fname, (_, (_, ftype))) in sfields {
                 if is_field_coin_type(ftype) {
                     let msg = "Sub-optimal 'one::coin::Coin' field type. Using \
-                        'sui::balance::Balance' instead will be more space efficient";
+                        'one::balance::Balance' instead will be more space efficient";
                     self.add_diag(diag!(COIN_FIELD_DIAG, (ftype.loc, msg)));
                 }
             }

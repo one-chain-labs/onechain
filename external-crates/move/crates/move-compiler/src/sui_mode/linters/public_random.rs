@@ -25,7 +25,7 @@ const PUBLIC_RANDOM_DIAG: DiagnosticInfo = custom(
     Severity::Warning,
     LinterDiagnosticCategory::Sui as u8,
     LinterDiagnosticCode::PublicRandom as u8,
-    "Risky use of 'sui::random'",
+    "Risky use of 'one::random'",
 );
 
 simple_visitor!(

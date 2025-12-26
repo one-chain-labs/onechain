@@ -6,12 +6,12 @@ module reviews_rating::service;
 use reviews_rating::moderator::Moderator;
 use reviews_rating::review::{Self, Review};
 use std::string::String;
-use sui::balance::{Self, Balance};
-use sui::clock::Clock;
-use sui::coin::{Self, Coin};
-use sui::dynamic_field as df;
-use sui::object_table::{Self, ObjectTable};
-use sui::oct::OCT;
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::dynamic_field as df;
+use one::object_table::{Self, ObjectTable};
+use one::oct::OCT;
 
 const EInvalidPermission: u64 = 1;
 const ENotEnoughBalance: u64 = 2;

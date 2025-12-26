@@ -1,9 +1,9 @@
 // tests modules can use transfer functions outside of the defining module, if the type
 // has store
 module a::m {
-    use sui::transfer::{Self, Receiving};
+    use one::transfer::{Self, Receiving};
     use a::other;
-    use sui::object::UID;
+    use one::object::UID;
 
     public fun t(s: other::S) {
         transfer::public_transfer(s, @0x100)
@@ -21,7 +21,7 @@ module a::m {
         transfer::public_receive(p, s)
     }
 
-    public fun m(s: other::S, p: sui::party::Party) {
+    public fun m(s: other::S, p: one::party::Party) {
         transfer::public_party_transfer(s, p)
     }
 
@@ -29,7 +29,7 @@ module a::m {
 
 module a::other {
     struct S has key, store {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 }
 
@@ -40,7 +40,7 @@ module oct::object {
 }
 
 module oct::transfer {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Receiving<phantom T: key> { }
 
@@ -52,11 +52,11 @@ module oct::transfer {
         abort 0
     }
 
-    public fun party_transfer<T: key>(_: T, _: sui::party::Party) {
+    public fun party_transfer<T: key>(_: T, _: one::party::Party) {
         abort 0
     }
 
-    public fun public_party_transfer<T: key + store>(_: T, _: sui::party::Party) {
+    public fun public_party_transfer<T: key + store>(_: T, _: one::party::Party) {
         abort 0
     }
 

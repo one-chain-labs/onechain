@@ -1,5 +1,5 @@
 ---
-title: Module `sui::party`
+title: Module `one::party`
 ---
 
 
@@ -18,7 +18,7 @@ title: Module `sui::party`
 
 <pre><code><b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">sui::vec_map</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
 </code></pre>
 
 
@@ -47,13 +47,13 @@ of transaction execution.
 
 <dl>
 <dt>
-<code>default: <a href="../sui/party.md#sui_party_Permissions">sui::party::Permissions</a></code>
+<code>default: <a href="../sui/party.md#sui_party_Permissions">one::party::Permissions</a></code>
 </dt>
 <dd>
  The permissions that apply if no specific permissions are set in the <code>members</code> map.
 </dd>
 <dt>
-<code>members: <a href="../sui/vec_map.md#sui_vec_map_VecMap">sui::vec_map::VecMap</a>&lt;<b>address</b>, <a href="../sui/party.md#sui_party_Permissions">sui::party::Permissions</a>&gt;</code>
+<code>members: <a href="../sui/vec_map.md#sui_vec_map_VecMap">one::vec_map::VecMap</a>&lt;<b>address</b>, <a href="../sui/party.md#sui_party_Permissions">one::party::Permissions</a>&gt;</code>
 </dt>
 <dd>
  The permissions per transaction sender.
@@ -168,7 +168,7 @@ Creates a <code><a href="../sui/party.md#sui_party_Party">Party</a></code> value
 has any permissions. And there are no default permissions.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/party.md#sui_party_single_owner">single_owner</a>(owner: <b>address</b>): <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/party.md#sui_party_single_owner">single_owner</a>(owner: <b>address</b>): <a href="../sui/party.md#sui_party_Party">one::party::Party</a>
 </code></pre>
 
 
@@ -192,10 +192,10 @@ has any permissions. And there are no default permissions.
 
 ## Macro function `transfer`
 
-A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#sui_transfer_party_transfer">sui::transfer::party_transfer</a></code>.
+A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#sui_transfer_party_transfer">one::transfer::party_transfer</a></code>.
 
 
-<pre><code><b>public</b> <b>macro</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer">transfer</a>&lt;$T: key&gt;($self: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>, $obj: $T)
+<pre><code><b>public</b> <b>macro</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer">transfer</a>&lt;$T: key&gt;($self: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>, $obj: $T)
 </code></pre>
 
 
@@ -206,7 +206,7 @@ A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#
 
 <pre><code><b>public</b> <b>macro</b> <b>fun</b> <a href="../sui/transfer.md#sui_transfer">transfer</a>&lt;$T: key&gt;($self: <a href="../sui/party.md#sui_party_Party">Party</a>, $obj: $T) {
     <b>let</b> mp = $self;
-    <a href="../sui/transfer.md#sui_transfer_party_transfer">sui::transfer::party_transfer</a>($obj, mp)
+    <a href="../sui/transfer.md#sui_transfer_party_transfer">one::transfer::party_transfer</a>($obj, mp)
 }
 </code></pre>
 
@@ -218,10 +218,10 @@ A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#
 
 ## Macro function `public_transfer`
 
-A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#sui_transfer_public_party_transfer">sui::transfer::public_party_transfer</a></code>.
+A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#sui_transfer_public_party_transfer">one::transfer::public_party_transfer</a></code>.
 
 
-<pre><code><b>public</b> <b>macro</b> <b>fun</b> <a href="../sui/party.md#sui_party_public_transfer">public_transfer</a>&lt;$T: key, store&gt;($self: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>, $obj: $T)
+<pre><code><b>public</b> <b>macro</b> <b>fun</b> <a href="../sui/party.md#sui_party_public_transfer">public_transfer</a>&lt;$T: key, store&gt;($self: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>, $obj: $T)
 </code></pre>
 
 
@@ -232,7 +232,7 @@ A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#
 
 <pre><code><b>public</b> <b>macro</b> <b>fun</b> <a href="../sui/party.md#sui_party_public_transfer">public_transfer</a>&lt;$T: key + store&gt;($self: <a href="../sui/party.md#sui_party_Party">Party</a>, $obj: $T) {
     <b>let</b> mp = $self;
-    <a href="../sui/transfer.md#sui_transfer_public_party_transfer">sui::transfer::public_party_transfer</a>($obj, mp)
+    <a href="../sui/transfer.md#sui_transfer_public_party_transfer">one::transfer::public_party_transfer</a>($obj, mp)
 }
 </code></pre>
 
@@ -246,7 +246,7 @@ A helper <code><b>macro</b></code> that calls <code><a href="../sui/transfer.md#
 
 
 
-<pre><code><b>fun</b> <a href="../sui/party.md#sui_party_empty">empty</a>(): <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>
+<pre><code><b>fun</b> <a href="../sui/party.md#sui_party_empty">empty</a>(): <a href="../sui/party.md#sui_party_Party">one::party::Party</a>
 </code></pre>
 
 
@@ -273,7 +273,7 @@ members: <a href="../sui/vec_map.md#sui_vec_map_empty">vec_map::empty</a>(),
 
 
 
-<pre><code><b>fun</b> <a href="../sui/party.md#sui_party_set_permissions">set_permissions</a>(p: &<b>mut</b> <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>, <b>address</b>: <b>address</b>, permissions: <a href="../sui/party.md#sui_party_Permissions">sui::party::Permissions</a>)
+<pre><code><b>fun</b> <a href="../sui/party.md#sui_party_set_permissions">set_permissions</a>(p: &<b>mut</b> <a href="../sui/party.md#sui_party_Party">one::party::Party</a>, <b>address</b>: <b>address</b>, permissions: <a href="../sui/party.md#sui_party_Permissions">one::party::Permissions</a>)
 </code></pre>
 
 
@@ -300,7 +300,7 @@ p.members.insert(<b>address</b>, permissions);
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/party.md#sui_party_is_single_owner">is_single_owner</a>(p: &<a href="../sui/party.md#sui_party_Party">sui::party::Party</a>): bool
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/party.md#sui_party_is_single_owner">is_single_owner</a>(p: &<a href="../sui/party.md#sui_party_Party">one::party::Party</a>): bool
 </code></pre>
 
 
@@ -326,7 +326,7 @@ p.members.insert(<b>address</b>, permissions);
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/party.md#sui_party_into_native">into_native</a>(p: <a href="../sui/party.md#sui_party_Party">sui::party::Party</a>): (u64, vector&lt;<b>address</b>&gt;, vector&lt;u64&gt;)
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/party.md#sui_party_into_native">into_native</a>(p: <a href="../sui/party.md#sui_party_Party">one::party::Party</a>): (u64, vector&lt;<b>address</b>&gt;, vector&lt;u64&gt;)
 </code></pre>
 
 

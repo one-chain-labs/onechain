@@ -18,7 +18,7 @@
 /// /// This function reads u8 and u64 value from the input
 /// /// and returns the rest of the bytes.
 /// fun deserialize(bytes: vector<u8>): (u8, u64, vector<u8>) {
-///     use sui::bcs::{Self, BCS};
+///     use one::bcs::{Self, BCS};
 ///
 ///     let prepared: BCS = bcs::new(bytes);
 ///     let (u8_value, u64_value) = (
@@ -35,7 +35,7 @@
 module oct::bcs;
 
 use std::bcs;
-use sui::address;
+use one::address;
 
 /// For when bytes length is less than required for deserialization.
 const EOutOfRange: u64 = 0;

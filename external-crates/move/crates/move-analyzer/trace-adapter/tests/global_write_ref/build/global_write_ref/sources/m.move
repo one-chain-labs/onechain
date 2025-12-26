@@ -2,7 +2,7 @@
 // coming from a global reference is handled correctly
 module global_write_ref::m;
 
-use sui::linked_table;
+use one::linked_table;
 
 fun foo(table: &linked_table::LinkedTable<u64, u8>): u64 {
     let mut res = 0;

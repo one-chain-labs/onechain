@@ -4,8 +4,8 @@
 // where a given instantiation`T<...>` has key but does _not_ have store
 
 module a::m {
-    use sui::transfer::{Self, Receiving};
-    use sui::object::UID;
+    use one::transfer::{Self, Receiving};
+    use one::object::UID;
 
     public fun t1<T: key + store>(s: T) {
         transfer::transfer(s, @0x100);
@@ -23,7 +23,7 @@ module a::m {
         transfer::receive(p, s)
     }
 
-    public fun t5<T: key + store>(s: T, p: sui::party::Party) {
+    public fun t5<T: key + store>(s: T, p: one::party::Party) {
         transfer::party_transfer(s, p)
     }
 }
@@ -35,7 +35,7 @@ module oct::object {
 }
 
 module oct::transfer {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Receiving<phantom T: key> { }
 
@@ -47,11 +47,11 @@ module oct::transfer {
         abort 0
     }
 
-    public fun party_transfer<T: key>(_: T, _: sui::party::Party) {
+    public fun party_transfer<T: key>(_: T, _: one::party::Party) {
         abort 0
     }
 
-    public fun public_party_transfer<T: key + store>(_: T, _: sui::party::Party) {
+    public fun public_party_transfer<T: key + store>(_: T, _: one::party::Party) {
         abort 0
     }
 

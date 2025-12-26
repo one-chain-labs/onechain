@@ -19,7 +19,7 @@ pub type SnapshotManifest = BTreeMap<u64, Snapshot>;
 ///
 // Note: the [Snapshot] and [SnapshotPackage] types are similar to the
 // [sui_framework::{SystemPackageMetadata, SystemPackage}] types,
-// and also to the [sui::framework_versions::{FrameworkVersion, FrameworkPackage}] types.
+// and also to the [one::framework_versions::{FrameworkVersion, FrameworkPackage}] types.
 // They are sort of a stepping stone from one to the other - the [sui_framework] types contain
 // additional information about the compiled bytecode of the package, while the
 // [framework_versions] types do not contain information about the object IDs of the packages.

@@ -4,12 +4,12 @@
 #[test_only]
 module oct_system::validator_set_tests;
 
-use sui::address;
-use sui::balance;
-use sui::coin;
-use sui::test_scenario::{Self, Scenario};
-use sui::test_utils::{Self, assert_eq};
-use sui::vec_map;
+use one::address;
+use one::balance;
+use one::coin;
+use one::test_scenario::{Self, Scenario};
+use one::test_utils::{Self, assert_eq};
+use one::vec_map;
 use one_system::validator::{Self, Validator, staking_pool_id};
 use one_system::validator_set::{Self, ValidatorSet};
 

@@ -7,8 +7,8 @@
 /// operations.
 module oct::token_treasury_cap_tests;
 
-use sui::token;
-use sui::token_test_utils as test;
+use one::token;
+use one::token_test_utils as test;
 
 #[test]
 /// Scenario: mint and spend a Token, confirm spending request with the

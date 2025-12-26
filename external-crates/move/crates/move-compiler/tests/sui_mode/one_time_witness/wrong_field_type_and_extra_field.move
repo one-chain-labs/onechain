@@ -3,7 +3,7 @@ module a::beep {
         f0: u64,
         f1: bool,
     }
-    fun init(_ctx: &mut sui::tx_context::TxContext) {
+    fun init(_ctx: &mut one::tx_context::TxContext) {
     }
 }
 

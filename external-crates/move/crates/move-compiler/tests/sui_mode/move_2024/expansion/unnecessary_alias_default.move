@@ -8,7 +8,7 @@ module oct::tx_context {
 }
 
 module a::m {
-    use sui::object::{Self, ID, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::object::{Self, ID, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 }

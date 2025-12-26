@@ -3,8 +3,8 @@
 
 module usdc_usage::example;
 
-use sui::coin::Coin;
-use sui::oct::OCT;
+use one::coin::Coin;
+use one::oct::OCT;
 use usdc::usdc::USDC;
 
 public struct Sword has key, store {

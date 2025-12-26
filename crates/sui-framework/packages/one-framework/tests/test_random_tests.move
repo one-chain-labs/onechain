@@ -4,7 +4,7 @@
 #[test_only]
 module oct::test_random_tests;
 
-use sui::test_random::new;
+use one::test_random::new;
 
 #[test]
 fun test_next_bytes() {

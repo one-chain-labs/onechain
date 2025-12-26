@@ -5,10 +5,10 @@
 #[allow(unused_use)]
 module oct::random_tests;
 
-use sui::bcs;
-use sui::random::{Self, Random};
-use sui::test_scenario;
-use sui::test_utils::assert_eq;
+use one::bcs;
+use one::random::{Self, Random};
+use one::test_scenario;
+use one::test_utils::assert_eq;
 
 // TODO: add a test from https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-22r1a.pdf ?
 

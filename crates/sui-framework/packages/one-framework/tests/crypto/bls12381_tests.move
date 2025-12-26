@@ -6,10 +6,10 @@
 module oct::bls12381_tests;
 
 use std::hash::sha2_256;
-use sui::bls12381;
-use sui::group_ops;
-use sui::random;
-use sui::test_utils::assert_eq;
+use one::bls12381;
+use one::group_ops;
+use one::random;
+use one::test_utils::assert_eq;
 
 const ORDER_BYTES: vector<u8> = x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 const ORDER_MINUS_ONE_BYTES: vector<u8> =

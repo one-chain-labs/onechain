@@ -1,14 +1,14 @@
 // valid Random by immutable reference
 
 module a::m {
-    public entry fun yes_random_ref(_: &sui::random::Random) {
+    public entry fun yes_random_ref(_: &one::random::Random) {
         abort 0
     }
 }
 
 module oct::random {
     struct Random has key {
-        id: sui::object::UID,
+        id: one::object::UID,
     }
 }
 

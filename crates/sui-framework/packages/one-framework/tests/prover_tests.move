@@ -4,7 +4,7 @@
 #[test_only]
 module oct::prover_tests;
 
-use sui::dynamic_field;
+use one::dynamic_field;
 
 public struct Obj has key, store {
     id: UID,

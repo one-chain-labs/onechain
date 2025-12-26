@@ -90,7 +90,7 @@ pub struct NameServiceConfig {
     pub reverse_registry_id: ObjectID,
 }
 
-/// Rust version of the Move sui::table::Table type.
+/// Rust version of the Move one::table::Table type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Table<K, V> {
     pub id: ObjectID,

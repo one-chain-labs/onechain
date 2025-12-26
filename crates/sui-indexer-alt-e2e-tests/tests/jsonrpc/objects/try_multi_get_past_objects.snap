@@ -25,7 +25,7 @@ gas summary: computation_cost: 1000000, storage_cost: 1976000,  storage_rebate: 
 task 3, lines 17-19:
 //# programmable --sender A --inputs 44
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: sui::transfer::public_share_object<sui::coin::Coin<sui::oct::OCT>>(Result(0))
+//> 1: one::transfer::public_share_object<one::coin::Coin<one::oct::OCT>>(Result(0))
 created: object(3,0)
 mutated: object(0,0)
 gas summary: computation_cost: 1000000, storage_cost: 1976000,  storage_rebate: 978120, non_refundable_storage_fee: 9880
@@ -33,14 +33,14 @@ gas summary: computation_cost: 1000000, storage_cost: 1976000,  storage_rebate: 
 task 4, lines 21-23:
 //# programmable --sender A --inputs 45
 //> 0: SplitCoins(Gas, [Input(0)]);
-//> 1: sui::transfer::public_freeze_object<sui::coin::Coin<sui::oct::OCT>>(Result(0))
+//> 1: one::transfer::public_freeze_object<one::coin::Coin<one::oct::OCT>>(Result(0))
 created: object(4,0)
 mutated: object(0,0)
 gas summary: computation_cost: 1000000, storage_cost: 1976000,  storage_rebate: 978120, non_refundable_storage_fee: 9880
 
 task 5, lines 25-27:
 //# programmable --sender A --inputs @A
-//> 0: sui::table::new<u64, u64>();
+//> 0: one::table::new<u64, u64>();
 //> 1: TransferObjects([Result(0)], Input(0))
 created: object(5,0)
 mutated: object(0,0)
@@ -48,14 +48,14 @@ gas summary: computation_cost: 1000000, storage_cost: 2333200,  storage_rebate: 
 
 task 6, lines 29-30:
 //# programmable --sender A --inputs object(5,0) 46 47
-//> 0: sui::table::add<u64, u64>(Input(0), Input(1), Input(2))
+//> 0: one::table::add<u64, u64>(Input(0), Input(1), Input(2))
 created: object(6,0)
 mutated: object(0,0), object(5,0)
 gas summary: computation_cost: 1000000, storage_cost: 3800000,  storage_rebate: 2309868, non_refundable_storage_fee: 23332
 
 task 7, lines 32-33:
 //# programmable --sender A --inputs object(5,0) 46
-//> 0: sui::table::remove<u64, u64>(Input(0), Input(1))
+//> 0: one::table::remove<u64, u64>(Input(0), Input(1))
 mutated: object(0,0), object(5,0)
 deleted: object(6,0)
 gas summary: computation_cost: 1000000, storage_cost: 2333200,  storage_rebate: 3762000, non_refundable_storage_fee: 38000

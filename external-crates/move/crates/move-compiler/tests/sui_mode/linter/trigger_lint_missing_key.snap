@@ -11,6 +11,6 @@ warning[Lint W99007]: struct with id but missing key ability
 5 │ ╭     struct MissingKeyAbility {
 6 │ │         id: UID,
 7 │ │     }
-  │ ╰─────^ Struct's first field has an 'id' field of type 'sui::object::UID' but is missing the 'key' ability.
+  │ ╰─────^ Struct's first field has an 'id' field of type 'one::object::UID' but is missing the 'key' ability.
   │  
   = This warning can be suppressed with '#[allow(lint(missing_key))]' applied to the 'module' or module member ('const', 'fun', or 'struct')

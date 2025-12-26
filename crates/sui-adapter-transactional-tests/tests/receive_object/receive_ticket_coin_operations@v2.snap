@@ -20,8 +20,8 @@ task 3, line 27:
 Owner: Account Address ( _ )
 Version: 3
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -32,8 +32,8 @@ task 4, lines 29-31:
 Owner: Account Address ( fake(2,0) )
 Version: 3
 Contents: tto::M1::B {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },
@@ -68,8 +68,8 @@ task 9, line 44:
 Owner: Account Address ( _ )
 Version: 7
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -80,8 +80,8 @@ task 10, line 46:
 Owner: Account Address ( fake(2,0) )
 Version: 3
 Contents: tto::M1::B {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },

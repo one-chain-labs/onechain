@@ -8,15 +8,15 @@
 module nft_rental::rentables_ext;
 
 use kiosk::kiosk_lock_rule::Rule as LockRule;
-use sui::bag;
-use sui::balance::{Self, Balance};
-use sui::clock::Clock;
-use sui::coin::{Self, Coin};
-use sui::kiosk::{Kiosk, KioskOwnerCap};
-use sui::kiosk_extension;
-use sui::package::Publisher;
-use sui::oct::OCT;
-use sui::transfer_policy::{Self, TransferPolicy, TransferPolicyCap, has_rule};
+use one::bag;
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::kiosk::{Kiosk, KioskOwnerCap};
+use one::kiosk_extension;
+use one::package::Publisher;
+use one::oct::OCT;
+use one::transfer_policy::{Self, TransferPolicy, TransferPolicyCap, has_rule};
 
 // === Imports ===
 

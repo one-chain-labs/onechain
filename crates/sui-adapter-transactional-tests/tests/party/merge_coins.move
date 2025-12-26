@@ -6,7 +6,7 @@
 //# publish --sender A
 module ex::m;
 
-use sui::coin;
+use one::coin;
 
 public struct M has drop {}
 
@@ -18,11 +18,11 @@ fun init(witness: M, ctx: &mut TxContext) {
 
 // Verify ConsenusAddressOwner coin can be merged into AddressOwner coin.
 //# programmable --sender A --inputs object(1,2) 100 @A
-//> 0: sui::coin::mint<ex::m::M>(Input(0), Input(1));
-//> 1: sui::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 0: one::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 1: one::coin::mint<ex::m::M>(Input(0), Input(1));
 //> 2: TransferObjects([Result(0)], Input(2));
-//> 3: sui::party::single_owner(Input(2));
-//> sui::transfer::public_party_transfer<sui::coin::Coin<ex::m::M>>(Result(1), Result(3))
+//> 3: one::party::single_owner(Input(2));
+//> one::transfer::public_party_transfer<one::coin::Coin<ex::m::M>>(Result(1), Result(3))
 
 //# programmable --sender A --inputs object(2,0) object(2,1) @A
 //> MergeCoins(Input(1), [Input(0)])
@@ -31,11 +31,11 @@ fun init(witness: M, ctx: &mut TxContext) {
 
 // Verify AddressOwner coin can be merged into ConsensusAddressOwner coin.
 //# programmable --sender A --inputs object(1,2) 100 @A
-//> 0: sui::coin::mint<ex::m::M>(Input(0), Input(1));
-//> 1: sui::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 0: one::coin::mint<ex::m::M>(Input(0), Input(1));
+//> 1: one::coin::mint<ex::m::M>(Input(0), Input(1));
 //> 2: TransferObjects([Result(0)], Input(2));
-//> 3: sui::party::single_owner(Input(2));
-//> sui::transfer::public_party_transfer<sui::coin::Coin<ex::m::M>>(Result(1), Result(3))
+//> 3: one::party::single_owner(Input(2));
+//> one::transfer::public_party_transfer<one::coin::Coin<ex::m::M>>(Result(1), Result(3))
 
 //# programmable --sender A --inputs object(5,0) object(5,1) @A
 //> MergeCoins(Input(0), [Input(1)])

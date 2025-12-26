@@ -1,5 +1,5 @@
 module a::m {
-    use sui::object;
+    use one::object;
     struct Obj has key {
         id: object::UID,
     }

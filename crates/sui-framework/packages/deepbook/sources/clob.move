@@ -4,13 +4,13 @@
 module deepbook::clob {
     use std::type_name::TypeName;
 
-    use sui::balance::Balance;
-    use sui::clock::{Self, Clock};
-    use sui::coin::Coin;
-    use sui::event;
-    use sui::linked_table::{Self, LinkedTable};
-    use sui::oct::OCT;
-    use sui::table::{Self, Table, contains, borrow_mut};
+    use one::balance::Balance;
+    use one::clock::{Self, Clock};
+    use one::coin::Coin;
+    use one::event;
+    use one::linked_table::{Self, LinkedTable};
+    use one::oct::OCT;
+    use one::table::{Self, Table, contains, borrow_mut};
 
     use deepbook::critbit::{Self, CritbitTree, borrow_mut_leaf_by_index, remove_leaf_by_index, borrow_leaf_by_index, borrow_leaf_by_key, find_leaf};
     use deepbook::custodian::{Self, Custodian, AccountCap};

@@ -15,7 +15,7 @@ use sui_types::transaction::{
 use sui_types::{base_types::SuiAddress, Identifier};
 use test_cluster::TestClusterBuilder;
 const SUI_COIN_TYPE: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
+    "0x0000000000000000000000000000000000000000000000000000000000000002::one::SUI";
 const INITIAL_SUI_BALANCE: u64 = 150000000000000000;
 
 #[sim_test]

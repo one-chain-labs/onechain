@@ -1,5 +1,5 @@
 ---
-title: Module `sui::authenticator_state`
+title: Module `one::authenticator_state`
 ---
 
 
@@ -31,14 +31,14 @@ title: Module `sui::authenticator_state`
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/u64.md#std_u64">std::u64</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/party.md#sui_party">sui::party</a>;
-<b>use</b> <a href="../sui/transfer.md#sui_transfer">sui::transfer</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
-<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">sui::vec_map</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
 </code></pre>
 
 
@@ -63,7 +63,7 @@ future versions of the authenticator state.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
 </dd>
@@ -99,7 +99,7 @@ future versions of the authenticator state.
 <dd>
 </dd>
 <dt>
-<code>active_jwks: vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>&gt;</code>
+<code>active_jwks: vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>&gt;</code>
 </dt>
 <dd>
  List of currently active JWKs.
@@ -200,12 +200,12 @@ Must match the JwkId struct in fastcrypto-zkp
 
 <dl>
 <dt>
-<code>jwk_id: <a href="../sui/authenticator_state.md#sui_authenticator_state_JwkId">sui::authenticator_state::JwkId</a></code>
+<code>jwk_id: <a href="../sui/authenticator_state.md#sui_authenticator_state_JwkId">one::authenticator_state::JwkId</a></code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>jwk: <a href="../sui/authenticator_state.md#sui_authenticator_state_JWK">sui::authenticator_state::JWK</a></code>
+<code>jwk: <a href="../sui/authenticator_state.md#sui_authenticator_state_JWK">one::authenticator_state::JWK</a></code>
 </dt>
 <dd>
 </dd>
@@ -267,7 +267,7 @@ Sender is not @0x0 the system address.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_active_jwk_equal">active_jwk_equal</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>): bool
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_active_jwk_equal">active_jwk_equal</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>): bool
 </code></pre>
 
 
@@ -292,7 +292,7 @@ Sender is not @0x0 the system address.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_jwk_equal">jwk_equal</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JWK">sui::authenticator_state::JWK</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JWK">sui::authenticator_state::JWK</a>): bool
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_jwk_equal">jwk_equal</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JWK">one::authenticator_state::JWK</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JWK">one::authenticator_state::JWK</a>): bool
 </code></pre>
 
 
@@ -319,7 +319,7 @@ Sender is not @0x0 the system address.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_jwk_id_equal">jwk_id_equal</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JwkId">sui::authenticator_state::JwkId</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JwkId">sui::authenticator_state::JwkId</a>): bool
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_jwk_id_equal">jwk_id_equal</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JwkId">one::authenticator_state::JwkId</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_JwkId">one::authenticator_state::JwkId</a>): bool
 </code></pre>
 
 
@@ -387,7 +387,7 @@ Sender is not @0x0 the system address.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_jwk_lt">jwk_lt</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>): bool
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_jwk_lt">jwk_lt</a>(a: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>, b: &<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>): bool
 </code></pre>
 
 
@@ -430,7 +430,7 @@ the authenticator state object is first created.
 Can only be called by genesis or change_epoch transactions.
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_create">create</a>(ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_create">create</a>(ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -465,7 +465,7 @@ Can only be called by genesis or change_epoch transactions.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_load_inner_mut">load_inner_mut</a>(self: &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">sui::authenticator_state::AuthenticatorState</a>): &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorStateInner">sui::authenticator_state::AuthenticatorStateInner</a>
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_load_inner_mut">load_inner_mut</a>(self: &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">one::authenticator_state::AuthenticatorState</a>): &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorStateInner">one::authenticator_state::AuthenticatorStateInner</a>
 </code></pre>
 
 
@@ -494,7 +494,7 @@ Can only be called by genesis or change_epoch transactions.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_load_inner">load_inner</a>(self: &<a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">sui::authenticator_state::AuthenticatorState</a>): &<a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorStateInner">sui::authenticator_state::AuthenticatorStateInner</a>
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_load_inner">load_inner</a>(self: &<a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">one::authenticator_state::AuthenticatorState</a>): &<a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorStateInner">one::authenticator_state::AuthenticatorStateInner</a>
 </code></pre>
 
 
@@ -523,7 +523,7 @@ Can only be called by genesis or change_epoch transactions.
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_check_sorted">check_sorted</a>(new_active_jwks: &vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>&gt;)
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_check_sorted">check_sorted</a>(new_active_jwks: &vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>&gt;)
 </code></pre>
 
 
@@ -557,7 +557,7 @@ If a new JWK is already present, but with a previous epoch, then the epoch is up
 indicate that the JWK has been validated in the current epoch and should not be expired.
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_update_authenticator_state">update_authenticator_state</a>(self: &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">sui::authenticator_state::AuthenticatorState</a>, new_active_jwks: vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>&gt;, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_update_authenticator_state">update_authenticator_state</a>(self: &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">one::authenticator_state::AuthenticatorState</a>, new_active_jwks: vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>&gt;, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -628,7 +628,7 @@ indicate that the JWK has been validated in the current epoch and should not be 
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_deduplicate">deduplicate</a>(jwks: vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>&gt;): vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>&gt;
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_deduplicate">deduplicate</a>(jwks: vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>&gt;): vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>&gt;
 </code></pre>
 
 
@@ -669,7 +669,7 @@ indicate that the JWK has been validated in the current epoch and should not be 
 
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_expire_jwks">expire_jwks</a>(self: &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">sui::authenticator_state::AuthenticatorState</a>, min_epoch: u64, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_expire_jwks">expire_jwks</a>(self: &<b>mut</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">one::authenticator_state::AuthenticatorState</a>, min_epoch: u64, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -750,7 +750,7 @@ Get the current active_jwks. Called when the node starts up in order to load the
 JWK state from the chain.
 
 
-<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_get_active_jwks">get_active_jwks</a>(self: &<a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">sui::authenticator_state::AuthenticatorState</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">sui::authenticator_state::ActiveJwk</a>&gt;
+<pre><code><b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state_get_active_jwks">get_active_jwks</a>(self: &<a href="../sui/authenticator_state.md#sui_authenticator_state_AuthenticatorState">one::authenticator_state::AuthenticatorState</a>, ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): vector&lt;<a href="../sui/authenticator_state.md#sui_authenticator_state_ActiveJwk">one::authenticator_state::ActiveJwk</a>&gt;
 </code></pre>
 
 

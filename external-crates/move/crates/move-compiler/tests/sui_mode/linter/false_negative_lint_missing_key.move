@@ -1,5 +1,5 @@
 module a::trigger_lint_cases {
-    use sui::object::UID;
+    use one::object::UID;
 
     // False negative cases (should trigger warning but might not):
 

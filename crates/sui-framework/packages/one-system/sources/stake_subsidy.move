@@ -3,9 +3,9 @@
 
 module oct_system::stake_subsidy;
 
-use sui::bag::{Self, Bag};
-use sui::balance::Balance;
-use sui::oct::OCT;
+use one::bag::{Self, Bag};
+use one::balance::Balance;
+use one::oct::OCT;
 
 const ESubsidyDecreaseRateTooLarge: u64 = 0;
 

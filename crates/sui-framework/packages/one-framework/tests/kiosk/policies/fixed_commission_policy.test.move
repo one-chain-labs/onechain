@@ -6,9 +6,9 @@
 /// Follows the "transfer rules" layout and implements each of the steps.
 module oct::fixed_commission;
 
-use sui::coin::Coin;
-use sui::oct::OCT;
-use sui::transfer_policy::{Self as policy, TransferPolicy, TransferRequest, TransferPolicyCap};
+use one::coin::Coin;
+use one::oct::OCT;
+use one::transfer_policy::{Self as policy, TransferPolicy, TransferRequest, TransferPolicyCap};
 
 /// Expected amount does not match the passed one.
 const EIncorrectAmount: u64 = 0;

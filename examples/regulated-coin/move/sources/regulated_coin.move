@@ -3,7 +3,7 @@
 
 module regulated_coin_example::regulated_coin;
 
-use sui::coin;
+use one::coin;
 
 public struct REGULATED_COIN has drop {}
 

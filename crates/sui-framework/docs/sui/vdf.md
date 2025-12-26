@@ -1,5 +1,5 @@
 ---
-title: Module `sui::vdf`
+title: Module `one::vdf`
 ---
 
 

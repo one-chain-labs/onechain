@@ -1,9 +1,9 @@
 ---
-title: Module `sui::object_bag`
+title: Module `one::object_bag`
 ---
 
-Similar to <code><a href="../sui/bag.md#sui_bag">sui::bag</a></code>, an <code><a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code> is a heterogeneous map-like collection. But unlike
-<code><a href="../sui/bag.md#sui_bag">sui::bag</a></code>, the values bound to these dynamic fields _must_ be objects themselves. This allows
+Similar to <code><a href="../sui/bag.md#sui_bag">one::bag</a></code>, an <code><a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code> is a heterogeneous map-like collection. But unlike
+<code><a href="../sui/bag.md#sui_bag">one::bag</a></code>, the values bound to these dynamic fields _must_ be objects themselves. This allows
 for the objects to still exist in storage, which may be important for external tools.
 The difference is otherwise not observable from within Move.
 
@@ -28,12 +28,12 @@ The difference is otherwise not observable from within Move.
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">sui::dynamic_object_field</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -55,7 +55,7 @@ The difference is otherwise not observable from within Move.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
  the ID of this bag
@@ -92,7 +92,7 @@ The difference is otherwise not observable from within Move.
 Creates a new, empty bag
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>
 </code></pre>
 
 
@@ -118,11 +118,11 @@ Creates a new, empty bag
 ## Function `add`
 
 Adds a key-value pair to the bag <code><a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code>
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">sui::dynamic_field::EFieldAlreadyExists</a></code> if the bag already has an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">one::dynamic_field::EFieldAlreadyExists</a></code> if the bag already has an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_add">add</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K, v: V)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_add">add</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K, v: V)
 </code></pre>
 
 
@@ -146,13 +146,13 @@ that key <code>k: K</code>.
 ## Function `borrow`
 
 Immutably borrows the value associated with the key in the bag <code><a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the bag does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the bag does not have an entry with
 that key <code>k: K</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldTypeMismatch">sui::dynamic_field::EFieldTypeMismatch</a></code> if the bag has an entry for the key, but
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldTypeMismatch">one::dynamic_field::EFieldTypeMismatch</a></code> if the bag has an entry for the key, but
 the value does not have the specified type.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K): &V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K): &V
 </code></pre>
 
 
@@ -175,13 +175,13 @@ the value does not have the specified type.
 ## Function `borrow_mut`
 
 Mutably borrows the value associated with the key in the bag <code><a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the bag does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the bag does not have an entry with
 that key <code>k: K</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldTypeMismatch">sui::dynamic_field::EFieldTypeMismatch</a></code> if the bag has an entry for the key, but
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldTypeMismatch">one::dynamic_field::EFieldTypeMismatch</a></code> if the bag has an entry for the key, but
 the value does not have the specified type.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K): &<b>mut</b> V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K): &<b>mut</b> V
 </code></pre>
 
 
@@ -204,13 +204,13 @@ the value does not have the specified type.
 ## Function `remove`
 
 Mutably borrows the key-value pair in the bag <code><a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code> and returns the value.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the bag does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the bag does not have an entry with
 that key <code>k: K</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldTypeMismatch">sui::dynamic_field::EFieldTypeMismatch</a></code> if the bag has an entry for the key, but
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldTypeMismatch">one::dynamic_field::EFieldTypeMismatch</a></code> if the bag has an entry for the key, but
 the value does not have the specified type.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K): V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<b>mut</b> <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K): V
 </code></pre>
 
 
@@ -237,7 +237,7 @@ the value does not have the specified type.
 Returns true iff there is an value associated with the key <code>k: K</code> in the bag <code><a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">ObjectBag</a></code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_contains">contains</a>&lt;K: <b>copy</b>, drop, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_contains">contains</a>&lt;K: <b>copy</b>, drop, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K): bool
 </code></pre>
 
 
@@ -263,7 +263,7 @@ Returns true iff there is an value associated with the key <code>k: K</code> in 
 with an assigned value of type <code>V</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_contains_with_type">contains_with_type</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_contains_with_type">contains_with_type</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K): bool
 </code></pre>
 
 
@@ -288,7 +288,7 @@ with an assigned value of type <code>V</code>
 Returns the size of the bag, the number of key-value pairs
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_length">length</a>(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_length">length</a>(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>): u64
 </code></pre>
 
 
@@ -313,7 +313,7 @@ Returns the size of the bag, the number of key-value pairs
 Returns true iff the bag is empty (if <code><a href="../sui/object_bag.md#sui_object_bag_length">length</a></code> returns <code>0</code>)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_is_empty">is_empty</a>(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_is_empty">is_empty</a>(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>): bool
 </code></pre>
 
 
@@ -339,7 +339,7 @@ Destroys an empty bag
 Aborts with <code><a href="../sui/object_bag.md#sui_object_bag_EBagNotEmpty">EBagNotEmpty</a></code> if the bag still contains values
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_destroy_empty">destroy_empty</a>(<a href="../sui/bag.md#sui_bag">bag</a>: <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_destroy_empty">destroy_empty</a>(<a href="../sui/bag.md#sui_bag">bag</a>: <a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>)
 </code></pre>
 
 
@@ -367,7 +367,7 @@ Returns the ID of the object associated with the key if the bag has an entry wit
 Returns none otherwise
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_value_id">value_id</a>&lt;K: <b>copy</b>, drop, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">sui::object_bag::ObjectBag</a>, k: K): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<a href="../sui/object.md#sui_object_ID">sui::object::ID</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_bag.md#sui_object_bag_value_id">value_id</a>&lt;K: <b>copy</b>, drop, store&gt;(<a href="../sui/bag.md#sui_bag">bag</a>: &<a href="../sui/object_bag.md#sui_object_bag_ObjectBag">one::object_bag::ObjectBag</a>, k: K): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<a href="../sui/object.md#sui_object_ID">one::object::ID</a>&gt;
 </code></pre>
 
 

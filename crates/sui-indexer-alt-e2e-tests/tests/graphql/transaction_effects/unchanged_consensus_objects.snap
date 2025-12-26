@@ -17,8 +17,8 @@ task 2, line 35:
 Owner: Shared( 2 )
 Version: 2
 Contents: test::shared_object_tests::SharedCounter {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(1,0),
         },
     },

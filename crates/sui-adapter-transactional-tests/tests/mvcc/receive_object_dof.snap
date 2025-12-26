@@ -22,16 +22,16 @@ task 3, line 62:
 //# view-object 2,0
 Owner: Object ID: ( fake(2,1) )
 Version: 2
-Contents: sui::dynamic_field::Field<sui::dynamic_object_field::Wrapper<u64>, sui::object::ID> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::dynamic_field::Field<one::dynamic_object_field::Wrapper<u64>, one::object::ID> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
-    name: sui::dynamic_object_field::Wrapper<u64> {
+    name: one::dynamic_object_field::Wrapper<u64> {
         name: 0u64,
     },
-    value: sui::object::ID {
+    value: one::object::ID {
         bytes: fake(2,3),
     },
 }
@@ -41,8 +41,8 @@ task 4, line 64:
 Owner: Object ID: ( fake(2,0) )
 Version: 2
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,3),
         },
     },
@@ -54,8 +54,8 @@ task 5, line 66:
 Owner: Account Address ( fake(2,2) )
 Version: 2
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },
@@ -67,8 +67,8 @@ task 6, line 68:
 Owner: Account Address ( A )
 Version: 2
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,2),
         },
     },
@@ -85,16 +85,16 @@ task 8, lines 72-74:
 //# view-object 2,0
 Owner: Object ID: ( fake(2,1) )
 Version: 2
-Contents: sui::dynamic_field::Field<sui::dynamic_object_field::Wrapper<u64>, sui::object::ID> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::dynamic_field::Field<one::dynamic_object_field::Wrapper<u64>, one::object::ID> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
-    name: sui::dynamic_object_field::Wrapper<u64> {
+    name: one::dynamic_object_field::Wrapper<u64> {
         name: 0u64,
     },
-    value: sui::object::ID {
+    value: one::object::ID {
         bytes: fake(2,3),
     },
 }
@@ -104,8 +104,8 @@ task 9, line 75:
 Owner: Object ID: ( fake(2,0) )
 Version: 2
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,3),
         },
     },
@@ -117,8 +117,8 @@ task 10, line 77:
 Owner: Object ID: ( fake(7,0) )
 Version: 3
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },
@@ -130,8 +130,8 @@ task 11, line 79:
 Owner: Account Address ( A )
 Version: 3
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,2),
         },
     },
@@ -148,16 +148,16 @@ task 13, lines 84-86:
 //# view-object 2,0
 Owner: Object ID: ( fake(2,1) )
 Version: 2
-Contents: sui::dynamic_field::Field<sui::dynamic_object_field::Wrapper<u64>, sui::object::ID> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+Contents: one::dynamic_field::Field<one::dynamic_object_field::Wrapper<u64>, one::object::ID> {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
-    name: sui::dynamic_object_field::Wrapper<u64> {
+    name: one::dynamic_object_field::Wrapper<u64> {
         name: 0u64,
     },
-    value: sui::object::ID {
+    value: one::object::ID {
         bytes: fake(2,3),
     },
 }
@@ -167,8 +167,8 @@ task 14, line 87:
 Owner: Object ID: ( fake(2,0) )
 Version: 4
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,3),
         },
     },
@@ -180,8 +180,8 @@ task 15, line 89:
 Owner: Object ID: ( fake(7,0) )
 Version: 4
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },
@@ -193,8 +193,8 @@ task 16, line 91:
 Owner: Account Address ( A )
 Version: 4
 Contents: tto::M1::A {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,2),
         },
     },

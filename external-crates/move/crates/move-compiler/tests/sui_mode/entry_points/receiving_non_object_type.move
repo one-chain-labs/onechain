@@ -1,7 +1,7 @@
 // invalid, Receiving type with non-object type param
 
 module a::m {
-    use sui::transfer::Receiving;
+    use one::transfer::Receiving;
 
     public entry fun no(_: Receiving<u64>) { abort 0 }
 }

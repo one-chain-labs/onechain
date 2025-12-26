@@ -23,10 +23,10 @@ use bridge::committee::{
 };
 use bridge::crypto;
 use bridge::message;
-use sui::hex;
-use sui::test_scenario;
-use sui::test_utils::{Self, assert_eq};
-use sui::vec_map;
+use one::hex;
+use one::test_scenario;
+use one::test_utils::{Self, assert_eq};
+use one::vec_map;
 use one_system::governance_test_utils::{
     advance_epoch_with_reward_amounts,
     create_sui_system_state_for_testing,

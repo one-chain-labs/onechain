@@ -100,7 +100,7 @@ fun test_object_swap() {
 #[test, expected_failure(abort_code = EWrongValue)]
 /// The `value` is swapped with another instance of the type `T`.
 fun test_borrow_swap() {
-    let ctx = &mut sui::tx_context::dummy();
+    let ctx = &mut one::tx_context::dummy();
     let mut ref_1 = new(Test { id: object::new(ctx) }, ctx);
     let mut ref_2 = new(Test { id: object::new(ctx) }, ctx);
 

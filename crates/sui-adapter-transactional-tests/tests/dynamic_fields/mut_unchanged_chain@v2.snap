@@ -23,8 +23,8 @@ task 3, line 90:
 Owner: Account Address ( A )
 Version: 2
 Contents: test::m1::GreatGrandParent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
@@ -35,8 +35,8 @@ task 4, lines 92-94:
 Owner: Shared( 2 )
 Version: 2
 Contents: test::m1::GreatGrandParent {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,9),
         },
     },

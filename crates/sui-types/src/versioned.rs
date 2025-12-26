@@ -4,7 +4,7 @@
 use crate::id::UID;
 use serde::{Deserialize, Serialize};
 
-/// Rust version of the Move sui::versioned::Versioned type.
+/// Rust version of the Move one::versioned::Versioned type.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Versioned {
     pub id: UID,

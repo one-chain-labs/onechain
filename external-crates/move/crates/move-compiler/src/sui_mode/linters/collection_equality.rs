@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! This analysis flags situations when instances of a sui::table::Table or sui::table_vec::TableVec
-//! or sui::bag::Bag are being compared for (in)equality at this type of comparison is not very
+//! This analysis flags situations when instances of a one::table::Table or one::table_vec::TableVec
+//! or one::bag::Bag are being compared for (in)equality at this type of comparison is not very
 //! useful and DOES NOT take into consideration structural (in)equality.
 
 use move_core_types::account_address::AccountAddress;

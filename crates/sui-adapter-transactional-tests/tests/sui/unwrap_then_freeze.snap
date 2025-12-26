@@ -23,8 +23,8 @@ task 3, line 42:
 Owner: Account Address ( A )
 Version: 3
 Contents: test::object_basics::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -50,8 +50,8 @@ task 6, line 48:
 Owner: Immutable
 Version: 5
 Contents: test::object_basics::Object {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },

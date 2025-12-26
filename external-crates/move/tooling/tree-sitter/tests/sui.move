@@ -5,10 +5,10 @@
 /// It has 9 decimals, and the smallest unit (10^-9) is called "mist".
 module oct::oct {
     use std::option;
-    use sui::tx_context::{Self, TxContext};
-    use sui::balance::{Self, Balance};
-    use sui::transfer;
-    use sui::coin;
+    use one::tx_context::{Self, TxContext};
+    use one::balance::{Self, Balance};
+    use one::transfer;
+    use one::coin;
 
     const EAlreadyMinted: u64 = 0;
     /// Sender is not @0x0 the system address.
@@ -21,7 +21,7 @@ module oct::oct {
 
     #[allow(unused_const)]
     /// The total supply of Sui denominated in whole Sui tokens (10 Billion)
-    const TOTAL_SUPPLY_SUI: u64 = 10_000_000_000;
+    const TOTAL_SUPPLY_OCT: u64 = 10_000_000_000;
 
     /// The total supply of Sui denominated in Mist (10 Billion * 10^9)
     const TOTAL_SUPPLY_MIST: u64 = 10_000_000_000_000_000_000;

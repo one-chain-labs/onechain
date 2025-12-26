@@ -15,9 +15,9 @@ use expect_test::expect;
 use fastcrypto::encoding::{Base64, Encoding};
 use move_package::{lock_file::schema::ManagedPackage, BuildConfig as MoveBuildConfig};
 use serde_json::json;
-use sui::client_commands::{GasDataArgs, PaymentArgs, TxProcessingArgs};
-use sui::client_ptb::ptb::PTB;
-use sui::sui_commands::IndexerArgs;
+use one::client_commands::{GasDataArgs, PaymentArgs, TxProcessingArgs};
+use one::client_ptb::ptb::PTB;
+use one::sui_commands::IndexerArgs;
 use sui_keys::key_identity::KeyIdentity;
 use sui_protocol_config::ProtocolConfig;
 use sui_sdk::SuiClient;
@@ -32,7 +32,7 @@ use tokio::time::sleep;
 
 use std::path::Path;
 use std::{fs, io};
-use sui::{
+use one::{
     client_commands::{
         estimate_gas_budget, SuiClientCommandResult, SuiClientCommands, SwitchResponse,
     },
@@ -583,7 +583,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
     );
 
     let args = shlex::split(&complex_ptb_string).unwrap();
-    sui::client_ptb::ptb::PTB { args: args.clone() }
+    one::client_ptb::ptb::PTB { args: args.clone() }
         .execute(context)
         .await?;
 
@@ -599,7 +599,7 @@ async fn test_ptb_publish_and_complex_arg_resolution() -> Result<(), anyhow::Err
     );
 
     let args = shlex::split(&delete_object_ptb_string).unwrap();
-    sui::client_ptb::ptb::PTB { args: args.clone() }
+    one::client_ptb::ptb::PTB { args: args.clone() }
         .execute(context)
         .await?;
 
@@ -616,7 +616,7 @@ async fn test_ptb_publish() -> Result<(), anyhow::Error> {
 
     let publish_ptb_string = format!(
         r#"
-         --move-call sui::tx_context::sender
+         --move-call one::tx_context::sender
          --assign sender
          --publish {}
          --assign upgrade_cap
@@ -625,7 +625,7 @@ async fn test_ptb_publish() -> Result<(), anyhow::Error> {
         package_path.display()
     );
     let args = shlex::split(&publish_ptb_string).unwrap();
-    sui::client_ptb::ptb::PTB { args: args.clone() }
+    one::client_ptb::ptb::PTB { args: args.clone() }
         .execute(context)
         .await?;
     Ok(())
@@ -1006,7 +1006,7 @@ async fn test_move_call_args_linter_command() -> Result<(), anyhow::Error> {
     // let err_string = format!("{} ", resp.err().unwrap());
     // let framework_addr = SUI_FRAMEWORK_ADDRESS.to_hex_literal();
     // let package_addr = package.to_hex_literal();
-    // assert!(err_string.contains(&format!("Expected argument of type {package_addr}::object_basics::Object, but found type {framework_addr}::coin::Coin<{framework_addr}::sui::SUI>")));
+    // assert!(err_string.contains(&format!("Expected argument of type {package_addr}::object_basics::Object, but found type {framework_addr}::coin::Coin<{framework_addr}::one::SUI>")));
 
     // Try a proper transfer
     let args = [

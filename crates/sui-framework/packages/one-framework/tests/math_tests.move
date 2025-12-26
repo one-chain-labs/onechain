@@ -4,7 +4,7 @@
 #[test_only, allow(deprecated_usage)]
 module oct::math_tests;
 
-use sui::math;
+use one::math;
 
 #[test]
 fun test_max() {

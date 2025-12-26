@@ -25,30 +25,30 @@ task 3, line 173:
 Owner: Account Address ( A )
 Version: 2
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
     other: test::m::EnumWrapper::A{
         pos0: test::m::Inner::A{
-            pos0: sui::object::UID {
-                id: sui::object::ID {
+            pos0: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
         },
     },
     wrapped: test::m::Wrapped {
-        id: sui::object::UID {
-            id: sui::object::ID {
+        id: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
         other: test::m::EnumWrapper::A{
             pos0: test::m::Inner::A{
-                pos0: sui::object::UID {
-                    id: sui::object::ID {
+                pos0: one::object::UID {
+                    id: one::object::ID {
                         bytes: _,
                     },
                 },
@@ -57,15 +57,15 @@ Contents: test::m::S {
     },
     many: vector[
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
             other: test::m::EnumWrapper::A{
                 pos0: test::m::Inner::A{
-                    pos0: sui::object::UID {
-                        id: sui::object::ID {
+                    pos0: one::object::UID {
+                        id: one::object::ID {
                             bytes: _,
                         },
                     },
@@ -73,15 +73,15 @@ Contents: test::m::S {
             },
         },
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
             other: test::m::EnumWrapper::B{
                 pos0: test::m::Inner::B{
-                    pos0: sui::object::UID {
-                        id: sui::object::ID {
+                    pos0: one::object::UID {
+                        id: one::object::ID {
                             bytes: _,
                         },
                     },
@@ -102,30 +102,30 @@ task 5, line 178:
 Owner: Account Address ( A )
 Version: 3
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
     other: test::m::EnumWrapper::A{
         pos0: test::m::Inner::A{
-            pos0: sui::object::UID {
-                id: sui::object::ID {
+            pos0: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
         },
     },
     wrapped: test::m::Wrapped {
-        id: sui::object::UID {
-            id: sui::object::ID {
+        id: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
         other: test::m::EnumWrapper::A{
             pos0: test::m::Inner::A{
-                pos0: sui::object::UID {
-                    id: sui::object::ID {
+                pos0: one::object::UID {
+                    id: one::object::ID {
                         bytes: _,
                     },
                 },
@@ -134,15 +134,15 @@ Contents: test::m::S {
     },
     many: vector[
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
             other: test::m::EnumWrapper::A{
                 pos0: test::m::Inner::A{
-                    pos0: sui::object::UID {
-                        id: sui::object::ID {
+                    pos0: one::object::UID {
+                        id: one::object::ID {
                             bytes: _,
                         },
                     },
@@ -150,15 +150,15 @@ Contents: test::m::S {
             },
         },
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
             other: test::m::EnumWrapper::B{
                 pos0: test::m::Inner::B{
-                    pos0: sui::object::UID {
-                        id: sui::object::ID {
+                    pos0: one::object::UID {
+                        id: one::object::ID {
                             bytes: _,
                         },
                     },
@@ -180,30 +180,30 @@ task 7, lines 183-185:
 Owner: Account Address ( A )
 Version: 4
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
     other: test::m::EnumWrapper::A{
         pos0: test::m::Inner::A{
-            pos0: sui::object::UID {
-                id: sui::object::ID {
+            pos0: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
         },
     },
     wrapped: test::m::Wrapped {
-        id: sui::object::UID {
-            id: sui::object::ID {
+        id: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
         other: test::m::EnumWrapper::A{
             pos0: test::m::Inner::A{
-                pos0: sui::object::UID {
-                    id: sui::object::ID {
+                pos0: one::object::UID {
+                    id: one::object::ID {
                         bytes: _,
                     },
                 },
@@ -212,15 +212,15 @@ Contents: test::m::S {
     },
     many: vector[
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
             other: test::m::EnumWrapper::A{
                 pos0: test::m::Inner::A{
-                    pos0: sui::object::UID {
-                        id: sui::object::ID {
+                    pos0: one::object::UID {
+                        id: one::object::ID {
                             bytes: _,
                         },
                     },
@@ -228,15 +228,15 @@ Contents: test::m::S {
             },
         },
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
             other: test::m::EnumWrapper::B{
                 pos0: test::m::Inner::B{
-                    pos0: sui::object::UID {
-                        id: sui::object::ID {
+                    pos0: one::object::UID {
+                        id: one::object::ID {
                             bytes: _,
                         },
                     },

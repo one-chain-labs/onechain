@@ -3,11 +3,11 @@
 
 #[test_only]
 module oct::kiosk_marketplace_ext {
-    use sui::coin::Coin;
-    use sui::kiosk::{Self, KioskOwnerCap, Kiosk, PurchaseCap};
-    use sui::kiosk_extension as ext;
-    use sui::oct::OCT;
-    use sui::transfer_policy::{Self as policy, TransferPolicy, TransferRequest};
+    use one::coin::Coin;
+    use one::kiosk::{Self, KioskOwnerCap, Kiosk, PurchaseCap};
+    use one::kiosk_extension as ext;
+    use one::oct::OCT;
+    use one::transfer_policy::{Self as policy, TransferPolicy, TransferRequest};
 
     /// Trying to access an owner-only action.
     const ENotOwner: u64 = 0;
@@ -115,8 +115,8 @@ module oct::kiosk_marketplace_ext {
 
 #[test_only]
 module oct::kiosk_extensions_tests {
-    use sui::kiosk_extension as ext;
-    use sui::kiosk_test_utils as test;
+    use one::kiosk_extension as ext;
+    use one::kiosk_test_utils as test;
 
     /// The `Ext` witness to use for testing.
     public struct Extension has drop {}
@@ -158,7 +158,7 @@ module oct::kiosk_extensions_tests {
     // - `ext::place` (not allowed | only lock)
     // - `ext::lock` (not allowed | only place)
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotAllowed)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotAllowed)]
     fun test_lock_not_allowed() {
         let ctx = &mut test::ctx();
         let (policy, _policy_cap) = test::get_policy(ctx);
@@ -171,7 +171,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotAllowed)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotAllowed)]
     fun test_lock_not_allowed_but_place() {
         let ctx = &mut test::ctx();
         let (policy, _policy_cap) = test::get_policy(ctx);
@@ -184,7 +184,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotAllowed)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotAllowed)]
     fun test_place_not_allowed() {
         let ctx = &mut test::ctx();
         let (policy, _policy_cap) = test::get_policy(ctx);
@@ -225,7 +225,7 @@ module oct::kiosk_extensions_tests {
     // - `ext::lock`
     // - `ext::place`
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_enable_not_installed() {
         let ctx = &mut test::ctx();
         let (mut kiosk, owner_cap) = test::get_kiosk(ctx);
@@ -235,7 +235,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_disable_not_installed() {
         let ctx = &mut test::ctx();
         let (mut kiosk, owner_cap) = test::get_kiosk(ctx);
@@ -245,7 +245,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_remove_not_installed() {
         let ctx = &mut test::ctx();
         let (mut kiosk, owner_cap) = test::get_kiosk(ctx);
@@ -255,7 +255,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_storage_not_installed() {
         let ctx = &mut test::ctx();
         let (kiosk, _owner_cap) = test::get_kiosk(ctx);
@@ -265,7 +265,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_storage_mut_not_installed() {
         let ctx = &mut test::ctx();
         let (mut kiosk, _owner_cap) = test::get_kiosk(ctx);
@@ -275,7 +275,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_lock_not_installed() {
         let ctx = &mut test::ctx();
         let (policy, _policy_cap) = test::get_policy(ctx);
@@ -287,7 +287,7 @@ module oct::kiosk_extensions_tests {
         abort 1337
     }
 
-    #[test, expected_failure(abort_code = sui::kiosk_extension::EExtensionNotInstalled)]
+    #[test, expected_failure(abort_code = one::kiosk_extension::EExtensionNotInstalled)]
     fun test_place_not_installed() {
         let ctx = &mut test::ctx();
         let (policy, _policy_cap) = test::get_policy(ctx);

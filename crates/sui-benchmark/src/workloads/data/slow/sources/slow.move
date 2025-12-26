@@ -3,7 +3,7 @@
 
 module slow::slow {
     use std::vector;
-    use sui::clock;
+    use one::clock;
 
     public struct Obj has key, store {
         id: object::UID,

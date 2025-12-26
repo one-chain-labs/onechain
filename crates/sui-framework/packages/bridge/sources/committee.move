@@ -6,10 +6,10 @@ module bridge::committee;
 
 use bridge::crypto;
 use bridge::message::{Self, Blocklist, BridgeMessage};
-use sui::ecdsa_k1;
-use sui::event::emit;
-use sui::vec_map::{Self, VecMap};
-use sui::vec_set;
+use one::ecdsa_k1;
+use one::event::emit;
+use one::vec_map::{Self, VecMap};
+use one::vec_set;
 use one_system::one_system::SuiSystemState;
 
 const ESignatureBelowThreshold: u64 = 0;

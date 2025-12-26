@@ -10,7 +10,7 @@
 /// companion to existing open-loop (`Coin`) systems.
 ///
 /// ```
-/// Module:      sui::balance       sui::coin             sui::token
+/// Module:      one::balance       one::coin             one::token
 /// Main type:   Balance<T>         Coin<T>               Token<T>
 /// Capability:  Supply<T>  <---->  TreasuryCap<T> <----> TreasuryCap<T>
 /// Abilities:   store              key + store           key
@@ -24,14 +24,14 @@ module oct::token {
     use std::string::{Self, String};
     use std::option::{Self, Option};
     use std::type_name::{Self, TypeName};
-    use sui::tx_context::{Self, TxContext};
-    use sui::coin::{Self, Coin, TreasuryCap};
-    use sui::balance::{Self, Balance};
-    use sui::object::{Self, ID, UID};
-    use sui::vec_map::{Self, VecMap};
-    use sui::vec_set::{Self, VecSet};
-    use sui::dynamic_field as df;
-    use sui::transfer;
+    use one::tx_context::{Self, TxContext};
+    use one::coin::{Self, Coin, TreasuryCap};
+    use one::balance::{Self, Balance};
+    use one::object::{Self, ID, UID};
+    use one::vec_map::{Self, VecMap};
+    use one::vec_set::{Self, VecSet};
+    use one::dynamic_field as df;
+    use one::transfer;
 
     /// The action is not allowed (defined) in the policy.
     const EUnknownAction: u64 = 0;

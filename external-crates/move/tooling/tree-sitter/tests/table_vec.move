@@ -3,8 +3,8 @@
 
 /// A basic scalable vector library implemented using `Table`.
 module oct::table_vec {
-    use sui::table::{Self, Table};
-    use sui::tx_context::TxContext;
+    use one::table::{Self, Table};
+    use one::tx_context::TxContext;
 
     struct TableVec<phantom Element: store> has store {
         /// The contents of the table vector.

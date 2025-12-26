@@ -4,7 +4,7 @@
 #[test_only]
 module oct::object_tests;
 
-use sui::address;
+use one::address;
 
 const EDifferentAddress: u64 = 0xF000;
 const EDifferentBytes: u64 = 0xF001;

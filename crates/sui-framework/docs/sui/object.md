@@ -1,5 +1,5 @@
 ---
-title: Module `sui::object`
+title: Module `one::object`
 ---
 
 Sui object identifiers
@@ -41,9 +41,9 @@ Sui object identifiers
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -103,7 +103,7 @@ This is a privileged type that can only be derived from a <code>TxContext</code>
 
 <dl>
 <dt>
-<code><a href="../sui/object.md#sui_object_id">id</a>: <a href="../sui/object.md#sui_object_ID">sui::object::ID</a></code>
+<code><a href="../sui/object.md#sui_object_id">id</a>: <a href="../sui/object.md#sui_object_ID">one::object::ID</a></code>
 </dt>
 <dd>
 </dd>
@@ -204,7 +204,7 @@ Sender is not @0x0 the system address.
 Get the raw bytes of a <code><a href="../sui/object.md#sui_object_ID">ID</a></code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_to_bytes">id_to_bytes</a>(<a href="../sui/object.md#sui_object_id">id</a>: &<a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_to_bytes">id_to_bytes</a>(<a href="../sui/object.md#sui_object_id">id</a>: &<a href="../sui/object.md#sui_object_ID">one::object::ID</a>): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -229,7 +229,7 @@ Get the raw bytes of a <code><a href="../sui/object.md#sui_object_ID">ID</a></co
 Get the inner bytes of <code><a href="../sui/object.md#sui_object_id">id</a></code> as an address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_to_address">id_to_address</a>(<a href="../sui/object.md#sui_object_id">id</a>: &<a href="../sui/object.md#sui_object_ID">sui::object::ID</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_to_address">id_to_address</a>(<a href="../sui/object.md#sui_object_id">id</a>: &<a href="../sui/object.md#sui_object_ID">one::object::ID</a>): <b>address</b>
 </code></pre>
 
 
@@ -254,7 +254,7 @@ Get the inner bytes of <code><a href="../sui/object.md#sui_object_id">id</a></co
 Make an <code><a href="../sui/object.md#sui_object_ID">ID</a></code> from raw bytes.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_from_bytes">id_from_bytes</a>(bytes: vector&lt;u8&gt;): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_from_bytes">id_from_bytes</a>(bytes: vector&lt;u8&gt;): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -279,7 +279,7 @@ Make an <code><a href="../sui/object.md#sui_object_ID">ID</a></code> from raw by
 Make an <code><a href="../sui/object.md#sui_object_ID">ID</a></code> from an address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_from_address">id_from_address</a>(bytes: <b>address</b>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id_from_address">id_from_address</a>(bytes: <b>address</b>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -305,7 +305,7 @@ Create the <code><a href="../sui/object.md#sui_object_UID">UID</a></code> for th
 This should only be called once from <code>sui_system</code>.
 
 
-<pre><code><b>fun</b> <a href="../sui/object.md#sui_object_sui_system_state">sui_system_state</a>(ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>fun</b> <a href="../sui/object.md#sui_object_sui_system_state">sui_system_state</a>(ctx: &<a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -334,7 +334,7 @@ Create the <code><a href="../sui/object.md#sui_object_UID">UID</a></code> for th
 This should only be called once from <code><a href="../sui/clock.md#sui_clock">clock</a></code>.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/clock.md#sui_clock">clock</a>(): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/clock.md#sui_clock">clock</a>(): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -362,7 +362,7 @@ Create the <code><a href="../sui/object.md#sui_object_UID">UID</a></code> for th
 This should only be called once from <code><a href="../sui/authenticator_state.md#sui_authenticator_state">authenticator_state</a></code>.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state">authenticator_state</a>(): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/authenticator_state.md#sui_authenticator_state">authenticator_state</a>(): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -390,7 +390,7 @@ Create the <code><a href="../sui/object.md#sui_object_UID">UID</a></code> for th
 This should only be called once from <code><a href="../sui/random.md#sui_random">random</a></code>.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_randomness_state">randomness_state</a>(): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_randomness_state">randomness_state</a>(): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -418,7 +418,7 @@ Create the <code><a href="../sui/object.md#sui_object_UID">UID</a></code> for th
 This should only be called once from <code><a href="../sui/deny_list.md#sui_deny_list">deny_list</a></code>.
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_sui_deny_list_object_id">sui_deny_list_object_id</a>(): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_sui_deny_list_object_id">sui_deny_list_object_id</a>(): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -444,7 +444,7 @@ This should only be called once from <code><a href="../sui/deny_list.md#sui_deny
 
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_sui_accumulator_root_object_id">sui_accumulator_root_object_id</a>(): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_sui_accumulator_root_object_id">sui_accumulator_root_object_id</a>(): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -496,7 +496,7 @@ Create the <code><a href="../sui/object.md#sui_object_UID">UID</a></code> for th
 This should only be called once from <code><a href="../sui/object.md#sui_object_bridge">bridge</a></code>.
 
 
-<pre><code><b>fun</b> <a href="../sui/object.md#sui_object_bridge">bridge</a>(): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>fun</b> <a href="../sui/object.md#sui_object_bridge">bridge</a>(): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -523,7 +523,7 @@ This should only be called once from <code><a href="../sui/object.md#sui_object_
 Get the inner <code><a href="../sui/object.md#sui_object_ID">ID</a></code> of <code>uid</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_as_inner">uid_as_inner</a>(uid: &<a href="../sui/object.md#sui_object_UID">sui::object::UID</a>): &<a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_as_inner">uid_as_inner</a>(uid: &<a href="../sui/object.md#sui_object_UID">one::object::UID</a>): &<a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -548,7 +548,7 @@ Get the inner <code><a href="../sui/object.md#sui_object_ID">ID</a></code> of <c
 Get the raw bytes of a <code>uid</code>'s inner <code><a href="../sui/object.md#sui_object_ID">ID</a></code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_to_inner">uid_to_inner</a>(uid: &<a href="../sui/object.md#sui_object_UID">sui::object::UID</a>): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_to_inner">uid_to_inner</a>(uid: &<a href="../sui/object.md#sui_object_UID">one::object::UID</a>): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -573,7 +573,7 @@ Get the raw bytes of a <code>uid</code>'s inner <code><a href="../sui/object.md#
 Get the raw bytes of a <code><a href="../sui/object.md#sui_object_UID">UID</a></code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_to_bytes">uid_to_bytes</a>(uid: &<a href="../sui/object.md#sui_object_UID">sui::object::UID</a>): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_to_bytes">uid_to_bytes</a>(uid: &<a href="../sui/object.md#sui_object_UID">one::object::UID</a>): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -598,7 +598,7 @@ Get the raw bytes of a <code><a href="../sui/object.md#sui_object_UID">UID</a></
 Get the inner bytes of <code><a href="../sui/object.md#sui_object_id">id</a></code> as an address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_to_address">uid_to_address</a>(uid: &<a href="../sui/object.md#sui_object_UID">sui::object::UID</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_uid_to_address">uid_to_address</a>(uid: &<a href="../sui/object.md#sui_object_UID">one::object::UID</a>): <b>address</b>
 </code></pre>
 
 
@@ -624,7 +624,7 @@ Create a new object. Returns the <code><a href="../sui/object.md#sui_object_UID"
 This is the only way to create <code><a href="../sui/object.md#sui_object_UID">UID</a></code>s.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_new">new</a>(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -655,7 +655,7 @@ gets unpacked, the programmer will have to do something with its
 system event so Sui knows to process the object deletion
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_delete">delete</a>(<a href="../sui/object.md#sui_object_id">id</a>: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_delete">delete</a>(<a href="../sui/object.md#sui_object_id">id</a>: <a href="../sui/object.md#sui_object_UID">one::object::UID</a>)
 </code></pre>
 
 
@@ -681,7 +681,7 @@ system event so Sui knows to process the object deletion
 Get the underlying <code><a href="../sui/object.md#sui_object_ID">ID</a></code> of <code>obj</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id">id</a>&lt;T: key&gt;(obj: &T): <a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_id">id</a>&lt;T: key&gt;(obj: &T): <a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -706,7 +706,7 @@ Get the underlying <code><a href="../sui/object.md#sui_object_ID">ID</a></code> 
 Borrow the underlying <code><a href="../sui/object.md#sui_object_ID">ID</a></code> of <code>obj</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_borrow_id">borrow_id</a>&lt;T: key&gt;(obj: &T): &<a href="../sui/object.md#sui_object_ID">sui::object::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object.md#sui_object_borrow_id">borrow_id</a>&lt;T: key&gt;(obj: &T): &<a href="../sui/object.md#sui_object_ID">one::object::ID</a>
 </code></pre>
 
 
@@ -785,7 +785,7 @@ Cannot be made public as the access to <code><a href="../sui/object.md#sui_objec
 restrictable in the object's module.
 
 
-<pre><code><b>fun</b> <a href="../sui/object.md#sui_object_borrow_uid">borrow_uid</a>&lt;T: key&gt;(obj: &T): &<a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>fun</b> <a href="../sui/object.md#sui_object_borrow_uid">borrow_uid</a>&lt;T: key&gt;(obj: &T): &<a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 
@@ -808,7 +808,7 @@ restrictable in the object's module.
 Generate a new UID specifically used for creating a UID from a hash
 
 
-<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_new_uid_from_hash">new_uid_from_hash</a>(bytes: <b>address</b>): <a href="../sui/object.md#sui_object_UID">sui::object::UID</a>
+<pre><code><b>public</b>(<a href="../sui/package.md#sui_package">package</a>) <b>fun</b> <a href="../sui/object.md#sui_object_new_uid_from_hash">new_uid_from_hash</a>(bytes: <b>address</b>): <a href="../sui/object.md#sui_object_UID">one::object::UID</a>
 </code></pre>
 
 

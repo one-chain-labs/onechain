@@ -4,9 +4,9 @@
 #[test_only]
 module oct::package_tests;
 
-use sui::package::{Self, UpgradeCap, UpgradeTicket};
-use sui::test_scenario::{Self, Scenario};
-use sui::test_utils;
+use one::package::{Self, UpgradeCap, UpgradeTicket};
+use one::test_scenario::{Self, Scenario};
+use one::test_utils;
 
 /// OTW for the package_tests module -- it can't actually be a OTW
 /// (name matching module name) because we need to be able to
@@ -81,7 +81,7 @@ fun test_upgrade_policy_reflected_in_ticket() {
 
     while (!policies.is_empty()) {
         let policy = policies.pop_back();
-        let ticket = check_ticket(&mut cap, policy, sui::hash::blake2b256(&vector[policy]));
+        let ticket = check_ticket(&mut cap, policy, one::hash::blake2b256(&vector[policy]));
         let receipt = ticket.test_upgrade();
         cap.commit_upgrade(receipt);
     };
@@ -99,7 +99,7 @@ fun test_full_upgrade_flow() {
     let version = cap.version();
     let ticket = cap.authorize_upgrade(
         package::dep_only_policy(),
-        sui::hash::blake2b256(&b"package contents"),
+        one::hash::blake2b256(&b"package contents"),
     );
 
     test_utils::assert_eq(ticket.ticket_policy(), package::dep_only_policy());
@@ -112,7 +112,7 @@ fun test_full_upgrade_flow() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::package::ETooPermissive)]
+#[expected_failure(abort_code = one::package::ETooPermissive)]
 fun test_failure_to_widen_upgrade_policy() {
     let mut scenario = test_scenario::begin(@0x1);
     let mut cap = package::test_publish(@0x42.to_id(), scenario.ctx());
@@ -125,7 +125,7 @@ fun test_failure_to_widen_upgrade_policy() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::package::ETooPermissive)]
+#[expected_failure(abort_code = one::package::ETooPermissive)]
 fun test_failure_to_authorize_overly_permissive_upgrade() {
     let mut scenario = test_scenario::begin(@0x1);
     let mut cap = package::test_publish(@0x42.to_id(), scenario.ctx());
@@ -133,35 +133,35 @@ fun test_failure_to_authorize_overly_permissive_upgrade() {
 
     let _ticket = cap.authorize_upgrade(
         package::compatible_policy(),
-        sui::hash::blake2b256(&b"package contents"),
+        one::hash::blake2b256(&b"package contents"),
     );
 
     abort 0
 }
 
 #[test]
-#[expected_failure(abort_code = sui::package::EAlreadyAuthorized)]
+#[expected_failure(abort_code = one::package::EAlreadyAuthorized)]
 fun test_failure_to_authorize_multiple_upgrades() {
     let mut scenario = test_scenario::begin(@0x1);
     let mut cap = package::test_publish(@0x42.to_id(), scenario.ctx());
 
     let _ticket0 = cap.authorize_upgrade(
         package::compatible_policy(),
-        sui::hash::blake2b256(&b"package contents 0"),
+        one::hash::blake2b256(&b"package contents 0"),
     );
 
     // It's an error to try and issue more than one simultaneous
     // upgrade ticket -- this should abort.
     let _ticket1 = cap.authorize_upgrade(
         package::compatible_policy(),
-        sui::hash::blake2b256(&b"package contents 1"),
+        one::hash::blake2b256(&b"package contents 1"),
     );
 
     abort 0
 }
 
 #[test]
-#[expected_failure(abort_code = sui::package::EWrongUpgradeCap)]
+#[expected_failure(abort_code = one::package::EWrongUpgradeCap)]
 fun test_failure_to_commit_upgrade_to_wrong_cap() {
     let mut scenario = test_scenario::begin(@0x1);
     let mut cap0 = package::test_publish(@0x42.to_id(), scenario.ctx());
@@ -169,7 +169,7 @@ fun test_failure_to_commit_upgrade_to_wrong_cap() {
 
     let ticket1 = cap1.authorize_upgrade(
         package::dep_only_policy(),
-        sui::hash::blake2b256(&b"package contents 1"),
+        one::hash::blake2b256(&b"package contents 1"),
     );
 
     test_utils::assert_eq(ticket1.ticket_policy(), package::dep_only_policy());

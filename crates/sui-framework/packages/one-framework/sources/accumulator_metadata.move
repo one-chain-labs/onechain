@@ -3,9 +3,9 @@
 
 module oct::accumulator_metadata;
 
-use sui::accumulator::AccumulatorRoot;
-use sui::bag;
-use sui::dynamic_field;
+use one::accumulator::AccumulatorRoot;
+use one::bag;
+use one::dynamic_field;
 
 const EInvariantViolation: u64 = 0;
 

@@ -14,5 +14,5 @@ error[E03002]: unbound module
 error[E03004]: unbound type
   ┌─ tests/sui_mode/one_time_witness/init_unbound_type.move:7:17
   │
-7 │     fun init(_: Who, _ctx: &mut sui::tx_context::TxContext) {}
+7 │     fun init(_: Who, _ctx: &mut one::tx_context::TxContext) {}
   │                 ^^^ Unbound type 'Who' in current scope

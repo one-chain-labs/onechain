@@ -28,15 +28,15 @@ module P::M {
 }
 
 //# programmable --sender A --inputs @A
-//> 0: sui::object_bag::new();
+//> 0: one::object_bag::new();
 //> 1: TransferObjects([Result(0)], Input(0))
 
 //# programmable --sender A --inputs object(2,0) 42 43u32 44 45 46 @A
 //> 0: P::M::name(Input(1), Input(2));
 //> 1: P::M::value(Input(4));
 //> 2: P::M::value(Input(5));
-//> 3: sui::object_bag::add<u64, P::M::Value>(Input(0), Input(3), Result(1));
-//> 4: sui::object_bag::add<P::M::Name, P::M::Value>(Input(0), Result(0), Result(2))
+//> 3: one::object_bag::add<u64, P::M::Value>(Input(0), Input(3), Result(1));
+//> 4: one::object_bag::add<P::M::Name, P::M::Value>(Input(0), Result(0), Result(2))
 
 //# create-checkpoint
 

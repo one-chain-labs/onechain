@@ -5,7 +5,7 @@
 module oct_system::voting_power_tests;
 
 use std::unit_test::assert_eq;
-use sui::test_utils;
+use one::test_utils;
 use one_system::validator::{Self, Validator};
 use one_system::validator_builder;
 use one_system::validator_set;
@@ -119,7 +119,7 @@ fun create_validators_with_stakes(stakes: vector<u64>, ctx: &mut TxContext): vec
     vector::tabulate!(stakes.length(), |i| {
         validator_builder::new()
             .initial_stake(stakes[i])
-            .sui_address(sui::address::from_u256(i as u256))
+            .sui_address(one::address::from_u256(i as u256))
             .build(ctx)
     })
 }

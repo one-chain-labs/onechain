@@ -9,8 +9,8 @@
 
 /// Test event limits enforced
 module Test::M1 {
-    use sui::event;
-    use sui::bcs;
+    use one::event;
+    use one::bcs;
 
     public struct NewValueEvent has copy, drop {
         contents: vector<u8>

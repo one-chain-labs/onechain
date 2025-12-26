@@ -1,7 +1,7 @@
 // valid, T has store, thus Obj has key
 
 module a::m {
-    use sui::object;
+    use one::object;
 
     struct Obj<T> has key { id: object::UID, value: T }
 

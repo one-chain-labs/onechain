@@ -25,49 +25,49 @@ task 3, line 123:
 Owner: Account Address ( A )
 Version: 2
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
-    other: sui::object::UID {
-        id: sui::object::ID {
+    other: one::object::UID {
+        id: one::object::ID {
             bytes: _,
         },
     },
     wrapped: test::m::Wrapped {
-        id: sui::object::UID {
-            id: sui::object::ID {
+        id: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
-        other: sui::object::UID {
-            id: sui::object::ID {
+        other: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
     },
     many: vector[
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
-            other: sui::object::UID {
-                id: sui::object::ID {
+            other: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
         },
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
-            other: sui::object::UID {
-                id: sui::object::ID {
+            other: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
@@ -86,49 +86,49 @@ task 5, line 128:
 Owner: Account Address ( A )
 Version: 3
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
-    other: sui::object::UID {
-        id: sui::object::ID {
+    other: one::object::UID {
+        id: one::object::ID {
             bytes: _,
         },
     },
     wrapped: test::m::Wrapped {
-        id: sui::object::UID {
-            id: sui::object::ID {
+        id: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
-        other: sui::object::UID {
-            id: sui::object::ID {
+        other: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
     },
     many: vector[
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
-            other: sui::object::UID {
-                id: sui::object::ID {
+            other: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
         },
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
-            other: sui::object::UID {
-                id: sui::object::ID {
+            other: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
@@ -148,49 +148,49 @@ task 7, lines 133-136:
 Owner: Account Address ( A )
 Version: 4
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,8),
         },
     },
-    other: sui::object::UID {
-        id: sui::object::ID {
+    other: one::object::UID {
+        id: one::object::ID {
             bytes: _,
         },
     },
     wrapped: test::m::Wrapped {
-        id: sui::object::UID {
-            id: sui::object::ID {
+        id: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
-        other: sui::object::UID {
-            id: sui::object::ID {
+        other: one::object::UID {
+            id: one::object::ID {
                 bytes: _,
             },
         },
     },
     many: vector[
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
-            other: sui::object::UID {
-                id: sui::object::ID {
+            other: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
         },
         test::m::Wrapped {
-            id: sui::object::UID {
-                id: sui::object::ID {
+            id: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },
-            other: sui::object::UID {
-                id: sui::object::ID {
+            other: one::object::UID {
+                id: one::object::ID {
                     bytes: _,
                 },
             },

@@ -1,8 +1,8 @@
 // not allowed, it re-uses an ID in a new object
 module a::m {
-    use sui::object::UID;
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer::transfer;
+    use one::object::UID;
+    use one::tx_context::{Self, TxContext};
+    use one::transfer::transfer;
 
     struct Cat has key {
         id: UID,

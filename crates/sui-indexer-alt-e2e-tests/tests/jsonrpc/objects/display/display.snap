@@ -15,7 +15,7 @@ gas summary: computation_cost: 1000000, storage_cost: 17518000,  storage_rebate:
 
 task 2, lines 72-75:
 //# programmable --sender A --inputs @A 42 true "hello" 43u8
-//> 0: std::option::some<sui::object::ID>(Input(0));
+//> 0: std::option::some<one::object::ID>(Input(0));
 //> 1: test::mod::new(Input(1), Input(2), Input(3), Result(0), Input(4));
 //> 2: TransferObjects([Result(1)], Input(0))
 created: object(2,0)
@@ -24,7 +24,7 @@ gas summary: computation_cost: 1000000, storage_cost: 2599200,  storage_rebate: 
 
 task 3, lines 77-80:
 //# programmable --sender A --inputs @A 42 true "hello" 43u8
-//> 0: std::option::none<sui::object::ID>();
+//> 0: std::option::none<one::object::ID>();
 //> 1: test::mod::new(Input(1), Input(2), Input(3), Result(0), Input(4));
 //> 2: TransferObjects([Result(1)], Input(0))
 created: object(3,0)
@@ -128,8 +128,8 @@ Response: {
 
 task 10, lines 114-116:
 //# programmable --sender A --inputs object(1,1) "quy" "{bar.baz.qux.quy.val}!"
-//> 0: sui::display::edit<test::mod::Foo>(Input(0), Input(1), Input(2));
-//> 1: sui::display::update_version<test::mod::Foo>(Input(0));
+//> 0: one::display::edit<test::mod::Foo>(Input(0), Input(1), Input(2));
+//> 1: one::display::update_version<test::mod::Foo>(Input(0));
 events: Event { package_id: sui, transaction_module: Identifier("display"), sender: A, type_: StructTag { address: sui, module: Identifier("display"), name: Identifier("VersionUpdated"), type_params: [Struct(StructTag { address: test, module: Identifier("mod"), name: Identifier("Foo"), type_params: [] })] }, contents: [171, 94, 148, 202, 209, 114, 178, 213, 163, 102, 39, 16, 119, 12, 68, 110, 27, 92, 69, 105, 236, 7, 198, 167, 75, 242, 127, 230, 212, 118, 30, 134, 2, 0, 4, 3, 98, 97, 114, 17, 98, 97, 114, 32, 105, 115, 32, 123, 98, 97, 114, 46, 118, 97, 108, 125, 33, 3, 98, 97, 122, 21, 98, 97, 122, 32, 105, 115, 32, 123, 98, 97, 114, 46, 98, 97, 122, 46, 118, 97, 108, 125, 63, 3, 113, 117, 95, 77, 120, 40, 123, 98, 97, 114, 46, 98, 97, 122, 46, 113, 117, 120, 46, 118, 97, 108, 125, 41, 32, 121, 40, 123, 98, 97, 114, 46, 98, 97, 122, 46, 113, 117, 120, 46, 113, 117, 121, 46, 118, 97, 108, 125, 41, 44, 32, 122, 40, 123, 98, 97, 114, 46, 98, 97, 122, 46, 113, 117, 120, 46, 113, 117, 121, 46, 113, 117, 122, 46, 118, 97, 108, 125, 41, 63, 33, 3, 113, 117, 121, 22, 123, 98, 97, 114, 46, 98, 97, 122, 46, 113, 117, 120, 46, 113, 117, 121, 46, 118, 97, 108, 125, 33] }
 mutated: object(0,0), object(1,1)
 gas summary: computation_cost: 1000000, storage_cost: 3822800,  storage_rebate: 3807144, non_refundable_storage_fee: 38456

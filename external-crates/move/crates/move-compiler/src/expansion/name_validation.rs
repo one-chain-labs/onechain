@@ -22,9 +22,9 @@ pub const IMPLICIT_STD_MEMBERS: &[(Symbol, Symbol, ModuleMemberKind)] = &[(
 )];
 
 // Implicit aliases for Sui mode:
-// use sui::object::{Self, ID, UID};
-// use sui::transfer;
-// use sui::tx_context::{Self, TxContext};
+// use one::object::{Self, ID, UID};
+// use one::transfer;
+// use one::tx_context::{Self, TxContext};
 pub const IMPLICIT_SUI_MODULES: &[Symbol] = &[
     symbol!("object"),
     symbol!("transfer"),

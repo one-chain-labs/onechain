@@ -6,8 +6,8 @@
 /// can read / modify the configuration in 'em.
 module oct::token_config_tests;
 
-use sui::token;
-use sui::token_test_utils::{Self as test, TEST};
+use one::token;
+use one::token_test_utils::{Self as test, TEST};
 
 /// Rule witness to store configuration for
 public struct Rule1 has drop {}

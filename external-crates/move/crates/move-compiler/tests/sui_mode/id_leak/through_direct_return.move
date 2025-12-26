@@ -1,6 +1,6 @@
 // allowed, no object is being made with the UID
 module a::m {
-    use sui::object::UID;
+    use one::object::UID;
 
     struct Foo has key {
         id: UID,

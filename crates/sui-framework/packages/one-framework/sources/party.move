@@ -3,7 +3,7 @@
 
 module oct::party;
 
-use sui::vec_map::{Self, VecMap};
+use one::vec_map::{Self, VecMap};
 
 /// A party can read the object, taking it as an immutable argument. This restriction is checked
 /// when sending the transaction.
@@ -53,16 +53,16 @@ public fun single_owner(owner: address): Party {
     mp
 }
 
-/// A helper `macro` that calls `sui::transfer::party_transfer`.
+/// A helper `macro` that calls `one::transfer::party_transfer`.
 public macro fun transfer<$T: key>($self: Party, $obj: $T) {
     let mp = $self;
-    sui::transfer::party_transfer($obj, mp)
+    one::transfer::party_transfer($obj, mp)
 }
 
-/// A helper `macro` that calls `sui::transfer::public_party_transfer`.
+/// A helper `macro` that calls `one::transfer::public_party_transfer`.
 public macro fun public_transfer<$T: key + store>($self: Party, $obj: $T) {
     let mp = $self;
-    sui::transfer::public_party_transfer($obj, mp)
+    one::transfer::public_party_transfer($obj, mp)
 }
 
 /* public */ fun empty(): Party {

@@ -10,7 +10,7 @@
 
 module test::m1;
 
-use sui::dynamic_object_field;
+use one::dynamic_object_field;
 
 public struct Object has key, store {
     id: UID,
@@ -22,7 +22,7 @@ public struct ObjValue has key, store {
 }
 
 public fun create(ctx: &mut TxContext) {
-    let data = sui::address::to_bytes(ctx.sender());
+    let data = one::address::to_bytes(ctx.sender());
     let mut o1 = Object { id: object::new(ctx) };
     let mut o2 = Object { id: object::new(ctx) };
     dynamic_object_field::add(&mut o1.id, b"obj", ObjValue { id: object::new(ctx), data });
@@ -46,7 +46,7 @@ public fun add_remove(obj: &mut Object) {
 public fun write_back(obj: &mut Object, ctx: &mut TxContext) {
     let o: &mut ObjValue = dynamic_object_field::borrow_mut(&mut obj.id, b"obj");
     o.data = vector[];
-    o.data = sui::address::to_bytes(ctx.sender());
+    o.data = one::address::to_bytes(ctx.sender());
 }
 
 //# run test::m1::create --sender A

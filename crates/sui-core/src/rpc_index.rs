@@ -198,7 +198,7 @@ impl From<BalanceIndexInfo> for sui_types::storage::BalanceInfo {
     fn from(index_info: BalanceIndexInfo) -> Self {
         // Note: We represent balance deltas as i128 to simplify merging positive and negative updates.
         // Be aware: Move doesn’t enforce a one-time-witness (OTW) pattern when creating a Supply<T>.
-        // Anyone can call `sui::balance::create_supply` and mint unbounded supply, potentially pushing
+        // Anyone can call `one::balance::create_supply` and mint unbounded supply, potentially pushing
         // total balances over u64::MAX. To avoid crashing the indexer, we clamp the merged value instead
         // of panicking on overflow. This has the unfortunate consequence of making bugs in the index
         // harder to detect, but is a necessary trade-off to avoid creating a DOS attack vector.

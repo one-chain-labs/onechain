@@ -98,7 +98,7 @@ async fn test_get_coins() -> Result<(), anyhow::Error> {
 
     // We should get 0 coins for a non-existent coin type.
     let result: CoinPage = http_client
-        .get_coins(address, Some("0x2::sui::TestCoin".into()), None, None)
+        .get_coins(address, Some("0x2::one::TestCoin".into()), None, None)
         .await?;
     assert_eq!(0, result.data.len());
 

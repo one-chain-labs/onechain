@@ -8,7 +8,7 @@ use std::io::Read;
 use std::os::unix::fs::FileExt;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use sui::client_commands::{
+use one::client_commands::{
     GasDataArgs, PaymentArgs, SuiClientCommandResult, SuiClientCommands, TxProcessingArgs,
 };
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};

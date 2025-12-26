@@ -1,7 +1,7 @@
 module a::m {
 
     use std::vector;
-    use sui::table;
+    use one::table;
 
     struct ID has store, copy, drop {
         bytes: address,

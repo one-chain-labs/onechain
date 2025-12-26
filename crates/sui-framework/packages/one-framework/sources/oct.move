@@ -19,7 +19,7 @@ const MIST_PER_OCT: u64 = 1_000_000_000;
 
 #[allow(unused_const)]
 /// The total supply of Oct denominated in whole Oct tokens (10 Billion)
-const TOTAL_SUPPLY_SUI: u64 = 10_000_000_000;
+const TOTAL_SUPPLY_OCT: u64 = 10_000_000_000;
 
 /// The total supply of Oct denominated in Mist (10 Billion * 10^9)
 const TOTAL_SUPPLY_MIST: u64 = 10_000_000_000_000_000_000;

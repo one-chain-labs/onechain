@@ -4,7 +4,7 @@
 //! This pass verifies necessary properties for Move Objects, i.e. structs with the `key` ability.
 //! The properties checked are
 //! - The first field is named "id"
-//! - The first field has type `sui::object::UID`
+//! - The first field has type `one::object::UID`
 
 use crate::verification_failure;
 use move_binary_format::file_format::{CompiledModule, SignatureToken};

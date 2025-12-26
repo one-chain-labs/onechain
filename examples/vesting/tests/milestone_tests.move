@@ -4,9 +4,9 @@
 #[test_only]
 module vesting::milestone_tests;
 
-use sui::coin;
-use sui::oct::OCT;
-use sui::test_scenario as ts;
+use one::coin;
+use one::oct::OCT;
+use one::test_scenario as ts;
 use vesting::milestone::{Self, new_wallet, Wallet};
 
 public struct Token has key, store { id: UID }

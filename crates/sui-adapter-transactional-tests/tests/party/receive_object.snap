@@ -23,8 +23,8 @@ task 3, lines 47-49:
 Owner: Account Address ( _ )
 Version: 3
 Contents: ex::m::PubA {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -35,8 +35,8 @@ task 4, lines 50-52:
 Owner: ConsensusAddressOwner( 3, _ )
 Version: 3
 Contents: ex::m::PubA {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,1),
         },
     },
@@ -47,8 +47,8 @@ task 5, lines 53-55:
 Owner: Account Address ( fake(2,0) )
 Version: 3
 Contents: ex::m::PubB {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,2),
         },
     },
@@ -59,8 +59,8 @@ task 6, lines 56-58:
 Owner: Account Address ( fake(2,1) )
 Version: 3
 Contents: ex::m::PubB {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,3),
         },
     },
@@ -71,8 +71,8 @@ task 7, lines 59-61:
 Owner: ConsensusAddressOwner( 3, fake(2,1) )
 Version: 3
 Contents: ex::m::PubB {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,4),
         },
     },
@@ -83,8 +83,8 @@ task 8, lines 62-65:
 Owner: ConsensusAddressOwner( 3, fake(2,0) )
 Version: 3
 Contents: ex::m::PubB {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,5),
         },
     },
@@ -100,8 +100,8 @@ task 10, lines 68-71:
 Owner: Account Address ( _ )
 Version: 4
 Contents: ex::m::PubB {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,2),
         },
     },
@@ -117,8 +117,8 @@ task 12, lines 74-77:
 Owner: Account Address ( _ )
 Version: 5
 Contents: ex::m::PubB {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,3),
         },
     },

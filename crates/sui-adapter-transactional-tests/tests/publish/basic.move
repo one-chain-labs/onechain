@@ -10,14 +10,14 @@
 //# publish --dry-run
 
 module test1::m1 {
-    fun init(_: &sui::tx_context::TxContext) {
+    fun init(_: &one::tx_context::TxContext) {
     }
 }
 
 //# publish
 
 module test1::m2 {
-    fun init(_: &sui::tx_context::TxContext) {
+    fun init(_: &one::tx_context::TxContext) {
     }
 }
 
@@ -26,13 +26,13 @@ module test1::m2 {
 //# publish --dry-run
 
 module test2::m3 {
-    fun init(_: &sui::tx_context::TxContext) {
+    fun init(_: &one::tx_context::TxContext) {
     }
 }
 
 //# publish
 
 module test2::m4 {
-    fun init(_: &sui::tx_context::TxContext) {
+    fun init(_: &one::tx_context::TxContext) {
     }
 }

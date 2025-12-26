@@ -1,9 +1,9 @@
 ---
-title: Module `sui::object_table`
+title: Module `one::object_table`
 ---
 
-Similar to <code><a href="../sui/table.md#sui_table">sui::table</a></code>, an <code><a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code> is a map-like collection. But unlike
-<code><a href="../sui/table.md#sui_table">sui::table</a></code>, the values bound to these dynamic fields _must_ be objects themselves. This allows
+Similar to <code><a href="../sui/table.md#sui_table">one::table</a></code>, an <code><a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code> is a map-like collection. But unlike
+<code><a href="../sui/table.md#sui_table">one::table</a></code>, the values bound to these dynamic fields _must_ be objects themselves. This allows
 for the objects to still exist within in storage, which may be important for external tools.
 The difference is otherwise not observable from within Move.
 
@@ -27,12 +27,12 @@ The difference is otherwise not observable from within Move.
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../sui/address.md#sui_address">sui::address</a>;
-<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">sui::dynamic_field</a>;
-<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">sui::dynamic_object_field</a>;
-<b>use</b> <a href="../sui/hex.md#sui_hex">sui::hex</a>;
-<b>use</b> <a href="../sui/object.md#sui_object">sui::object</a>;
-<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">sui::tx_context</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
 </code></pre>
 
 
@@ -54,7 +54,7 @@ The difference is otherwise not observable from within Move.
 
 <dl>
 <dt>
-<code>id: <a href="../sui/object.md#sui_object_UID">sui::object::UID</a></code>
+<code>id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a></code>
 </dt>
 <dd>
  the ID of this table
@@ -91,7 +91,7 @@ The difference is otherwise not observable from within Move.
 Creates a new, empty table
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_new">new</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">sui::tx_context::TxContext</a>): <a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_new">new</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;
 </code></pre>
 
 
@@ -117,11 +117,11 @@ Creates a new, empty table
 ## Function `add`
 
 Adds a key-value pair to the table <code><a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code>
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">sui::dynamic_field::EFieldAlreadyExists</a></code> if the table already has an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldAlreadyExists">one::dynamic_field::EFieldAlreadyExists</a></code> if the table already has an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_add">add</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;, k: K, v: V)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_add">add</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;, k: K, v: V)
 </code></pre>
 
 
@@ -145,11 +145,11 @@ that key <code>k: K</code>.
 ## Function `borrow`
 
 Immutable borrows the value associated with the key in the table <code><a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): &V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/borrow.md#sui_borrow">borrow</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): &V
 </code></pre>
 
 
@@ -172,11 +172,11 @@ that key <code>k: K</code>.
 ## Function `borrow_mut`
 
 Mutably borrows the value associated with the key in the table <code><a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code>.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): &<b>mut</b> V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): &<b>mut</b> V
 </code></pre>
 
 
@@ -202,11 +202,11 @@ that key <code>k: K</code>.
 ## Function `remove`
 
 Removes the key-value pair in the table <code><a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code> and returns the value.
-Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">sui::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
+Aborts with <code><a href="../sui/dynamic_field.md#sui_dynamic_field_EFieldDoesNotExist">one::dynamic_field::EFieldDoesNotExist</a></code> if the table does not have an entry with
 that key <code>k: K</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): V
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_remove">remove</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<b>mut</b> <a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): V
 </code></pre>
 
 
@@ -234,7 +234,7 @@ Returns true if there is a value associated with the key <code>k: K</code> in ta
 <code><a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_contains">contains</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_contains">contains</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): bool
 </code></pre>
 
 
@@ -259,7 +259,7 @@ Returns true if there is a value associated with the key <code>k: K</code> in ta
 Returns the size of the table, the number of key-value pairs
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_length">length</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_length">length</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;): u64
 </code></pre>
 
 
@@ -284,7 +284,7 @@ Returns the size of the table, the number of key-value pairs
 Returns true if the table is empty (if <code><a href="../sui/object_table.md#sui_object_table_length">length</a></code> returns <code>0</code>)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_is_empty">is_empty</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_is_empty">is_empty</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -310,7 +310,7 @@ Destroys an empty table
 Aborts with <code><a href="../sui/object_table.md#sui_object_table_ETableNotEmpty">ETableNotEmpty</a></code> if the table still contains values
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: <a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: <a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;)
 </code></pre>
 
 
@@ -338,7 +338,7 @@ Returns the ID of the object associated with the key if the table has an entry w
 Returns none otherwise
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_value_id">value_id</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">sui::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<a href="../sui/object.md#sui_object_ID">sui::object::ID</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../sui/object_table.md#sui_object_table_value_id">value_id</a>&lt;K: <b>copy</b>, drop, store, V: key, store&gt;(<a href="../sui/table.md#sui_table">table</a>: &<a href="../sui/object_table.md#sui_object_table_ObjectTable">one::object_table::ObjectTable</a>&lt;K, V&gt;, k: K): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<a href="../sui/object.md#sui_object_ID">one::object::ID</a>&gt;
 </code></pre>
 
 

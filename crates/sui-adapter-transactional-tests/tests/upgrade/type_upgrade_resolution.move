@@ -37,5 +37,5 @@ module B2::b {
 }
 
 //# programmable
-//> M::m::g<sui::coin::Coin<A1::a::Base>>();
-//> M::m::g<sui::coin::Coin<B2::b::BB<A2::a::Base>>>();
+//> M::m::g<one::coin::Coin<A1::a::Base>>();
+//> M::m::g<one::coin::Coin<B2::b::BB<A2::a::Base>>>();

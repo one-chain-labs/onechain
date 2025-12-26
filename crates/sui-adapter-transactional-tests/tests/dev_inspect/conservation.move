@@ -8,11 +8,11 @@
 //# publish
 
 module test::m {
-    use sui::oct::OCT;
-    use sui::coin::Coin;
+    use one::oct::OCT;
+    use one::coin::Coin;
 
     public fun transfer_back(c: Coin<OCT>, ctx: &mut TxContext) {
-        sui::transfer::public_transfer(c, tx_context::sender(ctx))
+        one::transfer::public_transfer(c, tx_context::sender(ctx))
     }
 }
 

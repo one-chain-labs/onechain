@@ -4,7 +4,7 @@
 #[test_only]
 module oct::groth16_tests;
 
-use sui::groth16::{Self, bls12381, bn254};
+use one::groth16::{Self, bls12381, bn254};
 
 #[test]
 fun test_prepare_verifying_key_bls12381() {

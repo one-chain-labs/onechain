@@ -93,7 +93,7 @@ Group imports by dependency, for example:
 
 ```move
 use std::string::String;
-use sui::{
+use one::{
     coin::Coin,
     balance,
     table::Table
@@ -219,7 +219,7 @@ Keep your functions pure to maintain composability. Do not use `transfer::transf
 ```move
 module conventions::amm;
 
-use sui::coin::Coin;
+use one::coin::Coin;
 
 public struct Pool has key {
     id: UID
@@ -256,7 +256,7 @@ Pass the `Coin` object by value with the exact right amount directly to improve 
 ```move
 module conventions::amm;
 
-use sui::coin::Coin;
+use one::coin::Coin;
 
 public struct Pool has key {
     id: UID
@@ -282,10 +282,10 @@ To maintain composability, use capability objects instead of arrays of addresses
 ```move
 module conventions::access_control;
 
-use sui::sui::SUI;
-use sui::balance::Balance;
-use sui::coin::{Self, Coin};
-use sui::table::{Self, Table};
+use one::one::SUI;
+use one::balance::Balance;
+use one::coin::{Self, Coin};
+use one::table::{Self, Table};
 
 public struct Account has key, store {
     id: UID,
@@ -326,10 +326,10 @@ If your dApp data has a one to one relationship, it's best to use owned objects.
 ```move
 module conventions::vesting_wallet;
 
-use sui::sui::SUI;
-use sui::coin::Coin;
-use sui::table::Table;
-use sui::balance::Balance;
+use one::one::SUI;
+use one::coin::Coin;
+use one::table::Table;
+use one::balance::Balance;
 
 public struct OwnedWallet has key {
     id: UID,
@@ -404,7 +404,7 @@ Use field comments to describe the properties of your structs. In complex functi
 module conventions::hero;
 
 use std::string::String;
-use sui::kiosk::{Kiosk, KioskOwnerCap};
+use one::kiosk::{Kiosk, KioskOwnerCap};
 
 public struct Hero has key, store {
     id: UID,

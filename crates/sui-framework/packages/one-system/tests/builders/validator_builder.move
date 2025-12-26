@@ -9,10 +9,10 @@
 /// It can be used in the `TestRunner` module to set up validators in the system.
 module oct_system::validator_builder;
 
-use sui::bag;
-use sui::balance;
-use sui::oct::OCT;
-use sui::url;
+use one::bag;
+use one::balance;
+use one::oct::OCT;
+use one::url;
 use one_system::validator::{Self, Validator, ValidatorMetadata};
 
 // === Constants ===

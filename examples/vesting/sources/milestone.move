@@ -12,8 +12,8 @@
 /// ===========================================================================================
 module vesting::milestone;
 
-use sui::balance::Balance;
-use sui::coin::{Self, Coin};
+use one::balance::Balance;
+use one::coin::{Self, Coin};
 
 // === Errors ===
 #[error]

@@ -4,8 +4,8 @@
 #[test_only]
 module oct::table_tests;
 
-use sui::table;
-use sui::test_scenario;
+use one::table;
+use one::test_scenario;
 
 #[test]
 fun simple_all_functions() {
@@ -38,7 +38,7 @@ fun simple_all_functions() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldAlreadyExists)]
 fun add_duplicate() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -49,7 +49,7 @@ fun add_duplicate() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun borrow_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -59,7 +59,7 @@ fun borrow_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun borrow_mut_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -69,7 +69,7 @@ fun borrow_mut_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::dynamic_field::EFieldDoesNotExist)]
+#[expected_failure(abort_code = one::dynamic_field::EFieldDoesNotExist)]
 fun remove_missing() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);
@@ -79,7 +79,7 @@ fun remove_missing() {
 }
 
 #[test]
-#[expected_failure(abort_code = sui::table::ETableNotEmpty)]
+#[expected_failure(abort_code = one::table::ETableNotEmpty)]
 fun destroy_non_empty() {
     let sender = @0x0;
     let mut scenario = test_scenario::begin(sender);

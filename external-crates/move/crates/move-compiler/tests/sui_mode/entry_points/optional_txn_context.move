@@ -5,7 +5,7 @@ module a::m {
         abort 0
     }
 
-    struct Obj has key { id: sui::object::UID }
+    struct Obj has key { id: one::object::UID }
     public entry fun t2(_: bool, _: &mut Obj) {
         abort 0
     }

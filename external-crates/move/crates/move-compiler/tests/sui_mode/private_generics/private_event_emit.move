@@ -1,6 +1,6 @@
 // tests modules cannot emit events for types not defined in the current module
 module a::m {
-    use sui::event;
+    use one::event;
 
     struct X has copy, drop {}
 

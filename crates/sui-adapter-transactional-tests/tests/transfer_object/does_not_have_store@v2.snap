@@ -23,8 +23,8 @@ task 3, line 29:
 Owner: Account Address ( A )
 Version: 2
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -40,8 +40,8 @@ task 5, lines 33-36:
 Owner: Account Address ( A )
 Version: 3
 Contents: test::m::S {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(2,0),
         },
     },
@@ -58,8 +58,8 @@ task 7, line 40:
 Owner: Account Address ( A )
 Version: 4
 Contents: test::m::Cup<test::m::S> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(6,0),
         },
     },
@@ -75,8 +75,8 @@ task 9, line 44:
 Owner: Account Address ( A )
 Version: 5
 Contents: test::m::Cup<test::m::S> {
-    id: sui::object::UID {
-        id: sui::object::ID {
+    id: one::object::UID {
+        id: one::object::ID {
             bytes: fake(6,0),
         },
     },

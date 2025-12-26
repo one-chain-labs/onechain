@@ -13,9 +13,9 @@
 module oct::display;
 
 use std::string::String;
-use sui::event;
-use sui::package::Publisher;
-use sui::vec_map::{Self, VecMap};
+use one::event;
+use one::package::Publisher;
+use one::vec_map::{Self, VecMap};
 
 /// For when T does not belong to the package `Publisher`.
 const ENotOwner: u64 = 0;

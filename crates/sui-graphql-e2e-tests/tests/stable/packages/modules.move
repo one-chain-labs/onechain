@@ -6,8 +6,8 @@
 //# publish
 
 module pkg::m {
-    use sui::coin::{Self, Coin};
-    use sui::oct::OCT;
+    use one::coin::{Self, Coin};
+    use one::oct::OCT;
 
     public fun foo<C: drop>(x: u64, c: &Coin<C>): u64 {
         coin::value(c) + x

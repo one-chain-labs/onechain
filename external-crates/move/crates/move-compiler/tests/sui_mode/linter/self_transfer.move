@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module a::test {
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
+    use one::object::{Self, UID};
+    use one::transfer;
+    use one::tx_context::{Self, TxContext};
 
     struct S1 has key, store {
         id: UID
@@ -61,7 +61,7 @@ module oct::object {
     struct UID has store {
         id: address,
     }
-    public fun new(_: &mut sui::tx_context::TxContext): UID {
+    public fun new(_: &mut one::tx_context::TxContext): UID {
         abort ZERO
     }
 }

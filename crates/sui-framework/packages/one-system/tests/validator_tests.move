@@ -5,9 +5,9 @@
 module oct_system::validator_tests;
 
 use std::unit_test::assert_eq;
-use sui::balance;
-use sui::test_utils;
-use sui::url;
+use one::balance;
+use one::test_utils;
+use one::url;
 use one_system::staking_pool::StakedOct;
 use one_system::test_runner;
 use one_system::validator_builder;

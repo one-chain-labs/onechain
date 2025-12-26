@@ -2,7 +2,7 @@
 
 //# publish
 module a::m {
-    use sui::tx_context;
+    use one::tx_context;
 
     struct M<phantom T> has drop { dummy: bool }
 
@@ -11,7 +11,7 @@ module a::m {
 }
 
 module a::x {
-    use sui::tx_context;
+    use one::tx_context;
 
     struct X<phantom T> has drop { dummy: bool }
 
