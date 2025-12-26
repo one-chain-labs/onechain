@@ -32,7 +32,7 @@
 ///     (u8_value, u64_value, leftovers)
 /// }
 /// ```
-module oct::bcs {
+module one::bcs {
     use std::option::{Self, Option};
     use std::vector as v;
     use one::address;

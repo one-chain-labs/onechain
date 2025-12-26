@@ -4,7 +4,7 @@
 #[test_only]
 /// The goal of this module is to test Rule configuration setting and how Rules
 /// can read / modify the configuration in 'em.
-module oct::token_config_tests;
+module one::token_config_tests;
 
 use one::token;
 use one::token_test_utils::{Self as test, TEST};

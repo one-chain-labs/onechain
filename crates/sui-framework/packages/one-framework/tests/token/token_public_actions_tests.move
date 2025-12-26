@@ -3,7 +3,7 @@
 
 #[test_only]
 /// This module tests `join`, `split`, `zero` and `destroy_zero` functions
-module oct::token_public_actions_tests;
+module one::token_public_actions_tests;
 
 use one::token;
 use one::token_test_utils::{Self as test, TEST};

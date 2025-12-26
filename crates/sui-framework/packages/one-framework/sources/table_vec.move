@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// A basic scalable vector library implemented using `Table`.
-module oct::table_vec;
+module one::table_vec;
 
 use one::table::{Self, Table};
 

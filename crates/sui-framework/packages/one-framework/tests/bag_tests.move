@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::bag_tests;
+module one::bag_tests;
 
 use one::bag;
 use one::test_scenario;

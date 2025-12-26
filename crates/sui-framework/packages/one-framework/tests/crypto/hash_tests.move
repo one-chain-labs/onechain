@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::hash_tests;
+module one::hash_tests;
 
 use one::hash;
 

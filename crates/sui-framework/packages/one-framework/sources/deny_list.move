@@ -4,7 +4,7 @@
 /// Defines the `DenyList` type. The `DenyList` shared object is used to restrict access to
 /// instances of certain core types from being used as inputs by specified addresses in the deny
 /// list.
-module oct::deny_list;
+module one::deny_list;
 
 use one::bag::{Self, Bag};
 use one::config::{Self, Config};

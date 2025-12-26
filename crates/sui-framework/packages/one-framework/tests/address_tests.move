@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::address_tests;
+module one::address_tests;
 
 use one::address;
 

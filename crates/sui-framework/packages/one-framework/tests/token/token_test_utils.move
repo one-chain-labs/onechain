@@ -3,7 +3,7 @@
 
 #[test_only]
 /// This module defines base testing utilities for the
-module oct::token_test_utils;
+module one::token_test_utils;
 
 use one::coin::{Self, TreasuryCap};
 use one::token::{Self, Token, TokenPolicy, TokenPolicyCap};

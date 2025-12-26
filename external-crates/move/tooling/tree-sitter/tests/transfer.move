@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[allow(unused_const)]
-module oct::transfer {
+module one::transfer {
 
     use one::object::{Self, ID, UID};
     use one::prover;

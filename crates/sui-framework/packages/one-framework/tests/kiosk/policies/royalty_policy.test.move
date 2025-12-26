@@ -3,7 +3,7 @@
 
 #[test_only]
 /// A `TransferPolicy` Rule which implements percentage-based royalty fee.
-module oct::royalty_policy {
+module one::royalty_policy {
     use one::coin::{Self, Coin};
     use one::oct::OCT;
     use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
@@ -54,7 +54,7 @@ module oct::royalty_policy {
 }
 
 #[test_only]
-module oct::royalty_policy_tests {
+module one::royalty_policy_tests {
     use one::coin;
     use one::royalty_policy;
     use one::oct::OCT;

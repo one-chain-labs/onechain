@@ -38,7 +38,7 @@
 /// - `kiosk_extension` is a friend module to `kiosk` and has access to its
 /// internal functions (such as `place_internal` and `lock_internal` to
 /// implement custom authorization scheme for `place` and `lock` respectively).
-module oct::kiosk_extension;
+module one::kiosk_extension;
 
 use one::bag::{Self, Bag};
 use one::dynamic_field as df;

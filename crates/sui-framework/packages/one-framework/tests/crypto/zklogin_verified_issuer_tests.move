@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::zklogin_verified_issuer_tests;
+module one::zklogin_verified_issuer_tests;
 
 use one::test_scenario;
 use one::zklogin_verified_issuer::{

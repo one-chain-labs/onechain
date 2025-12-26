@@ -8,7 +8,7 @@ module a::trigger_lint_cases {
     }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }

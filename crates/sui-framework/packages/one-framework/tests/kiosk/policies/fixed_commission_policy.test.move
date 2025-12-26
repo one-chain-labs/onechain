@@ -4,7 +4,7 @@
 #[test_only]
 /// An example module implementing a fixed commission for the `TransferPolicy`.
 /// Follows the "transfer rules" layout and implements each of the steps.
-module oct::fixed_commission;
+module one::fixed_commission;
 
 use one::coin::Coin;
 use one::oct::OCT;

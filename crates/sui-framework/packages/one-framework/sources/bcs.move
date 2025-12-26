@@ -32,7 +32,7 @@
 ///     (u8_value, u64_value, leftovers)
 /// }
 /// ```
-module oct::bcs;
+module one::bcs;
 
 use std::bcs;
 use one::address;

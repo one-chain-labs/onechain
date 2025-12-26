@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::vec_set_tests;
+module one::vec_set_tests;
 
 use one::vec_set;
 

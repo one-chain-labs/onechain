@@ -25,6 +25,6 @@ module a::other {
     struct Event has copy, drop {}
 }
 
-module oct::event {
+module one::event {
     public fun emit<T: copy + drop>(_: T) { abort 0 }
 }

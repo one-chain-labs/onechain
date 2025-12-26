@@ -5,7 +5,7 @@
 /// This module implements tests for the TreasuryCap-related functionality such
 /// as spending, "flush"-ing, issuing new coins and performing marketplace-like
 /// operations.
-module oct::token_treasury_cap_tests;
+module one::token_treasury_cap_tests;
 
 use one::token;
 use one::token_test_utils as test;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::event_tests;
+module one::event_tests;
 
 use one::event;
 use one::test_utils::assert_eq;

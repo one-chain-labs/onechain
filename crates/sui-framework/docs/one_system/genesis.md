@@ -340,7 +340,7 @@ It will create a singleton SuiSystemState object, which contains
 all the information we need in the system.
 
 
-<pre><code><b>fun</b> <a href="../sui_system/genesis.md#sui_system_genesis_create">create</a>(sui_system_state_id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a>, sui_supply: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, genesis_chain_parameters: <a href="../sui_system/genesis.md#sui_system_genesis_GenesisChainParameters">one_system::genesis::GenesisChainParameters</a>, genesis_validators: vector&lt;<a href="../sui_system/genesis.md#sui_system_genesis_GenesisValidatorMetadata">one_system::genesis::GenesisValidatorMetadata</a>&gt;, token_distribution_schedule: <a href="../sui_system/genesis.md#sui_system_genesis_TokenDistributionSchedule">one_system::genesis::TokenDistributionSchedule</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui_system/genesis.md#sui_system_genesis_create">create</a>(sui_system_state_id: <a href="../sui/object.md#sui_object_UID">one::object::UID</a>, sui_supply: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, genesis_chain_parameters: <a href="../sui_system/genesis.md#sui_system_genesis_GenesisChainParameters">one_system::genesis::GenesisChainParameters</a>, genesis_validators: vector&lt;<a href="../sui_system/genesis.md#sui_system_genesis_GenesisValidatorMetadata">one_system::genesis::GenesisValidatorMetadata</a>&gt;, token_distribution_schedule: <a href="../sui_system/genesis.md#sui_system_genesis_TokenDistributionSchedule">one_system::genesis::TokenDistributionSchedule</a>, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -455,7 +455,7 @@ all the information we need in the system.
 
 
 
-<pre><code><b>fun</b> <a href="../sui_system/genesis.md#sui_system_genesis_allocate_tokens">allocate_tokens</a>(sui_supply: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, allocations: vector&lt;<a href="../sui_system/genesis.md#sui_system_genesis_TokenAllocation">one_system::genesis::TokenAllocation</a>&gt;, validators: &<b>mut</b> vector&lt;<a href="../sui_system/validator.md#sui_system_validator_Validator">one_system::validator::Validator</a>&gt;, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../sui_system/genesis.md#sui_system_genesis_allocate_tokens">allocate_tokens</a>(sui_supply: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, allocations: vector&lt;<a href="../sui_system/genesis.md#sui_system_genesis_TokenAllocation">one_system::genesis::TokenAllocation</a>&gt;, validators: &<b>mut</b> vector&lt;<a href="../sui_system/validator.md#sui_system_validator_Validator">one_system::validator::Validator</a>&gt;, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Oct types helpers and utilities
-module oct::types {
+module one::types {
     // === one-time witness ===
 
     /// Tests if the argument type is a one-time witness, that is a type with only one instantiation

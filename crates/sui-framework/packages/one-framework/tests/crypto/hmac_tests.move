@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::hmac_tests;
+module one::hmac_tests;
 
 use one::hmac;
 

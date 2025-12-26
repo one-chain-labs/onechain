@@ -4,7 +4,7 @@
 #[test_only]
 /// This module implements tests for the request formation and approval in the
 /// `TokenPolicy`.
-module oct::token_request_tests;
+module one::token_request_tests;
 
 use std::option::none;
 use one::token;

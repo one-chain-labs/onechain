@@ -5,7 +5,7 @@
 // This module provides functionality for generating and using secure randomness.
 //
 // Randomness is currently write-only, until user-facing API is implemented.
-module oct::random {
+module one::random {
     use std::vector;
     use one::object::{Self, UID};
     use one::transfer;

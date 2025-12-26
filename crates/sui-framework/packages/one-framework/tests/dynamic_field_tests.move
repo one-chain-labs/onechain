@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::dynamic_field_tests;
+module one::dynamic_field_tests;
 
 use one::dynamic_field::{add, exists_with_type, borrow, borrow_mut, remove};
 use one::test_scenario;

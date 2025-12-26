@@ -4,10 +4,10 @@
 /// A storable handler for Balances in general. Is used in the `Coin`
 /// module to allow balance operations and can be used to implement
 /// custom coins with `Supply` and `Balance`s.
-module oct::balance {
+module one::balance {
     use one::tx_context::{Self, TxContext};
 
-    friend oct::oct;
+    friend one::oct;
 
     /// For when trying to destroy a non-zero balance.
     const ENonZero: u64 = 0;
@@ -163,7 +163,7 @@ module oct::balance {
 }
 
 #[test_only]
-module oct::balance_tests {
+module one::balance_tests {
     use one::balance;
     use one::oct::OCT;
     use one::test_utils;

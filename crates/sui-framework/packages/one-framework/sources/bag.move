@@ -21,7 +21,7 @@
 /// `one::dynamic_field` while preventing accidentally stranding field values. A `UID` can be
 /// deleted, even if it has dynamic fields associated with it, but a bag, on the other hand, must be
 /// empty to be destroyed.
-module oct::bag;
+module one::bag;
 
 use one::dynamic_field as field;
 

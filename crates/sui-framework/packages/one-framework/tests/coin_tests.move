@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only, allow(deprecated_usage)]
-module oct::coin_tests;
+module one::coin_tests;
 
 use one::coin::{Self, Coin};
 use one::deny_list;

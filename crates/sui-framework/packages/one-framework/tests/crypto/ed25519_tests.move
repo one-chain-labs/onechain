@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::ed25519_tests;
+module one::ed25519_tests;
 
 use one::ed25519;
 

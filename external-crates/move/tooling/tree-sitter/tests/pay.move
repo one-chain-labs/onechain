@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module provides handy functionality for wallets and `one::Coin` management.
-module oct::pay {
+module one::pay {
     use one::tx_context::{Self, TxContext};
     use one::coin::{Self, Coin};
     use one::transfer;

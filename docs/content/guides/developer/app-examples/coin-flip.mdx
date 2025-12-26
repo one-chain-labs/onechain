@@ -55,7 +55,7 @@ Create a new file in the `sources` directory with the name `house_data.move` and
 module satoshi_flip::house_data {
 
   use one::balance::{Self, Balance};
-  use one::one::SUI;
+  use one::oct::OCT;
   use one::coin::{Self, Coin};
   use one::package::{Self};
 
@@ -331,7 +331,7 @@ module satoshi_flip::single_player_satoshi {
 
   use one::coin::{Self, Coin};
   use one::balance::Balance;
-  use one::one::SUI;
+  use one::oct::OCT;
   use one::bls12381::bls12381_min_pk_verify;
   use one::event::emit;
   use one::hash::{blake2b256};

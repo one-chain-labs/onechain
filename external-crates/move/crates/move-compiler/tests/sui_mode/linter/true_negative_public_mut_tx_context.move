@@ -17,10 +17,10 @@ module 0x42::true_negative {
 
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }
 
-module oct::mock_tx_context {
+module one::mock_tx_context {
     struct TxContext has drop {}
 }

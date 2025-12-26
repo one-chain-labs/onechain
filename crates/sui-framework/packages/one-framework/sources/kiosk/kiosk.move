@@ -80,7 +80,7 @@
 /// ```
 ///
 /// See `transfer_policy` module for more details on how they function.
-module oct::kiosk;
+module one::kiosk;
 
 use one::balance::{Self, Balance};
 use one::coin::{Self, Coin};

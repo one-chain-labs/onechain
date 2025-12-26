@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::ecvrf_tests;
+module one::ecvrf_tests;
 
 use one::ecvrf;
 

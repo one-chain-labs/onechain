@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::config;
+module one::config;
 
 use one::dynamic_field as field;
 

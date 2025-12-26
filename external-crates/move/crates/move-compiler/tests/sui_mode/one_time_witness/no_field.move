@@ -10,6 +10,6 @@ module a::m {
 
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }

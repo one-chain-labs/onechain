@@ -50,13 +50,13 @@ module a::other {
     }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::transfer {
+module one::transfer {
     use one::object::UID;
 
     struct Receiving<phantom T: key> { }
@@ -102,6 +102,6 @@ module oct::transfer {
     }
 }
 
-module oct::party {
+module one::party {
     struct Party has copy, drop {}
 }

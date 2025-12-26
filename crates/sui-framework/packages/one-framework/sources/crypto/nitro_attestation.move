@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::nitro_attestation;
+module one::nitro_attestation;
 
 use one::clock::{Self, Clock};
 

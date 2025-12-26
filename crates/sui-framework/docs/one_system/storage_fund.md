@@ -68,12 +68,12 @@ be taken out of the fund.
 
 <dl>
 <dt>
-<code><a href="../sui_system/storage_fund.md#sui_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;</code>
+<code><a href="../sui_system/storage_fund.md#sui_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
 </dd>
 <dt>
-<code>non_refundable_balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;</code>
+<code>non_refundable_balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -89,7 +89,7 @@ be taken out of the fund.
 Called by <code><a href="../sui_system/sui_system.md#sui_system_sui_system">sui_system</a></code> at genesis time.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_new">new</a>(initial_fund: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;): <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_new">new</a>(initial_fund: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;): <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>
 </code></pre>
 
 
@@ -118,7 +118,7 @@ Called by <code><a href="../sui_system/sui_system.md#sui_system_sui_system">sui_
 Called by <code><a href="../sui_system/sui_system.md#sui_system_sui_system">sui_system</a></code> at epoch change times to process the inflows and outflows of storage fund.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_advance_epoch">advance_epoch</a>(self: &<b>mut</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>, storage_charges: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, storage_fund_reinvestment: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, leftover_staking_rewards: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, storage_rebate_amount: u64, non_refundable_storage_fee_amount: u64): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_advance_epoch">advance_epoch</a>(self: &<b>mut</b> <a href="../sui_system/storage_fund.md#sui_system_storage_fund_StorageFund">one_system::storage_fund::StorageFund</a>, storage_charges: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, storage_fund_reinvestment: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, leftover_staking_rewards: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, storage_rebate_amount: u64, non_refundable_storage_fee_amount: u64): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 

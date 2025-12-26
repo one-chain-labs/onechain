@@ -3,7 +3,7 @@
 
 #[test_only]
 #[allow(unused_use)]
-module oct::random_tests;
+module one::random_tests;
 
 use one::bcs;
 use one::random::{Self, Random};

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Oct object identifiers
-module oct::object {
+module one::object {
     use std::bcs;
     use one::address;
     use one::tx_context::{Self, TxContext};

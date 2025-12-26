@@ -11,13 +11,13 @@ module a::edge_cases {
 
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::another {
+module one::another {
     struct UID has store {
         id: address,
     }

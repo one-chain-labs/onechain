@@ -18,9 +18,9 @@ module 0::beep {
   struct BEEP has store { boop: one::table::Table<u8, bool> }
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }
-module oct::table {
+module one::table {
     struct Table<phantom K, phantom V> has store {}
 }

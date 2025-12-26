@@ -61,7 +61,7 @@ module std::vector {
     native public fun pop_back<Element>(v: &mut vector<Element>): Element;
 }
 
-module oct::table {
+module one::table {
     struct Table<phantom K: copy + drop + store, phantom V: store> {
         size: u64,
     }

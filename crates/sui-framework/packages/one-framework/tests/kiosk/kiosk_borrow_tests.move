@@ -3,7 +3,7 @@
 
 #[test_only]
 /// Tests for borrowing mechanics.
-module oct::kiosk_borrow_tests;
+module one::kiosk_borrow_tests;
 
 use one::kiosk_test_utils::{Self as utils, Asset};
 

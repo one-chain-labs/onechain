@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::groth16_tests;
+module one::groth16_tests;
 
 use one::groth16::{Self, bls12381, bn254};
 

@@ -50,7 +50,7 @@ Options:
            --make-move-vec <u64> []
            --make-move-vec <u64> [1, 2, 3, 4]
            --make-move-vec <std::option::Option<u64>> [none,none]
-           --make-move-vec <one::coin::Coin<one::one::SUI>> [gas]
+           --make-move-vec <one::coin::Coin<one::oct::OCT>> [gas]
 
       --merge-coins <INTO_COIN> <[COIN OBJECTS]>
           Merge N coins into the provided coin.
@@ -291,13 +291,13 @@ The following example showcases how to split a gas coin into multiple coins, mak
 # Split off from gas
 --split-coins gas "[0,1,2,3]"
 --assign coins
---move-call one::coin::destroy_zero<one::one::SUI> coins.0
+--move-call one::coin::destroy_zero<one::oct::OCT> coins.0
 # Can further split a split coin (and through variable bindings/result accesses)
 --split-coins coins.1 "[0,0]"
 --assign zcoins
 # Destroy both new coins
---move-call one::coin::destroy_zero<one::one::SUI> zcoins.0
---move-call one::coin::destroy_zero<one::one::SUI> zcoins.1
+--move-call one::coin::destroy_zero<one::oct::OCT> zcoins.0
+--move-call one::coin::destroy_zero<one::oct::OCT> zcoins.1
 # Can merge the split coins back
 --merge-coins gas "[coins.1, coins.2, coins.3]"
 --gas-budget 10000000

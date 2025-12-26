@@ -6,7 +6,7 @@
 /// - [ ] test purchase flow
 /// - [ ] test purchase cap flow
 /// - [ ] test withdraw methods
-module oct::kiosk_tests;
+module one::kiosk_tests;
 
 use one::coin;
 use one::kiosk_test_utils::{Self as test, Asset};

@@ -6,7 +6,7 @@ module a::m {
     public entry fun no(_: Receiving<u64>) { abort 0 }
 }
 
-module oct::transfer {
+module one::transfer {
     struct Receiving<phantom T: key> has drop {
         id: address
     }

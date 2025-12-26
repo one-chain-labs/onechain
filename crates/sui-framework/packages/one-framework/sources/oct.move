@@ -3,10 +3,10 @@
 
 /// Coin<OCT> is the token used to pay for gas in Oct.
 /// It has 9 decimals, and the smallest unit (10^-9) is called "mist".
-module oct::oct;
+module one::oct;
 
-use oct::balance::Balance;
-use oct::coin;
+use one::balance::Balance;
+use one::coin;
 
 const EAlreadyMinted: u64 = 0;
 /// Sender is not @0x0 the system address.

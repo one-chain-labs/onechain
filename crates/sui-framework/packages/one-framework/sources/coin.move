@@ -4,7 +4,7 @@
 /// Defines the `Coin` type - platform wide representation of fungible
 /// tokens and coins. `Coin` can be described as a secure wrapper around
 /// `Balance` type.
-module oct::coin;
+module one::coin;
 
 use std::ascii;
 use std::string;

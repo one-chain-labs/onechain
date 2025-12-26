@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::linked_table_tests;
+module one::linked_table_tests;
 
 use one::linked_table::{Self, LinkedTable};
 use one::test_scenario;

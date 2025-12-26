@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::poseidon_tests;
+module one::poseidon_tests;
 
 use one::poseidon::poseidon_bn254;
 

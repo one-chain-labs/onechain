@@ -16,7 +16,7 @@
 /// // table1 does not equal table2, despite having the same entries
 /// assert!(&table1 != &table2);
 /// ```
-module oct::table;
+module one::table;
 
 use one::dynamic_field as field;
 

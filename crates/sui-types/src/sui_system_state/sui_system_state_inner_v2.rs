@@ -24,7 +24,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Rust version of the Move one::sui_system::SystemParametersV2 type
+/// Rust version of the Move one::one_system::SystemParametersV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SystemParametersV2 {
     /// The duration of an epoch, in milliseconds.
@@ -59,7 +59,7 @@ pub struct SystemParametersV2 {
     pub extra_fields: Bag,
 }
 
-/// Rust version of the Move sui_system::sui_system::SuiSystemStateInnerV2 type
+/// Rust version of the Move one_system::one_system::SuiSystemStateInnerV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SuiSystemStateInnerV2 {
     pub epoch: u64,

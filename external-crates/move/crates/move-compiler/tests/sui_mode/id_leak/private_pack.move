@@ -20,7 +20,7 @@ module b::b {
     }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }

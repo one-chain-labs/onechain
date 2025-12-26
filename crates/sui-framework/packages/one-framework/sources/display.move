@@ -10,7 +10,7 @@
 /// substitution and filling-in the pieces using the data from the object T.
 ///
 /// More entry functions might be added in the future depending on the use cases.
-module oct::display;
+module one::display;
 
 use std::string::String;
 use one::event;

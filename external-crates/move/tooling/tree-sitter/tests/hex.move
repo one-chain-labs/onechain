@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// HEX (Base16) encoding utility.
-module oct::hex {
+module one::hex {
     use std::vector;
 
     const EInvalidHexLength: u64 = 0;

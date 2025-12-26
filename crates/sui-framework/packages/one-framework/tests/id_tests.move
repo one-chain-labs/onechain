@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::id_tests;
+module one::id_tests;
 
 const EIdBytesMismatch: u64 = 0;
 

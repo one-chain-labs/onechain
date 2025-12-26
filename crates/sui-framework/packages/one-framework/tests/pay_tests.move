@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::pay_tests;
+module one::pay_tests;
 
 use one::balance;
 use one::coin::{Self, Coin};

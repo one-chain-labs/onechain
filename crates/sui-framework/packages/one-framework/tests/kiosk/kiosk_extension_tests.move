@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::kiosk_marketplace_ext {
+module one::kiosk_marketplace_ext {
     use one::coin::Coin;
     use one::kiosk::{Self, KioskOwnerCap, Kiosk, PurchaseCap};
     use one::kiosk_extension as ext;
@@ -114,7 +114,7 @@ module oct::kiosk_marketplace_ext {
 }
 
 #[test_only]
-module oct::kiosk_extensions_tests {
+module one::kiosk_extensions_tests {
     use one::kiosk_extension as ext;
     use one::kiosk_test_utils as test;
 

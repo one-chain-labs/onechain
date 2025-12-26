@@ -282,7 +282,7 @@ To maintain composability, use capability objects instead of arrays of addresses
 ```move
 module conventions::access_control;
 
-use one::one::SUI;
+use one::oct::OCT;
 use one::balance::Balance;
 use one::coin::{Self, Coin};
 use one::table::{Self, Table};
@@ -326,7 +326,7 @@ If your dApp data has a one to one relationship, it's best to use owned objects.
 ```move
 module conventions::vesting_wallet;
 
-use one::one::SUI;
+use one::oct::OCT;
 use one::coin::Coin;
 use one::table::Table;
 use one::balance::Balance;

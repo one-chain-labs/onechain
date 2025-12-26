@@ -292,9 +292,9 @@ Looking toward the future, Move 2024 Beta adds the following keywords to the lan
 Move 2024 revises how paths and namespaces work compared to legacy Move, toward easing `enum` aliasing in the future. Consider the following snippet from a test annotation in the `sui_system` library:
 
 ```move
-use sui_system::sui_system;
+use one_system::sui_system;
 ...
-#[expected_failure(abort_code = sui_system::validator_set::EInvalidCap)]
+#[expected_failure(abort_code = one_system::validator_set::EInvalidCap)]
 ```
 
 Legacy Move would always treat a three-part name as an address(`sui_system`), module(`validator_set`), and module member (`EInvalidCap`). Move 2024 respects scope for `use`, so `sui_system` in the attribute resolves to the module, producing a name resolution error overall.
@@ -302,9 +302,9 @@ Legacy Move would always treat a three-part name as an address(`sui_system`), mo
 To avoid cases where this is the intended behavior, Move 2024 introduces a prefix operation for global qualification. To use, you can rewrite this annotation as:
 
 ```move
-use sui_system::sui_system;
+use one_system::sui_system;
 ...
-#[expected_failure(abort_code = ::sui_system::validator_set::EInvalidCap)]
+#[expected_failure(abort_code = ::one_system::validator_set::EInvalidCap)]
                              // ^ note `::` here
 ```
 

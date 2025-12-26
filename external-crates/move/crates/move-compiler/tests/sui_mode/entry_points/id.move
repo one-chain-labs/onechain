@@ -13,7 +13,7 @@ module a::m {
 
 }
 
-module oct::object {
+module one::object {
     struct ID has store {
         id: address,
     }

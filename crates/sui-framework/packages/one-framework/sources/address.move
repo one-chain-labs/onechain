@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[defines_primitive(address)]
-module oct::address;
+module one::address;
 
 use std::ascii;
 use std::bcs;

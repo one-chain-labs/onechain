@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::vdf_tests;
+module one::vdf_tests;
 
 use one::vdf::{hash_to_input, vdf_verify};
 

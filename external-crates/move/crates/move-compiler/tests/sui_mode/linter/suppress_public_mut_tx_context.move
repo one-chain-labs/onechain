@@ -15,6 +15,6 @@ module 0x42::suppress_cases {
 }
 
 // Mocking the one::tx_context module
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }

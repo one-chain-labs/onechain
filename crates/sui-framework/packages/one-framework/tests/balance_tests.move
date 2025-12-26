@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::coin_balance_tests;
+module one::coin_balance_tests;
 
 use one::balance;
 use one::coin;

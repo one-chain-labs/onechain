@@ -33,7 +33,7 @@ module a::m {
 }
 
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
@@ -45,14 +45,14 @@ module oct::object {
     }
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
     public fun sender(_: &TxContext): address {
         @0
     }
 }
 
-module oct::transfer {
+module one::transfer {
     public fun transfer<T: key>(_: T, _: address) {
         abort 0
     }

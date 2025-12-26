@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::table_vec_tests;
+module one::table_vec_tests;
 
 use one::table_vec;
 use one::test_scenario;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Generic Move and native functions for group operations.
-module oct::group_ops;
+module one::group_ops;
 
 use one::bcs;
 

@@ -3,7 +3,7 @@
 
 /// Similar to `one::table` but the values are linked together, allowing for ordered insertion and
 /// removal
-module oct::linked_table;
+module one::linked_table;
 
 use one::dynamic_field as field;
 

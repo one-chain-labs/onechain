@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::test_scenario_tests;
+module one::test_scenario_tests;
 
 use one::dynamic_field;
 use one::dynamic_object_field;

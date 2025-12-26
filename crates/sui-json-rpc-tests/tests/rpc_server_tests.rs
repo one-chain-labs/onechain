@@ -368,7 +368,7 @@ async fn test_get_coins() -> Result<(), anyhow::Error> {
     assert!(!result.has_next_page);
 
     let result: CoinPage = http_client
-        .get_coins(address, Some("0x2::one::TestCoin".into()), None, None)
+        .get_coins(address, Some("0x2::oct::TestCoin".into()), None, None)
         .await?;
     assert_eq!(0, result.data.len());
 

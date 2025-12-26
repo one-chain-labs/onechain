@@ -62,7 +62,7 @@ title: Module `one_system::stake_subsidy`
 
 <dl>
 <dt>
-<code>balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;</code>
+<code>balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
  Balance of SUI set aside for stake subsidies that will be drawn down over time.
@@ -133,7 +133,7 @@ title: Module `one_system::stake_subsidy`
 
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_create">create</a>(balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, initial_distribution_amount: u64, stake_subsidy_period_length: u64, stake_subsidy_decrease_rate: u16, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_StakeSubsidy">one_system::stake_subsidy::StakeSubsidy</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_create">create</a>(balance: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, initial_distribution_amount: u64, stake_subsidy_period_length: u64, stake_subsidy_decrease_rate: u16, ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_StakeSubsidy">one_system::stake_subsidy::StakeSubsidy</a>
 </code></pre>
 
 
@@ -176,7 +176,7 @@ title: Module `one_system::stake_subsidy`
 Advance the epoch counter and draw down the subsidy for the epoch.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_advance_epoch">advance_epoch</a>(self: &<b>mut</b> <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_StakeSubsidy">one_system::stake_subsidy::StakeSubsidy</a>): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_advance_epoch">advance_epoch</a>(self: &<b>mut</b> <a href="../sui_system/stake_subsidy.md#sui_system_stake_subsidy_StakeSubsidy">one_system::stake_subsidy::StakeSubsidy</a>): <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 

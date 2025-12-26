@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::address {
+module one::address {
     use one::hex;
     use std::ascii;
     use std::bcs;

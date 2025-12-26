@@ -7,7 +7,7 @@
 //
 // This module is not currently accessible from user contracts, and is used only to record the JWK
 // state to the chain for auditability + restore from snapshot purposes.
-module oct::authenticator_state {
+module one::authenticator_state {
     // friend bar;
     // friend one::coin;
 

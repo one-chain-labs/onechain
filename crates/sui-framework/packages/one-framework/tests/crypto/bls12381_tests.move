@@ -3,7 +3,7 @@
 
 #[allow(implicit_const_copy)]
 #[test_only]
-module oct::bls12381_tests;
+module one::bls12381_tests;
 
 use std::hash::sha2_256;
 use one::bls12381;

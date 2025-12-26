@@ -4731,7 +4731,7 @@
             },
             {
               "name": "object_type",
-              "description": "Optional type filter to limit the types of objects listed.\n\nProviding an object type with no type params will return objects of that\ntype with any type parameter, e.g. `0x2::coin::Coin` will return all\n`Coin\u003cT\u003e` objects regardless of the type parameter `T`. Providing a type\nwith a type param will retrict the returned objects to only those objects\nthat match the provided type parameters, e.g.\n`0x2::coin::Coin\u003c0x2::oct::OCT\u003e` will only return `Coin\u003cSUI\u003e` objects.",
+              "description": "Optional type filter to limit the types of objects listed.\n\nProviding an object type with no type params will return objects of that\ntype with any type parameter, e.g. `0x2::coin::Coin` will return all\n`Coin\u003cT\u003e` objects regardless of the type parameter `T`. Providing a type\nwith a type param will retrict the returned objects to only those objects\nthat match the provided type parameters, e.g.\n`0x2::coin::Coin\u003c0x2::one::OCT\u003e` will only return `Coin\u003cSUI\u003e` objects.",
               "label": "optional",
               "type": "string",
               "longType": "string",

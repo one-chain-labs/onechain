@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Module which defines instances of the poseidon hash functions. Available in Devnet only.
-module oct::poseidon;
+module one::poseidon;
 
 use one::bcs;
 

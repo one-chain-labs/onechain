@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module provides functionality for generating secure randomness.
-module oct::random;
+module one::random;
 
 use std::bcs;
 use one::hmac::hmac_sha3_256;

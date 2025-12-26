@@ -10,7 +10,7 @@
 /// in the `Kiosk`. When an item is placed into the Kiosk, a `PlacedWitness`
 /// struct is created which can be used to prove that the `T` was placed
 /// to the `Kiosk`.
-module oct::witness_policy {
+module one::witness_policy {
     use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap, TransferRequest};
 
     /// When a Proof does not find its Rule<Proof>.
@@ -41,7 +41,7 @@ module oct::witness_policy {
 }
 
 #[test_only]
-module oct::witness_policy_tests {
+module one::witness_policy_tests {
     use one::transfer_policy as policy;
     use one::transfer_policy_tests::{Self as test, Asset};
     use one::witness_policy;

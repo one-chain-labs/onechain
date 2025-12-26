@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::versioned_tests;
+module one::versioned_tests;
 
 use one::versioned;
 

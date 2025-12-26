@@ -21,7 +21,7 @@ use one::{
     coin::Coin,
     dynamic_field as df,
     dynamic_object_field as dof,
-    oct::OCT,
+    one::OCT,
     table::{Self, Table},
     table_vec::{Self, TableVec as TV}
 };

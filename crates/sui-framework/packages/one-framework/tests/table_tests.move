@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::table_tests;
+module one::table_tests;
 
 use one::table;
 use one::test_scenario;

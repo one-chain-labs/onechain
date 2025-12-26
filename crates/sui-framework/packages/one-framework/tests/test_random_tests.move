@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::test_random_tests;
+module one::test_random_tests;
 
 use one::test_random::new;
 

@@ -3,6 +3,6 @@ module a::m {
     fun init(_: &mut one::tx_context::TxContext) {}
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }

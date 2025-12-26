@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::accumulator;
+module one::accumulator;
 
 use one::dynamic_field;
 use one::object::sui_accumulator_root_address;

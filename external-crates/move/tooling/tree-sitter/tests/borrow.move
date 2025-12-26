@@ -6,7 +6,7 @@
 /// With Programmable transactions, it is possible to borrow a value within
 /// a transaction, use it and put back in the end. Hot-potato `Borrow` makes
 /// sure the object is returned and was not swapped for another one.
-module oct::borrow {
+module one::borrow {
     use one::object::{Self, ID};
     use std::option::{Self, Option};
     use one::tx_context::{Self, TxContext};

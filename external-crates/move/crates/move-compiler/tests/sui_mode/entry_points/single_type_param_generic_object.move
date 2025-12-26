@@ -11,12 +11,12 @@ module a::m {
 
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
 }

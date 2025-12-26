@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::accumulator_settlement;
+module one::accumulator_settlement;
 
 use one::accumulator::{AccumulatorRoot, accumulator_key, U128, create_u128, destroy_u128};
 

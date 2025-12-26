@@ -3,7 +3,7 @@
 
 /// APIs for accessing time from move calls, via the `Clock`: a unique
 /// shared object that is created at 0x6 during genesis.
-module oct::clock {
+module one::clock {
     use one::object::{Self, UID};
     use one::transfer;
     use one::tx_context::{Self, TxContext};

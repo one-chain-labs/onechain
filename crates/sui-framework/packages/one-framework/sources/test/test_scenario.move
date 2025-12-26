@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::test_scenario;
+module one::test_scenario;
 
 use one::vec_map::VecMap;
 

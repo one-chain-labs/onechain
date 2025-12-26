@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Group operations of BLS12-381.
-module oct::bls12381;
+module one::bls12381;
 
 use one::group_ops::{Self, Element};
 

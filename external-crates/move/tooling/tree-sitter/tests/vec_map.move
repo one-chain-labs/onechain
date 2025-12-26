@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::vec_map {
+module one::vec_map {
     use std::option::{Self, Option};
     use std::vector;
 

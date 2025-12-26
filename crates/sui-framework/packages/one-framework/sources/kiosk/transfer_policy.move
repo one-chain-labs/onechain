@@ -21,7 +21,7 @@
 /// of their types and collect profits if a fee is required on sales. Custom
 /// policies can be removed at any moment, and the change will affect all instances
 /// of the type at once.
-module oct::transfer_policy;
+module one::transfer_policy;
 
 use std::type_name::{Self, TypeName};
 use one::balance::{Self, Balance};

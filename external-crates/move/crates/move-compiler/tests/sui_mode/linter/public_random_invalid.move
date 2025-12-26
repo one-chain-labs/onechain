@@ -11,13 +11,13 @@ module a::test {
     public entry fun not_allowed4(_x: u64, _r: &Random, _y: u64) {}
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::random {
+module one::random {
     use one::object::UID;
 
     struct Random has key { id: UID }

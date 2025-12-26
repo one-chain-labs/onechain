@@ -3,7 +3,7 @@
 
 /// Coin<OCT> is the token used to pay for gas in Sui.
 /// It has 9 decimals, and the smallest unit (10^-9) is called "mist".
-module oct::oct {
+module one::oct {
     use std::option;
     use one::tx_context::{Self, TxContext};
     use one::balance::{Self, Balance};

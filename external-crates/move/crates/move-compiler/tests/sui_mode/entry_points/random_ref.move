@@ -6,13 +6,13 @@ module a::m {
     }
 }
 
-module oct::random {
+module one::random {
     struct Random has key {
         id: one::object::UID,
     }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }

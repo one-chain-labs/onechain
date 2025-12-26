@@ -127,7 +127,7 @@ type BalanceChange {
 	"""
 	owner: Address
 	"""
-	The inner type of the coin whose balance has changed (e.g. `0x2::one::SUI`).
+	The inner type of the coin whose balance has changed (e.g. `0x2::oct::OCT`).
 	"""
 	coinType: String
 	"""

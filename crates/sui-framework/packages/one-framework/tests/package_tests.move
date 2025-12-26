@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::package_tests;
+module one::package_tests;
 
 use one::package::{Self, UpgradeCap, UpgradeTicket};
 use one::test_scenario::{Self, Scenario};

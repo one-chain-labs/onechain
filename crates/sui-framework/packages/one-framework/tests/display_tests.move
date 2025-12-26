@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::display_tests;
+module one::display_tests;
 
 use std::string::String;
 use one::display;

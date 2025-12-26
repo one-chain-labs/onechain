@@ -49,13 +49,13 @@ module a::test {
     }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::bag {
+module one::bag {
     use one::object::UID;
 
     struct Bag has key, store {
@@ -63,7 +63,7 @@ module oct::bag {
     }
 }
 
-module oct::object_bag {
+module one::object_bag {
     use one::object::UID;
 
     struct ObjectBag has key, store {
@@ -71,7 +71,7 @@ module oct::object_bag {
     }
 }
 
-module oct::table {
+module one::table {
     use one::object::UID;
 
     struct Table<phantom K: copy + drop + store, phantom V: store> has key, store {
@@ -79,7 +79,7 @@ module oct::table {
     }
 }
 
-module oct::object_table {
+module one::object_table {
     use one::object::UID;
 
     struct ObjectTable<phantom K: copy + drop + store, phantom V: key + store> has key, store {
@@ -87,7 +87,7 @@ module oct::object_table {
     }
 }
 
-module oct::linked_table {
+module one::linked_table {
     use one::object::UID;
 
     struct LinkedTable<phantom K: copy + drop + store, phantom V: store> has key, store {
@@ -95,7 +95,7 @@ module oct::linked_table {
     }
 }
 
-module oct::table_vec {
+module one::table_vec {
     use one::object::UID;
 
     struct TableVec<phantom Element: store> has key, store {
@@ -103,7 +103,7 @@ module oct::table_vec {
     }
 }
 
-module oct::vec_map {
+module one::vec_map {
     use one::object::UID;
 
     struct VecMap<phantom K: copy, phantom V> has key, store {
@@ -111,7 +111,7 @@ module oct::vec_map {
     }
 }
 
-module oct::vec_set {
+module one::vec_set {
     use one::object::UID;
 
     struct VecSet<phantom K: copy + drop> has key, store {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::nitro_attestation_tests;
+module one::nitro_attestation_tests;
 
 use one::nitro_attestation;
 use one::test_scenario;

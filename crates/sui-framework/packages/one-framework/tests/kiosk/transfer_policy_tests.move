@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::malicious_policy {
+module one::malicious_policy {
     use one::transfer_policy::{Self as policy, TransferRequest};
 
     public struct Rule has drop {}
@@ -13,7 +13,7 @@ module oct::malicious_policy {
 }
 
 #[test_only]
-module oct::transfer_policy_tests {
+module one::transfer_policy_tests {
     use one::coin;
     use one::dummy_policy;
     use one::malicious_policy;

@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::accumulator_metadata;
+module one::accumulator_metadata;
 
 use one::accumulator::AccumulatorRoot;
 use one::bag;

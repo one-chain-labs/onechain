@@ -822,7 +822,7 @@ Returned as metadata only when a maker order is filled from place order function
 <dd>
 </dd>
 <dt>
-<code>creation_fee: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;</code>
+<code>creation_fee: <a href="../sui/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -1172,7 +1172,7 @@ Destroy the given <code>pool_owner_cap</code> object
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_pool">create_pool</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_pool">create_pool</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -1204,7 +1204,7 @@ The taker_fee_rate should be greater than or equal to the maker_rebate_rate, and
 Taker_fee_rate of 0.25% should be 2_500_000 for example
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_customized_pool">create_customized_pool</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _taker_fee_rate: u64, _maker_rebate_rate: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_customized_pool">create_customized_pool</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _taker_fee_rate: u64, _maker_rebate_rate: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -1236,7 +1236,7 @@ Taker_fee_rate of 0.25% should be 2_500_000 for example
 Function for creating an external pool. This API can be used to wrap deepbook pools into other objects.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_pool_with_return">create_pool_with_return</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../deepbook/clob_v2.md#deepbook_clob_v2_Pool">deepbook::clob_v2::Pool</a>&lt;BaseAsset, QuoteAsset&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_pool_with_return">create_pool_with_return</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../deepbook/clob_v2.md#deepbook_clob_v2_Pool">deepbook::clob_v2::Pool</a>&lt;BaseAsset, QuoteAsset&gt;
 </code></pre>
 
 
@@ -1268,7 +1268,7 @@ The taker_fee_rate should be greater than or equal to the maker_rebate_rate, and
 Taker_fee_rate of 0.25% should be 2_500_000 for example
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_customized_pool_with_return">create_customized_pool_with_return</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _taker_fee_rate: u64, _maker_rebate_rate: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../deepbook/clob_v2.md#deepbook_clob_v2_Pool">deepbook::clob_v2::Pool</a>&lt;BaseAsset, QuoteAsset&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_customized_pool_with_return">create_customized_pool_with_return</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _taker_fee_rate: u64, _maker_rebate_rate: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../deepbook/clob_v2.md#deepbook_clob_v2_Pool">deepbook::clob_v2::Pool</a>&lt;BaseAsset, QuoteAsset&gt;
 </code></pre>
 
 
@@ -1302,7 +1302,7 @@ If a user wants to create a pool and then destroy/lock the pool_owner_cap one ca
 so with this function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_customized_pool_v2">create_customized_pool_v2</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _taker_fee_rate: u64, _maker_rebate_rate: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::one::SUI</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): (<a href="../deepbook/clob_v2.md#deepbook_clob_v2_Pool">deepbook::clob_v2::Pool</a>&lt;BaseAsset, QuoteAsset&gt;, <a href="../deepbook/clob_v2.md#deepbook_clob_v2_PoolOwnerCap">deepbook::clob_v2::PoolOwnerCap</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="../deepbook/clob_v2.md#deepbook_clob_v2_create_customized_pool_v2">create_customized_pool_v2</a>&lt;BaseAsset, QuoteAsset&gt;(_tick_size: u64, _lot_size: u64, _taker_fee_rate: u64, _maker_rebate_rate: u64, _creation_fee: <a href="../sui/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../sui/sui.md#sui_sui_SUI">one::oct::OCT</a>&gt;, _ctx: &<b>mut</b> <a href="../sui/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): (<a href="../deepbook/clob_v2.md#deepbook_clob_v2_Pool">deepbook::clob_v2::Pool</a>&lt;BaseAsset, QuoteAsset&gt;, <a href="../deepbook/clob_v2.md#deepbook_clob_v2_PoolOwnerCap">deepbook::clob_v2::PoolOwnerCap</a>)
 </code></pre>
 
 

@@ -168,7 +168,7 @@ This example finds the balance changes of all the transactions where a given add
 ```graphql
 query ($address: SuiAddress!) {
   transactionBlocks(filter: {
-    function: "0x3::sui_system::request_add_stake"
+    function: "0x3::one_system::request_add_stake"
     sentAddress: $address
   }) {
     nodes {

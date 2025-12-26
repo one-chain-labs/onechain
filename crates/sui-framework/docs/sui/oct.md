@@ -1,5 +1,5 @@
 ---
-title: Module `oct::oct`
+title: Module `one::oct`
 ---
 
 Coin<OCT> is the token used to pay for gas in Oct.
@@ -19,26 +19,26 @@ It has 9 decimals, and the smallest unit (10^-9) is called "mist".
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
-<b>use</b> <a href="../oct/accumulator.md#sui_accumulator">oct::accumulator</a>;
-<b>use</b> <a href="../oct/address.md#sui_address">oct::address</a>;
-<b>use</b> <a href="../oct/bag.md#sui_bag">oct::bag</a>;
-<b>use</b> <a href="../oct/balance.md#sui_balance">oct::balance</a>;
-<b>use</b> <a href="../oct/coin.md#sui_coin">oct::coin</a>;
-<b>use</b> <a href="../oct/config.md#sui_config">oct::config</a>;
-<b>use</b> <a href="../oct/deny_list.md#sui_deny_list">oct::deny_list</a>;
-<b>use</b> <a href="../oct/dynamic_field.md#sui_dynamic_field">oct::dynamic_field</a>;
-<b>use</b> <a href="../oct/dynamic_object_field.md#sui_dynamic_object_field">oct::dynamic_object_field</a>;
-<b>use</b> <a href="../oct/event.md#sui_event">oct::event</a>;
-<b>use</b> <a href="../oct/hex.md#sui_hex">oct::hex</a>;
-<b>use</b> <a href="../oct/object.md#sui_object">oct::object</a>;
-<b>use</b> <a href="../oct/party.md#sui_party">oct::party</a>;
-<b>use</b> <a href="../oct/table.md#sui_table">oct::table</a>;
-<b>use</b> <a href="../oct/transfer.md#sui_transfer">oct::transfer</a>;
-<b>use</b> <a href="../oct/tx_context.md#sui_tx_context">oct::tx_context</a>;
-<b>use</b> <a href="../oct/types.md#sui_types">oct::types</a>;
-<b>use</b> <a href="../oct/url.md#sui_url">oct::url</a>;
-<b>use</b> <a href="../oct/vec_map.md#sui_vec_map">oct::vec_map</a>;
-<b>use</b> <a href="../oct/vec_set.md#sui_vec_set">oct::vec_set</a>;
+<b>use</b> <a href="../oct/accumulator.md#sui_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../oct/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../oct/bag.md#sui_bag">one::bag</a>;
+<b>use</b> <a href="../oct/balance.md#sui_balance">one::balance</a>;
+<b>use</b> <a href="../oct/coin.md#sui_coin">one::coin</a>;
+<b>use</b> <a href="../oct/config.md#sui_config">one::config</a>;
+<b>use</b> <a href="../oct/deny_list.md#sui_deny_list">one::deny_list</a>;
+<b>use</b> <a href="../oct/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../oct/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../oct/event.md#sui_event">one::event</a>;
+<b>use</b> <a href="../oct/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../oct/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../oct/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../oct/table.md#sui_table">one::table</a>;
+<b>use</b> <a href="../oct/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../oct/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../oct/types.md#sui_types">one::types</a>;
+<b>use</b> <a href="../oct/url.md#sui_url">one::url</a>;
+<b>use</b> <a href="../oct/vec_map.md#sui_vec_map">one::vec_map</a>;
+<b>use</b> <a href="../oct/vec_set.md#sui_vec_set">one::vec_set</a>;
 </code></pre>
 
 
@@ -128,7 +128,7 @@ Register the <code><a href="../oct/oct.md#sui_sui_SUI">OCT</a></code> Coin to ac
 This should be called only once during genesis creation.
 
 
-<pre><code><b>fun</b> <a href="../oct/oct.md#sui_sui_new">new</a>(ctx: &<b>mut</b> <a href="../oct/tx_context.md#sui_tx_context_TxContext">oct::tx_context::TxContext</a>): <a href="../oct/balance.md#sui_balance_Balance">oct::balance::Balance</a>&lt;<a href="../oct/oct.md#sui_sui_SUI">oct::oct::OCT</a>&gt;
+<pre><code><b>fun</b> <a href="../oct/oct.md#sui_sui_new">new</a>(ctx: &<b>mut</b> <a href="../oct/tx_context.md#sui_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../oct/balance.md#sui_balance_Balance">one::balance::Balance</a>&lt;<a href="../oct/oct.md#sui_sui_SUI">one::oct::OCT</a>&gt;
 </code></pre>
 
 
@@ -168,7 +168,7 @@ This should be called only once during genesis creation.
 
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../oct/transfer.md#sui_transfer">transfer</a>(c: <a href="../oct/coin.md#sui_coin_Coin">oct::coin::Coin</a>&lt;<a href="../oct/oct.md#sui_sui_SUI">oct::oct::OCT</a>&gt;, recipient: <b>address</b>)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../oct/transfer.md#sui_transfer">transfer</a>(c: <a href="../oct/coin.md#sui_coin_Coin">one::coin::Coin</a>&lt;<a href="../oct/oct.md#sui_sui_SUI">one::oct::OCT</a>&gt;, recipient: <b>address</b>)
 </code></pre>
 
 

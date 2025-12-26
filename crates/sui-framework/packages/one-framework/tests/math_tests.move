@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only, allow(deprecated_usage)]
-module oct::math_tests;
+module one::math_tests;
 
 use one::math;
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::deny_list_tests;
+module one::deny_list_tests;
 
 use std::type_name;
 use one::deny_list;

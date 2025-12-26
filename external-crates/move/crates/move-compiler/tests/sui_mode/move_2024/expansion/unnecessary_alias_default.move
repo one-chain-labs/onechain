@@ -1,9 +1,9 @@
-module oct::object {
+module one::object {
     public struct ID()
     public struct UID()
 }
-module oct::transfer {}
-module oct::tx_context {
+module one::transfer {}
+module one::tx_context {
     public struct TxContext()
 }
 

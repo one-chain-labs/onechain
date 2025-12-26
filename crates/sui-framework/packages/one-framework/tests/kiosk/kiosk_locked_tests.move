@@ -3,7 +3,7 @@
 
 #[test_only]
 /// Test illustrating how an asset can be forever locked in the Kiosk.
-module oct::kiosk_locked_test;
+module one::kiosk_locked_test;
 
 use one::item_locked_policy as locked_policy;
 use one::kiosk_test_utils::{Self as test, Asset};

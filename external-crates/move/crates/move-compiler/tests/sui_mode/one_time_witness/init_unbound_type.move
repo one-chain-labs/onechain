@@ -7,6 +7,6 @@ module a::beep {
     fun init(_: Who, _ctx: &mut one::tx_context::TxContext) {}
 }
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext {}
 }

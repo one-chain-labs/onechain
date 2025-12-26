@@ -135,7 +135,7 @@ expression: "run_one(cmds, context).await?"
         "objectId": "0x0000000000000000000000000000000000000000000000000000000000000005",
         "version": "1",
         "digest": "MmKCAHwfU7DrwgAf7LE6C7DEF7xHq8tPxfntbHu9AeS",
-        "type": "0x3::sui_system::SuiSystemState",
+        "type": "0x3::one_system::SuiSystemState",
         "owner": {
           "Shared": {
             "initial_shared_version": {
@@ -147,7 +147,7 @@ expression: "run_one(cmds, context).await?"
         "storageRebate": "0",
         "content": {
           "dataType": "moveObject",
-          "type": "0x3::sui_system::SuiSystemState",
+          "type": "0x3::one_system::SuiSystemState",
           "hasPublicTransfer": false,
           "fields": {
             "id": {
@@ -166,7 +166,7 @@ expression: "run_one(cmds, context).await?"
         "objectId": "0x0000000000000000000000000000000000000000000000000000000000000005",
         "version": "1",
         "digest": "MmKCAHwfU7DrwgAf7LE6C7DEF7xHq8tPxfntbHu9AeS",
-        "type": "0x3::sui_system::SuiSystemState",
+        "type": "0x3::one_system::SuiSystemState",
         "owner": {
           "Shared": {
             "initial_shared_version": {
@@ -178,7 +178,7 @@ expression: "run_one(cmds, context).await?"
         "storageRebate": "0",
         "bcs": {
           "dataType": "moveObject",
-          "type": "0x3::sui_system::SuiSystemState",
+          "type": "0x3::one_system::SuiSystemState",
           "hasPublicTransfer": false,
           "version": {
             "$serde_json::private::Number": "1"

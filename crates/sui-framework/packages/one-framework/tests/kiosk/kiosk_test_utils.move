@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::kiosk_test_utils;
+module one::kiosk_test_utils;
 
 use one::coin::{Self, Coin};
 use one::kiosk::{Self, Kiosk, KioskOwnerCap};

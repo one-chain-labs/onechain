@@ -26,7 +26,7 @@
 ///    }
 /// }
 /// ```
-module oct::event;
+module one::event;
 
 /// Emit a custom Move event, sending the data offchain.
 ///

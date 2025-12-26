@@ -9,13 +9,13 @@ module a::m {
     public entry fun yes(_: &Receiving<S>) { }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::transfer {
+module one::transfer {
     struct Receiving<phantom T: key> has drop {
         id: address
     }

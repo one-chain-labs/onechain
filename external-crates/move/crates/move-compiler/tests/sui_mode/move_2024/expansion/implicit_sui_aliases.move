@@ -14,7 +14,7 @@ module a::m {
 
 
 // we don't link out to the sui framework
-module oct::object {
+module one::object {
     public struct ID has copy, drop, store {
         bytes: address
     }
@@ -26,10 +26,10 @@ module oct::object {
     public fun new(_: &mut TxContext): UID { abort 0 }
     public fun id_from_address(_: address): ID { abort 0 }
 }
-module oct::transfer {
+module one::transfer {
     public fun transfer<T: key>(_: T, _: address) { abort 0 }
 }
-module oct::tx_context {
+module one::tx_context {
     public struct TxContext has drop {}
     public fun sender(_: &TxContext): address { @0 }
 }

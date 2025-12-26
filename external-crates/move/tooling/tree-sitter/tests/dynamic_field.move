@@ -8,7 +8,7 @@
 /// the `copy`, `drop`, and `store` abilities, e.g. an integer, a boolean, or a string.
 /// This gives Sui programmers the flexibility to extend objects on-the-fly, and it also serves as a
 /// building block for core collection types
-module oct::dynamic_field {
+module one::dynamic_field {
     use std::option::{Self, Option};
     use one::object::{Self, ID, UID};
     use one::prover;

@@ -43,13 +43,13 @@ module a::test3 {
     }
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::coin {
+module one::coin {
     use one::object::UID;
     struct Coin<phantom T> has key, store {
         id: UID

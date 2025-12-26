@@ -3,7 +3,7 @@
 
 #[test_only]
 /// Tests if normally illegal (in terms of Sui bytecode verification) code is allowed in tests.
-module oct::verifier_tests;
+module one::verifier_tests;
 
 public struct VERIFIER_TESTS has drop {}
 

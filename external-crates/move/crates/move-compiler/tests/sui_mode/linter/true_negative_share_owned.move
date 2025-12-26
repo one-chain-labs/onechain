@@ -74,14 +74,14 @@ module b::can_determine_to_be_new_with_struct {
 
 
 
-module oct::tx_context {
+module one::tx_context {
     struct TxContext has drop {}
     public fun sender(_: &TxContext): address {
         @0
     }
 }
 
-module oct::object {
+module one::object {
     const ZERO: u64 = 0;
     struct UID has store {
         id: address,
@@ -94,7 +94,7 @@ module oct::object {
     }
 }
 
-module oct::transfer {
+module one::transfer {
     const ZERO: u64 = 0;
     public fun transfer<T: key>(_: T, _: address) {
         abort ZERO

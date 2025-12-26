@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct::test_random;
+module one::test_random;
 
 use std::hash;
 

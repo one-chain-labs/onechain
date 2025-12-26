@@ -205,7 +205,7 @@ message Balance {
   optional string owner = 1;
 
   // The marker type for the coins being aggregated into this balance, e.g.
-  // `0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT`.
+  // `0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT`.
   optional string coin_type = 2;
 
   /// The total balance for coins of this type, owned by one address,

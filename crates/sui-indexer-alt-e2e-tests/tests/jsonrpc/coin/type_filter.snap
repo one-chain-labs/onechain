@@ -88,7 +88,7 @@ Response: {
   "result": {
     "data": [
       {
-        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT",
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT",
         "coinObjectId": "0x2834d85dbfefdcd66f04811231ba818893793e83a895d53402fd99e132e36562",
         "version": "3",
         "digest": "Cy2yHmJFWTiwEBvNCi9XQRsh4eGgyw5UbcuToXEdvne3",

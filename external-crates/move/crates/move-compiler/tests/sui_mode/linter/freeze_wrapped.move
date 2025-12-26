@@ -66,13 +66,13 @@ module a::test {
 
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::transfer {
+module one::transfer {
     const ZERO: u64 = 0;
     public fun public_freeze_object<T: key>(_: T) {
         abort ZERO

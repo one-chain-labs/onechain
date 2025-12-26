@@ -29,13 +29,13 @@ module a::test3 {
     public fun test_fn(_r: &Random, _rg: &RandomGenerator) {}
 }
 
-module oct::object {
+module one::object {
     struct UID has store {
         id: address,
     }
 }
 
-module oct::random {
+module one::random {
     use one::object::UID;
 
     struct Random has key { id: UID }

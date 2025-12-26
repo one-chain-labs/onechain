@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct::party;
+module one::party;
 
 use one::vec_map::{Self, VecMap};
 

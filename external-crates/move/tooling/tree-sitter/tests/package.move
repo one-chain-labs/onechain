@@ -4,7 +4,7 @@
 /// Functions for operating on Move packages from within Move:
 /// - Creating proof-of-publish objects from one-time witnesses
 /// - Administering package upgrades through upgrade policies.
-module oct::package {
+module one::package {
     use one::object::{Self, ID, UID};
     use one::tx_context::{TxContext, sender};
     use std::ascii::String;

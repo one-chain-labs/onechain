@@ -3,7 +3,7 @@
 
 #[test_only]
 #[allow(unused_use)]
-module oct::authenticator_state_tests;
+module one::authenticator_state_tests;
 
 use std::string::String;
 use one::authenticator_state::{

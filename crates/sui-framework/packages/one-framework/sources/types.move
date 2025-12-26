@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Oct types helpers and utilities
-module oct::types;
+module one::types;
 
 // === one-time witness ===
 
