@@ -212,7 +212,7 @@ Create a new SuiSystemState object and make it shared.
 This function will be called only once in genesis.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_create">create</a>(validators: vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;, <a href="../one_system/storage_fund.md#one_system_storage_fund">storage_fund</a>: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;, protocol_version: u64, epoch_start_timestamp_ms: u64, parameters: <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_SystemParameters">one_system::sui_system_state_inner::SystemParameters</a>, <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy">stake_subsidy</a>: <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy_StakeSubsidy">one_system::stake_subsidy::StakeSubsidy</a>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_create">create</a>(id: <a href="../one/object.md#one_object_UID">one::object::UID</a>, validators: vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;, <a href="../one_system/storage_fund.md#one_system_storage_fund">storage_fund</a>: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;, protocol_version: u64, epoch_start_timestamp_ms: u64, parameters: <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_SystemParameters">one_system::sui_system_state_inner::SystemParameters</a>, <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy">stake_subsidy</a>: <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy_StakeSubsidy">one_system::stake_subsidy::StakeSubsidy</a>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -222,7 +222,7 @@ This function will be called only once in genesis.
 
 
 <pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_create">create</a>(
-    //id: UID,
+    id: UID,
     validators: vector&lt;Validator&gt;,
     <a href="../one_system/storage_fund.md#one_system_storage_fund">storage_fund</a>: Balance&lt;OCT&gt;,
     protocol_version: u64,
@@ -231,7 +231,6 @@ This function will be called only once in genesis.
     <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy">stake_subsidy</a>: StakeSubsidy,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> id = <a href="../one/object.md#one_object_new">one::object::new</a>(ctx); //addno
     <b>let</b> system_state = <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_create">sui_system_state_inner::create</a>(
         validators,
         <a href="../one_system/storage_fund.md#one_system_storage_fund">storage_fund</a>,

@@ -348,7 +348,7 @@ It will create a singleton SuiSystemState object, which contains
 all the information we need in the system.
 
 
-<pre><code><b>fun</b> <a href="../one_system/genesis.md#one_system_genesis_create">create</a>(sui_supply: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;, genesis_chain_parameters: <a href="../one_system/genesis.md#one_system_genesis_GenesisChainParameters">one_system::genesis::GenesisChainParameters</a>, genesis_validators: vector&lt;<a href="../one_system/genesis.md#one_system_genesis_GenesisValidatorMetadata">one_system::genesis::GenesisValidatorMetadata</a>&gt;, token_distribution_schedule: <a href="../one_system/genesis.md#one_system_genesis_TokenDistributionSchedule">one_system::genesis::TokenDistributionSchedule</a>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
+<pre><code><b>fun</b> <a href="../one_system/genesis.md#one_system_genesis_create">create</a>(sui_system_state_id: <a href="../one/object.md#one_object_UID">one::object::UID</a>, sui_supply: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;, genesis_chain_parameters: <a href="../one_system/genesis.md#one_system_genesis_GenesisChainParameters">one_system::genesis::GenesisChainParameters</a>, genesis_validators: vector&lt;<a href="../one_system/genesis.md#one_system_genesis_GenesisValidatorMetadata">one_system::genesis::GenesisValidatorMetadata</a>&gt;, token_distribution_schedule: <a href="../one_system/genesis.md#one_system_genesis_TokenDistributionSchedule">one_system::genesis::TokenDistributionSchedule</a>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
 </code></pre>
 
 
@@ -358,7 +358,7 @@ all the information we need in the system.
 
 
 <pre><code><b>fun</b> <a href="../one_system/genesis.md#one_system_genesis_create">create</a>(
-    //sui_system_state_id: UID,
+    sui_system_state_id: UID,
     <b>mut</b> sui_supply: Balance&lt;OCT&gt;,
     genesis_chain_parameters: <a href="../one_system/genesis.md#one_system_genesis_GenesisChainParameters">GenesisChainParameters</a>,
     genesis_validators: vector&lt;<a href="../one_system/genesis.md#one_system_genesis_GenesisValidatorMetadata">GenesisValidatorMetadata</a>&gt;,
@@ -443,7 +443,7 @@ all the information we need in the system.
         ctx,
     );
     one_system::create(
-        //sui_system_state_id,
+        sui_system_state_id,
         validators,
         <a href="../one_system/storage_fund.md#one_system_storage_fund">storage_fund</a>,
         genesis_chain_parameters.protocol_version,

@@ -157,7 +157,7 @@ up to BFT assumptions
 
 
 
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a>: u64 = 1000;
+<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a>: u64 = 2000;
 </code></pre>
 
 
