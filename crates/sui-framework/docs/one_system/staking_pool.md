@@ -160,7 +160,7 @@ A staking pool embedded in each validator struct in the system state object.
  Pending stake amount for this epoch, emptied at epoch boundaries.
 </dd>
 <dt>
-<code>pending_total_oct_withdraw: u64</code>
+<code>pending_total_sui_withdraw: u64</code>
 </dt>
 <dd>
  Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
@@ -598,7 +598,7 @@ Create a new, empty staking pool.
         pool_token_balance: 0,
         <a href="../one_system/staking_pool.md#one_system_staking_pool_exchange_rates">exchange_rates</a>: table::new(ctx),
         pending_stake: 0,
-        pending_total_oct_withdraw: 0,
+        pending_total_sui_withdraw: 0,
         pending_pool_token_withdraw: 0,
         extra_fields: bag::new(ctx),
     }
@@ -691,7 +691,7 @@ A proportional amount of pool token withdraw is recorded and processed at epoch 
         ctx.epoch(),
     );
     <b>let</b> total_sui_withdraw_amount = principal_withdraw_amount + rewards_withdraw.value();
-    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + total_sui_withdraw_amount;
+    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + total_sui_withdraw_amount;
     pool.pending_pool_token_withdraw =
         pool.pending_pool_token_withdraw + pool_token_withdraw_amount;
     // If the pool is inactive or preactive, we immediately process the withdrawal.
@@ -743,7 +743,7 @@ A proportional amount of pool token withdraw is recorded and processed at epoch 
     fungible_staked_oct_data.total_supply = fungible_staked_oct_data.total_supply - value;
     <b>let</b> <b>mut</b> sui_out = fungible_staked_oct_data.principal.<a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(principal_amount);
     sui_out.join(pool.rewards_pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_split">split</a>(rewards_amount));
-    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + sui_out.value();
+    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + sui_out.value();
     pool.pending_pool_token_withdraw = pool.pending_pool_token_withdraw + value;
     sui_out
 }
@@ -922,7 +922,7 @@ Returns values are amount of pool tokens withdrawn and withdrawn principal porti
 
 
 <pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_unwrap_staked_oct">unwrap_staked_oct</a>(staked_oct: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): Balance&lt;OCT&gt; {
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> { id, principal, .. } = staked_oct;
+    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> { id, principal, <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>: _,.. } = staked_oct;
     id.delete();
     principal
 }
@@ -1012,9 +1012,9 @@ Also called immediately upon withdrawal if the pool is inactive.
 
 
 <pre><code><b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_process_pending_stake_withdraw">process_pending_stake_withdraw</a>(pool: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>) {
-    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> = pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> - pool.pending_total_oct_withdraw;
+    pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> = pool.<a href="../one_system/staking_pool.md#one_system_staking_pool_sui_balance">sui_balance</a> - pool.pending_total_sui_withdraw;
     pool.pool_token_balance = pool.pool_token_balance - pool.pending_pool_token_withdraw;
-    pool.pending_total_oct_withdraw = 0;
+    pool.pending_total_sui_withdraw = 0;
     pool.pending_pool_token_withdraw = 0;
 }
 </code></pre>
@@ -1544,7 +1544,7 @@ Aborts if some of the staking parameters are incompatible (pool id, stake activa
 
 <pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_join_staked_oct">join_staked_oct</a>(self: &<b>mut</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>, other: <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>) {
     <b>assert</b>!(<a href="../one_system/staking_pool.md#one_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self, &other), <a href="../one_system/staking_pool.md#one_system_staking_pool_EIncompatibleStakedOct">EIncompatibleStakedOct</a>);
-    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> { id, principal, .. } = other;
+    <b>let</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a> { id, principal, <a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>:_,.. } = other;
     id.delete();
     self.principal.join(principal);
 }
@@ -1572,7 +1572,8 @@ Returns true if all the staking parameters of the staked sui except the principa
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_is_equal_staking_metadata">is_equal_staking_metadata</a>(self: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>, other: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">StakedOct</a>): bool {
     (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_pool_id">pool_id</a>) &&
-    (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>)
+    (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_stake_activation_epoch">stake_activation_epoch</a>) &&
+    (self.<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a> == other.<a href="../one_system/staking_pool.md#one_system_staking_pool_lock">lock</a>)
 }
 </code></pre>
 
@@ -1664,7 +1665,7 @@ Returns the total withdrawal from the staking pool this epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/staking_pool.md#one_system_staking_pool_pending_stake_withdraw_amount">pending_stake_withdraw_amount</a>(<a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakingPool">StakingPool</a>): u64 {
-    <a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>.pending_total_oct_withdraw
+    <a href="../one_system/staking_pool.md#one_system_staking_pool">staking_pool</a>.pending_total_sui_withdraw
 }
 </code></pre>
 

@@ -1312,15 +1312,13 @@ Only an active validator can request to be removed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_set.md#one_system_validator_set_request_remove_validator">request_remove_validator</a>(self: &<b>mut</b> <a href="../one_system/validator_set.md#one_system_validator_set_ValidatorSet">ValidatorSet</a>, ctx: &TxContext) {
-    <b>let</b> validator_address = ctx.sender();
-    <b>let</b> validator_index = <a href="../one_system/validator_set.md#one_system_validator_set_find_validator">find_validator</a>(
-        &self.<a href="../one_system/validator_set.md#one_system_validator_set_active_validators">active_validators</a>,
-        validator_address,
-    ).destroy_or!(<b>abort</b> <a href="../one_system/validator_set.md#one_system_validator_set_ENotAValidator">ENotAValidator</a>);
-    <b>assert</b>!(!self.pending_removals.contains(&validator_index), <a href="../one_system/validator_set.md#one_system_validator_set_EValidatorAlreadyRemoved">EValidatorAlreadyRemoved</a>);
-    self.pending_removals.push_back(validator_index);
-}
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_set.md#one_system_validator_set_request_remove_validator">request_remove_validator</a>(
+        self: &<b>mut</b> <a href="../one_system/validator_set.md#one_system_validator_set_ValidatorSet">ValidatorSet</a>,
+        ctx: &TxContext,
+    ) {
+        <b>let</b> validator_address = ctx.sender();
+        self.<a href="../one_system/validator_set.md#one_system_validator_set_remove_validator">remove_validator</a>(validator_address)
+    }
 </code></pre>
 
 
@@ -3296,16 +3294,10 @@ The staking rewards are shared with the stakers while the storage fund ones are 
         <b>let</b> <b>mut</b> validator_reward = staker_reward.split(validator_commission_amount <b>as</b> u64);
         // Add storage fund rewards to the <a href="../one_system/validator.md#one_system_validator">validator</a>'s reward.
         validator_reward.join(storage_fund_reward.split(adjusted_storage_fund_reward_amounts[i]));
-        // Add rewards to the <a href="../one_system/validator.md#one_system_validator">validator</a>. Don't try and distribute rewards though <b>if</b> the payout is zero.
         <b>if</b> (validator_reward.value() &gt; 0) {
-            <b>let</b> validator_address = <a href="../one_system/validator.md#one_system_validator">validator</a>.sui_address();
-            <b>let</b> rewards_stake = <a href="../one_system/validator.md#one_system_validator">validator</a>.<a href="../one_system/validator_set.md#one_system_validator_set_request_add_stake">request_add_stake</a>(
-                validator_reward,
-                validator_address,
-                <b>false</b>,
-                ctx,
-            );
-            transfer::public_transfer(rewards_stake, validator_address);
+            <b>let</b> revenue_receiving_address =  <a href="../one_system/validator.md#one_system_validator">validator</a>.revenue_receiving_address();
+            <b>let</b> rewards_stake = <a href="../one_system/validator.md#one_system_validator">validator</a>.request_add_stake_no_check(validator_reward, revenue_receiving_address,<b>false</b>, ctx);
+            transfer::public_transfer(rewards_stake, revenue_receiving_address);
         } <b>else</b> {
             validator_reward.destroy_zero();
         };

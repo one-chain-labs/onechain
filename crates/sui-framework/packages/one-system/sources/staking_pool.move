@@ -58,7 +58,7 @@ public struct StakingPool has key, store {
     pending_stake: u64,
     /// Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
     /// This includes both the principal and rewards SUI withdrawn.
-    pending_total_oct_withdraw: u64,
+    pending_total_sui_withdraw: u64,
     /// Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
     pending_pool_token_withdraw: u64,
     /// Any extra fields that's not defined statically.
@@ -121,7 +121,7 @@ public(package) fun new(ctx: &mut TxContext): StakingPool {
         pool_token_balance: 0,
         exchange_rates: table::new(ctx),
         pending_stake: 0,
-        pending_total_oct_withdraw: 0,
+        pending_total_sui_withdraw: 0,
         pending_pool_token_withdraw: 0,
         extra_fields: bag::new(ctx),
     }
@@ -180,7 +180,7 @@ public(package) fun request_withdraw_stake(
     );
     let total_sui_withdraw_amount = principal_withdraw_amount + rewards_withdraw.value();
 
-    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + total_sui_withdraw_amount;
+    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + total_sui_withdraw_amount;
     pool.pending_pool_token_withdraw =
         pool.pending_pool_token_withdraw + pool_token_withdraw_amount;
 
@@ -220,7 +220,7 @@ public(package) fun redeem_fungible_staked_oct(
     let mut sui_out = fungible_staked_oct_data.principal.split(principal_amount);
     sui_out.join(pool.rewards_pool.split(rewards_amount));
 
-    pool.pending_total_oct_withdraw = pool.pending_total_oct_withdraw + sui_out.value();
+    pool.pending_total_sui_withdraw = pool.pending_total_sui_withdraw + sui_out.value();
     pool.pending_pool_token_withdraw = pool.pending_pool_token_withdraw + value;
 
     sui_out
@@ -337,7 +337,7 @@ public(package) fun withdraw_from_principal(
 use fun unwrap_staked_oct as StakedOct.into_balance;
 
 fun unwrap_staked_oct(staked_oct: StakedOct): Balance<OCT> {
-    let StakedOct { id, principal, .. } = staked_oct;
+    let StakedOct { id, principal, lock: _,.. } = staked_oct;
     id.delete();
     principal
 }
@@ -370,9 +370,9 @@ public(package) fun process_pending_stakes_and_withdraws(pool: &mut StakingPool,
 /// Called at epoch boundaries to process pending stake withdraws requested during the epoch.
 /// Also called immediately upon withdrawal if the pool is inactive.
 fun process_pending_stake_withdraw(pool: &mut StakingPool) {
-    pool.sui_balance = pool.sui_balance - pool.pending_total_oct_withdraw;
+    pool.sui_balance = pool.sui_balance - pool.pending_total_sui_withdraw;
     pool.pool_token_balance = pool.pool_token_balance - pool.pending_pool_token_withdraw;
-    pool.pending_total_oct_withdraw = 0;
+    pool.pending_total_sui_withdraw = 0;
     pool.pending_pool_token_withdraw = 0;
 }
 
@@ -555,7 +555,7 @@ public use fun join_staked_oct as StakedOct.join;
 /// Aborts if some of the staking parameters are incompatible (pool id, stake activation epoch, etc.)
 public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
     assert!(is_equal_staking_metadata(self, &other), EIncompatibleStakedOct);
-    let StakedOct { id, principal, .. } = other;
+    let StakedOct { id, principal, lock:_,.. } = other;
 
     id.delete();
     self.principal.join(principal);
@@ -564,7 +564,8 @@ public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
 /// Returns true if all the staking parameters of the staked sui except the principal are identical
 public fun is_equal_staking_metadata(self: &StakedOct, other: &StakedOct): bool {
     (self.pool_id == other.pool_id) &&
-    (self.stake_activation_epoch == other.stake_activation_epoch)
+    (self.stake_activation_epoch == other.stake_activation_epoch) &&
+    (self.lock == other.lock)
 }
 
 public fun pool_token_exchange_rate_at_epoch(
@@ -597,7 +598,7 @@ public fun pending_stake_amount(staking_pool: &StakingPool): u64 {
 
 /// Returns the total withdrawal from the staking pool this epoch.
 public fun pending_stake_withdraw_amount(staking_pool: &StakingPool): u64 {
-    staking_pool.pending_total_oct_withdraw
+    staking_pool.pending_total_sui_withdraw
 }
 
 public(package) fun exchange_rates(pool: &StakingPool): &Table<u64, PoolTokenExchangeRate> {

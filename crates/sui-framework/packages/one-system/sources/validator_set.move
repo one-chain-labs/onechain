@@ -396,15 +396,14 @@ public(package) fun assert_no_pending_or_active_duplicates(
 /// The index of the validator is added to `pending_removals` and
 /// will be processed at the end of epoch.
 /// Only an active validator can request to be removed.
-public(package) fun request_remove_validator(self: &mut ValidatorSet, ctx: &TxContext) {
-    let validator_address = ctx.sender();
-    let validator_index = find_validator(
-        &self.active_validators,
-        validator_address,
-    ).destroy_or!(abort ENotAValidator);
-    assert!(!self.pending_removals.contains(&validator_index), EValidatorAlreadyRemoved);
-    self.pending_removals.push_back(validator_index);
-}
+public(package) fun request_remove_validator(
+        self: &mut ValidatorSet,
+        ctx: &TxContext,
+    ) {
+        let validator_address = ctx.sender();
+        self.remove_validator(validator_address)
+    }
+
 
 // ==== staking related functions ====
 
@@ -1419,16 +1418,10 @@ fun distribute_reward(
         // Add storage fund rewards to the validator's reward.
         validator_reward.join(storage_fund_reward.split(adjusted_storage_fund_reward_amounts[i]));
 
-        // Add rewards to the validator. Don't try and distribute rewards though if the payout is zero.
         if (validator_reward.value() > 0) {
-            let validator_address = validator.sui_address();
-            let rewards_stake = validator.request_add_stake(
-                validator_reward,
-                validator_address,
-                false,
-                ctx,
-            );
-            transfer::public_transfer(rewards_stake, validator_address);
+            let revenue_receiving_address =  validator.revenue_receiving_address();
+            let rewards_stake = validator.request_add_stake_no_check(validator_reward, revenue_receiving_address,false, ctx);
+            transfer::public_transfer(rewards_stake, revenue_receiving_address);
         } else {
             validator_reward.destroy_zero();
         };
