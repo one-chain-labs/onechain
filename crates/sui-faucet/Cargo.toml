@@ -1,5 +1,5 @@
 [package]
-name = "one-faucet"
+name = "sui-faucet"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
