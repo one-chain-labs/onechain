@@ -70,7 +70,7 @@ const EDuplicateValidator: u64 = 1;
 /// It will create a singleton SuiSystemState object, which contains
 /// all the information we need in the system.
 fun create(
-    //sui_system_state_id: UID,
+    sui_system_state_id: UID,
     mut sui_supply: Balance<OCT>,
     genesis_chain_parameters: GenesisChainParameters,
     genesis_validators: vector<GenesisValidatorMetadata>,

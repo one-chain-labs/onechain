@@ -80,7 +80,7 @@ const EWrongInnerVersion: u64 = 1;
 /// Create a new SuiSystemState object and make it shared.
 /// This function will be called only once in genesis.
 public(package) fun create(
-    //id: UID,
+    id: UID,
     validators: vector<Validator>,
     storage_fund: Balance<OCT>,
     protocol_version: u64,
@@ -89,7 +89,6 @@ public(package) fun create(
     stake_subsidy: StakeSubsidy,
     ctx: &mut TxContext,
 ) {
-    let id = one::object::new(ctx); //addno
     let system_state = sui_system_state_inner::create(
         validators,
         storage_fund,
