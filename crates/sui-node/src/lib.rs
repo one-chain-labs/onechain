@@ -2108,7 +2108,7 @@ impl SuiNode {
     ) -> SuiResult<Vec<(JwkId, JWK)>> {
         use fastcrypto_zkp::bn254::zk_login::fetch_jwks;
         let client = reqwest::Client::new();
-        fetch_jwks(provider, &client)
+        fetch_jwks(provider, &client, true)
             .await
             .map_err(|_| SuiError::JWKRetrievalError)
     }

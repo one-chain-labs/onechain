@@ -746,7 +746,7 @@ impl From<crate::sui_system_state::sui_system_state_inner_v1::StakingPoolV1> for
             pool_token_balance: Some(pool_token_balance),
             exchange_rates: Some(exchange_rates.into()),
             pending_stake: Some(pending_stake),
-            pending_total_oct_withdraw: Some(pending_total_oct_withdraw),
+            pending_total_sui_withdraw: Some(pending_total_oct_withdraw),
             pending_pool_token_withdraw: Some(pending_pool_token_withdraw),
             extra_fields: Some(extra_fields.into()),
         }
