@@ -21,6 +21,7 @@ const MAX_VALIDATOR_METADATA_LENGTH: usize = 256;
 pub struct ValidatorInfo {
     pub name: String,
     pub account_address: SuiAddress,
+    pub revenue_receiving_address: SuiAddress,
     pub protocol_key: AuthorityPublicKeyBytes,
     pub worker_key: NetworkPublicKey,
     pub network_key: NetworkPublicKey,
@@ -42,6 +43,10 @@ impl ValidatorInfo {
 
     pub fn sui_address(&self) -> SuiAddress {
         self.account_address
+    }
+
+    pub fn revenue_receiving_address(&self) -> SuiAddress {
+        self.revenue_receiving_address
     }
 
     pub fn protocol_key(&self) -> AuthorityPublicKeyBytes {
@@ -180,6 +185,7 @@ impl From<GenesisValidatorInfo> for GenesisValidatorMetadata {
             image_url: info.image_url,
             project_url: info.project_url,
             sui_address: info.account_address,
+            revenue_receiving_address: info.revenue_receiving_address,
             gas_price: info.gas_price,
             commission_rate: info.commission_rate,
             protocol_public_key: info.protocol_key.as_bytes().to_vec(),
@@ -203,6 +209,7 @@ pub struct GenesisValidatorMetadata {
     pub project_url: String,
 
     pub sui_address: SuiAddress,
+    pub revenue_receiving_address: SuiAddress,
 
     pub gas_price: u64,
     pub commission_rate: u64,

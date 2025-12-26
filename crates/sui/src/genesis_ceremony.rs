@@ -5,7 +5,7 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use fastcrypto::encoding::{Encoding, Hex};
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 use sui_config::{genesis::UnsignedGenesis, SUI_GENESIS_FILENAME};
 use sui_genesis_builder::Builder;
 use sui_types::multiaddr::Multiaddr;
@@ -51,6 +51,8 @@ pub enum CeremonyCommand {
     AddValidator {
         #[clap(long)]
         name: String,
+        #[clap(long)]
+        revenue_receiving_address: Option<String>,
         #[clap(long)]
         validator_key_file: PathBuf,
         #[clap(long)]
@@ -115,6 +117,7 @@ pub fn run(cmd: Ceremony) -> Result<()> {
 
         CeremonyCommand::AddValidator {
             name,
+            revenue_receiving_address,
             validator_key_file,
             worker_key_file,
             account_key_file,
@@ -133,12 +136,20 @@ pub fn run(cmd: Ceremony) -> Result<()> {
             let worker_keypair: NetworkKeyPair = read_network_keypair_from_file(worker_key_file)?;
             let network_keypair: NetworkKeyPair = read_network_keypair_from_file(network_key_file)?;
             let pop = generate_proof_of_possession(&keypair, (&account_keypair.public()).into());
+            
+            let revenue_receiving_address = if let Some(revenue_receiving_address) = revenue_receiving_address {
+                SuiAddress::from_str(&revenue_receiving_address)?
+            } else {
+                SuiAddress::from(&account_keypair.public())
+            };
+
             builder = builder.add_validator(
                 sui_genesis_builder::validator_info::ValidatorInfo {
                     name,
                     protocol_key: keypair.public().into(),
                     worker_key: worker_keypair.public().clone(),
                     account_address: SuiAddress::from(&account_keypair.public()),
+                    revenue_receiving_address,
                     network_key: network_keypair.public().clone(),
                     gas_price: sui_config::node::DEFAULT_VALIDATOR_GAS_PRICE,
                     commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
@@ -287,6 +298,7 @@ mod test {
                     protocol_key: keypair.public().into(),
                     worker_key: worker_keypair.public().clone(),
                     account_address: SuiAddress::from(account_keypair.public()),
+                    revenue_receiving_address: SuiAddress::from(account_keypair.public()),
                     network_key: network_keypair.public().clone(),
                     gas_price: sui_config::node::DEFAULT_VALIDATOR_GAS_PRICE,
                     commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
@@ -340,6 +352,7 @@ mod test {
                 protocol_version: None,
                 command: CeremonyCommand::AddValidator {
                     name: validator.name().to_owned(),
+                    revenue_receiving_address: None,
                     validator_key_file: key_file.into(),
                     worker_key_file: worker_key_file.into(),
                     network_key_file: network_key_file.into(),
