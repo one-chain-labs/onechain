@@ -342,8 +342,8 @@ mod tests {
                     type_parameters: [
                         Datatype {
                             package: "0x0000000000000000000000000000000000000000000000000000000000000002",
-                            module: "sui",
-                            type_: "SUI",
+                            module: "oct",
+                            type_: "OCT",
                             type_parameters: [],
                         },
                     ],
@@ -370,7 +370,7 @@ mod tests {
             vec![S::Datatype(struct_key("0x2::oct::OCT"), vec![])],
         ));
 
-        let expect = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::one::OCT>"];
+        let expect = expect!["0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin<0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT>"];
         expect.assert_eq(&format!("{signature}"));
     }
 }
