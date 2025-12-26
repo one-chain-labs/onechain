@@ -73,7 +73,7 @@ async fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
         adapter.with_offchain_reader(Box::new(OffchainReaderForAdapter { cluster: cluster_arc.clone() }));
 
-        run_tasks_with_adapter(path, adapter, output).await?;
+        run_tasks_with_adapter(path, adapter, output, None).await?;
 
         match Arc::try_unwrap(cluster_arc) {
             Ok(cluster) => cluster.cleanup_resources().await,

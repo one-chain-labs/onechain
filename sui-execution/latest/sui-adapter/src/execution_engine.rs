@@ -6,12 +6,13 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
 
-    use std::{collections::HashSet, sync::Arc};
+    use std::{cell::RefCell, collections::HashSet, rc::Rc, sync::Arc};
 
     use move_binary_format::CompiledModule;
     use move_core_types::ident_str;
     use move_trace_format::format::MoveTraceBuilder;
     use move_vm_runtime::move_vm::MoveVM;
+    use mysten_common::debug_fatal;
     use sui_move_natives::all_natives;
     use sui_protocol_config::{
         check_limit_by_meter,
@@ -22,6 +23,7 @@ mod checked {
     #[cfg(msim)]
     use sui_types::sui_system_state::advance_epoch_result_injection::maybe_modify_result;
     use sui_types::{
+        accumulator_root::{ACCUMULATOR_ROOT_CREATE_FUNC, ACCUMULATOR_ROOT_MODULE},
         authenticator_state::{
             AUTHENTICATOR_STATE_CREATE_FUNCTION_NAME,
             AUTHENTICATOR_STATE_EXPIRE_JWKS_FUNCTION_NAME,
@@ -29,7 +31,7 @@ mod checked {
             AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME,
         },
         balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
-        base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest, TxContext},
+        base_types::{SequenceNumber, SuiAddress, TransactionDigest, TxContext},
         bridge::{
             BridgeChainId,
             BRIDGE_COMMITTEE_MINIMAL_VOTING_POWER,
@@ -43,9 +45,10 @@ mod checked {
         digests::{get_mainnet_chain_identifier, get_testnet_chain_identifier, ChainIdentifier},
         effects::TransactionEffects,
         error::{ExecutionError, ExecutionErrorKind},
-        execution::{is_certificate_denied, ExecutionTiming, ResultWithTimings},
+        execution::{ExecutionTiming, ResultWithTimings},
         execution_config_utils::to_binary_config,
-        execution_status::{CongestedObjects, ExecutionStatus},
+        execution_params::ExecutionOrEarlyError,
+        execution_status::ExecutionStatus,
         gas::{GasCostSummary, SuiGasStatus},
         gas_coin::GAS,
         id::UID,
@@ -96,8 +99,10 @@ mod checked {
     use crate::{
         adapter::new_move_vm,
         execution_mode::{self, ExecutionMode},
+        execution_value::SuiResolver,
         gas_charger::GasCharger,
         programmable_transactions,
+        sui_types::gas::SuiGasStatusAPI,
         temporary_store::TemporaryStore,
         type_layout_resolver::TypeLayoutResolver,
     };
@@ -117,7 +122,7 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         trace_builder_opt: &mut Option<MoveTraceBuilder>,
     ) -> (
         InnerTemporaryStore,
@@ -135,8 +140,6 @@ mod checked {
         let shared_object_refs = input_objects.filter_shared_objects();
         let receiving_objects = transaction_kind.receiving_objects();
         let mut transaction_dependencies = input_objects.transaction_dependencies();
-        let contains_deleted_input = input_objects.contains_deleted_objects();
-        let cancelled_objects = input_objects.get_cancelled_objects();
 
         let mut temporary_store =
             TemporaryStore::new(store, input_objects, receiving_objects, transaction_digest, protocol_config, *epoch_id);
@@ -150,32 +153,35 @@ mod checked {
             }
         };
         let gas_price = gas_status.gas_price();
+        let rgp = gas_status.reference_gas_price();
         let mut gas_charger = GasCharger::new(transaction_digest, gas_data.payment, gas_status, protocol_config);
 
-        let mut tx_ctx = TxContext::new_from_components(
+        let tx_ctx = TxContext::new_from_components(
             &transaction_signer,
             &transaction_digest,
             epoch_id,
             epoch_timestamp_ms,
+            rgp,
             gas_price,
+            gas_data.budget,
             sponsor,
+            protocol_config,
         );
+        let tx_ctx = Rc::new(RefCell::new(tx_ctx));
 
         let is_epoch_change = transaction_kind.is_end_of_epoch_tx();
 
-        let deny_cert = is_certificate_denied(&transaction_digest, certificate_deny_set);
         let (gas_cost_summary, execution_result, timings) = execute_transaction::<Mode>(
+            store,
             &mut temporary_store,
             transaction_kind,
             &mut gas_charger,
-            &mut tx_ctx,
+            tx_ctx,
             move_vm,
             protocol_config,
             metrics,
             enable_expensive_checks,
-            deny_cert,
-            contains_deleted_input,
-            cancelled_objects,
+            execution_params,
             trace_builder_opt,
         );
 
@@ -184,13 +190,21 @@ mod checked {
             use ExecutionErrorKind as K;
             match error.kind() {
                 K::InvariantViolation | K::VMInvariantViolation => {
-                    #[skip_checked_arithmetic]
-                    tracing::error!(
-                        kind = ?error.kind(),
-                        tx_digest = ?transaction_digest,
-                        "INVARIANT VIOLATION! Source: {:?}",
-                        error.source(),
-                    );
+                    if protocol_config.debug_fatal_on_move_invariant_violation() {
+                        debug_fatal!(
+                            "INVARIANT VIOLATION! Txn Digest: {}, Source: {:?}",
+                            transaction_digest,
+                            error.source(),
+                        );
+                    } else {
+                        #[skip_checked_arithmetic]
+                        tracing::error!(
+                            kind = ?error.kind(),
+                            tx_digest = ?transaction_digest,
+                            "INVARIANT VIOLATION! Source: {:?}",
+                            error.source(),
+                        );
+                    }
                 }
 
                 K::SuiMoveVerificationError | K::VMVerificationOrDeserializationError => {
@@ -239,7 +253,13 @@ mod checked {
 
         if enable_expensive_checks && !Mode::allow_arbitrary_function_calls() {
             temporary_store
-                .check_ownership_invariants(&transaction_signer, &mut gas_charger, &mutable_inputs, is_epoch_change)
+                .check_ownership_invariants(
+                    &transaction_signer,
+                    &sponsor,
+                    &mut gas_charger,
+                    &mutable_inputs,
+                    is_epoch_change,
+                )
                 .unwrap()
         } // else, in dev inspect mode and anything goes--don't check
 
@@ -261,19 +281,20 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         move_vm: &Arc<MoveVM>,
-        tx_context: &mut TxContext,
+        tx_context: Rc<RefCell<TxContext>>,
         input_objects: CheckedInputObjects,
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
         let input_objects = input_objects.into_inner();
         let mut temporary_store =
-            TemporaryStore::new(store, input_objects, vec![], tx_context.digest(), protocol_config, 0);
-        let mut gas_charger = GasCharger::new_unmetered(tx_context.digest());
+            TemporaryStore::new(store, input_objects, vec![], tx_context.borrow().digest(), protocol_config, 0);
+        let mut gas_charger = GasCharger::new_unmetered(tx_context.borrow().digest());
         programmable_transactions::execution::execute::<execution_mode::Genesis>(
             protocol_config,
             metrics,
             move_vm,
             &mut temporary_store,
+            store.as_backing_package_store(),
             tx_context,
             &mut gas_charger,
             pt,
@@ -286,17 +307,16 @@ mod checked {
 
     #[instrument(name = "tx_execute", level = "debug", skip_all)]
     fn execute_transaction<Mode: ExecutionMode>(
+        store: &dyn BackingStore,
         temporary_store: &mut TemporaryStore<'_>,
         transaction_kind: TransactionKind,
         gas_charger: &mut GasCharger,
-        tx_ctx: &mut TxContext,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &Arc<MoveVM>,
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        deny_cert: bool,
-        contains_deleted_input: bool,
-        cancelled_objects: Option<(Vec<ObjectID>, SequenceNumber)>,
+        execution_params: ExecutionOrEarlyError,
         trace_builder_opt: &mut Option<MoveTraceBuilder>,
     ) -> (GasCostSummary, Result<Mode::ExecutionResults, ExecutionError>, Vec<ExecutionTiming>) {
         gas_charger.smash_gas(temporary_store);
@@ -306,7 +326,7 @@ mod checked {
 
         let is_genesis_tx = matches!(transaction_kind, TransactionKind::Genesis(_));
         let advance_epoch_gas_summary = transaction_kind.get_advance_epoch_tx_gas_summary();
-        let digest = tx_ctx.digest();
+        let digest = tx_ctx.borrow().digest();
 
         // We must charge object read here during transaction execution, because if this fails
         // we must still ensure an effect is committed and all objects versions incremented
@@ -315,39 +335,23 @@ mod checked {
         let result: ResultWithTimings<Mode::ExecutionResults, ExecutionError> = result
             .map_err(|e| (e, vec![]))
             .and_then(|()| -> ResultWithTimings<Mode::ExecutionResults, ExecutionError> {
-                let mut execution_result: ResultWithTimings<Mode::ExecutionResults, ExecutionError> = if deny_cert {
-                    Err((ExecutionError::new(ExecutionErrorKind::CertificateDenied, None), vec![]))
-                } else if contains_deleted_input {
-                    Err((ExecutionError::new(ExecutionErrorKind::InputObjectDeleted, None), vec![]))
-                } else if let Some((cancelled_objects, reason)) = cancelled_objects {
-                    match reason {
-                        SequenceNumber::CONGESTED => Err((
-                            ExecutionError::new(
-                                ExecutionErrorKind::ExecutionCancelledDueToSharedObjectCongestion {
-                                    congested_objects: CongestedObjects(cancelled_objects),
-                                },
-                                None,
-                            ),
-                            vec![],
-                        )),
-                        SequenceNumber::RANDOMNESS_UNAVAILABLE => Err((
-                            ExecutionError::new(ExecutionErrorKind::ExecutionCancelledDueToRandomnessUnavailable, None),
-                            vec![],
-                        )),
-                        _ => panic!("invalid cancellation reason SequenceNumber: {reason}"),
-                    }
-                } else {
-                    execution_loop::<Mode>(
-                        temporary_store,
-                        transaction_kind,
-                        tx_ctx,
-                        move_vm,
-                        gas_charger,
-                        protocol_config,
-                        metrics.clone(),
-                        trace_builder_opt,
-                    )
-                };
+                let mut execution_result: ResultWithTimings<Mode::ExecutionResults, ExecutionError> =
+                    match execution_params {
+                        ExecutionOrEarlyError::Err(early_execution_error) => {
+                            Err((ExecutionError::new(early_execution_error, None), vec![]))
+                        }
+                        ExecutionOrEarlyError::Ok(()) => execution_loop::<Mode>(
+                            store,
+                            temporary_store,
+                            transaction_kind,
+                            tx_ctx,
+                            move_vm,
+                            gas_charger,
+                            protocol_config,
+                            metrics.clone(),
+                            trace_builder_opt,
+                        ),
+                    };
 
                 let meter_check = check_meter_limit(temporary_store, gas_charger, protocol_config, metrics.clone());
                 if let Err(e) = meter_check {
@@ -539,7 +543,7 @@ mod checked {
                             max_size: lim as u64,
                         },
                         "Written objects size crossed hard limit",
-                    ))
+                    ));
                 }
             };
         }
@@ -549,9 +553,10 @@ mod checked {
 
     #[instrument(level = "debug", skip_all)]
     fn execution_loop<Mode: ExecutionMode>(
+        store: &dyn BackingStore,
         temporary_store: &mut TemporaryStore<'_>,
         transaction_kind: TransactionKind,
-        tx_ctx: &mut TxContext,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &Arc<MoveVM>,
         gas_charger: &mut GasCharger,
         protocol_config: &ProtocolConfig,
@@ -565,6 +570,7 @@ mod checked {
                     builder,
                     change_epoch,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -576,15 +582,19 @@ mod checked {
                 Ok((Mode::empty_results(), vec![]))
             }
             TransactionKind::Genesis(GenesisTransaction { objects }) => {
-                if tx_ctx.epoch() != 0 {
+                if tx_ctx.borrow().epoch() != 0 {
                     panic!("BUG: Genesis Transactions can only be executed in epoch 0");
                 }
 
                 for genesis_object in objects {
                     match genesis_object {
                         sui_types::transaction::GenesisObject::RawObject { data, owner } => {
-                            let object =
-                                ObjectInner { data, owner, previous_transaction: tx_ctx.digest(), storage_rebate: 0 };
+                            let object = ObjectInner {
+                                data,
+                                owner,
+                                previous_transaction: tx_ctx.borrow().digest(),
+                                storage_rebate: 0,
+                            };
                             temporary_store.create_object(object.into());
                         }
                     }
@@ -595,6 +605,7 @@ mod checked {
                 setup_consensus_commit(
                     prologue.commit_timestamp_ms,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -609,6 +620,7 @@ mod checked {
                 setup_consensus_commit(
                     prologue.commit_timestamp_ms,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -623,6 +635,7 @@ mod checked {
                 setup_consensus_commit(
                     prologue.commit_timestamp_ms,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -637,6 +650,7 @@ mod checked {
                 setup_consensus_commit(
                     prologue.commit_timestamp_ms,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -652,11 +666,26 @@ mod checked {
                 metrics,
                 move_vm,
                 temporary_store,
+                store.as_backing_package_store(),
                 tx_ctx,
                 gas_charger,
                 pt,
                 trace_builder_opt,
             ),
+            TransactionKind::ProgrammableSystemTransaction(pt) => {
+                programmable_transactions::execution::execute::<execution_mode::System>(
+                    protocol_config,
+                    metrics,
+                    move_vm,
+                    temporary_store,
+                    store.as_backing_package_store(),
+                    tx_ctx,
+                    gas_charger,
+                    pt,
+                    trace_builder_opt,
+                )?;
+                Ok((Mode::empty_results(), vec![]))
+            }
             TransactionKind::EndOfEpochTransaction(txns) => {
                 let mut builder = ProgrammableTransactionBuilder::new();
                 let len = txns.len();
@@ -668,6 +697,7 @@ mod checked {
                                 builder,
                                 change_epoch,
                                 temporary_store,
+                                store,
                                 tx_ctx,
                                 move_vm,
                                 gas_charger,
@@ -707,11 +737,19 @@ mod checked {
                             builder = setup_bridge_committee_update(builder, bridge_shared_version)
                         }
                         EndOfEpochTransactionKind::StoreExecutionTimeObservations(estimates) => {
-                            assert_eq!(
+                            assert!(matches!(
                                 protocol_config.per_object_congestion_control_mode(),
-                                PerObjectCongestionControlMode::ExecutionTimeEstimate
-                            );
+                                PerObjectCongestionControlMode::ExecutionTimeEstimate(_)
+                            ));
                             builder = setup_store_execution_time_estimates(builder, estimates);
+                        }
+                        EndOfEpochTransactionKind::AccumulatorRootCreate => {
+                            assert!(protocol_config.enable_accumulators());
+                            builder = setup_accumulator_root_create(builder);
+                        }
+                        EndOfEpochTransactionKind::CoinRegistryCreate => {
+                            assert!(protocol_config.enable_coin_registry());
+                            builder = setup_coin_registry_create(builder);
                         }
                     }
                 }
@@ -721,6 +759,7 @@ mod checked {
                 setup_authenticator_state_update(
                     auth_state_update,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -735,6 +774,7 @@ mod checked {
                 setup_randomness_state_update(
                     randomness_state_update,
                     temporary_store,
+                    store,
                     tx_ctx,
                     move_vm,
                     gas_charger,
@@ -871,7 +911,8 @@ mod checked {
         builder: ProgrammableTransactionBuilder,
         change_epoch: ChangeEpoch,
         temporary_store: &mut TemporaryStore<'_>,
-        tx_ctx: &mut TxContext,
+        store: &dyn BackingStore,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &Arc<MoveVM>,
         gas_charger: &mut GasCharger,
         protocol_config: &ProtocolConfig,
@@ -895,7 +936,8 @@ mod checked {
             metrics.clone(),
             move_vm,
             temporary_store,
-            tx_ctx,
+            store.as_backing_package_store(),
+            tx_ctx.clone(),
             gas_charger,
             advance_epoch_pt,
             trace_builder_opt,
@@ -924,7 +966,8 @@ mod checked {
                     metrics.clone(),
                     move_vm,
                     temporary_store,
-                    tx_ctx,
+                    store.as_backing_package_store(),
+                    tx_ctx.clone(),
                     gas_charger,
                     advance_epoch_safe_mode_pt,
                     trace_builder_opt,
@@ -935,15 +978,12 @@ mod checked {
         }
 
         if protocol_config.fresh_vm_on_framework_upgrade() {
-            let new_vm = new_move_vm(
-                all_natives(/* silent */ true, protocol_config),
-                protocol_config,
-                /* enable_profiler */ None,
-            )
-            .expect("Failed to create new MoveVM");
+            let new_vm = new_move_vm(all_natives(/* silent */ true, protocol_config), protocol_config)
+                .expect("Failed to create new MoveVM");
             process_system_packages(
                 change_epoch,
                 temporary_store,
+                store,
                 tx_ctx,
                 &new_vm,
                 gas_charger,
@@ -955,6 +995,7 @@ mod checked {
             process_system_packages(
                 change_epoch,
                 temporary_store,
+                store,
                 tx_ctx,
                 move_vm,
                 gas_charger,
@@ -969,14 +1010,15 @@ mod checked {
     fn process_system_packages(
         change_epoch: ChangeEpoch,
         temporary_store: &mut TemporaryStore<'_>,
-        tx_ctx: &mut TxContext,
+        store: &dyn BackingStore,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &MoveVM,
         gas_charger: &mut GasCharger,
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         trace_builder_opt: &mut Option<MoveTraceBuilder>,
     ) {
-        let digest = tx_ctx.digest();
+        let digest = tx_ctx.borrow().digest();
         let binary_config = to_binary_config(protocol_config);
         for (version, modules, dependencies) in change_epoch.system_packages.into_iter() {
             let deserialized_modules: Vec<_> =
@@ -997,7 +1039,8 @@ mod checked {
                     metrics.clone(),
                     move_vm,
                     temporary_store,
-                    tx_ctx,
+                    store.as_backing_package_store(),
+                    tx_ctx.clone(),
                     gas_charger,
                     publish_pt,
                     trace_builder_opt,
@@ -1026,7 +1069,8 @@ mod checked {
     fn setup_consensus_commit(
         consensus_commit_timestamp_ms: CheckpointTimestamp,
         temporary_store: &mut TemporaryStore<'_>,
-        tx_ctx: &mut TxContext,
+        store: &dyn BackingStore,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &Arc<MoveVM>,
         gas_charger: &mut GasCharger,
         protocol_config: &ProtocolConfig,
@@ -1050,6 +1094,7 @@ mod checked {
             metrics,
             move_vm,
             temporary_store,
+            store.as_backing_package_store(),
             tx_ctx,
             gas_charger,
             pt,
@@ -1152,7 +1197,8 @@ mod checked {
     fn setup_authenticator_state_update(
         update: AuthenticatorStateUpdate,
         temporary_store: &mut TemporaryStore<'_>,
-        tx_ctx: &mut TxContext,
+        store: &dyn BackingStore,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &Arc<MoveVM>,
         gas_charger: &mut GasCharger,
         protocol_config: &ProtocolConfig,
@@ -1183,6 +1229,7 @@ mod checked {
             metrics,
             move_vm,
             temporary_store,
+            store.as_backing_package_store(),
             tx_ctx,
             gas_charger,
             pt,
@@ -1218,7 +1265,8 @@ mod checked {
     fn setup_randomness_state_update(
         update: RandomnessStateUpdate,
         temporary_store: &mut TemporaryStore<'_>,
-        tx_ctx: &mut TxContext,
+        store: &dyn BackingStore,
+        tx_ctx: Rc<RefCell<TxContext>>,
         move_vm: &Arc<MoveVM>,
         gas_charger: &mut GasCharger,
         protocol_config: &ProtocolConfig,
@@ -1250,6 +1298,7 @@ mod checked {
             metrics,
             move_vm,
             temporary_store,
+            store.as_backing_package_store(),
             tx_ctx,
             gas_charger,
             pt,
@@ -1288,6 +1337,32 @@ mod checked {
             vec![],
             vec![system_state, estimates_arg],
         );
+        builder
+    }
+
+    fn setup_accumulator_root_create(mut builder: ProgrammableTransactionBuilder) -> ProgrammableTransactionBuilder {
+        builder
+            .move_call(
+                SUI_FRAMEWORK_ADDRESS.into(),
+                ACCUMULATOR_ROOT_MODULE.to_owned(),
+                ACCUMULATOR_ROOT_CREATE_FUNC.to_owned(),
+                vec![],
+                vec![],
+            )
+            .expect("Unable to generate accumulator_root_create transaction!");
+        builder
+    }
+
+    fn setup_coin_registry_create(mut builder: ProgrammableTransactionBuilder) -> ProgrammableTransactionBuilder {
+        builder
+            .move_call(
+                SUI_FRAMEWORK_ADDRESS.into(),
+                ident_str!("coin_registry").to_owned(),
+                ident_str!("create").to_owned(),
+                vec![],
+                vec![],
+            )
+            .expect("Unable to generate coin_registry_create transaction!");
         builder
     }
 }

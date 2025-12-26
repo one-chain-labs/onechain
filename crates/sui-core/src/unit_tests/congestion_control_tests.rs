@@ -11,7 +11,7 @@ use sui_types::{
     base_types::{ConsensusObjectSequenceKey, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
     digests::TransactionDigest,
-    effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
+    effects::{InputConsensusObject, TransactionEffects, TransactionEffectsAPI},
     executable_transaction::VerifiedExecutableTransaction,
     execution_status::{CongestedObjects, ExecutionFailureStatus, ExecutionStatus},
     object::Object,
@@ -31,6 +31,7 @@ use crate::{
         shared_object_congestion_tracker::SharedObjectCongestionTracker,
         test_authority_builder::TestAuthorityBuilder,
         AuthorityState,
+        ExecutionEnv,
     },
     move_call,
 };
@@ -247,6 +248,7 @@ async fn test_congestion_control_execution_cancellation() {
         Some(SharedObjectCongestionTracker::new(
             [(shared_object_1.0, 10)],
             PerObjectCongestionControlMode::TotalGasBudget,
+            false,
             Some(test_setup.protocol_config.max_accumulated_txn_cost_per_object_in_mysticeti_commit()),
             Some(1000), // Not used.
             None,       // Not used.
@@ -276,15 +278,15 @@ async fn test_congestion_control_execution_cancellation() {
         command: None
     });
 
-    // Tests shared object versions in effects are set correctly.
-    assert_eq!(effects.input_shared_objects(), vec![
-        InputSharedObject::Cancelled(shared_object_1.0, SequenceNumber::CONGESTED),
-        InputSharedObject::Cancelled(shared_object_2.0, SequenceNumber::CANCELLED_READ)
+    // Tests consensus object versions in effects are set correctly.
+    assert_eq!(effects.input_consensus_objects(), vec![
+        InputConsensusObject::Cancelled(shared_object_1.0, SequenceNumber::CONGESTED),
+        InputConsensusObject::Cancelled(shared_object_2.0, SequenceNumber::CANCELLED_READ)
     ]);
 
     // Run the same transaction in `authority_state_2`, but using the above effects for the execution.
-    let cert = certify_shared_obj_transaction_no_execution(&authority_state_2, congested_tx).await.unwrap();
-    authority_state_2
+    let (cert, _) = certify_shared_obj_transaction_no_execution(&authority_state_2, congested_tx).await.unwrap();
+    let assigned_versions = authority_state_2
         .epoch_store_for_testing()
         .acquire_shared_version_assignments_from_effects(
             &VerifiedExecutableTransaction::new_from_certificate(cert.clone()),
@@ -292,7 +294,8 @@ async fn test_congestion_control_execution_cancellation() {
             authority_state_2.get_object_cache_reader().as_ref(),
         )
         .unwrap();
-    let (effects_2, execution_error) = authority_state_2.try_execute_for_test(&cert).await.unwrap();
+    let execution_env = ExecutionEnv::new().with_assigned_versions(assigned_versions);
+    let (effects_2, execution_error) = authority_state_2.try_execute_for_test(&cert, execution_env).await.unwrap();
 
     // Should result in the same cancellation.
     assert_eq!(

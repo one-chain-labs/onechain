@@ -6,7 +6,6 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 use sui_types::{event::EventID, Identifier};
 use typed_store::{
     rocks::{DBMap, MetricConf},
-    traits::{TableSummary, TypedStoreDebug},
     DBMapUtils,
     Map,
 };
@@ -70,7 +69,10 @@ impl BridgeOrchestratorTables {
     }
 
     pub fn get_all_pending_actions(&self) -> HashMap<BridgeActionDigest, BridgeAction> {
-        self.pending_actions.unbounded_iter().collect()
+        self.pending_actions
+            .safe_iter()
+            .collect::<Result<HashMap<_, _>, _>>()
+            .expect("failed to get all pending actions")
     }
 
     pub fn get_sui_event_cursors(&self, identifiers: &[Identifier]) -> BridgeResult<Vec<Option<EventID>>> {

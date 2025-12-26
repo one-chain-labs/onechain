@@ -6,20 +6,18 @@ use axum::{
     http::HeaderMap,
     response::{IntoResponse, Response},
 };
-
-use crate::{
-    types::{
-        X_SUI_CHAIN,
-        X_SUI_CHAIN_ID,
-        X_SUI_CHECKPOINT_HEIGHT,
-        X_SUI_EPOCH,
-        X_SUI_LOWEST_AVAILABLE_CHECKPOINT,
-        X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS,
-        X_SUI_TIMESTAMP,
-        X_SUI_TIMESTAMP_MS,
-    },
-    RpcService,
+use sui_rpc::headers::{
+    X_SUI_CHAIN,
+    X_SUI_CHAIN_ID,
+    X_SUI_CHECKPOINT_HEIGHT,
+    X_SUI_EPOCH,
+    X_SUI_LOWEST_AVAILABLE_CHECKPOINT,
+    X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS,
+    X_SUI_TIMESTAMP,
+    X_SUI_TIMESTAMP_MS,
 };
+
+use crate::RpcService;
 
 pub async fn append_info_headers(State(state): State<RpcService>, response: Response) -> impl IntoResponse {
     let mut headers = HeaderMap::new();
@@ -39,7 +37,7 @@ pub async fn append_info_headers(State(state): State<RpcService>, response: Resp
 
         headers.insert(
             X_SUI_TIMESTAMP,
-            crate::proto::types::timestamp_ms_to_proto(latest_checkpoint.timestamp_ms)
+            crate::proto::timestamp_ms_to_proto(latest_checkpoint.timestamp_ms)
                 .to_string()
                 .try_into()
                 .expect("timestamp is a valid HeaderValue"),
@@ -52,6 +50,10 @@ pub async fn append_info_headers(State(state): State<RpcService>, response: Resp
 
     if let Ok(lowest_available_checkpoint_objects) = state.reader.inner().get_lowest_available_checkpoint_objects() {
         headers.insert(X_SUI_LOWEST_AVAILABLE_CHECKPOINT_OBJECTS, lowest_available_checkpoint_objects.into());
+    }
+
+    if let Some(server_version) = state.server_version().and_then(|version| version.to_string().try_into().ok()) {
+        headers.insert(axum::http::header::SERVER, server_version);
     }
 
     (headers, response)

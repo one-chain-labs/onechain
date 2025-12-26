@@ -98,7 +98,11 @@ impl<T: SubmitToConsensus + ReconfigurationInitiator> CheckpointOutput for Submi
                 SignedCheckpointSummary::new(epoch_store.epoch(), summary.clone(), &*self.signer, self.authority);
 
             let message = CheckpointSignatureMessage { summary };
-            let transaction = ConsensusTransaction::new_checkpoint_signature_message(message);
+            let transaction = if epoch_store.protocol_config().consensus_checkpoint_signature_key_includes_digest() {
+                ConsensusTransaction::new_checkpoint_signature_message_v2(message)
+            } else {
+                ConsensusTransaction::new_checkpoint_signature_message(message)
+            };
             self.sender.submit_to_consensus(&vec![transaction], epoch_store)?;
             self.metrics.last_sent_checkpoint_signature.set(checkpoint_seq as i64);
         } else {
@@ -110,6 +114,10 @@ impl<T: SubmitToConsensus + ReconfigurationInitiator> CheckpointOutput for Submi
 
         if checkpoint_timestamp >= self.next_reconfiguration_timestamp_ms {
             // close_epoch is ok if called multiple times
+            info!(
+                "Closing epoch at sequence {checkpoint_seq} at timestamp {checkpoint_timestamp}. next_reconfiguration_timestamp_ms {}",
+                self.next_reconfiguration_timestamp_ms
+            );
             self.sender.close_epoch(epoch_store);
         }
         Ok(())

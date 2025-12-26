@@ -197,12 +197,12 @@ impl Epoch {
         let commitments: Vec<EpochCommitment> = bcs::from_bytes(commitments)
             .map_err(|e| Error::Internal(format!("Error deserializing commitments: {e}")).extend())?;
 
-        let digest = commitments.into_iter().next().map(|commitment| {
-            let EpochCommitment::ECMHLiveObjectSetDigest(digest) = commitment;
-            Base58::encode(digest.digest.into_inner())
-        });
-
-        Ok(digest)
+        for commitment in commitments {
+            if let EpochCommitment::ECMHLiveObjectSetDigest(digest) = commitment {
+                return Ok(Some(Base58::encode(digest.digest.into_inner())));
+            }
+        }
+        Ok(None)
     }
 
     /// The epoch's corresponding checkpoints.

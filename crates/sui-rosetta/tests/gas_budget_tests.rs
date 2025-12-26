@@ -83,15 +83,14 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
             "account": { "address" : sender.to_string() },
             "amount" : {
                 "value": "-1000000000",
-                "currency": {
-                    "symbol": "SUI",
-                    "decimals": 9,
+                "currency": { "symbol": "SUI", "decimals": 9,
                 }
             },
         }]
     ))
     .unwrap();
 
+    // We manually use rosetta-flow here to check the intermediate results.
     let metadata = Some(PreprocessMetadata { budget: Some(budget) });
 
     let preprocess: ConstructionPreprocessResponse = rosetta_client
@@ -100,7 +99,8 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
             operations: ops.clone(),
             metadata,
         })
-        .await;
+        .await
+        .unwrap();
     println!("Preprocess : {preprocess:?}");
     assert_eq!(preprocess.options.as_ref().unwrap().budget.unwrap(), budget);
 
@@ -110,7 +110,8 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
             options: preprocess.options,
             public_keys: vec![],
         })
-        .await;
+        .await
+        .unwrap();
     println!("Metadata : {metadata:?}");
     assert_eq!(metadata.metadata.budget, budget);
 
@@ -121,15 +122,16 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
             metadata: Some(metadata.metadata),
             public_keys: vec![],
         })
-        .await;
+        .await
+        .unwrap();
     println!("Payload : {payloads:?}");
 
     // Combine
     let signing_payload = payloads.payloads.first().unwrap();
     let bytes = Hex::decode(&signing_payload.hex_bytes).unwrap();
     let signer = signing_payload.account_identifier.address;
-    let signature = keystore.sign_hashed(&signer, &bytes).unwrap();
-    let public_key = keystore.get_key(&signer).unwrap().public();
+    let signature = keystore.sign_hashed(&signer, &bytes).await.unwrap();
+    let public_key = keystore.export(&signer).unwrap().public();
 
     let combine: ConstructionCombineResponse = rosetta_client
         .call(RosettaEndpoint::Combine, &ConstructionCombineRequest {
@@ -142,7 +144,8 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
                 hex_bytes: Hex::from_bytes(SuiSignature::signature_bytes(&signature)),
             }],
         })
-        .await;
+        .await
+        .unwrap();
     println!("Combine : {combine:?}");
 
     // Submit
@@ -151,7 +154,8 @@ async fn pay_with_gas_budget(budget: u64) -> TransactionIdentifierResponseResult
             network_identifier,
             signed_transaction: combine.signed_transaction,
         })
-        .await;
+        .await
+        .unwrap();
     println!("Submit : {submit:?}");
     submit
 }

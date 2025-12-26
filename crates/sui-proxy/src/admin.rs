@@ -90,7 +90,13 @@ pub struct Labels {
 }
 
 /// App will configure our routes. This fn is also used to instrument our tests
-pub fn app(labels: Labels, client: ReqwestClient, relay: HistogramRelay, allower: Option<SuiNodeProvider>) -> Router {
+pub fn app(
+    labels: Labels,
+    client: ReqwestClient,
+    relay: HistogramRelay,
+    allower: Option<SuiNodeProvider>,
+    timeout_secs: Option<u64>,
+) -> Router {
     // build our application with a route and our sender mpsc
     let mut router = Router::new()
         .route("/publish/metrics", post(publish_metrics))
@@ -104,10 +110,9 @@ pub fn app(labels: Labels, client: ReqwestClient, relay: HistogramRelay, allower
         // Enforce on all routes.
         // If the request does not complete within the specified timeout it will be aborted
         // and a 408 Request Timeout response will be sent.
-        .layer(TimeoutLayer::new(Duration::from_secs(var!(
-            "NODE_CLIENT_TIMEOUT",
-            20
-        ))))
+        .layer(TimeoutLayer::new(Duration::from_secs(
+            timeout_secs.unwrap_or(20),
+        )))
         .layer(Extension(relay))
         .layer(Extension(labels))
         .layer(Extension(client))

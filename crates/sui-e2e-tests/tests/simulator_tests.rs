@@ -134,5 +134,5 @@ async fn test_net_determinism() {
 
     let handle = test_cluster.spawn_new_fullnode().await;
 
-    handle.sui_node.state().get_transaction_cache_reader().notify_read_executed_effects(&[digest]).await;
+    handle.sui_node.state().get_transaction_cache_reader().notify_read_executed_effects("", &[digest]).await;
 }

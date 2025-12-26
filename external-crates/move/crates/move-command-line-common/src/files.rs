@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, *};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::{collections::BTreeMap, path::Path};
-use vfs::{error::VfsErrorKind, VfsPath, VfsResult};
+use vfs::{VfsPath, VfsResult, error::VfsErrorKind};
 
 /// Result of sha256 hash of a file's contents.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ pub const MOVE_IR_EXTENSION: &str = "mvir";
 /// Extension for Move bytecode files
 pub const MOVE_COMPILED_EXTENSION: &str = "mv";
 /// Extension for Move source map files (mappings from source to bytecode)
-pub const SOURCE_MAP_EXTENSION: &str = "mvsm";
+pub const DEBUG_INFO_EXTENSION: &str = "mvd";
 /// Extension for error description map for compiled releases
 pub const MOVE_ERROR_DESC_EXTENSION: &str = "errmap";
 /// Extension for coverage maps

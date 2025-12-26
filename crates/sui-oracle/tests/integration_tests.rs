@@ -85,7 +85,7 @@ async fn test_publish_primitive() {
     let (gas, gas_price) = get_gas(&client, sender).await;
     let data = TransactionData::new_programmable(sender, vec![gas], pt, 1000000000, gas_price);
 
-    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).unwrap();
+    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).await.unwrap();
 
     let tx = Transaction::from_data(data.clone(), vec![signature]);
 
@@ -169,7 +169,7 @@ async fn test_publish_complex_value() {
     let (gas, gas_price) = get_gas(&client, sender).await;
     let data = TransactionData::new_programmable(sender, vec![gas], pt, 1000000000, gas_price);
 
-    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).unwrap();
+    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).await.unwrap();
 
     let tx = Transaction::from_data(data.clone(), vec![signature]);
 
@@ -249,7 +249,7 @@ async fn test_consume_oracle_data() {
         let (gas, gas_price) = get_gas(&client, sender).await;
         let data = TransactionData::new_programmable(sender, vec![gas], pt, 1000000000, gas_price);
 
-        let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).unwrap();
+        let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).await.unwrap();
 
         let tx = Transaction::from_data(data.clone(), vec![signature]);
 
@@ -323,7 +323,7 @@ async fn test_consume_oracle_data() {
     let (gas, gas_price) = get_gas(&client, sender).await;
     let data = TransactionData::new_programmable(sender, vec![gas], pt, 1000000000, gas_price);
 
-    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).unwrap();
+    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).await.unwrap();
 
     let tx = Transaction::from_data(data.clone(), vec![signature]);
 
@@ -351,8 +351,9 @@ async fn get_gas(client: &SuiClient, sender: SuiAddress) -> (ObjectRef, u64) {
 async fn init_test_client() -> (SuiClient, Keystore, SuiAddress) {
     let client = SuiClientBuilder::default().build("https://rpc.devnet.sui.io:443").await.unwrap();
 
-    let keystore =
-        Keystore::File(FileBasedKeystore::new(&dirs::home_dir().unwrap().join(".sui/sui_config/sui.keystore")).unwrap());
+    let keystore = Keystore::File(
+        FileBasedKeystore::load_or_create(&dirs::home_dir().unwrap().join(".sui/sui_config/sui.keystore")).unwrap(),
+    );
     let sender: SuiAddress = keystore.addresses()[0];
     let gas = client.coin_read_api().get_coins(sender, None, None, Some(1)).await.unwrap();
 
@@ -368,7 +369,7 @@ async fn publish_package(sender: SuiAddress, keystore: &Keystore, client: &SuiCl
     let gas = client.coin_read_api().get_coins(sender, None, None, Some(1)).await.unwrap();
     let gas = gas.data[0].object_ref();
     let data = TransactionData::new_module(sender, gas, all_module_bytes, dependencies, 1000000000, 1000);
-    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).unwrap();
+    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).await.unwrap();
 
     let tx = Transaction::from_data(data.clone(), vec![signature]);
 
@@ -417,7 +418,7 @@ async fn create_oracle(
     let gas_price = client.governance_api().get_reference_gas_price().await.unwrap();
     let data = TransactionData::new_programmable(sender, vec![gas], pt, 1000000000, gas_price);
 
-    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).unwrap();
+    let signature = keystore.sign_secure(&sender, &data, Intent::sui_transaction()).await.unwrap();
     let tx = Transaction::from_data(data.clone(), vec![signature]);
     let result = client
         .quorum_driver_api()

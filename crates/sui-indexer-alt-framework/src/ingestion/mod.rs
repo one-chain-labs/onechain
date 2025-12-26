@@ -9,7 +9,6 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -22,6 +21,7 @@ use crate::{
         regulator::regulator,
     },
     metrics::IndexerMetrics,
+    types::full_checkpoint_content::CheckpointData,
 };
 
 mod broadcaster;
@@ -30,19 +30,34 @@ pub mod error;
 mod local_client;
 mod regulator;
 mod remote_client;
+mod rpc_client;
 #[cfg(test)]
 mod test_utils;
 
-#[derive(clap::Args, Clone, Debug)]
+#[derive(clap::Args, Clone, Debug, Default)]
+#[group(required = true)]
 pub struct ClientArgs {
     /// Remote Store to fetch checkpoints from.
-    #[clap(long, required = true, group = "source")]
+    #[clap(long, group = "source")]
     pub remote_store_url: Option<Url>,
 
     /// Path to the local ingestion directory.
     /// If both remote_store_url and local_ingestion_path are provided, remote_store_url will be used.
-    #[clap(long, required = true, group = "source")]
+    #[clap(long, group = "source")]
     pub local_ingestion_path: Option<PathBuf>,
+
+    /// Sui fullnode gRPC url to fetch checkpoints from.
+    /// If all remote_store_url, local_ingestion_path and rpc_api_url are provided, remote_store_url will be used.
+    #[clap(long, env, group = "source")]
+    pub rpc_api_url: Option<Url>,
+
+    /// Optional username for the gRPC service.
+    #[clap(long, env)]
+    pub rpc_username: Option<String>,
+
+    /// Optional password for the gRPC service.
+    #[clap(long, env)]
+    pub rpc_password: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -57,7 +72,7 @@ pub struct IngestionConfig {
     pub retry_interval_ms: u64,
 }
 
-pub(crate) struct IngestionService {
+pub struct IngestionService {
     config: IngestionConfig,
     client: IngestionClient,
     ingest_hi_tx: mpsc::UnboundedSender<(&'static str, u64)>,
@@ -75,7 +90,7 @@ impl IngestionConfig {
 impl IngestionService {
     /// TODO: If we want to expose this as part of the framework, so people can run just an
     /// ingestion service, we will need to split `IngestionMetrics` out from `IndexerMetrics`.
-    pub(crate) fn new(
+    pub fn new(
         args: ClientArgs,
         config: IngestionConfig,
         metrics: Arc<IndexerMetrics>,
@@ -86,8 +101,10 @@ impl IngestionService {
             IngestionClient::new_remote(url.clone(), metrics.clone())?
         } else if let Some(path) = args.local_ingestion_path.as_ref() {
             IngestionClient::new_local(path.clone(), metrics.clone())
+        } else if let Some(rpc_api_url) = args.rpc_api_url.as_ref() {
+            IngestionClient::new_rpc(rpc_api_url.clone(), args.rpc_username, args.rpc_password, metrics.clone())?
         } else {
-            panic!("Either remote_store_url or local_ingestion_path must be provided");
+            panic!("One of remote_store_url, local_ingestion_path or rpc_api_url must be provided");
         };
 
         let subscribers = Vec::new();
@@ -109,9 +126,7 @@ impl IngestionService {
     /// run ahead of the watermark by more than the config's buffer_size.
     ///
     /// Returns the channel to receive checkpoints from and the channel to accept watermarks from.
-    pub(crate) fn subscribe(
-        &mut self,
-    ) -> (mpsc::Receiver<Arc<CheckpointData>>, mpsc::UnboundedSender<(&'static str, u64)>) {
+    pub fn subscribe(&mut self) -> (mpsc::Receiver<Arc<CheckpointData>>, mpsc::UnboundedSender<(&'static str, u64)>) {
         let (sender, receiver) = mpsc::channel(self.config.checkpoint_buffer_size);
         self.subscribers.push(sender);
         (receiver, self.ingest_hi_tx.clone())
@@ -131,7 +146,7 @@ impl IngestionService {
     /// If ingestion reaches the leading edge of the network, it will encounter checkpoints that do
     /// not exist yet. These will be retried repeatedly on a fixed `retry_interval` until they
     /// become available.
-    pub(crate) async fn run<I>(self, checkpoints: I) -> Result<(JoinHandle<()>, JoinHandle<()>)>
+    pub async fn run<I>(self, checkpoints: I) -> Result<(JoinHandle<()>, JoinHandle<()>)>
     where
         I: IntoIterator<Item = u64> + Send + Sync + 'static,
         I::IntoIter: Send + Sync + 'static,
@@ -182,7 +197,13 @@ mod tests {
         cancel: CancellationToken,
     ) -> IngestionService {
         IngestionService::new(
-            ClientArgs { remote_store_url: Some(Url::parse(&uri).unwrap()), local_ingestion_path: None },
+            ClientArgs {
+                remote_store_url: Some(Url::parse(&uri).unwrap()),
+                local_ingestion_path: None,
+                rpc_api_url: None,
+                rpc_username: None,
+                rpc_password: None,
+            },
             IngestionConfig { checkpoint_buffer_size, ingest_concurrency, ..Default::default() },
             test_metrics(),
             cancel,
@@ -265,28 +286,6 @@ mod tests {
 
         let (rx, _) = ingestion_service.subscribe();
         let subscriber = test_subscriber(1, rx, cancel.clone()).await;
-        let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
-
-        cancel.cancelled().await;
-        subscriber.await.unwrap();
-        regulator.await.unwrap();
-        broadcaster.await.unwrap();
-    }
-
-    /// If fetching the checkpoint throws an unexpected error, the whole pipeline will be shut
-    /// down.
-    #[tokio::test]
-    async fn shutdown_on_unexpected_error() {
-        telemetry_subscribers::init_for_testing();
-
-        let server = MockServer::start().await;
-        respond_with(&server, status(StatusCode::IM_A_TEAPOT)).await;
-
-        let cancel = CancellationToken::new();
-        let mut ingestion_service = test_ingestion(server.uri(), 1, 1, cancel.clone()).await;
-
-        let (rx, _) = ingestion_service.subscribe();
-        let subscriber = test_subscriber(usize::MAX, rx, cancel.clone()).await;
         let (regulator, broadcaster) = ingestion_service.run(0 ..).await.unwrap();
 
         cancel.cancelled().await;

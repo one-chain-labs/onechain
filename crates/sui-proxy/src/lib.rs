@@ -122,6 +122,7 @@ mod tests {
             client,
             HistogramRelay::new(),
             Some(allower.clone()),
+            None,
         );
 
         let listener = std::net::TcpListener::bind("localhost:0").unwrap();
@@ -208,16 +209,14 @@ mod tests {
             "dummy user agent",
         );
 
-        // this will affect other tests if they are run in parallel, but we only have two tests, so it shouldn't be an issue (yet)
-        // even still, the other tests complete very fast so those tests would also need to slow down by orders and orders to be
-        // bothered by this env var
-        std::env::set_var("NODE_CLIENT_TIMEOUT", "5");
+        let timeout_secs = Some(2u64);
 
         let app = admin::app(
             Labels { network: "unittest-network".into(), inventory_hostname: "ansible_inventory_name".into() },
             client,
             HistogramRelay::new(),
             Some(allower.clone()),
+            timeout_secs,
         );
 
         let listener = std::net::TcpListener::bind("localhost:0").unwrap();
@@ -269,7 +268,5 @@ mod tests {
             .expect("expected a successful post with a self-signed certificate");
         let status = res.status();
         assert_eq!(status, StatusCode::REQUEST_TIMEOUT);
-        // Clean up the environment variable
-        std::env::remove_var("NODE_CLIENT_TIMEOUT");
     }
 }

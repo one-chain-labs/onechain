@@ -3,13 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sui_macros::sim_test;
-use sui_types::SUI_RANDOMNESS_STATE_OBJECT_ID;
+use sui_types::{supported_protocol_versions::SupportedProtocolVersions, SUI_RANDOMNESS_STATE_OBJECT_ID};
 use test_cluster::TestClusterBuilder;
 
 #[sim_test]
 async fn test_create_randomness_state_object() {
-    let test_cluster =
-        TestClusterBuilder::new().with_protocol_version(31.into()).with_epoch_duration_ms(10000).build().await;
+    #[cfg(msim)]
+    {
+        use sui_core::authority::framework_injection;
+        let framework = sui_framework_snapshot::load_bytecode_snapshot(54).unwrap();
+        framework_injection::set_system_packages(framework);
+    }
+
+    let test_cluster = TestClusterBuilder::new()
+        .with_protocol_version(31.into())
+        .with_epoch_duration_ms(10000)
+        .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(31, 54))
+        .build()
+        .await;
 
     let handles = test_cluster.all_node_handles();
 

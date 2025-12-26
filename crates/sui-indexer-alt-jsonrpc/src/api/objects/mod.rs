@@ -23,7 +23,7 @@ use crate::{
 };
 
 mod error;
-mod filter;
+pub(crate) mod filter;
 pub(crate) mod response;
 
 #[open_rpc(namespace = "sui", tag = "Objects API")]
@@ -219,7 +219,7 @@ impl QueryObjectsApiServer for QueryObjects {
 
         let options = query.options.unwrap_or_default();
 
-        let obj_futures = object_ids.iter().map(|id| response::latest_object(ctx, *id, &options));
+        let obj_futures = object_ids.iter().map(|id| response::live_object(ctx, *id, &options));
 
         let data = future::join_all(obj_futures)
             .await

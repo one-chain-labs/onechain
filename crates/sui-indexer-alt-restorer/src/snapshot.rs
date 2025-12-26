@@ -59,9 +59,10 @@ impl SnapshotRestorer {
             NonZeroUsize::new(args.concurrency).unwrap(),
             m,
             true, // skip_reset_local_store
+            3,    // max_retries
         )
         .await?;
-        let db = Db::for_write(args.db_args.clone()).await?;
+        let db = Db::for_write(args.database_url.clone(), args.db_args.clone()).await?;
 
         Ok(Self { restore_args: args.clone(), snapshot_reader, db, next_checkpoint_after_epoch })
     }

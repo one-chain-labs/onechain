@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use move_core_types::identifier::Identifier;
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
+    base_types::{FullObjectRef, ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{CallArg, ObjectArg, Transaction, DEFAULT_VALIDATOR_GAS_PRICE},
 };
@@ -60,7 +60,7 @@ impl TxGenerator for MoveTxGenerator {
             for i in 1 ..= self.num_transfers {
                 let object = account.gas_objects[i as usize];
                 if self.use_native_transfer {
-                    builder.transfer_object(account.sender, object).unwrap();
+                    builder.transfer_object(account.sender, FullObjectRef::from_fastpath_ref(object)).unwrap();
                 } else {
                     builder
                         .move_call(

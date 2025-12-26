@@ -201,7 +201,10 @@ impl Workload<dyn Payload> for SharedCounterWorkload {
                 .call_counter_create(self.basics_package_id.unwrap())
                 .build_and_sign(keypair.as_ref());
             let proxy_ref = proxy.clone();
-            futures.push(async move { proxy_ref.execute_transaction_block(transaction).await.unwrap().created()[0].0 });
+            futures.push(async move {
+                let (_, execution_result) = proxy_ref.execute_transaction_block(transaction).await;
+                execution_result.unwrap().created()[0].0
+            });
         }
         self.counters = join_all(futures).await;
     }
@@ -230,5 +233,9 @@ impl Workload<dyn Payload> for SharedCounterWorkload {
         }
         let payloads: Vec<Box<dyn Payload>> = shared_payloads.into_iter().map(|b| Box::<dyn Payload>::from(b)).collect();
         payloads
+    }
+
+    fn name(&self) -> &str {
+        "SharedCounter"
     }
 }

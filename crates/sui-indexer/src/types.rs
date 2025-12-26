@@ -166,11 +166,11 @@ impl EventIndex {
             event_sequence_number: rng.r#gen(),
             sender: SuiAddress::random_for_testing_only(),
             emit_package: ObjectID::random(),
-            emit_module: rng.r#gen::<u64>().to_string(),
+            emit_module: rng.gen::<u64>().to_string(),
             type_package: ObjectID::random(),
-            type_module: rng.r#gen::<u64>().to_string(),
-            type_name: rng.r#gen::<u64>().to_string(),
-            type_instantiation: rng.r#gen::<u64>().to_string(),
+            type_module: rng.gen::<u64>().to_string(),
+            type_name: rng.gen::<u64>().to_string(),
+            type_instantiation: rng.gen::<u64>().to_string(),
         }
     }
 }
@@ -239,9 +239,7 @@ pub fn owner_to_owner_info(owner: &Owner) -> (OwnerType, Option<SuiAddress>) {
         Owner::ObjectOwner(address) => (OwnerType::Object, Some(*address)),
         Owner::Shared { .. } => (OwnerType::Shared, None),
         Owner::Immutable => (OwnerType::Immutable, None),
-        // ConsensusV2 objects are treated as singly-owned for now in indexers.
-        // This will need to be updated if additional Authenticators are added.
-        Owner::ConsensusV2 { authenticator, .. } => (OwnerType::Address, Some(*authenticator.as_single_owner())),
+        Owner::ConsensusAddressOwner { owner, .. } => (OwnerType::Address, Some(*owner)),
     }
 }
 
@@ -367,7 +365,7 @@ impl TxIndex {
             sender: SuiAddress::random_for_testing_only(),
             recipients: (0 .. rng.gen_range(0 .. 1000)).map(|_| SuiAddress::random_for_testing_only()).collect(),
             move_calls: (0 .. rng.gen_range(0 .. 1000))
-                .map(|_| (ObjectID::random(), rng.r#gen::<u64>().to_string(), rng.r#gen::<u64>().to_string()))
+                .map(|_| (ObjectID::random(), rng.gen::<u64>().to_string(), rng.gen::<u64>().to_string()))
                 .collect(),
         }
     }

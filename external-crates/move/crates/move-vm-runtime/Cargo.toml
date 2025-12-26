@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -23,9 +23,9 @@ smallvec.workspace = true
 move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-core-types.workspace = true
 move-vm-config.workspace = true
-move-vm-types.workspace = true
+# referred to via path for execution versioning
+move-vm-types = { path = "../move-vm-types" }
 move-binary-format.workspace = true
-move-vm-profiler.workspace = true
 move-trace-format.workspace = true
 
 [dev-dependencies]
@@ -43,5 +43,4 @@ testing = []
 lazy_natives = []
 tracing = [
     "move-vm-config/tracing",
-    "move-vm-profiler/tracing",
 ]

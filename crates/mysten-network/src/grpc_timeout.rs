@@ -88,7 +88,7 @@ where
 
         if let Some(sleep) = this.sleep.as_pin_mut() {
             ready!(sleep.poll(cx));
-            let response = Status::deadline_exceeded("Timeout expired").into_http().map(|_| MaybeEmptyBody::empty());
+            let response = Status::deadline_exceeded("Timeout expired").into_http().map(|()| MaybeEmptyBody::empty());
             return Poll::Ready(Ok(response));
         }
 

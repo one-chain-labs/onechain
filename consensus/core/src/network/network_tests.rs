@@ -5,6 +5,7 @@ use std::{sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use consensus_config::NetworkKeyPair;
+use consensus_types::block::Round;
 use futures::StreamExt as _;
 use parking_lot::Mutex;
 use rstest::rstest;
@@ -21,7 +22,6 @@ use super::{
 use crate::{
     block::{TestBlock, VerifiedBlock},
     context::Context,
-    Round,
 };
 
 trait ManagerBuilder {

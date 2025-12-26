@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier_meter::Meter;
@@ -23,6 +23,7 @@ use sui_types::{
     effects::TransactionEffects,
     error::{ExecutionError, SuiError, SuiResult},
     execution::{ExecutionResult, ExecutionTiming, TypeLayoutStore},
+    execution_params::ExecutionOrEarlyError,
     gas::SuiGasStatus,
     inner_temporary_store::InnerTemporaryStore,
     layout_resolver::LayoutResolver,
@@ -42,12 +43,8 @@ pub(crate) struct Verifier<'m> {
 }
 
 impl Executor {
-    pub(crate) fn new(
-        protocol_config: &ProtocolConfig,
-        silent: bool,
-        enable_profiler: Option<PathBuf>,
-    ) -> Result<Self, SuiError> {
-        Ok(Executor(Arc::new(new_move_vm(all_natives(silent, protocol_config), protocol_config, enable_profiler)?)))
+    pub(crate) fn new(protocol_config: &ProtocolConfig, silent: bool) -> Result<Self, SuiError> {
+        Ok(Executor(Arc::new(new_move_vm(all_natives(silent, protocol_config), protocol_config)?)))
     }
 }
 
@@ -64,7 +61,7 @@ impl executor::Executor for Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         input_objects: CheckedInputObjects,
@@ -89,7 +86,7 @@ impl executor::Executor for Executor {
             protocol_config,
             metrics,
             enable_expensive_checks,
-            certificate_deny_set,
+            execution_params,
             trace_builder_opt,
         )
     }
@@ -100,7 +97,7 @@ impl executor::Executor for Executor {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         input_objects: CheckedInputObjects,
@@ -126,7 +123,7 @@ impl executor::Executor for Executor {
                 protocol_config,
                 metrics,
                 enable_expensive_checks,
-                certificate_deny_set,
+                execution_params,
                 &mut None,
             )
         } else {
@@ -144,7 +141,7 @@ impl executor::Executor for Executor {
                 protocol_config,
                 metrics,
                 enable_expensive_checks,
-                certificate_deny_set,
+                execution_params,
                 &mut None,
             )
         };
@@ -162,16 +159,20 @@ impl executor::Executor for Executor {
         input_objects: CheckedInputObjects,
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
-        let mut tx_context = TxContext::new_from_components(
+        let tx_context = TxContext::new_from_components(
             &SuiAddress::default(),
             transaction_digest,
             &epoch_id,
             epoch_timestamp_ms,
-            // genesis transaction: RGP: 1, sponsor: None
+            // genesis transaction: RGP: 1, budget: 1M, sponsor: None
             1,
+            1,
+            1_000_000,
             None,
+            protocol_config,
         );
-        execute_genesis_state_update(store, protocol_config, metrics, &self.0, &mut tx_context, input_objects, pt)
+        let tx_context = Rc::new(RefCell::new(tx_context));
+        execute_genesis_state_update(store, protocol_config, metrics, &self.0, tx_context, input_objects, pt)
     }
 
     fn type_layout_resolver<'r, 'vm: 'r, 'store: 'r>(

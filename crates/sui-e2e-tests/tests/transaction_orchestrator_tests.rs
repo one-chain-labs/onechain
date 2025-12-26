@@ -3,7 +3,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use sui_core::{authority_client::NetworkAuthorityClient, transaction_orchestrator::TransactiondOrchestrator};
+use sui_core::{authority_client::NetworkAuthorityClient, transaction_orchestrator::TransactionOrchestrator};
 use sui_macros::sim_test;
 use sui_storage::{key_value_store::TransactionKeyValueStore, key_value_store_metrics::KeyValueStoreMetrics};
 use sui_test_transaction_builder::{
@@ -55,7 +55,7 @@ async fn test_blocking_execution() -> Result<(), anyhow::Error> {
         .await?;
 
     // Wait for data sync to catch up
-    handle.state().get_transaction_cache_reader().notify_read_executed_effects(&[digest]).await;
+    handle.state().get_transaction_cache_reader().notify_read_executed_effects("", &[digest]).await;
 
     // Transaction Orchestrator proactivcely executes txn locally
     let txn = txns.swap_remove(0);
@@ -120,10 +120,14 @@ async fn test_fullnode_wal_log() -> Result<(), anyhow::Error> {
         .await
         .unwrap_err();
 
-    // Because the tx did not go through, we expect to see it in the WAL log
+    // Because the tx did not go through, we expect to see it in the WAL log if it
+    // was submitted via quorum driver. Transaction driver submitted tx would have
+    // been removed from wal on timeout/error.
     let pending_txes: Vec<_> =
-        orchestrator.load_all_pending_transactions().into_iter().map(|t| t.into_inner()).collect();
-    assert_eq!(pending_txes, vec![txn.clone()]);
+        orchestrator.load_all_pending_transactions_in_test()?.into_iter().map(|t| t.into_inner()).collect();
+    if !pending_txes.is_empty() {
+        assert_eq!(pending_txes, vec![txn.clone()]);
+    }
 
     // Bring up 1 validator, we obtain quorum again and tx should succeed
     test_cluster.start_node(&validator_addresses[0]).await;
@@ -135,7 +139,7 @@ async fn test_fullnode_wal_log() -> Result<(), anyhow::Error> {
     // response is returned and we will not need the sleep.
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     // The tx should be erased in wal log.
-    let pending_txes = orchestrator.load_all_pending_transactions();
+    let pending_txes = orchestrator.load_all_pending_transactions_in_test()?;
     assert!(pending_txes.is_empty());
 
     Ok(())
@@ -238,7 +242,7 @@ async fn test_tx_across_epoch_boundaries() {
 }
 
 async fn execute_with_orchestrator(
-    orchestrator: &TransactiondOrchestrator<NetworkAuthorityClient>,
+    orchestrator: &TransactionOrchestrator<NetworkAuthorityClient>,
     txn: Transaction,
     request_type: ExecuteTransactionRequestType,
 ) -> Result<(ExecuteTransactionResponseV3, IsTransactionExecutedLocally), QuorumDriverError> {

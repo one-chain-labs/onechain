@@ -14,11 +14,11 @@ module one::malicious_policy {
 
 #[test_only]
 module one::transfer_policy_tests {
-    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
+    use one::coin;
     use one::dummy_policy;
     use one::malicious_policy;
     use one::package;
-    use one::coin;
+    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
 
     public struct OTW has drop {}
     public struct Asset has key, store { id: UID }
@@ -42,11 +42,11 @@ module one::transfer_policy_tests {
         let ctx = &mut tx_context::dummy();
         let (mut policy, cap) = prepare(ctx);
 
-        assert!(policy.rules().size() == 0);
+        assert!(policy.rules().length() == 0);
         // now require everyone to pay any amount
         dummy_policy::set(&mut policy, &cap);
 
-        assert!(policy.rules().size() == 1);
+        assert!(policy.rules().length() == 1);
 
         let mut request = policy::new_request(fresh_id(ctx), 10_000, fresh_id(ctx));
 
@@ -64,12 +64,12 @@ module one::transfer_policy_tests {
         let ctx = &mut tx_context::dummy();
         let (mut policy, cap) = prepare(ctx);
 
-        assert!(policy.rules().size() == 0);
+        assert!(policy.rules().length() == 0);
 
         // now require everyone to pay any amount
         dummy_policy::set(&mut policy, &cap);
 
-        assert!(policy.rules().size() == 1);
+        assert!(policy.rules().length() == 1);
 
         let mut request = policy::new_request(fresh_id(ctx), 10_000, fresh_id(ctx));
         dummy_policy::pay(&mut policy, &mut request, coin::mint_for_testing(10_000, ctx));
@@ -80,7 +80,7 @@ module one::transfer_policy_tests {
         let request = policy::new_request(fresh_id(ctx), 10_000, fresh_id(ctx));
         policy.confirm_request(request);
 
-        assert!(policy.rules().size() == 0);
+        assert!(policy.rules().length() == 0);
         assert!(wrapup(policy, cap, ctx) == 10_000);
     }
 
@@ -142,7 +142,11 @@ module one::transfer_policy_tests {
         (policy, cap)
     }
 
-    public fun wrapup(policy: TransferPolicy<Asset>, cap: TransferPolicyCap<Asset>, ctx: &mut TxContext): u64 {
+    public fun wrapup(
+        policy: TransferPolicy<Asset>,
+        cap: TransferPolicyCap<Asset>,
+        ctx: &mut TxContext,
+    ): u64 {
         let profits = policy.destroy_and_withdraw(cap, ctx);
         profits.burn_for_testing()
     }

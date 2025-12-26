@@ -9,9 +9,23 @@ use sui_indexer_alt_jsonrpc::{
     config::RpcLayer,
     start_rpc,
 };
-use sui_indexer_alt_metrics::MetricsService;
-use tokio::fs;
+use sui_indexer_alt_metrics::{uptime, MetricsService};
+use tokio::{fs, signal};
 use tokio_util::sync::CancellationToken;
+use tracing::info;
+
+// Define the `GIT_REVISION` const
+bin_version::git_revision!();
+
+static VERSION: &str = const_str::concat!(
+    env!("CARGO_PKG_VERSION_MAJOR"),
+    ".",
+    env!("CARGO_PKG_VERSION_MINOR"),
+    ".",
+    env!("CARGO_PKG_VERSION_PATCH"),
+    "-",
+    GIT_REVISION
+);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -21,7 +35,17 @@ async fn main() -> anyhow::Result<()> {
     let _guard = telemetry_subscribers::TelemetryConfig::new().with_env().init();
 
     match args.command {
-        Command::Rpc { rpc_args, system_package_task_args, metrics_args, config } => {
+        Command::Rpc {
+            database_url,
+            bigtable_instance,
+            db_args,
+            bigtable_args,
+            rpc_args,
+            system_package_task_args,
+            metrics_args,
+            node_args,
+            config,
+        } => {
             let rpc_config = if let Some(path) = config {
                 let contents = fs::read_to_string(path).await.context("Failed to read configuration TOML file")?;
 
@@ -38,9 +62,28 @@ async fn main() -> anyhow::Result<()> {
 
             let metrics = MetricsService::new(metrics_args, registry, cancel.child_token());
 
+            let h_ctrl_c = tokio::spawn({
+                let cancel = cancel.clone();
+                async move {
+                    tokio::select! {
+                        _ = cancel.cancelled() => {}
+                        _ = signal::ctrl_c() => {
+                            info!("Received Ctrl-C, shutting down...");
+                            cancel.cancel();
+                        }
+                    }
+                }
+            });
+
+            metrics.registry().register(uptime(VERSION)?).context("Failed to register uptime metric.")?;
+
             let h_rpc = start_rpc(
-                args.db_args,
+                Some(database_url),
+                bigtable_instance,
+                db_args,
+                bigtable_args,
                 rpc_args,
+                node_args,
                 system_package_task_args,
                 rpc_config,
                 metrics.registry(),
@@ -53,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
             let _ = h_rpc.await;
             cancel.cancel();
             let _ = h_metrics.await;
+            let _ = h_ctrl_c.await;
         }
 
         Command::GenerateConfig => {

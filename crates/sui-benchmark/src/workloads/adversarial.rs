@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -35,7 +35,7 @@ use crate::{
     drivers::Interval,
     in_memory_wallet::{move_call_pt_impl, InMemoryWallet},
     system_state_observer::{SystemState, SystemStateObserver},
-    workloads::{payload::Payload, workload::ExpectedFailureType, Gas, GasCoinConfig},
+    workloads::{benchmark_move_base_dir, payload::Payload, workload::ExpectedFailureType, Gas, GasCoinConfig},
     BenchMoveCallArg,
     ExecutionEffects,
     ProgrammableTransactionBuilder,
@@ -231,7 +231,7 @@ impl AdversarialTestPayload {
                 to_sender_signed_transaction(data, account.key())
             }
             AdversarialPayloadType::MaxPackagePublish => {
-                let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                let mut path = benchmark_move_base_dir();
                 path.push("src/workloads/data/max_package");
                 TestTransactionBuilder::new(self.sender, account.gas, gas_price)
                     .publish(path)
@@ -411,14 +411,16 @@ impl Workload<dyn Payload> for AdversarialWorkload {
         system_state_observer: Arc<SystemStateObserver>,
     ) {
         let gas = &self.init_gas;
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut path = benchmark_move_base_dir();
         path.push("src/workloads/data/adversarial");
         let SystemState { reference_gas_price, protocol_config } = system_state_observer.state.borrow().clone();
         let protocol_config = protocol_config.unwrap();
         let gas_budget = protocol_config.max_tx_gas();
         let transaction =
             TestTransactionBuilder::new(gas.1, gas.0, reference_gas_price).publish(path).build_and_sign(gas.2.as_ref());
-        let effects = proxy.execute_transaction_block(transaction).await.unwrap();
+
+        let (_, execution_result) = proxy.execute_transaction_block(transaction).await;
+        let effects = execution_result.unwrap();
         let created = effects.created();
         // should only create the package object, upgrade cap, dynamic field top level obj, and NUM_DYNAMIC_FIELDS df objects. otherwise, there are some object initializers running and we will need to disambiguate
         assert_eq!(created.len() as u64, 3 + protocol_config.object_runtime_max_num_store_entries());
@@ -452,7 +454,8 @@ impl Workload<dyn Payload> for AdversarialWorkload {
             reference_gas_price,
         );
 
-        let effects = proxy.execute_transaction_block(transaction).await.unwrap();
+        let (_, execution_result) = proxy.execute_transaction_block(transaction).await;
+        let effects = execution_result.unwrap();
 
         let created = effects.created();
         assert_eq!(created.len() as u64, num_shared_objs);
@@ -480,6 +483,10 @@ impl Workload<dyn Payload> for AdversarialWorkload {
             })
         }
         payloads.into_iter().map(|b| Box::<dyn Payload>::from(Box::new(b))).collect()
+    }
+
+    fn name(&self) -> &str {
+        "Adversarial"
     }
 }
 

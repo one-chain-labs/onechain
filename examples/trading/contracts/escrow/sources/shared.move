@@ -29,11 +29,12 @@
 module escrow::shared;
 
 use escrow::lock::{Locked, Key};
-use one::{dynamic_object_field as dof, event};
+use one::dynamic_object_field as dof;
+use one::event;
 
 /// The `name` of the DOF that holds the Escrowed object.
 /// Allows easy discoverability for the escrowed object.
-public struct EscrowedObjectKey has copy, store, drop {}
+public struct EscrowedObjectKey has copy, drop, store {}
 
 /// An object held in escrow
 ///

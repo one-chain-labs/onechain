@@ -4,13 +4,17 @@
 use std::{path::PathBuf, time::Instant};
 
 use prometheus::Registry;
-use sui_indexer_alt_framework::{ingestion::ClientArgs, Indexer, IndexerArgs};
-use sui_indexer_alt_schema::MIGRATIONS;
-use sui_pg_db::{reset_database, DbArgs};
+use sui_indexer_alt_framework::{
+    ingestion::ClientArgs,
+    postgres::{reset_database, DbArgs},
+    IndexerArgs,
+};
+use sui_indexer_alt_schema::{checkpoints::StoredGenesis, epochs::StoredEpochStart, MIGRATIONS};
 use sui_synthetic_ingestion::synthetic_ingestion::read_ingestion_data;
 use tokio_util::sync::CancellationToken;
+use url::Url;
 
-use crate::{config::IndexerConfig, setup_indexer};
+use crate::{config::IndexerConfig, setup_indexer, BootstrapGenesis};
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct BenchmarkArgs {
@@ -25,6 +29,7 @@ pub struct BenchmarkArgs {
 }
 
 pub async fn run_benchmark(
+    database_url: Url,
     db_args: DbArgs,
     benchmark_args: BenchmarkArgs,
     indexer_config: IndexerConfig,
@@ -36,7 +41,7 @@ pub async fn run_benchmark(
     let last_checkpoint = *ingestion_data.keys().last().unwrap();
     let num_transactions: usize = ingestion_data.values().map(|c| c.transactions.len()).sum();
 
-    reset_database(db_args.clone(), Some(Indexer::migrations(Some(&MIGRATIONS)))).await?;
+    reset_database(database_url.clone(), db_args.clone(), Some(&MIGRATIONS)).await?;
 
     let indexer_args = IndexerArgs {
         first_checkpoint: Some(first_checkpoint),
@@ -45,16 +50,33 @@ pub async fn run_benchmark(
         ..Default::default()
     };
 
-    let client_args = ClientArgs { remote_store_url: None, local_ingestion_path: Some(ingestion_path.clone()) };
+    let client_args = ClientArgs {
+        remote_store_url: None,
+        local_ingestion_path: Some(ingestion_path.clone()),
+        rpc_api_url: None,
+        rpc_username: None,
+        rpc_password: None,
+    };
 
     let cur_time = Instant::now();
 
     setup_indexer(
+        database_url,
         db_args,
         indexer_args,
         client_args,
         indexer_config,
-        false, /* with_genesis */
+        Some(BootstrapGenesis {
+            stored_genesis: StoredGenesis { genesis_digest: [0u8; 32].to_vec(), initial_protocol_version: 0 },
+            stored_epoch_start: StoredEpochStart {
+                epoch: 0,
+                protocol_version: 0,
+                cp_lo: 0,
+                start_timestamp_ms: 0,
+                reference_gas_price: 0,
+                system_state: vec![],
+            },
+        }),
         &Registry::new(),
         CancellationToken::new(),
     )

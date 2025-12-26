@@ -12,23 +12,25 @@ use std::{
 
 use anyhow::Result;
 use futures::future::try_join_all;
-use one_node::SuiNodeHandle;
 use rand::rngs::OsRng;
+#[cfg(msim)]
+use sui_config::node::ExecutionTimeObserverConfig;
 use sui_config::{
     node::{AuthorityOverloadConfig, DBCheckpointConfig, RunWithRange},
     ExecutionCacheConfig,
     NodeConfig,
 };
 use sui_macros::nondeterministic;
-use sui_protocol_config::ProtocolVersion;
+use one_node::SuiNodeHandle;
+use sui_protocol_config::{Chain, ProtocolVersion};
 use sui_swarm_config::{
     genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig},
     network_config::NetworkConfig,
     network_config_builder::{
         CommitteeConfig,
         ConfigBuilder,
+        GlobalStateHashV2EnabledConfig,
         ProtocolVersionsConfig,
-        StateAccumulatorV2EnabledConfig,
         SupportedProtocolVersionsCallback,
     },
     node_config_builder::FullnodeConfigBuilder,
@@ -51,6 +53,7 @@ pub struct SwarmBuilder<R = OsRng> {
     committee: CommitteeConfig,
     genesis_config: Option<GenesisConfig>,
     network_config: Option<NetworkConfig>,
+    chain_override: Option<Chain>,
     additional_objects: Vec<Object>,
     fullnode_count: usize,
     fullnode_rpc_port: Option<u16>,
@@ -69,8 +72,10 @@ pub struct SwarmBuilder<R = OsRng> {
     fullnode_fw_config: Option<RemoteFirewallConfig>,
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
-    state_accumulator_v2_enabled_config: StateAccumulatorV2EnabledConfig,
+    global_state_hash_v2_enabled_config: GlobalStateHashV2EnabledConfig,
     disable_fullnode_pruning: bool,
+    #[cfg(msim)]
+    execution_time_observer_config: Option<ExecutionTimeObserverConfig>,
 }
 
 impl SwarmBuilder {
@@ -82,6 +87,7 @@ impl SwarmBuilder {
             committee: CommitteeConfig::Size(NonZeroUsize::new(1).unwrap()),
             genesis_config: None,
             network_config: None,
+            chain_override: None,
             additional_objects: vec![],
             fullnode_count: 0,
             fullnode_rpc_port: None,
@@ -99,8 +105,10 @@ impl SwarmBuilder {
             fullnode_fw_config: None,
             max_submit_position: None,
             submit_delay_step_override_millis: None,
-            state_accumulator_v2_enabled_config: StateAccumulatorV2EnabledConfig::Global(true),
+            global_state_hash_v2_enabled_config: GlobalStateHashV2EnabledConfig::Global(true),
             disable_fullnode_pruning: false,
+            #[cfg(msim)]
+            execution_time_observer_config: None,
         }
     }
 }
@@ -113,6 +121,7 @@ impl<R> SwarmBuilder<R> {
             committee: self.committee,
             genesis_config: self.genesis_config,
             network_config: self.network_config,
+            chain_override: self.chain_override,
             additional_objects: self.additional_objects,
             fullnode_count: self.fullnode_count,
             fullnode_rpc_port: self.fullnode_rpc_port,
@@ -130,8 +139,10 @@ impl<R> SwarmBuilder<R> {
             fullnode_fw_config: self.fullnode_fw_config,
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
-            state_accumulator_v2_enabled_config: self.state_accumulator_v2_enabled_config,
+            global_state_hash_v2_enabled_config: self.global_state_hash_v2_enabled_config,
             disable_fullnode_pruning: self.disable_fullnode_pruning,
+            #[cfg(msim)]
+            execution_time_observer_config: self.execution_time_observer_config,
         }
     }
 
@@ -161,6 +172,12 @@ impl<R> SwarmBuilder<R> {
     pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
         assert!(self.network_config.is_none() && self.genesis_config.is_none());
         self.genesis_config = Some(genesis_config);
+        self
+    }
+
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        assert!(self.chain_override.is_none());
+        self.chain_override = Some(chain);
         self
     }
 
@@ -233,8 +250,14 @@ impl<R> SwarmBuilder<R> {
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_config(mut self, c: StateAccumulatorV2EnabledConfig) -> Self {
-        self.state_accumulator_v2_enabled_config = c;
+    pub fn with_global_state_hash_v2_enabled_config(mut self, c: GlobalStateHashV2EnabledConfig) -> Self {
+        self.global_state_hash_v2_enabled_config = c;
+        self
+    }
+
+    #[cfg(msim)]
+    pub fn with_execution_time_observer_config(mut self, c: ExecutionTimeObserverConfig) -> Self {
+        self.execution_time_observer_config = Some(c);
         self
     }
 
@@ -320,6 +343,10 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
                 config_builder = config_builder.with_genesis_config(genesis_config);
             }
 
+            if let Some(chain_override) = self.chain_override {
+                config_builder = config_builder.with_chain_override(chain_override);
+            }
+
             if let Some(num_unpruned_validators) = self.num_unpruned_validators {
                 config_builder = config_builder.with_num_unpruned_validators(num_unpruned_validators);
             }
@@ -349,13 +376,20 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
                     config_builder.with_submit_delay_step_override_millis(submit_delay_step_override_millis);
             }
 
-            config_builder
+            #[allow(unused_mut)]
+            let mut final_builder = config_builder
                 .committee(self.committee)
                 .rng(self.rng)
                 .with_objects(self.additional_objects)
                 .with_supported_protocol_versions_config(self.supported_protocol_versions_config.clone())
-                .with_state_accumulator_v2_enabled_config(self.state_accumulator_v2_enabled_config.clone())
-                .build()
+                .with_global_state_hash_v2_enabled_config(self.global_state_hash_v2_enabled_config.clone());
+
+            #[cfg(msim)]
+            if let Some(execution_time_observer_config) = self.execution_time_observer_config {
+                final_builder = final_builder.with_execution_time_observer_config(execution_time_observer_config);
+            }
+
+            final_builder.build()
         });
 
         let mut nodes: HashMap<_, _> = network_config
@@ -375,6 +409,10 @@ impl<R: rand::RngCore + rand::CryptoRng> SwarmBuilder<R> {
             .with_data_ingestion_dir(ingest_data)
             .with_fw_config(self.fullnode_fw_config)
             .with_disable_pruning(self.disable_fullnode_pruning);
+
+        if let Some(chain) = self.chain_override {
+            fullnode_config_builder = fullnode_config_builder.with_chain_override(chain);
+        }
 
         if let Some(spvc) = &self.fullnode_supported_protocol_versions_config {
             let supported_versions = match spvc {

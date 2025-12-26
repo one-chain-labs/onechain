@@ -1,0 +1,9 @@
+[package]
+name = "emit_event"
+edition = "2024.beta"
+
+[dependencies]
+One = { local = "../../../sui-framework/packages/one-framework" }
+
+[addresses]
+emit_event = "0x0"

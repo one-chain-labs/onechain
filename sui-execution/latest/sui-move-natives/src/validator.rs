@@ -10,7 +10,7 @@ use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeR
 use smallvec::smallvec;
 use sui_types::sui_system_state::sui_system_state_inner_v1::ValidatorMetadataV1;
 
-use crate::NativesCostTable;
+use crate::{get_extension, NativesCostTable};
 
 #[derive(Clone, Debug)]
 pub struct ValidatorValidateMetadataBcsCostParams {
@@ -32,7 +32,7 @@ pub fn validate_metadata_bcs(
     debug_assert!(args.len() == 1);
 
     let validator_validate_metadata_bcs_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().validator_validate_metadata_bcs_cost_params.clone();
+        get_extension!(context, NativesCostTable)?.validator_validate_metadata_bcs_cost_params.clone();
 
     native_charge_gas_early_exit!(
         context,

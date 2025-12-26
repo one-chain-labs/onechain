@@ -20,7 +20,7 @@ pub(crate) async fn reduce<W: Worker>(
     reducer: Option<Box<dyn Reducer<W::Result>>>,
 ) -> Result<()> {
     // convert to a stream of MAX size. This way, each iteration of the loop will process all ready messages
-    let mut stream = ReceiverStream::new(progress_receiver).ready_chunks(MAX_CHECKPOINTS_IN_PROGRESS);
+    let mut stream = ReceiverStream::new(progress_receiver).ready_chunks(*MAX_CHECKPOINTS_IN_PROGRESS);
     let mut unprocessed = HashMap::new();
     let mut batch = vec![];
     let mut progress_update = None;
@@ -76,5 +76,9 @@ where
 {
     async fn commit(&self, batch: Vec<R>) -> Result<()> {
         self.as_ref().commit(batch).await
+    }
+
+    fn should_close_batch(&self, batch: &[R], next_item: Option<&R>) -> bool {
+        self.as_ref().should_close_batch(batch, next_item)
     }
 }

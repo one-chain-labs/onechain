@@ -1,10 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
-
-use mysten_common::metrics::{push_metrics, MetricsPushClient};
-use mysten_metrics::RegistryService;
 use prometheus::{
     register_histogram_vec_with_registry,
     register_int_counter_vec_with_registry,
@@ -18,64 +14,12 @@ use prometheus::{
     IntGaugeVec,
     Registry,
 };
-use sui_types::crypto::NetworkKeyPair;
-
-use crate::config::MetricsConfig;
 
 const FINE_GRAINED_LATENCY_SEC_BUCKETS: &[f64] = &[
     0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6,
     1.8, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10., 15., 20., 25., 30., 35., 40., 45.,
     50., 60., 70., 80., 90., 100., 120., 140., 160., 180., 200., 250., 300., 350., 400.,
 ];
-
-/// Starts a task to periodically push metrics to a configured endpoint if a metrics push endpoint
-/// is configured.
-pub fn start_metrics_push_task(
-    metrics_config: &Option<MetricsConfig>,
-    metrics_key_pair: NetworkKeyPair,
-    registry: RegistryService,
-) {
-    use fastcrypto::traits::KeyPair;
-
-    const DEFAULT_METRICS_PUSH_INTERVAL: Duration = Duration::from_secs(60);
-
-    let (interval, url) = match metrics_config {
-        Some(MetricsConfig { push_interval_seconds, push_url: url }) => {
-            let interval = push_interval_seconds.map(Duration::from_secs).unwrap_or(DEFAULT_METRICS_PUSH_INTERVAL);
-            let url = reqwest::Url::parse(url).expect("unable to parse metrics push url");
-            (interval, url)
-        }
-        _ => return,
-    };
-
-    let mut client = MetricsPushClient::new(metrics_key_pair.copy());
-
-    tokio::spawn(async move {
-        tracing::info!(push_url =% url, interval =? interval, "Started Metrics Push Service");
-
-        let mut interval = tokio::time::interval(interval);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        let mut errors = 0;
-        loop {
-            interval.tick().await;
-
-            if let Err(error) = push_metrics(&client, &url, &registry).await {
-                errors += 1;
-                if errors >= 10 {
-                    // If we hit 10 failures in a row, start logging errors.
-                    tracing::error!("unable to push metrics: {error}; new client will be created");
-                } else {
-                    tracing::warn!("unable to push metrics: {error}; new client will be created");
-                }
-                // aggressively recreate our client connection if we hit an error
-                client = MetricsPushClient::new(metrics_key_pair.copy());
-            } else {
-                errors = 0;
-            }
-        }
-    });
-}
 
 #[derive(Clone, Debug)]
 pub struct BridgeMetrics {
@@ -347,14 +291,14 @@ impl BridgeMetrics {
             .unwrap(),
             auth_agg_ok_responses: register_int_counter_vec_with_registry!(
                 "bridge_auth_agg_ok_responses",
-                "Total number of ok respones from auth agg",
+                "Total number of ok response from auth agg",
                 &["authority"],
                 registry,
             )
             .unwrap(),
             auth_agg_bad_responses: register_int_counter_vec_with_registry!(
                 "bridge_auth_agg_bad_responses",
-                "Total number of bad respones from auth agg",
+                "Total number of bad response from auth agg",
                 &["authority"],
                 registry,
             )

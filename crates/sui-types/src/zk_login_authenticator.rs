@@ -34,7 +34,7 @@ mod zk_login_authenticator_test;
 pub struct ZkLoginAuthenticator {
     pub inputs: ZkLoginInputs,
     max_epoch: EpochId,
-    user_signature: Signature,
+    pub user_signature: Signature,
     #[serde(skip)]
     pub bytes: OnceCell<Vec<u8>>,
 }

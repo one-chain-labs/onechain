@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::PathBuf,
+    rc::Rc,
     sync::Arc,
 };
 
@@ -28,7 +29,7 @@ use move_binary_format::{
         Visibility,
     },
     inclusion_mode::InclusionCheckMode,
-    normalized::{Enum, Field, Function, Module, Struct, Type, Variant},
+    normalized,
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceName;
@@ -51,37 +52,45 @@ use move_package::compilation::compiled_package::CompiledUnitWithSource;
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiRawData};
 use sui_move_build::CompiledPackage;
 use sui_protocol_config::ProtocolConfig;
-use sui_sdk::SuiClient;
+use sui_sdk::apis::ReadApi;
 use sui_types::{base_types::ObjectID, execution_config_utils::to_binary_config, move_package::UpgradePolicy};
+
+type Enum = normalized::Enum<normalized::RcIdentifier>;
+type Field = normalized::Field<normalized::RcIdentifier>;
+type Function = normalized::Function<normalized::RcIdentifier>;
+type Module = normalized::Module<normalized::RcIdentifier>;
+type Struct = normalized::Struct<normalized::RcIdentifier>;
+type Type = normalized::Type<normalized::RcIdentifier>;
+type Variant = normalized::Variant<normalized::RcIdentifier>;
 
 /// Errors that can occur during upgrade compatibility checks,
 /// one-to-one related to the underlying trait functions see: [`CompatibilityMode`].
 #[derive(Debug, Clone)]
 pub(crate) enum UpgradeCompatibilityModeError {
     StructMissing { name: Identifier },
-    StructAbilityMismatch { name: Identifier, old_struct: Struct, new_struct: Struct },
-    StructTypeParamMismatch { name: Identifier, old_struct: Struct, new_struct: Struct },
-    StructFieldMismatch { name: Identifier, old_struct: Struct, new_struct: Struct },
+    StructAbilityMismatch { name: Identifier, old_struct: Rc<Struct>, new_struct: Rc<Struct> },
+    StructTypeParamMismatch { name: Identifier, old_struct: Rc<Struct>, new_struct: Rc<Struct> },
+    StructFieldMismatch { name: Identifier, old_struct: Rc<Struct>, new_struct: Rc<Struct> },
     EnumMissing { name: Identifier },
-    EnumAbilityMismatch { name: Identifier, old_enum: Enum, new_enum: Enum },
-    EnumTypeParamMismatch { name: Identifier, old_enum: Enum, new_enum: Enum },
-    EnumNewVariant { name: Identifier, old_enum: Enum, new_enum: Enum },
-    EnumVariantMissing { name: Identifier, old_enum: Enum, tag: usize },
-    EnumVariantMismatch { name: Identifier, old_enum: Enum, new_enum: Enum },
+    EnumAbilityMismatch { name: Identifier, old_enum: Rc<Enum>, new_enum: Rc<Enum> },
+    EnumTypeParamMismatch { name: Identifier, old_enum: Rc<Enum>, new_enum: Rc<Enum> },
+    EnumNewVariant { name: Identifier, old_enum: Rc<Enum>, new_enum: Rc<Enum> },
+    EnumVariantMissing { name: Identifier, old_enum: Rc<Enum>, tag: usize },
+    EnumVariantMismatch { name: Identifier, old_enum: Rc<Enum>, new_enum: Rc<Enum> },
     FunctionMissingPublic { name: Identifier },
     FunctionMissingEntry { name: Identifier },
-    FunctionSignatureMismatch { name: Identifier, old_function: Function, new_function: Function },
+    FunctionSignatureMismatch { name: Identifier, old_function: Rc<Function>, new_function: Rc<Function> },
     FunctionLostPublicVisibility { name: Identifier },
-    FunctionEntryCompatibility { name: Identifier, old_function: Function },
+    FunctionEntryCompatibility { name: Identifier, old_function: Rc<Function> },
 
     // inclusion check specific errors
     FileFormatVersionDowngrade { old_version: u32, new_version: u32 },
     StructNew { name: Identifier },
-    StructChange { name: Identifier, old_struct: Struct, new_struct: Struct },
+    StructChange { name: Identifier, old_struct: Rc<Struct>, new_struct: Rc<Struct> },
     EnumNew { name: Identifier },
-    EnumChange { name: Identifier, new_enum: Enum },
+    EnumChange { name: Identifier, new_enum: Rc<Enum> },
     FunctionNew { name: Identifier },
-    FunctionChange { name: Identifier, old_func: Function, new_func: Function },
+    FunctionChange { name: Identifier, old_func: Rc<Function>, new_func: Rc<Function> },
     FunctionMissing { name: Identifier },
     FriendNew,
     FriendMissing,
@@ -189,11 +198,11 @@ impl CompatibilityMode for CliCompatibilityMode {
     ) {
     }
 
-    fn struct_missing(&mut self, name: &Identifier, _old_struct: &Struct) {
+    fn struct_missing(&mut self, name: &Identifier, _old_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructMissing { name: name.clone() });
     }
 
-    fn struct_ability_mismatch(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct) {
+    fn struct_ability_mismatch(&mut self, name: &Identifier, old_struct: &Rc<Struct>, new_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructAbilityMismatch {
             name: name.clone(),
             old_struct: old_struct.clone(),
@@ -201,7 +210,7 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn struct_type_param_mismatch(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct) {
+    fn struct_type_param_mismatch(&mut self, name: &Identifier, old_struct: &Rc<Struct>, new_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructTypeParamMismatch {
             name: name.clone(),
             old_struct: old_struct.clone(),
@@ -209,7 +218,7 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn struct_field_mismatch(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct) {
+    fn struct_field_mismatch(&mut self, name: &Identifier, old_struct: &Rc<Struct>, new_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructFieldMismatch {
             name: name.clone(),
             old_struct: old_struct.clone(),
@@ -217,11 +226,11 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn enum_missing(&mut self, name: &Identifier, _old_enum: &Enum) {
+    fn enum_missing(&mut self, name: &Identifier, _old_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumMissing { name: name.clone() });
     }
 
-    fn enum_ability_mismatch(&mut self, name: &Identifier, old_enum: &Enum, new_enum: &Enum) {
+    fn enum_ability_mismatch(&mut self, name: &Identifier, old_enum: &Rc<Enum>, new_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumAbilityMismatch {
             name: name.clone(),
             old_enum: old_enum.clone(),
@@ -229,7 +238,7 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn enum_type_param_mismatch(&mut self, name: &Identifier, old_enum: &Enum, new_enum: &Enum) {
+    fn enum_type_param_mismatch(&mut self, name: &Identifier, old_enum: &Rc<Enum>, new_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumTypeParamMismatch {
             name: name.clone(),
             old_enum: old_enum.clone(),
@@ -237,7 +246,7 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn enum_new_variant(&mut self, name: &Identifier, old_enum: &Enum, new_enum: &Enum) {
+    fn enum_new_variant(&mut self, name: &Identifier, old_enum: &Rc<Enum>, new_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumNewVariant {
             name: name.clone(),
             old_enum: old_enum.clone(),
@@ -245,7 +254,7 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn enum_variant_missing(&mut self, name: &Identifier, old_enum: &Enum, tag: usize) {
+    fn enum_variant_missing(&mut self, name: &Identifier, old_enum: &Rc<Enum>, tag: usize) {
         self.errors.push(UpgradeCompatibilityModeError::EnumVariantMissing {
             name: name.clone(),
             old_enum: old_enum.clone(),
@@ -253,7 +262,13 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn enum_variant_mismatch(&mut self, name: &Identifier, old_enum: &Enum, new_enum: &Enum, _variant_idx: usize) {
+    fn enum_variant_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_enum: &Rc<Enum>,
+        new_enum: &Rc<Enum>,
+        _variant_idx: usize,
+    ) {
         self.errors.push(UpgradeCompatibilityModeError::EnumVariantMismatch {
             name: name.clone(),
             old_enum: old_enum.clone(),
@@ -261,15 +276,20 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn function_missing_public(&mut self, name: &Identifier, _old_function: &Function) {
+    fn function_missing_public(&mut self, name: &Identifier, _old_function: &Rc<Function>) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionMissingPublic { name: name.clone() });
     }
 
-    fn function_missing_entry(&mut self, name: &Identifier, _old_function: &Function) {
+    fn function_missing_entry(&mut self, name: &Identifier, _old_function: &Rc<Function>) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionMissingEntry { name: name.clone() });
     }
 
-    fn function_signature_mismatch(&mut self, name: &Identifier, old_function: &Function, new_function: &Function) {
+    fn function_signature_mismatch(
+        &mut self,
+        name: &Identifier,
+        old_function: &Rc<Function>,
+        new_function: &Rc<Function>,
+    ) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionSignatureMismatch {
             name: name.clone(),
             old_function: old_function.clone(),
@@ -277,11 +297,16 @@ impl CompatibilityMode for CliCompatibilityMode {
         });
     }
 
-    fn function_lost_public_visibility(&mut self, name: &Identifier, _old_function: &Function) {
+    fn function_lost_public_visibility(&mut self, name: &Identifier, _old_function: &Rc<Function>) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionLostPublicVisibility { name: name.clone() });
     }
 
-    fn function_entry_compatibility(&mut self, name: &Identifier, old_function: &Function, _new_function: &Function) {
+    fn function_entry_compatibility(
+        &mut self,
+        name: &Identifier,
+        old_function: &Rc<Function>,
+        _new_function: &Rc<Function>,
+    ) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionEntryCompatibility {
             name: name.clone(),
             old_function: old_function.clone(),
@@ -323,11 +348,11 @@ impl InclusionCheckMode for CliInclusionCheckMode {
         self.errors.push(UpgradeCompatibilityModeError::FileFormatVersionDowngrade { old_version, new_version });
     }
 
-    fn struct_new(&mut self, name: &Identifier, _new_struct: &Struct) {
+    fn struct_new(&mut self, name: &Identifier, _new_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructNew { name: name.clone() });
     }
 
-    fn struct_change(&mut self, name: &Identifier, old_struct: &Struct, new_struct: &Struct) {
+    fn struct_change(&mut self, name: &Identifier, old_struct: &Rc<Struct>, new_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructChange {
             name: name.clone(),
             old_struct: old_struct.clone(),
@@ -335,27 +360,27 @@ impl InclusionCheckMode for CliInclusionCheckMode {
         });
     }
 
-    fn struct_missing(&mut self, name: &Identifier, _old_struct: &Struct) {
+    fn struct_missing(&mut self, name: &Identifier, _old_struct: &Rc<Struct>) {
         self.errors.push(UpgradeCompatibilityModeError::StructMissing { name: name.clone() });
     }
 
-    fn enum_new(&mut self, name: &Identifier, _new_enum: &Enum) {
+    fn enum_new(&mut self, name: &Identifier, _new_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumNew { name: name.clone() });
     }
 
-    fn enum_change(&mut self, name: &Identifier, new_enum: &Enum) {
+    fn enum_change(&mut self, name: &Identifier, new_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumChange { name: name.clone(), new_enum: new_enum.clone() });
     }
 
-    fn enum_missing(&mut self, name: &Identifier, _old_enum: &Enum) {
+    fn enum_missing(&mut self, name: &Identifier, _old_enum: &Rc<Enum>) {
         self.errors.push(UpgradeCompatibilityModeError::EnumMissing { name: name.clone() });
     }
 
-    fn function_new(&mut self, name: &Identifier, _new_func: &Function) {
+    fn function_new(&mut self, name: &Identifier, _new_func: &Rc<Function>) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionNew { name: name.clone() });
     }
 
-    fn function_change(&mut self, name: &Identifier, old_func: &Function, new_func: &Function) {
+    fn function_change(&mut self, name: &Identifier, old_func: &Rc<Function>, new_func: &Rc<Function>) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionChange {
             name: name.clone(),
             old_func: old_func.clone(),
@@ -363,7 +388,7 @@ impl InclusionCheckMode for CliInclusionCheckMode {
         });
     }
 
-    fn function_missing(&mut self, name: &Identifier, _old_func: &Function) {
+    fn function_missing(&mut self, name: &Identifier, _old_func: &Rc<Function>) {
         self.errors.push(UpgradeCompatibilityModeError::FunctionMissing { name: name.clone() });
     }
 
@@ -502,15 +527,14 @@ upgrade_codes!(
 
 /// Check the upgrade compatibility of a new package with an existing on-chain package.
 pub(crate) async fn check_compatibility(
-    client: &SuiClient,
+    read_api: &ReadApi,
     package_id: ObjectID,
     new_package: CompiledPackage,
     package_path: PathBuf,
     upgrade_policy: u8,
     protocol_config: ProtocolConfig,
 ) -> Result<(), Error> {
-    let existing_obj_read = client
-        .read_api()
+    let existing_obj_read = read_api
         .get_object_with_options(package_id, SuiObjectDataOptions::new().with_bcs())
         .await
         .context("Unable to get existing package")?;
@@ -535,18 +559,25 @@ pub(crate) async fn check_compatibility(
 
     let policy = UpgradePolicy::try_from(upgrade_policy).map_err(|_| anyhow!("Invalid upgrade policy"))?;
 
-    compare_packages(existing_modules, new_package, package_path, policy)
+    compare_packages(
+        *existing_package.to_move_package(u64::MAX /* safe as this pkg comes from the network */)?.original_package_id(),
+        existing_modules,
+        new_package,
+        package_path,
+        policy,
+    )
 }
 
 /// Collect all the errors into a single error message.
 fn compare_packages(
+    package_id: AccountAddress,
     existing_modules: Vec<CompiledModule>,
     mut new_package: CompiledPackage,
     package_path: PathBuf,
     policy: UpgradePolicy,
 ) -> Result<(), Error> {
     // create a map from the new modules
-    let new_modules_map: HashMap<Identifier, CompiledModule> =
+    let mut new_modules_map: HashMap<Identifier, CompiledModule> =
         new_package.get_modules().map(|m| (m.self_id().name().to_owned(), m.clone())).collect();
 
     let lookup: HashMap<Identifier, IdentifierTableLookup> =
@@ -568,8 +599,17 @@ fn compare_packages(
 
     for existing_module in existing_modules {
         let name = existing_module.self_id().name().to_owned();
-        match new_modules_map.get(&name) {
+        match new_modules_map.get_mut(&name) {
             Some(new_module) => {
+                let new_module_address_idx = new_module.self_handle().address;
+                let addrs = &mut new_module.address_identifiers;
+                if let Some(address_mut) = addrs.get_mut(new_module_address_idx.0 as usize) {
+                    if *address_mut == AccountAddress::ZERO {
+                        // if the new module address is zero, set it to the on-chain address
+                        *address_mut = package_id;
+                    }
+                }
+
                 let compiled_unit_with_source =
                     new_package.package.get_module_by_name_from_root(name.as_str()).context("Unable to get module")?;
 
@@ -609,13 +649,20 @@ fn modules_into_diags(
     lookup: &IdentifierTableLookup,
     policy: UpgradePolicy,
 ) -> Result<Diagnostics, Error> {
+    let pool = &mut normalized::RcPool::new();
     let diags_list = match policy {
-        UpgradePolicy::DepOnly => InclusionCheck::Equal
-            .check_with_mode::<CliInclusionCheckMode>(&Module::new(existing_module), &Module::new(new_module)),
-        UpgradePolicy::Additive => InclusionCheck::Subset
-            .check_with_mode::<CliInclusionCheckMode>(&Module::new(existing_module), &Module::new(new_module)),
-        _ => Compatibility::upgrade_check()
-            .check_with_mode::<CliCompatibilityMode>(&Module::new(existing_module), &Module::new(new_module)),
+        UpgradePolicy::DepOnly => InclusionCheck::Equal.check_with_mode::<CliInclusionCheckMode>(
+            &Module::new(pool, existing_module, /* include code */ true),
+            &Module::new(pool, new_module, /* include code */ true),
+        ),
+        UpgradePolicy::Additive => InclusionCheck::Subset.check_with_mode::<CliInclusionCheckMode>(
+            &Module::new(pool, existing_module, /* include code */ true),
+            &Module::new(pool, new_module, /* include code */ true),
+        ),
+        _ => Compatibility::upgrade_check().check_with_mode::<CliCompatibilityMode>(
+            &Module::new(pool, existing_module, /* include code */ true),
+            &Module::new(pool, new_module, /* include code */ true),
+        ),
     }
     .err()
     .unwrap_or_default()
@@ -865,8 +912,8 @@ fn function_lost_public(
 /// If the lengths are the same check each parameter piece wise and add a diagnostic for each mismatch.
 fn function_signature_mismatch_diag(
     function_name: &Identifier,
-    old_function: &Function,
-    new_function: &Function,
+    old_function: &Rc<Function>,
+    new_function: &Rc<Function>,
     public_visibility_related_error: bool,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1055,7 +1102,7 @@ fn function_signature_mismatch_diag(
 
 fn function_entry_mismatch(
     function_name: &Identifier,
-    old_function: &Function,
+    old_function: &Rc<Function>,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
 ) -> Result<Diagnostics, Error> {
@@ -1132,8 +1179,8 @@ fn ability_mismatch_label(
 /// Returns a diagnostic for a given struct's ability mismatch.
 fn struct_ability_mismatch_diag(
     struct_name: &Identifier,
-    old_struct: &Struct,
-    new_struct: &Struct,
+    old_struct: &Rc<Struct>,
+    new_struct: &Rc<Struct>,
     public_visibility_related_error: bool,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1202,8 +1249,8 @@ fn field_mismatch_message(
 /// If the lengths are the same check each field piece wise and return a diagnostic for each mismatch.
 fn struct_field_mismatch_diag(
     struct_name: &Identifier,
-    old_struct: &Struct,
-    new_struct: &Struct,
+    old_struct: &Rc<Struct>,
+    new_struct: &Rc<Struct>,
     public_visibility_related_error: bool,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1220,13 +1267,10 @@ fn struct_field_mismatch_diag(
 
     let def_loc = struct_sourcemap.definition_location;
 
-    let dummy_field = Field {
-        name: Identifier::new("dummy_field").context("unexpected error with identifier constructor")?,
-        type_: Type::Bool,
-    };
-    let old_fields: Vec<&Field> = old_struct.fields.iter().filter(|f| f != &&dummy_field).collect();
+    let is_dummy_field = |f: &Field| f.name.as_str() == "dummy_field" && f.type_ == Type::Bool;
+    let old_fields: Vec<Rc<Field>> = old_struct.fields.0.values().filter(|f| !is_dummy_field(f)).cloned().collect();
 
-    let new_fields: Vec<&Field> = new_struct.fields.iter().filter(|f| f != &&dummy_field).collect();
+    let new_fields: Vec<Rc<Field>> = new_struct.fields.0.values().filter(|f| !is_dummy_field(f)).cloned().collect();
 
     let reason = if public_visibility_related_error {
         "Structs are part of a module's public interface \
@@ -1250,9 +1294,9 @@ fn struct_field_mismatch_diag(
                 ),
             ],
         ));
-    } else if old_fields != new_fields {
-        for (i, (old_field, new_field)) in old_fields.iter().zip(new_fields.iter()).enumerate() {
-            if old_field != new_field {
+    } else if !old_fields.iter().zip(&new_fields).all(|(old_field, new_field)| old_field.equivalent(new_field)) {
+        for (i, (old_field, new_field)) in old_fields.iter().zip(&new_fields).enumerate() {
+            if !old_field.equivalent(new_field) {
                 let field_loc = struct_sourcemap.fields.get(i).context("Unable to get field location")?;
 
                 let (code, label) =
@@ -1283,8 +1327,8 @@ fn struct_field_mismatch_diag(
 /// If the lengths are the same check each type parameter piece wise and return a diagnostic for each mismatch.
 fn struct_type_param_mismatch_diag(
     name: &Identifier,
-    old_struct: &Struct,
-    new_struct: &Struct,
+    old_struct: &Rc<Struct>,
+    new_struct: &Rc<Struct>,
     public_visibility_related_error: bool, // give a different code for errors which are public visibility related
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1313,8 +1357,8 @@ fn struct_type_param_mismatch_diag(
 /// Returns a diagnostic for enum ability mismatches.
 fn enum_ability_mismatch_diag(
     enum_name: &Identifier,
-    old_enum: &Enum,
-    new_enum: &Enum,
+    old_enum: &Rc<Enum>,
+    new_enum: &Rc<Enum>,
     public_visibility_related_error: bool, // give a different code for errors which are public visibility related
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1366,18 +1410,18 @@ fn enum_variant_field_message(
     old_variant: &Variant,
     new_variant: &Variant,
 ) -> Result<Vec<(DiagnosticInfo, String)>, Error> {
-    if old_variant.fields.len() != new_variant.fields.len() {
+    if old_variant.fields.0.len() != new_variant.fields.0.len() {
         return Ok(vec![(
             Declarations::FieldMismatch.into(),
             format!(
                 "Mismatched variant field count, expected {}, found {}.",
-                old_variant.fields.len(),
-                new_variant.fields.len()
+                old_variant.fields.0.len(),
+                new_variant.fields.0.len()
             ),
         )]);
     }
 
-    Ok(match (old_variant.name != new_variant.name, old_variant.fields != new_variant.fields) {
+    Ok(match (old_variant.name != new_variant.name, !old_variant.fields.equivalent(&new_variant.fields)) {
         (true, true) => vec![(
             Enums::VariantMismatch.into(),
             format!("Mismatched variant '{}', expected '{}'.", new_variant.name, old_variant.name),
@@ -1389,8 +1433,8 @@ fn enum_variant_field_message(
         (false, true) => {
             let mut errors: Vec<(DiagnosticInfo, String)> = vec![];
 
-            for (old_field, new_field) in old_variant.fields.iter().zip(new_variant.fields.iter()) {
-                if old_field != new_field {
+            for (old_field, new_field) in old_variant.fields.0.values().zip(new_variant.fields.0.values()) {
+                if !old_field.equivalent(new_field) {
                     let (code, label) = field_mismatch_message(old_field, new_field, Vec::new())?;
                     errors.push((code.into(), label));
                 }
@@ -1407,8 +1451,8 @@ fn enum_variant_field_message(
 /// If the lengths are the same check each type parameter piece wise and return a diagnostic for each mismatch.
 fn enum_variant_mismatch_diag(
     enum_name: &Identifier,
-    old_enum: &Enum,
-    new_enum: &Enum,
+    old_enum: &Rc<Enum>,
+    new_enum: &Rc<Enum>,
     public_visibility_related_error: bool, // give a different code for errors which are public visibility related
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1425,8 +1469,8 @@ fn enum_variant_mismatch_diag(
 
     let def_loc = enum_sourcemap.definition_location;
 
-    for (i, (old_variant, new_variant)) in old_enum.variants.iter().zip(new_enum.variants.iter()).enumerate() {
-        if old_variant != new_variant {
+    for (i, (old_variant, new_variant)) in old_enum.variants.values().zip(new_enum.variants.values()).enumerate() {
+        if !old_variant.equivalent(new_variant) {
             let variant_loc = enum_sourcemap.variants.get(i).context("Unable to get variant location")?.0 .1;
 
             let messages = enum_variant_field_message(old_variant, new_variant)?;
@@ -1463,8 +1507,8 @@ fn enum_variant_mismatch_diag(
 /// Returns diagnostics for each new variant in an enum.
 fn enum_new_variant_diag(
     enum_name: &Identifier,
-    old_enum: &Enum,
-    new_enum: &Enum,
+    old_enum: &Rc<Enum>,
+    new_enum: &Rc<Enum>,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
 ) -> Result<Diagnostics, Error> {
@@ -1478,12 +1522,12 @@ fn enum_new_variant_diag(
         .get_enum_source_map(EnumDefinitionIndex::new(*enum_index))
         .context("Unable to get enum source map")?;
 
-    let old_enum_map = old_enum.variants.iter().map(|v| &v.name).collect::<HashSet<_>>();
+    let old_enum_map = old_enum.variants.values().map(|v| v.name.as_ident_str()).collect::<HashSet<_>>();
 
     let def_loc = enum_sourcemap.definition_location;
 
-    for (i, new_variant) in new_enum.variants.iter().enumerate() {
-        if !old_enum_map.contains(&new_variant.name) {
+    for (i, new_variant) in new_enum.variants.values().enumerate() {
+        if !old_enum_map.contains(new_variant.name.as_ident_str()) {
             let variant_loc = enum_sourcemap.variants.get(i).context("Unable to get variant location")?.0 .1;
 
             diags.add(Diagnostic::new(
@@ -1510,7 +1554,7 @@ fn enum_new_variant_diag(
 /// Returns diagnostics for each missing variant in an enum.
 fn enum_variant_missing_diag(
     enum_name: &Identifier,
-    old_enum: &Enum,
+    old_enum: &Rc<Enum>,
     tag: usize,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
@@ -1525,7 +1569,7 @@ fn enum_variant_missing_diag(
         .get_enum_source_map(EnumDefinitionIndex::new(*enum_index))
         .context("Unable to get enum source map")?;
 
-    let variant_name = &old_enum.variants.get(tag).context("Unable to get variant")?.name;
+    let variant_name = &old_enum.variants.get_index(tag).context("Unable to get variant")?.1.name;
 
     diags.add(Diagnostic::new(
         Enums::VariantMismatch,
@@ -1577,8 +1621,8 @@ fn struct_new_diag(
 /// Returns a diagnostic for an unexpected struct changed.
 fn struct_changed_diag(
     struct_name: &Identifier,
-    old_struct: &Struct,
-    new_struct: &Struct,
+    old_struct: &Rc<Struct>,
+    new_struct: &Rc<Struct>,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
 ) -> Result<Diagnostics, Error> {
@@ -1606,7 +1650,7 @@ fn struct_changed_diag(
         )?);
     }
 
-    if old_struct.fields != new_struct.fields {
+    if !old_struct.fields.equivalent(&new_struct.fields) {
         diags.extend(struct_field_mismatch_diag(
             struct_name,
             old_struct,
@@ -1645,8 +1689,8 @@ fn enum_new_diag(
 /// Returns a diagnostic for an unexpected enum change.
 fn enum_changed_diag(
     enum_name: &Identifier,
-    old_enum: &Enum,
-    new_enum: &Enum,
+    old_enum: &Rc<Enum>,
+    new_enum: &Rc<Enum>,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
 ) -> Result<Diagnostics, Error> {
@@ -1674,7 +1718,13 @@ fn enum_changed_diag(
         )?);
     }
 
-    if old_enum.variants != new_enum.variants {
+    if old_enum.variants.len() != new_enum.variants.len()
+        || !old_enum
+            .variants
+            .values()
+            .zip(new_enum.variants.values())
+            .all(|(old_variant, new_variant)| old_variant.equivalent(new_variant))
+    {
         diags.extend(enum_variant_mismatch_diag(
             enum_name,
             old_enum,
@@ -1713,14 +1763,14 @@ fn function_new_diag(
 /// Returns a diagnostic for an unexpected function changed.
 fn function_changed_diag(
     function_name: &Identifier,
-    old_function: &Function,
-    new_function: &Function,
+    old_function: &Rc<Function>,
+    new_function: &Rc<Function>,
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,
 ) -> Result<Diagnostics, Error> {
     let mut diags = Diagnostics::new();
 
-    if old_function != new_function {
+    if !old_function.equivalent(new_function) {
         diags.extend(function_signature_mismatch_diag(
             function_name,
             old_function,
@@ -1737,8 +1787,8 @@ fn function_changed_diag(
 /// Returns a diagnostic for an enum type parameter mismatch.
 fn enum_type_param_mismatch(
     enum_name: &Identifier,
-    old_enum: &Enum,
-    new_enum: &Enum,
+    old_enum: &Rc<Enum>,
+    new_enum: &Rc<Enum>,
     public_visibility_related_error: bool, // give a different code for errors which are public visibility related
     compiled_unit_with_source: &CompiledUnitWithSource,
     lookup: &IdentifierTableLookup,

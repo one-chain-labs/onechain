@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
@@ -17,6 +17,7 @@ dirs-next.workspace = true
 hex.workspace = true
 insta = { workspace = true, features = ["serde"] }
 once_cell.workspace = true
+packed_struct.workspace = true
 serde.workspace = true
 sha2.workspace = true
 vfs.workspace = true

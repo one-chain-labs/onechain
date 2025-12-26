@@ -13,6 +13,7 @@ use crate::{
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     crypto::{AuthorityPublicKey, AuthorityPublicKeyBytes, NetworkPublicKey},
     error::SuiError,
+    gas::GasCostSummary,
     storage::ObjectStore,
     sui_system_state::{
         epoch_start_sui_system_state::{EpochStartSystemState, EpochStartValidatorInfoV1},
@@ -151,6 +152,10 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerV1 {
         self.safe_mode
     }
 
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary::default()
+    }
+
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
         self.epoch = params.epoch;
         self.safe_mode = true;
@@ -263,6 +268,10 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerShallowV2 {
 
     fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary::default()
     }
 
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
@@ -405,6 +414,10 @@ impl SuiSystemStateTrait for SimTestSuiSystemStateInnerDeepV2 {
 
     fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary::default()
     }
 
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {

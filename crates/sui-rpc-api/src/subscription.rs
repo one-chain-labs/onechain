@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{error, info, trace};
+use tracing::{info, trace};
 
-use crate::{metrics::SubscriptionMetrics, proto::node::v2::GetFullCheckpointResponse};
+use crate::metrics::SubscriptionMetrics;
 
 const CHECKPOINT_MAILBOX_SIZE: usize = 1024;
 const MAILBOX_SIZE: usize = 128;
@@ -15,7 +15,7 @@ const SUBSCRIPTION_CHANNEL_SIZE: usize = 256;
 const MAX_SUBSCRIBERS: usize = 1024;
 
 struct SubscriptionRequest {
-    sender: oneshot::Sender<mpsc::Receiver<Arc<GetFullCheckpointResponse>>>,
+    sender: oneshot::Sender<mpsc::Receiver<Arc<CheckpointData>>>,
 }
 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ pub struct SubscriptionServiceHandle {
 }
 
 impl SubscriptionServiceHandle {
-    pub async fn register_subscription(&self) -> Option<mpsc::Receiver<Arc<GetFullCheckpointResponse>>> {
+    pub async fn register_subscription(&self) -> Option<mpsc::Receiver<Arc<CheckpointData>>> {
         let (sender, reciever) = oneshot::channel();
         let request = SubscriptionRequest { sender };
         self.sender.send(request).await.ok()?;
@@ -39,7 +39,7 @@ pub struct SubscriptionService {
     // Expectation is that checkpoints are recieved in-order
     checkpoint_mailbox: mpsc::Receiver<CheckpointData>,
     mailbox: mpsc::Receiver<SubscriptionRequest>,
-    subscribers: Vec<mpsc::Sender<Arc<GetFullCheckpointResponse>>>,
+    subscribers: Vec<mpsc::Sender<Arc<CheckpointData>>>,
 
     metrics: SubscriptionMetrics,
 }
@@ -101,16 +101,7 @@ impl SubscriptionService {
             self.metrics.last_recieved_checkpoint.set(sequence_number);
         }
 
-        let checkpoint = match crate::service::checkpoints::checkpoint_data_to_full_checkpoint_response(
-            checkpoint,
-            &crate::field_mask::FieldMaskTree::new_wildcard(),
-        ) {
-            Ok(checkpoint) => Arc::new(checkpoint),
-            Err(e) => {
-                error!("unable to convert checkpoint to proto: {e:?}");
-                return;
-            }
-        };
+        let checkpoint = Arc::new(checkpoint);
 
         // Try to send the latest checkpoint to all subscribers. If a subscriber's channel is full
         // then they are likely too slow so we drop them.

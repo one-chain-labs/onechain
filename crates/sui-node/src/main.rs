@@ -5,16 +5,17 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use clap::{ArgGroup, Parser};
 use mysten_common::sync::async_once_cell::AsyncOnceCell;
-use one_node::metrics;
 use sui_config::{node::RunWithRange, Config, NodeConfig};
 use sui_core::runtime::SuiRuntimes;
+use sui_rpc_api::ServerVersion;
 use sui_types::{
     committee::EpochId,
+    crypto::KeypairTraits,
     messages_checkpoint::CheckpointSequenceNumber,
     multiaddr::Multiaddr,
     supported_protocol_versions::SupportedProtocolVersions,
 };
-use tokio::sync::broadcast;
+use tokio::{sync::broadcast, time::sleep};
 use tracing::{error, info};
 
 // Define the `GIT_REVISION` and `VERSION` consts
@@ -39,15 +40,18 @@ struct Args {
     run_with_range_checkpoint: Option<CheckpointSequenceNumber>,
 }
 
+#[cfg(all(not(target_env = "msvc"), feature = "jemalloc"))]
+#[global_allocator]
+static JEMALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 fn main() {
+    antithesis_sdk::antithesis_init();
+
+    move_vm_config::ensure_move_vm_profiler_disabled();
+
     // Ensure that a validator never calls get_for_min_version/get_for_max_version_UNSAFE.
     // TODO: re-enable after we figure out how to eliminate crashes in prod because of this.
     // ProtocolConfig::poison_get_for_min_version();
-
-    move_vm_profiler::tracing_feature_enabled! {
-        panic!("Cannot run the sui-node binary with tracing feature enabled");
-    }
-
     let args = Args::parse();
     let mut config = NodeConfig::load(&args.config_path).unwrap();
     assert!(
@@ -77,14 +81,23 @@ fn main() {
 
     drop(metrics_rt);
 
-    info!("One Node version: {VERSION}");
+    info!("Sui Node version: {VERSION}");
     info!("Supported protocol versions: {:?}", config.supported_protocol_versions);
 
     info!("Started Prometheus HTTP endpoint at {}", config.metrics_address);
 
     {
         let _enter = runtimes.metrics.enter();
-        metrics::start_metrics_push_task(&config, registry_service.clone());
+        if let Some(metrics_config) = &config.metrics {
+            if let Some(push_url) = &metrics_config.push_url {
+                sui_metrics_push_client::start_metrics_push_task(
+                    metrics_config.push_interval_seconds,
+                    push_url.clone(),
+                    config.network_key_pair().copy(),
+                    registry_service.clone(),
+                );
+            }
+        }
     }
 
     if let Some(listen_address) = args.listen_address {
@@ -99,14 +112,16 @@ fn main() {
     // if it deadlocks.
     let node_once_cell = Arc::new(AsyncOnceCell::<Arc<one_node::SuiNode>>::new());
     let node_once_cell_clone = node_once_cell.clone();
-    let rpc_runtime = runtimes.json_rpc.handle().clone();
 
-    // let sui-node signal main to shutdown runtimes
+    // let one-node signal main to shutdown runtimes
     let (runtime_shutdown_tx, runtime_shutdown_rx) = broadcast::channel::<()>(1);
 
+    let server_version = ServerVersion::new(env!("CARGO_BIN_NAME"), VERSION);
     runtimes.sui_node.spawn(async move {
-        match one_node::SuiNode::start_async(config, registry_service, Some(rpc_runtime), VERSION).await {
-            Ok(one_node) => node_once_cell_clone.set(one_node).expect("Failed to set node in AsyncOnceCell"),
+        match one_node::SuiNode::start_async(config, registry_service, server_version).await {
+            Ok(sui_node) => node_once_cell_clone
+                .set(sui_node)
+                .expect("Failed to set node in AsyncOnceCell"),
 
             Err(e) => {
                 error!("Failed to start node: {e:?}");
@@ -147,7 +162,6 @@ fn main() {
         one_node::admin::run_admin_server(node, admin_interface_port, filter_handle).await
     });
 
-    /*
     runtimes.metrics.spawn(async move {
         let node = node_once_cell.get().await;
         let state = node.state();
@@ -156,7 +170,6 @@ fn main() {
             sleep(Duration::from_secs(3600)).await;
         }
     });
-    */
 
     // wait for SIGINT on the main thread
     tokio::runtime::Builder::new_current_thread()

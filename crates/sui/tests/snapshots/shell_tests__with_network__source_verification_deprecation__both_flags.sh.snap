@@ -9,10 +9,10 @@ description: tests/shell_tests/with_network/source_verification_deprecation/both
 # test that we get an error if we supply both `--skip-dependency-verification` and `--verify-deps`
 
 echo "=== publish (should fail) ===" | tee /dev/stderr
-sui client --client.config $CONFIG publish example --skip-dependency-verification --verify-deps
+one client --client.config $CONFIG publish example --skip-dependency-verification --verify-deps
 
 echo "=== upgrade (should fail) ===" | tee /dev/stderr
-sui client --client.config $CONFIG upgrade example --upgrade-capability 0x1234 --skip-dependency-verification --verify-deps
+one client --client.config $CONFIG upgrade example --upgrade-capability 0x1234 --skip-dependency-verification --verify-deps
 
 ----- results -----
 success: false
@@ -25,12 +25,12 @@ exit_code: 2
 === publish (should fail) ===
 error: the argument '--skip-dependency-verification' cannot be used with '--verify-deps'
 
-Usage: sui client publish --skip-dependency-verification <package_path>
+Usage: one client publish --skip-dependency-verification <package_path>
 
 For more information, try '--help'.
 === upgrade (should fail) ===
 error: the argument '--skip-dependency-verification' cannot be used with '--verify-deps'
 
-Usage: sui client upgrade --upgrade-capability <UPGRADE_CAPABILITY> --skip-dependency-verification <package_path>
+Usage: one client upgrade --upgrade-capability <UPGRADE_CAPABILITY> --skip-dependency-verification <package_path>
 
 For more information, try '--help'.

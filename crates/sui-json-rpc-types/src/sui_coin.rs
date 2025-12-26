@@ -9,6 +9,7 @@ use serde_with::serde_as;
 use sui_types::{
     base_types::{EpochId, ObjectDigest, ObjectID, ObjectRef, SequenceNumber, TransactionDigest},
     coin::CoinMetadata,
+    coin_registry,
     error::SuiError,
     object::Object,
     sui_serde::{BigInt, SequenceNumber as AsSequenceNumber},
@@ -85,5 +86,18 @@ impl TryFrom<Object> for SuiCoinMetadata {
         let metadata: CoinMetadata = object.try_into()?;
         let CoinMetadata { decimals, name, symbol, description, icon_url, id } = metadata;
         Ok(Self { id: Some(*id.object_id()), decimals, name, symbol, description, icon_url })
+    }
+}
+
+impl From<coin_registry::Currency> for SuiCoinMetadata {
+    fn from(currency: coin_registry::Currency) -> Self {
+        Self {
+            id: Some(currency.id),
+            decimals: currency.decimals,
+            name: currency.name,
+            symbol: currency.symbol,
+            description: currency.description,
+            icon_url: Some(currency.icon_url),
+        }
     }
 }

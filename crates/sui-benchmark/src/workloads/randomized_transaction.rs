@@ -391,8 +391,10 @@ impl Workload<dyn Payload> for RandomizedTransactionWorkload {
                     .call_counter_create(self.basics_package_id.unwrap())
                     .build_and_sign(keypair.as_ref());
                 let proxy_ref = proxy.clone();
-                futures
-                    .push(async move { proxy_ref.execute_transaction_block(transaction).await.unwrap().created()[0].0 });
+                futures.push(async move {
+                    let (_, execution_result) = proxy_ref.execute_transaction_block(transaction).await;
+                    execution_result.unwrap().created()[0].0
+                });
             }
             self.shared_objects = join_all(futures).await;
         }
@@ -409,9 +411,11 @@ impl Workload<dyn Payload> for RandomizedTransactionWorkload {
                     .build_and_sign(keypair.as_ref());
                 let proxy_ref = proxy.clone();
                 futures.push(async move {
-                    let execution_result = proxy_ref.execute_transaction_block(transaction).await.unwrap();
-                    let created_owned = execution_result.created()[0].0;
-                    let updated_gas = execution_result.gas_object().0;
+                    let (_, execution_result) = proxy_ref.execute_transaction_block(transaction).await;
+                    let effects = execution_result.unwrap();
+
+                    let created_owned = effects.created()[0].0;
+                    let updated_gas = effects.gas_object().0;
                     (created_owned, updated_gas)
                 });
             }
@@ -461,5 +465,9 @@ impl Workload<dyn Payload> for RandomizedTransactionWorkload {
         }
 
         payloads.into_iter().map(|b| Box::<dyn Payload>::from(b)).collect()
+    }
+
+    fn name(&self) -> &str {
+        "RandomizedTransaction"
     }
 }

@@ -14,13 +14,6 @@
 //! 4. Passed to a function cal::;
 use std::{collections::BTreeMap, error::Error, num::NonZeroU64};
 
-use move_abstract_interpreter::absint::{
-    AbstractDomain,
-    AbstractInterpreter,
-    FunctionContext,
-    JoinResult,
-    TransferFunctions,
-};
 use move_abstract_stack::AbstractStack;
 use move_binary_format::{
     errors::PartialVMError,
@@ -35,9 +28,11 @@ use move_binary_format::{
         StructFieldInformation,
     },
 };
+use move_bytecode_verifier::absint::{analyze_function, AbstractDomain, FunctionContext, JoinResult, TransferFunctions};
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr, vm_status::StatusCode};
 use sui_types::{
+    accumulator_event::ACCUMULATOR_MODULE_NAME,
     authenticator_state::AUTHENTICATOR_STATE_MODULE_NAME,
     bridge::BRIDGE_MODULE_NAME,
     clock::CLOCK_MODULE_NAME,
@@ -71,6 +66,7 @@ type FunctionIdent<'a> = (&'a AccountAddress, &'a IdentStr, &'a IdentStr);
 const OBJECT_NEW: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, OBJECT_MODULE_NAME, ident_str!("new"));
 const OBJECT_NEW_UID_FROM_HASH: FunctionIdent =
     (&SUI_FRAMEWORK_ADDRESS, OBJECT_MODULE_NAME, ident_str!("new_uid_from_hash"));
+const OBJECT_NEW_DERIVED: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, ident_str!("derived_object"), ident_str!("claim"));
 const TS_NEW_OBJECT: FunctionIdent =
     (&SUI_FRAMEWORK_ADDRESS, ident_str!(TEST_SCENARIO_MODULE_NAME), ident_str!("new_object"));
 const SUI_SYSTEM_CREATE: FunctionIdent = (&SUI_SYSTEM_ADDRESS, SUI_SYSTEM_MODULE_NAME, ident_str!("create"));
@@ -82,7 +78,10 @@ const SUI_RANDOMNESS_STATE_CREATE: FunctionIdent =
 const SUI_DENY_LIST_CREATE: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, DENY_LIST_MODULE, DENY_LIST_CREATE_FUNC);
 
 const SUI_BRIDGE_CREATE: FunctionIdent = (&BRIDGE_ADDRESS, BRIDGE_MODULE_NAME, ident_str!("create"));
-const FRESH_ID_FUNCTIONS: &[FunctionIdent] = &[OBJECT_NEW, OBJECT_NEW_UID_FROM_HASH, TS_NEW_OBJECT];
+const SUI_ACCUMULATOR_CREATE: FunctionIdent = (&SUI_FRAMEWORK_ADDRESS, ACCUMULATOR_MODULE_NAME, ident_str!("create"));
+const SUI_COIN_REGISTRY_CREATE: FunctionIdent =
+    (&SUI_FRAMEWORK_ADDRESS, ident_str!("coin_registry"), ident_str!("create"));
+const FRESH_ID_FUNCTIONS: &[FunctionIdent] = &[OBJECT_NEW, OBJECT_NEW_UID_FROM_HASH, OBJECT_NEW_DERIVED, TS_NEW_OBJECT];
 const FUNCTIONS_TO_SKIP: &[FunctionIdent] = &[
     SUI_SYSTEM_CREATE,
     SUI_CLOCK_CREATE,
@@ -90,6 +89,8 @@ const FUNCTIONS_TO_SKIP: &[FunctionIdent] = &[
     SUI_RANDOMNESS_STATE_CREATE,
     SUI_DENY_LIST_CREATE,
     SUI_BRIDGE_CREATE,
+    SUI_ACCUMULATOR_CREATE,
+    SUI_COIN_REGISTRY_CREATE,
 ];
 
 impl AbstractValue {
@@ -113,15 +114,15 @@ fn verify_id_leak(module: &CompiledModule, meter: &mut (impl Meter + ?Sized)) ->
             None => continue,
         };
         let handle = module.function_handle_at(func_def.function);
-        let func_view = FunctionContext::new(module, FunctionDefinitionIndex(index as u16), code, handle);
-        let initial_state = AbstractState::new(&func_view);
-        let mut verifier = IDLeakAnalysis::new(module, &func_view);
+        let function_context = FunctionContext::new(module, FunctionDefinitionIndex(index as u16), code, handle);
+        let initial_state = AbstractState::new(&function_context);
+        let mut verifier = IDLeakAnalysis::new(module, &function_context);
         let function_to_verify = verifier.cur_function();
         if FUNCTIONS_TO_SKIP.iter().any(|to_skip| function_to_verify == *to_skip) {
             continue;
         }
-        verifier.analyze_function(initial_state, &func_view, meter).map_err(|err| {
-            // Handle verifificaiton timeout specially
+        analyze_function(&function_context, meter, &mut verifier, initial_state).map_err(|err| {
+            // Handle verification timeout specially
             if check_for_verifier_timeout(&err.major_status()) {
                 to_verification_timeout_error(err.to_string())
             } else if let Some(message) = err.source().as_ref() {
@@ -226,7 +227,6 @@ impl<'a> IDLeakAnalysis<'a> {
 }
 
 impl TransferFunctions for IDLeakAnalysis<'_> {
-    type Error = ExecutionError;
     type State = AbstractState;
 
     fn execute(
@@ -234,7 +234,7 @@ impl TransferFunctions for IDLeakAnalysis<'_> {
         state: &mut Self::State,
         bytecode: &Bytecode,
         index: CodeOffset,
-        last_index: CodeOffset,
+        (_first_index, last_index): (u16, u16),
         meter: &mut (impl Meter + ?Sized),
     ) -> Result<(), PartialVMError> {
         execute_inner(self, state, bytecode, index, meter)?;
@@ -249,8 +249,6 @@ impl TransferFunctions for IDLeakAnalysis<'_> {
         Ok(())
     }
 }
-
-impl AbstractInterpreter for IDLeakAnalysis<'_> {}
 
 fn call(verifier: &mut IDLeakAnalysis, function_handle: &FunctionHandle) -> Result<(), PartialVMError> {
     let parameters = verifier.binary_view.signature_at(function_handle.parameters);
@@ -291,9 +289,9 @@ fn pack(verifier: &mut IDLeakAnalysis, struct_def: &StructDefinition) -> Result<
         let msg = format!(
             "Invalid object creation in {cur_package}::{cur_module}::{cur_function}. \
                 Object created without a newly created UID. \
-                The UID must come directly from one::{}::{}. \
-                Or for tests, it can come from one::{}::{}",
-            OBJECT_NEW.1, OBJECT_NEW.2, TS_NEW_OBJECT.1, TS_NEW_OBJECT.2,
+                The UID must come directly from `one::{}::{}`, or `one::{}::{}`. \
+                For tests, it can also come from `one::{}::{}`",
+            OBJECT_NEW.1, OBJECT_NEW.2, OBJECT_NEW_DERIVED.1, OBJECT_NEW_DERIVED.2, TS_NEW_OBJECT.1, TS_NEW_OBJECT.2
         );
 
         return Err(PartialVMError::new(StatusCode::UNKNOWN_VERIFICATION_ERROR)

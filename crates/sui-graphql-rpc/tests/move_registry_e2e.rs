@@ -368,7 +368,7 @@ async fn publish_move_registry_package(cluster: &NetworkCluster) -> (ObjectID, (
     let package_path = PathBuf::from(DOT_MOVE_PKG);
     let tx = cluster.validator_fullnode_handle.test_transaction_builder().await.publish(package_path).build();
 
-    let sig = cluster.validator_fullnode_handle.wallet.sign_transaction(&tx);
+    let sig = cluster.validator_fullnode_handle.wallet.sign_transaction(&tx).await;
 
     let executed = cluster.validator_fullnode_handle.execute_transaction(sig).await;
 

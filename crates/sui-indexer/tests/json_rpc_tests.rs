@@ -107,7 +107,7 @@ async fn test_events() -> Result<(), anyhow::Error> {
     let arguments = vec![CallArg::Pure(bcs::to_bytes(&5u64).unwrap())];
     let transaction =
         cluster.test_transaction_builder().await.move_call(move_package, "events_queries", function, arguments).build();
-    let signed_transaction = cluster.wallet.sign_transaction(&transaction);
+    let signed_transaction = cluster.wallet.sign_transaction(&transaction).await;
     cluster.execute_transaction(signed_transaction).await;
 
     // query for events

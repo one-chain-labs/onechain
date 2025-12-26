@@ -70,6 +70,8 @@ fn async_verifier_bench(c: &mut Criterion) {
                         true,
                         true,
                         Some(30),
+                        vec![],
+                        true,
                     ));
 
                     b.iter(|| {
@@ -126,6 +128,7 @@ fn batch_verification_bench(c: &mut Criterion) {
                             &committee,
                             &certs.iter().collect_vec(),
                             Arc::new(VerifiedDigestCache::new_empty()),
+                            None,
                         );
                     })
                 },

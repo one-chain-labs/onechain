@@ -6,7 +6,7 @@ use std::time::Instant;
 use tracing::{debug, info};
 
 use super::Processor;
-use crate::models::watermarks::{CommitterWatermark, PrunerWatermark};
+use crate::store::CommitterWatermark;
 
 /// Tracing message for the watermark update will be logged at info level at least this many
 /// checkpoints.
@@ -75,14 +75,14 @@ impl WatermarkLogger {
     }
 }
 
-impl From<&CommitterWatermark<'_>> for LoggerWatermark {
+impl From<&CommitterWatermark> for LoggerWatermark {
     fn from(watermark: &CommitterWatermark) -> Self {
-        Self { checkpoint: watermark.checkpoint_hi_inclusive, transaction: Some(watermark.tx_hi) }
+        Self { checkpoint: watermark.checkpoint_hi_inclusive as i64, transaction: Some(watermark.tx_hi as i64) }
     }
 }
 
-impl From<&PrunerWatermark<'_>> for LoggerWatermark {
-    fn from(watermark: &PrunerWatermark) -> Self {
-        Self { checkpoint: watermark.pruner_hi, transaction: None }
+impl LoggerWatermark {
+    pub fn checkpoint(checkpoint: u64) -> Self {
+        Self { checkpoint: checkpoint as i64, transaction: None }
     }
 }

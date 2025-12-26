@@ -185,4 +185,8 @@ impl Workload<dyn Payload> for RandomnessWorkload {
         let payloads: Vec<Box<dyn Payload>> = shared_payloads.into_iter().map(|b| Box::<dyn Payload>::from(b)).collect();
         payloads
     }
+
+    fn name(&self) -> &str {
+        "Randomness"
+    }
 }

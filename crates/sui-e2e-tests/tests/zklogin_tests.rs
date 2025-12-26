@@ -15,6 +15,7 @@ use sui_types::{
     crypto::Signature,
     error::{SuiError, SuiResult, UserInputError},
     signature::GenericSignature,
+    supported_protocol_versions::SupportedProtocolVersions,
     transaction::Transaction,
     utils::{get_legacy_zklogin_user_address, get_zklogin_user_address, load_test_vectors, make_zklogin_tx},
     zk_login_authenticator::ZkLoginAuthenticator,
@@ -97,6 +98,10 @@ async fn test_legacy_zklogin_address_accept() {
 
 #[sim_test]
 async fn zklogin_end_to_end_test() {
+    if sui_simulator::has_mainnet_protocol_config_override() {
+        return;
+    }
+
     let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
 
     test_cluster.wait_for_authenticator_state_update().await;
@@ -162,10 +167,18 @@ async fn test_expired_zklogin_sig() {
 
 #[sim_test]
 async fn test_auth_state_creation() {
+    #[cfg(msim)]
+    {
+        use sui_core::authority::framework_injection;
+        let framework = sui_framework_snapshot::load_bytecode_snapshot(25).unwrap();
+        framework_injection::set_system_packages(framework);
+    }
+
     // Create test cluster without auth state object in genesis
     let test_cluster = TestClusterBuilder::new()
         .with_protocol_version(23.into())
         .with_epoch_duration_ms(15000)
+        .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(23, 25))
         .with_default_jwks()
         .build()
         .await;
@@ -178,8 +191,19 @@ async fn test_auth_state_creation() {
 
 #[sim_test]
 async fn test_create_authenticator_state_object() {
-    let test_cluster =
-        TestClusterBuilder::new().with_protocol_version(23.into()).with_epoch_duration_ms(15000).build().await;
+    #[cfg(msim)]
+    {
+        use sui_core::authority::framework_injection;
+        let framework = sui_framework_snapshot::load_bytecode_snapshot(25).unwrap();
+        framework_injection::set_system_packages(framework);
+    }
+
+    let test_cluster = TestClusterBuilder::new()
+        .with_protocol_version(23.into())
+        .with_epoch_duration_ms(15000)
+        .with_supported_protocol_versions(SupportedProtocolVersions::new_for_testing(23, 25))
+        .build()
+        .await;
 
     let handles = test_cluster.all_node_handles();
 

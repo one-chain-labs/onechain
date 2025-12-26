@@ -17,7 +17,6 @@ use sui_types::{
 use typed_store::{
     rocks::{default_db_options, DBMap, DBOptions, MetricConf},
     rocksdb::Options,
-    traits::{TableSummary, TypedStoreDebug},
     DBMapUtils,
     Map,
 };
@@ -43,7 +42,7 @@ impl CommitteeStore {
     pub fn new(path: PathBuf, genesis_committee: &Committee, db_options: Option<Options>) -> Self {
         let tables = CommitteeStoreTables::open_tables_read_write(path, MetricConf::new("committee"), db_options, None);
         let store = Self { tables, cache: RwLock::new(HashMap::new()) };
-        if store.database_is_empty() {
+        if store.database_is_empty().expect("CommitteeStore initialization failed") {
             store.init_genesis_committee(genesis_committee.clone()).expect("Init genesis committee data must not fail");
         }
         store
@@ -115,7 +114,7 @@ impl CommitteeStore {
         self.tables.committee_map.checkpoint_db(path).map_err(Into::into)
     }
 
-    fn database_is_empty(&self) -> bool {
-        self.tables.committee_map.unbounded_iter().next().is_none()
+    fn database_is_empty(&self) -> SuiResult<bool> {
+        Ok(self.tables.committee_map.safe_iter().next().transpose()?.is_none())
     }
 }

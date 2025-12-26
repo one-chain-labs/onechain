@@ -4,43 +4,21 @@ title: Module `one_system::voting_power`
 
 
 
--  [Struct `VotingPowerInfo`](#one_system_voting_power_VotingPowerInfo)
--  [Struct `VotingPowerInfoV2`](#one_system_voting_power_VotingPowerInfoV2)
+-  [Struct `VotingPowerInfo`](#sui_system_voting_power_VotingPowerInfo)
+-  [Struct `VotingPowerInfoV2`](#sui_system_voting_power_VotingPowerInfoV2)
 -  [Constants](#@Constants_0)
--  [Function `set_voting_power`](#one_system_voting_power_set_voting_power)
--  [Function `init_voting_power_info`](#one_system_voting_power_init_voting_power_info)
--  [Function `total_stake`](#one_system_voting_power_total_stake)
--  [Function `insert`](#one_system_voting_power_insert)
--  [Function `adjust_voting_power`](#one_system_voting_power_adjust_voting_power)
--  [Function `update_voting_power`](#one_system_voting_power_update_voting_power)
--  [Function `check_invariants`](#one_system_voting_power_check_invariants)
--  [Function `total_voting_power`](#one_system_voting_power_total_voting_power)
--  [Function `quorum_threshold`](#one_system_voting_power_quorum_threshold)
+-  [Function `set_voting_power`](#sui_system_voting_power_set_voting_power)
+-  [Function `init_voting_power_info`](#sui_system_voting_power_init_voting_power_info)
+-  [Function `derive_raw_voting_power`](#sui_system_voting_power_derive_raw_voting_power)
+-  [Function `insert`](#sui_system_voting_power_insert)
+-  [Function `adjust_voting_power`](#sui_system_voting_power_adjust_voting_power)
+-  [Function `update_voting_power`](#sui_system_voting_power_update_voting_power)
+-  [Function `check_invariants`](#sui_system_voting_power_check_invariants)
+-  [Function `total_voting_power`](#sui_system_voting_power_total_voting_power)
+-  [Function `quorum_threshold`](#sui_system_voting_power_quorum_threshold)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
-<b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
-<b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
-<b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
-<b>use</b> <a href="../one/coin_vesting.md#one_coin_vesting">one::coin_vesting</a>;
-<b>use</b> <a href="../one/config.md#one_config">one::config</a>;
-<b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
-<b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
-<b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
-<b>use</b> <a href="../one/event.md#one_event">one::event</a>;
-<b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
-<b>use</b> <a href="../one/object.md#one_object">one::object</a>;
-<b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
-<b>use</b> <a href="../one/table.md#one_table">one::table</a>;
-<b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
-<b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
-<b>use</b> <a href="../one/types.md#one_types">one::types</a>;
-<b>use</b> <a href="../one/url.md#one_url">one::url</a>;
-<b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
-<b>use</b> <a href="../one_system/staking_pool.md#one_system_staking_pool">one_system::staking_pool</a>;
-<b>use</b> <a href="../one_system/validator.md#one_system_validator">one_system::validator</a>;
-<b>use</b> <a href="../one_system/validator_cap.md#one_system_validator_cap">one_system::validator_cap</a>;
-<b>use</b> <a href="../std/address.md#std_address">std::address</a>;
+<pre><code><b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -48,18 +26,43 @@ title: Module `one_system::voting_power`
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/u64.md#std_u64">std::u64</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
+<b>use</b> <a href="../sui/accumulator.md#sui_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../sui/address.md#sui_address">one::address</a>;
+<b>use</b> <a href="../sui/bag.md#sui_bag">one::bag</a>;
+<b>use</b> <a href="../sui/balance.md#sui_balance">one::balance</a>;
+<b>use</b> <a href="../sui/coin.md#sui_coin">one::coin</a>;
+<b>use</b> <a href="../sui/config.md#sui_config">one::config</a>;
+<b>use</b> <a href="../sui/deny_list.md#sui_deny_list">one::deny_list</a>;
+<b>use</b> <a href="../sui/dynamic_field.md#sui_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../sui/dynamic_object_field.md#sui_dynamic_object_field">one::dynamic_object_field</a>;
+<b>use</b> <a href="../sui/event.md#sui_event">one::event</a>;
+<b>use</b> <a href="../sui/funds_accumulator.md#sui_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../sui/hex.md#sui_hex">one::hex</a>;
+<b>use</b> <a href="../sui/object.md#sui_object">one::object</a>;
+<b>use</b> <a href="../sui/party.md#sui_party">one::party</a>;
+<b>use</b> <a href="../sui/sui.md#sui_sui">one::sui</a>;
+<b>use</b> <a href="../sui/table.md#sui_table">one::table</a>;
+<b>use</b> <a href="../sui/transfer.md#sui_transfer">one::transfer</a>;
+<b>use</b> <a href="../sui/tx_context.md#sui_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../sui/types.md#sui_types">one::types</a>;
+<b>use</b> <a href="../sui/url.md#sui_url">one::url</a>;
+<b>use</b> <a href="../sui/vec_map.md#sui_vec_map">one::vec_map</a>;
+<b>use</b> <a href="../sui/vec_set.md#sui_vec_set">one::vec_set</a>;
+<b>use</b> <a href="../sui_system/staking_pool.md#sui_system_staking_pool">one_system::staking_pool</a>;
+<b>use</b> <a href="../sui_system/validator.md#sui_system_validator">one_system::validator</a>;
+<b>use</b> <a href="../sui_system/validator_cap.md#sui_system_validator_cap">one_system::validator_cap</a>;
 </code></pre>
 
 
 
-<a name="one_system_voting_power_VotingPowerInfo"></a>
+<a name="sui_system_voting_power_VotingPowerInfo"></a>
 
 ## Struct `VotingPowerInfo`
 
 Deprecated. Use VotingPowerInfoV2 instead.
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfo">VotingPowerInfo</a> <b>has</b> drop
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfo">VotingPowerInfo</a> <b>has</b> drop
 </code></pre>
 
 
@@ -75,7 +78,7 @@ Deprecated. Use VotingPowerInfoV2 instead.
 <dd>
 </dd>
 <dt>
-<code><a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>: u64</code>
+<code><a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>: u64</code>
 </dt>
 <dd>
 </dd>
@@ -84,13 +87,13 @@ Deprecated. Use VotingPowerInfoV2 instead.
 
 </details>
 
-<a name="one_system_voting_power_VotingPowerInfoV2"></a>
+<a name="sui_system_voting_power_VotingPowerInfoV2"></a>
 
 ## Struct `VotingPowerInfoV2`
 
 
 
-<pre><code><b>public</b> <b>struct</b> <a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a> <b>has</b> drop
+<pre><code><b>public</b> <b>struct</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a> <b>has</b> drop
 </code></pre>
 
 
@@ -106,7 +109,7 @@ Deprecated. Use VotingPowerInfoV2 instead.
 <dd>
 </dd>
 <dt>
-<code><a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>: u64</code>
+<code><a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>: u64</code>
 </dt>
 <dd>
 </dd>
@@ -125,63 +128,7 @@ Deprecated. Use VotingPowerInfoV2 instead.
 ## Constants
 
 
-<a name="one_system_voting_power_EInvalidVotingPower"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_EInvalidVotingPower">EInvalidVotingPower</a>: u64 = 4;
-</code></pre>
-
-
-
-<a name="one_system_voting_power_ERelativePowerMismatch"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_ERelativePowerMismatch">ERelativePowerMismatch</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="one_system_voting_power_ETotalPowerMismatch"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_ETotalPowerMismatch">ETotalPowerMismatch</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="one_system_voting_power_EVotingPowerOverThreshold"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_EVotingPowerOverThreshold">EVotingPowerOverThreshold</a>: u64 = 3;
-</code></pre>
-
-
-
-<a name="one_system_voting_power_MAX_VOTING_POWER"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a>: u64 = 2000;
-</code></pre>
-
-
-
-<a name="one_system_voting_power_QUORUM_THRESHOLD"></a>
-
-Quorum threshold for our fixed voting power--any message signed by this much voting power can be trusted
-up to BFT assumptions
-
-
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_QUORUM_THRESHOLD">QUORUM_THRESHOLD</a>: u64 = 6667;
-</code></pre>
-
-
-
-<a name="one_system_voting_power_TOTAL_VOTING_POWER"></a>
+<a name="sui_system_voting_power_TOTAL_VOTING_POWER"></a>
 
 Set total_voting_power as 10_000 by convention. Individual voting powers can be interpreted
 as easily understandable basis points (e.g., voting_power: 100 = 1%, voting_power: 1 = 0.01%) rather than
@@ -190,21 +137,77 @@ Fixing the total voting power allows clients to hardcode the quorum threshold an
 than recomputing these.
 
 
-<pre><code><b>const</b> <a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>: u64 = 10000;
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>: u64 = 10000;
 </code></pre>
 
 
 
-<a name="one_system_voting_power_set_voting_power"></a>
+<a name="sui_system_voting_power_QUORUM_THRESHOLD"></a>
+
+Quorum threshold for our fixed voting power--any message signed by this much voting power can be trusted
+up to BFT assumptions
+
+
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_QUORUM_THRESHOLD">QUORUM_THRESHOLD</a>: u64 = 6667;
+</code></pre>
+
+
+
+<a name="sui_system_voting_power_MAX_VOTING_POWER"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a>: u64 = 1000;
+</code></pre>
+
+
+
+<a name="sui_system_voting_power_ETotalPowerMismatch"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_ETotalPowerMismatch">ETotalPowerMismatch</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="sui_system_voting_power_ERelativePowerMismatch"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_ERelativePowerMismatch">ERelativePowerMismatch</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="sui_system_voting_power_EVotingPowerOverThreshold"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_EVotingPowerOverThreshold">EVotingPowerOverThreshold</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="sui_system_voting_power_EInvalidVotingPower"></a>
+
+
+
+<pre><code><b>const</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_EInvalidVotingPower">EInvalidVotingPower</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="sui_system_voting_power_set_voting_power"></a>
 
 ## Function `set_voting_power`
 
 Set the voting power of all validators.
 Each validator's voting power is initialized using their stake. We then attempt to cap their voting power
-at <code><a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a></code>. If <code><a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a></code> is not a feasible cap, we pick the lowest possible cap.
+at <code><a href="../sui_system/voting_power.md#sui_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a></code>. If <code><a href="../sui_system/voting_power.md#sui_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a></code> is not a feasible cap, we pick the lowest possible cap.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_set_voting_power">set_voting_power</a>(validators: &<b>mut</b> vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;)
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_set_voting_power">set_voting_power</a>(validators: &<b>mut</b> vector&lt;<a href="../sui_system/validator.md#sui_system_validator_Validator">one_system::validator::Validator</a>&gt;, total_stake: u64)
 </code></pre>
 
 
@@ -213,16 +216,20 @@ at <code><a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTI
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_set_voting_power">set_voting_power</a>(validators: &<b>mut</b> vector&lt;Validator&gt;) {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_set_voting_power">set_voting_power</a>(validators: &<b>mut</b> vector&lt;Validator&gt;, total_stake: u64) {
     // If threshold_pct is too small, it's possible that even when all validators reach the threshold we still don't
     // have 100%. So we bound the threshold_pct to be always enough to find a solution.
-    <b>let</b> threshold = <a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>.min(
-        <a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a>.max(<a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>.divide_and_round_up(validators.length())),
+    <b>let</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_total_voting_power">total_voting_power</a> = <a href="../sui_system/voting_power.md#sui_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>;
+    <b>let</b> average_voting_power = <a href="../sui_system/voting_power.md#sui_system_voting_power_total_voting_power">total_voting_power</a>.divide_and_round_up(validators.length());
+    <b>let</b> threshold = <a href="../sui_system/voting_power.md#sui_system_voting_power_total_voting_power">total_voting_power</a>.min(<a href="../sui_system/voting_power.md#sui_system_voting_power_MAX_VOTING_POWER">MAX_VOTING_POWER</a>.max(average_voting_power));
+    <b>let</b> (<b>mut</b> info_list, remaining_power) = <a href="../sui_system/voting_power.md#sui_system_voting_power_init_voting_power_info">init_voting_power_info</a>(
+        validators,
+        threshold,
+        total_stake,
     );
-    <b>let</b> (<b>mut</b> info_list, remaining_power) = <a href="../one_system/voting_power.md#one_system_voting_power_init_voting_power_info">init_voting_power_info</a>(validators, threshold);
-    <a href="../one_system/voting_power.md#one_system_voting_power_adjust_voting_power">adjust_voting_power</a>(&<b>mut</b> info_list, threshold, remaining_power);
-    <a href="../one_system/voting_power.md#one_system_voting_power_update_voting_power">update_voting_power</a>(validators, info_list);
-    <a href="../one_system/voting_power.md#one_system_voting_power_check_invariants">check_invariants</a>(validators);
+    <a href="../sui_system/voting_power.md#sui_system_voting_power_adjust_voting_power">adjust_voting_power</a>(&<b>mut</b> info_list, threshold, remaining_power);
+    <a href="../sui_system/voting_power.md#sui_system_voting_power_update_voting_power">update_voting_power</a>(validators, info_list);
+    <a href="../sui_system/voting_power.md#sui_system_voting_power_check_invariants">check_invariants</a>(validators);
 }
 </code></pre>
 
@@ -230,7 +237,7 @@ at <code><a href="../one_system/voting_power.md#one_system_voting_power_MAX_VOTI
 
 </details>
 
-<a name="one_system_voting_power_init_voting_power_info"></a>
+<a name="sui_system_voting_power_init_voting_power_info"></a>
 
 ## Function `init_voting_power_info`
 
@@ -240,7 +247,7 @@ descending order using voting power.
 Anything beyond the threshold is added to the remaining_power, which is also returned.
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_init_voting_power_info">init_voting_power_info</a>(validators: &vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;, threshold: u64): (vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;, u64)
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_init_voting_power_info">init_voting_power_info</a>(validators: &vector&lt;<a href="../sui_system/validator.md#sui_system_validator_Validator">one_system::validator::Validator</a>&gt;, threshold: u64, total_stake: u64): (vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;, u64)
 </code></pre>
 
 
@@ -249,30 +256,20 @@ Anything beyond the threshold is added to the remaining_power, which is also ret
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_init_voting_power_info">init_voting_power_info</a>(
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_init_voting_power_info">init_voting_power_info</a>(
     validators: &vector&lt;Validator&gt;,
     threshold: u64,
-): (vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;, u64) {
-    <b>let</b> <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a> = <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>(validators);
-    <b>let</b> <b>mut</b> i = 0;
-    <b>let</b> len = validators.length();
+    total_stake: u64,
+): (vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;, u64) {
     <b>let</b> <b>mut</b> total_power = 0;
     <b>let</b> <b>mut</b> result = vector[];
-    <b>while</b> (i &lt; len) {
-        <b>let</b> <a href="../one_system/validator.md#one_system_validator">validator</a> = &validators[i];
-        <b>let</b> stake = <a href="../one_system/validator.md#one_system_validator">validator</a>.<a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>();
-        <b>let</b> adjusted_stake = stake <b>as</b> u128 * (<a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a> <b>as</b> u128) / (<a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a> <b>as</b> u128);
-        <b>let</b> <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> = (adjusted_stake <b>as</b> u64).min(threshold);
-        <b>let</b> info = <a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a> {
-            validator_index: i,
-            <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>,
-            stake,
-        };
-        <a href="../one_system/voting_power.md#one_system_voting_power_insert">insert</a>(&<b>mut</b> result, info);
-        total_power = total_power + <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>;
-        i = i + 1;
-    };
-    (result, <a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a> - total_power)
+    validators.length().do!(|i| {
+        <b>let</b> stake = validators[i].total_stake();
+        <b>let</b> <a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> = <a href="../sui_system/voting_power.md#sui_system_voting_power_derive_raw_voting_power">derive_raw_voting_power</a>(stake, total_stake).min(threshold);
+        <a href="../sui_system/voting_power.md#sui_system_voting_power_insert">insert</a>(&<b>mut</b> result, <a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a> { validator_index: i, <a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>, stake });
+        total_power = total_power + <a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>;
+    });
+    (result, <a href="../sui_system/voting_power.md#sui_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a> - total_power)
 }
 </code></pre>
 
@@ -280,14 +277,13 @@ Anything beyond the threshold is added to the remaining_power, which is also ret
 
 </details>
 
-<a name="one_system_voting_power_total_stake"></a>
+<a name="sui_system_voting_power_derive_raw_voting_power"></a>
 
-## Function `total_stake`
-
-Sum up the total stake of all validators.
+## Function `derive_raw_voting_power`
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>(validators: &vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;): u64
+
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_derive_raw_voting_power">derive_raw_voting_power</a>(stake: u64, total_stake: u64): u64
 </code></pre>
 
 
@@ -296,15 +292,8 @@ Sum up the total stake of all validators.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>(validators: &vector&lt;Validator&gt;): u64 {
-    <b>let</b> <b>mut</b> i = 0;
-    <b>let</b> len = validators.length();
-    <b>let</b> <b>mut</b> <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a> =0 ;
-    <b>while</b> (i &lt; len) {
-        <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a> = <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a> + validators[i].<a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>();
-        i = i + 1;
-    };
-    <a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_derive_raw_voting_power">derive_raw_voting_power</a>(stake: u64, total_stake: u64): u64 {
+    ((stake <b>as</b> u128 * (<a href="../sui_system/voting_power.md#sui_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a> <b>as</b> u128) / (total_stake <b>as</b> u128)) <b>as</b> u64)
 }
 </code></pre>
 
@@ -312,7 +301,7 @@ Sum up the total stake of all validators.
 
 </details>
 
-<a name="one_system_voting_power_insert"></a>
+<a name="sui_system_voting_power_insert"></a>
 
 ## Function `insert`
 
@@ -320,7 +309,7 @@ Insert <code>new_info</code> to <code>info_list</code> as part of insertion sort
 using stake, in descending order.
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_insert">insert</a>(info_list: &<b>mut</b> vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;, new_info: <a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>)
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_insert">insert</a>(info_list: &<b>mut</b> vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;, new_info: <a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>)
 </code></pre>
 
 
@@ -329,13 +318,10 @@ using stake, in descending order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_insert">insert</a>(info_list: &<b>mut</b> vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;, new_info: <a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>) {
-    <b>let</b> <b>mut</b> i = 0;
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_insert">insert</a>(info_list: &<b>mut</b> vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;, new_info: <a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>) {
     <b>let</b> len = info_list.length();
-    <b>while</b> (i &lt; len && info_list[i].stake &gt; new_info.stake) {
-        i = i + 1;
-    };
-    info_list.<a href="../one_system/voting_power.md#one_system_voting_power_insert">insert</a>(new_info, i);
+    <b>let</b> idx = info_list.find_index!(|info| new_info.stake &gt;= info.stake);
+    info_list.<a href="../sui_system/voting_power.md#sui_system_voting_power_insert">insert</a>(new_info, idx.destroy_or!(len));
 }
 </code></pre>
 
@@ -343,14 +329,14 @@ using stake, in descending order.
 
 </details>
 
-<a name="one_system_voting_power_adjust_voting_power"></a>
+<a name="sui_system_voting_power_adjust_voting_power"></a>
 
 ## Function `adjust_voting_power`
 
 Distribute remaining_power to validators that are not capped at threshold.
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_adjust_voting_power">adjust_voting_power</a>(info_list: &<b>mut</b> vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;, threshold: u64, remaining_power: u64)
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_adjust_voting_power">adjust_voting_power</a>(info_list: &<b>mut</b> vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;, threshold: u64, remaining_power: u64)
 </code></pre>
 
 
@@ -359,23 +345,27 @@ Distribute remaining_power to validators that are not capped at threshold.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_adjust_voting_power">adjust_voting_power</a>(info_list: &<b>mut</b> vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;, threshold: u64, <b>mut</b> remaining_power: u64) {
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_adjust_voting_power">adjust_voting_power</a>(
+    info_list: &<b>mut</b> vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;,
+    threshold: u64,
+    <b>mut</b> remaining_power: u64,
+) {
     <b>let</b> <b>mut</b> i = 0;
     <b>let</b> len = info_list.length();
     <b>while</b> (i &lt; len && remaining_power &gt; 0) {
         <b>let</b> v = &<b>mut</b> info_list[i];
-        // planned is the amount of extra power we want to distribute to this <a href="../one_system/validator.md#one_system_validator">validator</a>.
+        // planned is the amount of extra power we want to distribute to this <a href="../sui_system/validator.md#sui_system_validator">validator</a>.
         <b>let</b> planned = remaining_power.divide_and_round_up(len - i);
-        // target is the targeting power this <a href="../one_system/validator.md#one_system_validator">validator</a> will reach, capped by threshold.
-        <b>let</b> target = threshold.min(v.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> + planned);
-        // actual is the actual amount of power we will be distributing to this <a href="../one_system/validator.md#one_system_validator">validator</a>.
-        <b>let</b> actual = remaining_power.min(target - v.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>);
-        v.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> = v.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> + actual;
-        <b>assert</b>!(v.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> &lt;= threshold, <a href="../one_system/voting_power.md#one_system_voting_power_EVotingPowerOverThreshold">EVotingPowerOverThreshold</a>);
+        // target is the targeting power this <a href="../sui_system/validator.md#sui_system_validator">validator</a> will reach, capped by threshold.
+        <b>let</b> target = threshold.min(v.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> + planned);
+        // actual is the actual amount of power we will be distributing to this <a href="../sui_system/validator.md#sui_system_validator">validator</a>.
+        <b>let</b> actual = remaining_power.min(target - v.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>);
+        v.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> = v.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> + actual;
+        <b>assert</b>!(v.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> &lt;= threshold, <a href="../sui_system/voting_power.md#sui_system_voting_power_EVotingPowerOverThreshold">EVotingPowerOverThreshold</a>);
         remaining_power = remaining_power - actual;
         i = i + 1;
     };
-    <b>assert</b>!(remaining_power == 0, <a href="../one_system/voting_power.md#one_system_voting_power_ETotalPowerMismatch">ETotalPowerMismatch</a>);
+    <b>assert</b>!(remaining_power == 0, <a href="../sui_system/voting_power.md#sui_system_voting_power_ETotalPowerMismatch">ETotalPowerMismatch</a>);
 }
 </code></pre>
 
@@ -383,14 +373,14 @@ Distribute remaining_power to validators that are not capped at threshold.
 
 </details>
 
-<a name="one_system_voting_power_update_voting_power"></a>
+<a name="sui_system_voting_power_update_voting_power"></a>
 
 ## Function `update_voting_power`
 
 Update validators with the decided voting power.
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_update_voting_power">update_voting_power</a>(validators: &<b>mut</b> vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;, info_list: vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;)
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_update_voting_power">update_voting_power</a>(validators: &<b>mut</b> vector&lt;<a href="../sui_system/validator.md#sui_system_validator_Validator">one_system::validator::Validator</a>&gt;, info_list: vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">one_system::voting_power::VotingPowerInfoV2</a>&gt;)
 </code></pre>
 
 
@@ -399,17 +389,10 @@ Update validators with the decided voting power.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_update_voting_power">update_voting_power</a>(validators: &<b>mut</b> vector&lt;Validator&gt;, <b>mut</b> info_list: vector&lt;<a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;) {
-    <b>while</b> (info_list.length() != 0) {
-        <b>let</b> <a href="../one_system/voting_power.md#one_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a> {
-            validator_index,
-            <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>,
-            stake: _,
-        } = info_list.pop_back();
-        <b>let</b> v = &<b>mut</b> validators[validator_index];
-        v.<a href="../one_system/voting_power.md#one_system_voting_power_set_voting_power">set_voting_power</a>(<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>);
-    };
-    info_list.destroy_empty();
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_update_voting_power">update_voting_power</a>(validators: &<b>mut</b> vector&lt;Validator&gt;, info_list: vector&lt;<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a>&gt;) {
+    info_list.destroy!(|<a href="../sui_system/voting_power.md#sui_system_voting_power_VotingPowerInfoV2">VotingPowerInfoV2</a> { validator_index, <a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>, .. }| {
+        validators[validator_index].<a href="../sui_system/voting_power.md#sui_system_voting_power_set_voting_power">set_voting_power</a>(<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>);
+    });
 }
 </code></pre>
 
@@ -417,14 +400,14 @@ Update validators with the decided voting power.
 
 </details>
 
-<a name="one_system_voting_power_check_invariants"></a>
+<a name="sui_system_voting_power_check_invariants"></a>
 
 ## Function `check_invariants`
 
 Check a few invariants that must hold after setting the voting power.
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_check_invariants">check_invariants</a>(v: &vector&lt;<a href="../one_system/validator.md#one_system_validator_Validator">one_system::validator::Validator</a>&gt;)
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_check_invariants">check_invariants</a>(v: &vector&lt;<a href="../sui_system/validator.md#sui_system_validator_Validator">one_system::validator::Validator</a>&gt;)
 </code></pre>
 
 
@@ -433,41 +416,35 @@ Check a few invariants that must hold after setting the voting power.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_check_invariants">check_invariants</a>(v: &vector&lt;Validator&gt;) {
-    // First check that the total voting power must be <a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>.
-    <b>let</b> <b>mut</b> i = 0;
-    <b>let</b> len = v.length();
+<pre><code><b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_check_invariants">check_invariants</a>(v: &vector&lt;Validator&gt;) {
     <b>let</b> <b>mut</b> total = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> = v[i].<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>();
-        <b>assert</b>!(<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a> &gt; 0, <a href="../one_system/voting_power.md#one_system_voting_power_EInvalidVotingPower">EInvalidVotingPower</a>);
-        total = total + <a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>;
-        i = i + 1;
-    };
-    <b>assert</b>!(total == <a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>, <a href="../one_system/voting_power.md#one_system_voting_power_ETotalPowerMismatch">ETotalPowerMismatch</a>);
-    // Second check that <b>if</b> <a href="../one_system/validator.md#one_system_validator">validator</a> A's stake is larger than B's stake, A's voting power must be no less
-    // than B's voting power; similarly, <b>if</b> A's stake is less than B's stake, A's voting power must be no larger
-    // than B's voting power.
-    <b>let</b> <b>mut</b> a = 0;
-    <b>while</b> (a &lt; len) {
-        <b>let</b> <b>mut</b> b = a + 1;
-        <b>while</b> (b &lt; len) {
+    v.do_ref!(|v| {
+        <b>let</b> <a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> = v.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>();
+        <b>assert</b>!(<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a> &gt; 0, <a href="../sui_system/voting_power.md#sui_system_voting_power_EInvalidVotingPower">EInvalidVotingPower</a>);
+        total = total + <a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>;
+    });
+    <b>assert</b>!(total == <a href="../sui_system/voting_power.md#sui_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>, <a href="../sui_system/voting_power.md#sui_system_voting_power_ETotalPowerMismatch">ETotalPowerMismatch</a>);
+    // Second check that <b>if</b> <a href="../sui_system/validator.md#sui_system_validator">validator</a> A's stake is larger than B's stake, A's
+    // voting power must be no less than B's voting power; similarly, <b>if</b> A's
+    // stake is less than B's stake, A's voting power must be no larger than
+    // B's voting power.
+    <b>let</b> length = v.length();
+    length.do!(|a| {
+        (a + 1).range_do!(length, |b| {
             <b>let</b> validator_a = &v[a];
             <b>let</b> validator_b = &v[b];
-            <b>let</b> stake_a = validator_a.<a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>();
-            <b>let</b> stake_b = validator_b.<a href="../one_system/voting_power.md#one_system_voting_power_total_stake">total_stake</a>();
-            <b>let</b> power_a = validator_a.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>();
-            <b>let</b> power_b = validator_b.<a href="../one_system/voting_power.md#one_system_voting_power">voting_power</a>();
+            <b>let</b> stake_a = validator_a.total_stake();
+            <b>let</b> stake_b = validator_b.total_stake();
+            <b>let</b> power_a = validator_a.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>();
+            <b>let</b> power_b = validator_b.<a href="../sui_system/voting_power.md#sui_system_voting_power">voting_power</a>();
             <b>if</b> (stake_a &gt; stake_b) {
-                <b>assert</b>!(power_a &gt;= power_b, <a href="../one_system/voting_power.md#one_system_voting_power_ERelativePowerMismatch">ERelativePowerMismatch</a>);
+                <b>assert</b>!(power_a &gt;= power_b, <a href="../sui_system/voting_power.md#sui_system_voting_power_ERelativePowerMismatch">ERelativePowerMismatch</a>);
             };
             <b>if</b> (stake_a &lt; stake_b) {
-                <b>assert</b>!(power_a &lt;= power_b, <a href="../one_system/voting_power.md#one_system_voting_power_ERelativePowerMismatch">ERelativePowerMismatch</a>);
+                <b>assert</b>!(power_a &lt;= power_b, <a href="../sui_system/voting_power.md#sui_system_voting_power_ERelativePowerMismatch">ERelativePowerMismatch</a>);
             };
-            b = b + 1;
-        };
-        a = a + 1;
-    }
+        })
+    });
 }
 </code></pre>
 
@@ -475,14 +452,14 @@ Check a few invariants that must hold after setting the voting power.
 
 </details>
 
-<a name="one_system_voting_power_total_voting_power"></a>
+<a name="sui_system_voting_power_total_voting_power"></a>
 
 ## Function `total_voting_power`
 
 Return the (constant) total voting power
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_total_voting_power">total_voting_power</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_total_voting_power">total_voting_power</a>(): u64
 </code></pre>
 
 
@@ -491,8 +468,8 @@ Return the (constant) total voting power
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_total_voting_power">total_voting_power</a>(): u64 {
-    <a href="../one_system/voting_power.md#one_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_total_voting_power">total_voting_power</a>(): u64 {
+    <a href="../sui_system/voting_power.md#sui_system_voting_power_TOTAL_VOTING_POWER">TOTAL_VOTING_POWER</a>
 }
 </code></pre>
 
@@ -500,14 +477,14 @@ Return the (constant) total voting power
 
 </details>
 
-<a name="one_system_voting_power_quorum_threshold"></a>
+<a name="sui_system_voting_power_quorum_threshold"></a>
 
 ## Function `quorum_threshold`
 
 Return the (constant) quorum threshold
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_quorum_threshold">quorum_threshold</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_quorum_threshold">quorum_threshold</a>(): u64
 </code></pre>
 
 
@@ -516,8 +493,8 @@ Return the (constant) quorum threshold
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one_system/voting_power.md#one_system_voting_power_quorum_threshold">quorum_threshold</a>(): u64 {
-    <a href="../one_system/voting_power.md#one_system_voting_power_QUORUM_THRESHOLD">QUORUM_THRESHOLD</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../sui_system/voting_power.md#sui_system_voting_power_quorum_threshold">quorum_threshold</a>(): u64 {
+    <a href="../sui_system/voting_power.md#sui_system_voting_power_QUORUM_THRESHOLD">QUORUM_THRESHOLD</a>
 }
 </code></pre>
 

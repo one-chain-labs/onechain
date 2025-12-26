@@ -98,7 +98,7 @@ where
                     sui_client_clone.get_latest_checkpoint_sequence_number(),
                     Duration::from_secs(120)
                 ) else {
-                    tracing::error!("Failed to query latest checkpoint sequence number from sui client after retry");
+                    tracing::error!("Failed to query latest checkpoint sequence number from one client after retry");
                     continue;
                 };
                 last_synced_sui_checkpoints_metric.set(latest_checkpoint_sequence_number as i64);
@@ -111,7 +111,7 @@ where
                 sui_client.query_events_by_module(BRIDGE_PACKAGE_ID, module.clone(), cursor),
                 Duration::from_secs(120)
             ) else {
-                tracing::error!("Failed to query events from sui client after retry");
+                tracing::error!("Failed to query events from one client after retry");
                 continue;
             };
 

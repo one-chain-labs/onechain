@@ -256,7 +256,7 @@ fun test_only_function(...) { ... }
 
 ## Running Unit Tests
 
-Unit tests for a Move package can be run with the [`sui move test` command](./packages.md).
+Unit tests for a Move package can be run with the [`one move test` command](./packages.md).
 
 When running tests, every test will either `PASS`, `FAIL`, or `TIMEOUT`. If a test case fails, the
 location of the failure along with the function name that caused the failure will be reported if
@@ -272,10 +272,10 @@ thread (see `OPTIONS` below on how to do this).
 There are also a number of options that can be passed to the unit testing binary to fine-tune
 testing and to help debug failing tests. The available options, and a
 description of what each one can do can be found by passing the help flag to
-the `sui move test` command:
+the `one move test` command:
 
 ```
-$ sui move test --help
+$ one move test --help
 ```
 
 ## Example
@@ -285,7 +285,7 @@ A simple module using some of the unit testing features is shown in the followin
 First create an empty package and change directory into it:
 
 ```bash
-$ sui move new test_example; cd test_example 
+$ one move new test_example; cd test_example 
 ```
 
 Next add the following module under the `sources` directory:
@@ -337,7 +337,7 @@ module test_example::my_module {
 You can then run these tests with the `move test` command:
 
 ```
-$ sui move test
+$ one move test
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING test_example
@@ -352,12 +352,12 @@ Test result: OK. Total tests: 3; passed: 3; failed: 0
 
 #### Passing specific tests to run
 
-You can run a specific test, or a set of tests with `sui move test <str>`. This
+You can run a specific test, or a set of tests with `one move test <str>`. This
 will only run tests whose fully qualified name contains `<str>`. For example if
 we wanted to only run tests with `"non_zero"` in their name:
 
 ```
-$ sui move test non_zero
+$ one move test non_zero
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING test_example
@@ -371,7 +371,7 @@ Test result: OK. Total tests: 1; passed: 1; failed: 0
 This bounds the amount of gas that can be consumed for any one test to `<bound>`:
 
 ```
-$ sui move test -i 0
+$ one move test -i 0
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING test_example
@@ -420,12 +420,12 @@ Test result: FAILED. Total tests: 3; passed: 0; failed: 3
 #### `-s` or `--statistics`
 
 With these flags you can gather statistics about the tests run and report the
-runtime and gas used for each test. You can additionally add `csv` (`sui move
+runtime and gas used for each test. You can additionally add `csv` (`one move
 test -s csv`) to get the gas usage in a csv output format. For example, if we
 wanted to see the statistics for the tests in the example above:
 
 ```
-$ sui move test -s
+$ one move test -s
 INCLUDING DEPENDENCY Sui
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING test_example

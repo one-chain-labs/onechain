@@ -14,14 +14,20 @@ mod compatibility_tests {
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
     use sui_types::execution_config_utils::to_binary_config;
 
+    /// The number of bytecode snapshots to backtest against the current framework.
+    /// This should be set to a reasonable number to ensure that we are testing against any
+    /// possible running version of the framework, but not too large to avoid weird config
+    /// artifacts.
+    const SNAPSHOT_BACKTEST_WINDOW: usize = 10;
+
     #[tokio::test]
     async fn test_framework_compatibility() {
-        // This test checks that the current framework is compatible with all previous framework
-        // bytecode snapshots.
-        for (version, _snapshots) in load_bytecode_snapshot_manifest() {
-            let config = ProtocolConfig::get_for_version(ProtocolVersion::new(version), Chain::Unknown);
+        // This test checks that the current framework is compatible with
+        // `SNAPSHOT_BACKTEST_WINDOW` previous framework bytecode snapshots.
+        for (version, _snapshots) in load_bytecode_snapshot_manifest().iter().rev().take(SNAPSHOT_BACKTEST_WINDOW) {
+            let config = ProtocolConfig::get_for_version(ProtocolVersion::new(*version), Chain::Unknown);
             let binary_config = to_binary_config(&config);
-            let framework = load_bytecode_snapshot(version).unwrap();
+            let framework = load_bytecode_snapshot(*version).unwrap();
             let old_framework_store: BTreeMap<_, _> =
                 framework.into_iter().map(|package| (package.id, package.genesis_object())).collect();
             for cur_package in BuiltInFramework::iter_system_packages() {
@@ -65,7 +71,7 @@ mod compatibility_tests {
         );
     }
 
-    /// This test checks that the the `SinglePackage` entries in `manifest.json` match the metadata
+    /// This test checks that the `SinglePackage` entries in `manifest.json` match the metadata
     /// in the `Move.toml` files in the repo.
     ///
     /// Note that this test currently assumes that no framework packages will be removed or moved

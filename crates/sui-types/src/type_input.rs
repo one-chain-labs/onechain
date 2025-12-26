@@ -12,6 +12,8 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use sui_macros::EnumVariantOrder;
 
+use crate::base_types::MoveObjectType;
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 pub struct StructInput {
     pub address: AccountAddress,
@@ -135,37 +137,10 @@ impl TypeInput {
         }
     }
 
-    /// Convert to a `TypeTag` consuming `self`. This can fail if this value includes invalid
-    /// identifiers.
-    pub fn into_type_tag(self) -> Result<TypeTag> {
-        use TypeInput as I;
-        use TypeTag as T;
-        Ok(match self {
-            I::Bool => T::Bool,
-            I::U8 => T::U8,
-            I::U16 => T::U16,
-            I::U32 => T::U32,
-            I::U64 => T::U64,
-            I::U128 => T::U128,
-            I::U256 => T::U256,
-            I::Address => T::Address,
-            I::Signer => T::Signer,
-            I::Vector(t) => T::Vector(Box::new(t.into_type_tag()?)),
-            I::Struct(s) => {
-                let StructInput { address, module, name, type_params } = *s;
-                let type_params = type_params.into_iter().map(|t| t.into_type_tag()).collect::<Result<_>>()?;
-                T::Struct(Box::new(StructTag {
-                    address,
-                    module: Identifier::new(module)?,
-                    name: Identifier::new(name)?,
-                    type_params,
-                }))
-            }
-        })
-    }
-
     /// Conversion to a `TypeTag`, which can fail if this value includes invalid identifiers.
-    pub fn as_type_tag(&self) -> Result<TypeTag> {
+    /// NB: This function should _not_ be used in the adapter or on the "write" side of transaction
+    /// processing.
+    pub fn to_type_tag(&self) -> Result<TypeTag> {
         use TypeInput as I;
         use TypeTag as T;
         Ok(match self {
@@ -178,10 +153,10 @@ impl TypeInput {
             I::U256 => T::U256,
             I::Address => T::Address,
             I::Signer => T::Signer,
-            I::Vector(t) => T::Vector(Box::new(t.as_type_tag()?)),
+            I::Vector(t) => T::Vector(Box::new(t.to_type_tag()?)),
             I::Struct(s) => {
                 let StructInput { address, module, name, type_params } = s.as_ref();
-                let type_params = type_params.iter().map(|t| t.as_type_tag()).collect::<Result<_>>()?;
+                let type_params = type_params.iter().map(|t| t.to_type_tag()).collect::<Result<_>>()?;
                 T::Struct(Box::new(StructTag {
                     address: *address,
                     module: Identifier::new(module.to_owned())?,
@@ -242,6 +217,12 @@ impl StructInput {
         }
 
         CanonicalDisplay { data: self, with_prefix }
+    }
+}
+
+impl From<MoveObjectType> for TypeInput {
+    fn from(obj: MoveObjectType) -> Self {
+        Self::from(TypeTag::from(obj))
     }
 }
 

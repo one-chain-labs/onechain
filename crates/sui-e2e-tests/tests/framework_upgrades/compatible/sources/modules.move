@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module one_system::msim_extra_1 {
-    use one::object::UID;
-    use one::tx_context::TxContext;
-
     public struct Type has drop {
-        x: u64
+        x: u64,
     }
 
     public struct Obj has key {

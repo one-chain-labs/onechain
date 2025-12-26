@@ -14,7 +14,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use crate::{get_extension, get_extension_mut, object_runtime::ObjectRuntime, NativesCostTable};
 
 #[derive(Clone)]
 pub struct BorrowUidCostParams {
@@ -33,7 +33,7 @@ pub fn borrow_uid(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let borrow_uid_cost_params = context.extensions_mut().get::<NativesCostTable>().borrow_uid_cost_params.clone();
+    let borrow_uid_cost_params = get_extension!(context, NativesCostTable)?.borrow_uid_cost_params.clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(context, borrow_uid_cost_params.object_borrow_uid_cost_base);
@@ -61,7 +61,7 @@ pub fn delete_impl(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let delete_impl_cost_params = context.extensions_mut().get::<NativesCostTable>().delete_impl_cost_params.clone();
+    let delete_impl_cost_params = get_extension!(context, NativesCostTable)?.delete_impl_cost_params.clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(context, delete_impl_cost_params.object_delete_impl_cost_base);
@@ -69,7 +69,7 @@ pub fn delete_impl(
     // unwrap safe because the interface of native function guarantees it.
     let uid_bytes = pop_arg!(args, AccountAddress);
 
-    let obj_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
+    let obj_runtime: &mut ObjectRuntime = get_extension_mut!(context)?;
     obj_runtime.delete_id(uid_bytes.into())?;
     Ok(NativeResult::ok(context.gas_used(), smallvec![]))
 }
@@ -91,7 +91,7 @@ pub fn record_new_uid(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let record_new_id_cost_params = context.extensions_mut().get::<NativesCostTable>().record_new_id_cost_params.clone();
+    let record_new_id_cost_params = get_extension!(context, NativesCostTable)?.record_new_id_cost_params.clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(context, record_new_id_cost_params.object_record_new_uid_cost_base);
@@ -99,7 +99,7 @@ pub fn record_new_uid(
     // unwrap safe because the interface of native function guarantees it.
     let uid_bytes = pop_arg!(args, AccountAddress);
 
-    let obj_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
+    let obj_runtime: &mut ObjectRuntime = get_extension_mut!(context)?;
     obj_runtime.new_id(uid_bytes.into())?;
     Ok(NativeResult::ok(context.gas_used(), smallvec![]))
 }

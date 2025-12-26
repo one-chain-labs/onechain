@@ -1,12 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, bail};
 use clap::Parser;
 use sui_core::{
-    authority::{authority_per_epoch_store::AuthorityEpochTables, authority_store_tables::AuthorityPerpetualTables},
+    authority::{
+        authority_per_epoch_store::AuthorityEpochTables,
+        authority_store_pruner::PrunerWatermarks,
+        authority_store_tables::AuthorityPerpetualTables,
+    },
     checkpoints::CheckpointStore,
 };
 use sui_types::{
@@ -15,7 +22,7 @@ use sui_types::{
     effects::TransactionEffectsAPI,
     messages_checkpoint::{CheckpointDigest, CheckpointSequenceNumber},
 };
-use typed_store::rocks::MetricConf;
+use typed_store::rocks::{safe_drop_db, MetricConf};
 
 use self::{
     db_dump::{dump_table, duplicate_objects_summary, list_tables, table_summary, StoreName},
@@ -195,7 +202,7 @@ pub async fn execute_db_tool_command(db_path: PathBuf, cmd: DbToolCommand) -> an
         DbToolCommand::PrintObject(o) => print_object(&db_path, o),
         DbToolCommand::PrintCheckpoint(d) => print_checkpoint(&db_path, d),
         DbToolCommand::PrintCheckpointContent(d) => print_checkpoint_content(&db_path, d),
-        DbToolCommand::ResetDB => reset_db_to_genesis(&db_path),
+        DbToolCommand::ResetDB => reset_db_to_genesis(&db_path).await,
         DbToolCommand::RewindCheckpointExecution(d) => {
             rewind_checkpoint_execution(&db_path, d.epoch, d.checkpoint_sequence_number)
         }
@@ -226,7 +233,7 @@ pub fn print_db_all_tables(db_path: PathBuf) -> anyhow::Result<()> {
 }
 
 pub fn print_db_duplicates_summary(db_path: PathBuf) -> anyhow::Result<()> {
-    let (total_count, duplicate_count, total_bytes, duplicated_bytes) = duplicate_objects_summary(db_path);
+    let (total_count, duplicate_count, total_bytes, duplicated_bytes) = duplicate_objects_summary(db_path)?;
     println!(
         "Total objects = {}, duplicated objects = {}, total bytes = {}, duplicated bytes = {}",
         total_count, duplicate_count, total_bytes, duplicated_bytes
@@ -249,7 +256,7 @@ pub fn print_consensus_commit(_path: &Path, _opt: PrintConsensusCommitOptions) -
 }
 
 pub fn print_transaction(path: &Path, opt: PrintTransactionOptions) -> anyhow::Result<()> {
-    let perpetual_db = AuthorityPerpetualTables::open(&path.join("store"), None);
+    let perpetual_db = AuthorityPerpetualTables::open(&path.join("store"), None, None);
     if let Some((epoch, checkpoint_seq_num)) = perpetual_db.get_checkpoint_sequence_number(&opt.digest)? {
         println!("Transaction {:?} executed in epoch {} checkpoint {}", opt.digest, epoch, checkpoint_seq_num);
     };
@@ -260,7 +267,7 @@ pub fn print_transaction(path: &Path, opt: PrintTransactionOptions) -> anyhow::R
 }
 
 pub fn print_object(path: &Path, opt: PrintObjectOptions) -> anyhow::Result<()> {
-    let perpetual_db = AuthorityPerpetualTables::open(&path.join("store"), None);
+    let perpetual_db = AuthorityPerpetualTables::open(&path.join("store"), None, None);
 
     let obj = if let Some(version) = opt.version {
         perpetual_db.get_object_by_key_fallible(&opt.id, version.into())?
@@ -278,7 +285,7 @@ pub fn print_object(path: &Path, opt: PrintObjectOptions) -> anyhow::Result<()> 
 }
 
 pub fn print_checkpoint(path: &Path, opt: PrintCheckpointOptions) -> anyhow::Result<()> {
-    let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
+    let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"), Arc::new(PrunerWatermarks::default()));
     let checkpoint = checkpoint_store
         .get_checkpoint_by_digest(&opt.digest)?
         .ok_or(anyhow!("Checkpoint digest {:?} not found in checkpoint store", opt.digest))?;
@@ -288,7 +295,7 @@ pub fn print_checkpoint(path: &Path, opt: PrintCheckpointOptions) -> anyhow::Res
 }
 
 pub fn print_checkpoint_content(path: &Path, opt: PrintCheckpointContentOptions) -> anyhow::Result<()> {
-    let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"));
+    let checkpoint_store = CheckpointStore::new(&path.join("checkpoints"), Arc::new(PrunerWatermarks::default()));
     let contents = checkpoint_store
         .get_checkpoint_contents(&opt.digest)?
         .ok_or(anyhow!("Checkpoint content digest {:?} not found in checkpoint store", opt.digest))?;
@@ -296,7 +303,7 @@ pub fn print_checkpoint_content(path: &Path, opt: PrintCheckpointContentOptions)
     Ok(())
 }
 
-pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
+pub async fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
     // Follow the below steps to test:
     //
     // Get a db snapshot. Either generate one by running stress locally and enabling db checkpoints or download one from S3 bucket (pretty big in size though).
@@ -326,19 +333,10 @@ pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
     //   num-epochs-to-retain: 18446744073709551615
     //   max-checkpoints-in-batch: 10
     //   max-transactions-in-batch: 1000
-    let perpetual_db = AuthorityPerpetualTables::open_tables_read_write(
-        path.join("store").join("perpetual"),
-        MetricConf::default(),
-        None,
-        None,
-    );
-    perpetual_db.reset_db_for_execution_since_genesis()?;
+    safe_drop_db(path.join("store").join("perpetual"), std::time::Duration::from_secs(60)).await?;
 
-    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
+    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"), Arc::new(PrunerWatermarks::default()));
     checkpoint_db.reset_db_for_execution_since_genesis()?;
-
-    let epoch_db = AuthorityEpochTables::open_tables_read_write(path.join("store"), MetricConf::default(), None, None);
-    epoch_db.reset_db_for_execution_since_genesis()?;
 
     Ok(())
 }
@@ -347,7 +345,7 @@ pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
 /// NOTE: Does not force re-execution of transactions.
 /// Run with: cargo run --package sui-tool -- db-tool --db-path /opt/sui/db/authorities_db/live rewind-checkpoint-execution --epoch 3 --checkpoint-sequence-number 300000
 pub fn rewind_checkpoint_execution(path: &Path, epoch: EpochId, checkpoint_sequence_number: u64) -> anyhow::Result<()> {
-    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
+    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"), Arc::new(PrunerWatermarks::default()));
     let Some(checkpoint) = checkpoint_db.get_checkpoint_by_sequence_number(checkpoint_sequence_number)? else {
         bail!("Checkpoint {checkpoint_sequence_number} not found!");
     };
@@ -409,7 +407,7 @@ pub fn print_all_entries(
 /// Run with (for example):
 /// cargo run --package sui-tool -- db-tool --db-path /opt/sui/db/authorities_db/live set_checkpoint_watermark --highest-synced 300000
 pub fn set_checkpoint_watermark(path: &Path, options: SetCheckpointWatermarkOptions) -> anyhow::Result<()> {
-    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
+    let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"), Arc::new(PrunerWatermarks::default()));
 
     if let Some(highest_verified) = options.highest_verified {
         let Some(checkpoint) = checkpoint_db.get_checkpoint_by_sequence_number(highest_verified)? else {

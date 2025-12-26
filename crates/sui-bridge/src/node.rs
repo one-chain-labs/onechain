@@ -144,7 +144,8 @@ async fn start_watchdog(
         _config_address,
         weth_address,
         usdt_address,
-        _wbtc_address,
+        wbtc_address,
+        lbtc_address,
     ) = get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider)
         .await
         .unwrap_or_else(|e| panic!("get_eth_contract_addresses should not fail: {}", e));
@@ -172,12 +173,28 @@ async fn start_watchdog(
     let wbtc_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
         vault_address,
-        _wbtc_address,
+        wbtc_address,
         VaultAsset::WBTC,
         watchdog_metrics.wbtc_vault_balance.clone(),
     )
     .await
     .unwrap_or_else(|e| panic!("Failed to create wbtc vault balance: {}", e));
+
+    let lbtc_vault_balance = if !lbtc_address.is_zero() {
+        Some(
+            EthereumVaultBalance::new(
+                eth_provider.clone(),
+                vault_address,
+                lbtc_address,
+                VaultAsset::LBTC,
+                watchdog_metrics.lbtc_vault_balance.clone(),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("Failed to create lbtc vault balance: {}", e)),
+        )
+    } else {
+        None
+    };
 
     let eth_bridge_status =
         EthBridgeStatus::new(eth_provider, eth_bridge_proxy_address, watchdog_metrics.eth_bridge_paused.clone());
@@ -191,6 +208,12 @@ async fn start_watchdog(
         Box::new(eth_bridge_status),
         Box::new(sui_bridge_status),
     ];
+
+    // Add lbtc_vault_balance if it's available
+    if let Some(balance) = lbtc_vault_balance {
+        observables.push(Box::new(balance));
+    }
+
     if let Some(watchdog_config) = watchdog_config {
         if !watchdog_config.total_supplies.is_empty() {
             let total_supplies = TotalSupplies::new(
@@ -501,7 +524,7 @@ mod tests {
         let kp = bridge_test_cluster.bridge_authority_key(0);
 
         // prepare node config (server only)
-        let tmp_dir = tempdir().unwrap().into_path();
+        let tmp_dir = tempdir().unwrap().keep();
         let authority_key_path = "test_starting_bridge_node_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");
         let base64_encoded = kp.encode_base64();
@@ -549,7 +572,7 @@ mod tests {
         let kp = bridge_test_cluster.bridge_authority_key(0);
 
         // prepare node config (server + client)
-        let tmp_dir = tempdir().unwrap().into_path();
+        let tmp_dir = tempdir().unwrap().keep();
         let db_path = tmp_dir.join("test_starting_bridge_node_with_client_db");
         let authority_key_path = "test_starting_bridge_node_with_client_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");
@@ -613,7 +636,7 @@ mod tests {
         let kp = bridge_test_cluster.bridge_authority_key(0);
 
         // prepare node config (server + client)
-        let tmp_dir = tempdir().unwrap().into_path();
+        let tmp_dir = tempdir().unwrap().keep();
         let db_path = tmp_dir.join("test_starting_bridge_node_with_client_and_separate_client_key_db");
         let authority_key_path = "test_starting_bridge_node_with_client_and_separate_client_key_bridge_authority_key";
         let server_listen_port = get_available_port("127.0.0.1");

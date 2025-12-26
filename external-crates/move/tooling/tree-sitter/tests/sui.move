@@ -15,7 +15,7 @@ module oct::OCT {
     const ENotSystemAddress: u64 = 1;
 
     #[allow(unused_const)]
-    /// The amount of Mist per Sui token based on the the fact that mist is
+    /// The amount of Mist per Sui token based on the fact that mist is
     /// 10^-9 of a Sui token
     const MIST_PER_OCT: u64 = 1_000_000_000;
 
@@ -29,7 +29,7 @@ module oct::OCT {
     /// Name of the coin
     struct SUI has drop {}
 
-    #[allow(unused_function)]
+    #[allow(unused_function, deprecated_usage)]
     /// Register the `SUI` Coin to acquire its `Supply`.
     /// This should be called only once during genesis creation.
     fun new(ctx: &mut TxContext): Balance<OCT> {

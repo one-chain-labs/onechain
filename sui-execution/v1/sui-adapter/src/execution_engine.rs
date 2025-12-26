@@ -6,7 +6,7 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
 
-    use std::{collections::HashSet, sync::Arc};
+    use std::sync::Arc;
 
     use move_binary_format::CompiledModule;
     use move_vm_runtime::move_vm::MoveVM;
@@ -21,14 +21,14 @@ mod checked {
             AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME,
         },
         balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
-        base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest, TxContext},
+        base_types::{ObjectRef, SuiAddress, TransactionDigest, TxContext},
         clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME},
         committee::EpochId,
         effects::TransactionEffects,
         error::{ExecutionError, ExecutionErrorKind},
-        execution::is_certificate_denied,
         execution_config_utils::to_binary_config,
-        execution_status::{CongestedObjects, ExecutionStatus},
+        execution_params::ExecutionOrEarlyError,
+        execution_status::ExecutionStatus,
         gas::{GasCostSummary, SuiGasStatus},
         gas_coin::GAS,
         inner_temporary_store::InnerTemporaryStore,
@@ -87,15 +87,12 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
     ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Mode::ExecutionResults, ExecutionError>) {
         let input_objects = input_objects.into_inner();
         let shared_object_refs = input_objects.filter_shared_objects();
         let receiving_objects = transaction_kind.receiving_objects();
         let mut transaction_dependencies = input_objects.transaction_dependencies();
-        let contains_deleted_input = input_objects.contains_deleted_objects();
-        let cancelled_objects = input_objects.get_cancelled_objects();
-
         let mut temporary_store =
             TemporaryStore::new(store, input_objects, receiving_objects, transaction_digest, protocol_config);
 
@@ -108,12 +105,14 @@ mod checked {
             epoch_timestamp_ms,
             // Those values are unused in execution versions before 3 (or latest)
             1,
+            1,
+            1_000_000,
             None,
+            protocol_config,
         );
 
         let is_epoch_change = transaction_kind.is_end_of_epoch_tx();
 
-        let deny_cert = is_certificate_denied(&transaction_digest, certificate_deny_set);
         let (gas_cost_summary, execution_result) = execute_transaction::<Mode>(
             &mut temporary_store,
             transaction_kind,
@@ -123,9 +122,7 @@ mod checked {
             protocol_config,
             metrics,
             enable_expensive_checks,
-            deny_cert,
-            contains_deleted_input,
-            cancelled_objects,
+            execution_params,
         );
 
         let status = if let Err(error) = &execution_result {
@@ -236,9 +233,7 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        deny_cert: bool,
-        contains_deleted_input: bool,
-        cancelled_objects: Option<(Vec<ObjectID>, SequenceNumber)>,
+        execution_params: ExecutionOrEarlyError,
     ) -> (GasCostSummary, Result<Mode::ExecutionResults, ExecutionError>) {
         gas_charger.smash_gas(temporary_store);
 
@@ -252,25 +247,11 @@ mod checked {
         // we must still ensure an effect is committed and all objects versions incremented
         let result = gas_charger.charge_input_objects(temporary_store);
         let mut result = result.and_then(|()| {
-            let mut execution_result = if deny_cert {
-                Err(ExecutionError::new(ExecutionErrorKind::CertificateDenied, None))
-            } else if contains_deleted_input {
-                Err(ExecutionError::new(ExecutionErrorKind::InputObjectDeleted, None))
-            } else if let Some((cancelled_objects, reason)) = cancelled_objects {
-                match reason {
-                    SequenceNumber::CONGESTED => Err(ExecutionError::new(
-                        ExecutionErrorKind::ExecutionCancelledDueToSharedObjectCongestion {
-                            congested_objects: CongestedObjects(cancelled_objects),
-                        },
-                        None,
-                    )),
-                    SequenceNumber::RANDOMNESS_UNAVAILABLE => {
-                        Err(ExecutionError::new(ExecutionErrorKind::ExecutionCancelledDueToRandomnessUnavailable, None))
-                    }
-                    _ => panic!("invalid cancellation reason SequenceNumber: {reason}"),
+            let mut execution_result = match execution_params {
+                ExecutionOrEarlyError::Err(early_execution_error) => {
+                    Err(ExecutionError::new(early_execution_error, None))
                 }
-            } else {
-                execution_loop::<Mode>(
+                ExecutionOrEarlyError::Ok(()) => execution_loop::<Mode>(
                     temporary_store,
                     transaction_kind,
                     tx_ctx,
@@ -278,7 +259,7 @@ mod checked {
                     gas_charger,
                     protocol_config,
                     metrics.clone(),
-                )
+                ),
             };
 
             let meter_check = check_meter_limit(temporary_store, gas_charger, protocol_config, metrics.clone());
@@ -621,6 +602,12 @@ mod checked {
                         EndOfEpochTransactionKind::StoreExecutionTimeObservations(_) => {
                             panic!("EndOfEpochTransactionKind::StoreExecutionTimeEstimates should not exist in v1");
                         }
+                        EndOfEpochTransactionKind::AccumulatorRootCreate => {
+                            panic!("EndOfEpochTransactionKind::AccumulatorRootCreate should not exist in v1");
+                        }
+                        EndOfEpochTransactionKind::CoinRegistryCreate => {
+                            panic!("EndOfEpochTransactionKind::CoinRegistryCreate should not exist in v1");
+                        }
                     }
                 }
                 unreachable!("EndOfEpochTransactionKind::ChangeEpoch should be the last transaction in the list")
@@ -639,6 +626,9 @@ mod checked {
             }
             TransactionKind::RandomnessStateUpdate(_) => {
                 panic!("RandomnessStateUpdate should not exist in v1");
+            }
+            TransactionKind::ProgrammableSystemTransaction(_) => {
+                panic!("ProgrammableSystemTransaction should not exist in execution layer v1");
             }
         }?;
         temporary_store.check_execution_results_consistency()?;

@@ -12,7 +12,9 @@ async fn test_currency_defaults() {
     let expected = Currency {
         symbol: "SUI".to_string(),
         decimals: 9,
-        metadata: CurrencyMetadata { coin_type: "0x2::oct::OCT".to_string() },
+        metadata: CurrencyMetadata {
+            coin_type: "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT".to_string(),
+        },
     };
 
     let currency: Currency = serde_json::from_value(json!(
@@ -88,7 +90,8 @@ async fn test_metadata_total_coin_value_js_conversion_for_large_balance() {
 
     let prod_metadata = ConstructionMetadata {
         sender: Default::default(),
-        coins: vec![],
+        gas_coins: vec![],
+        extra_gas_coins: vec![],
         objects: vec![],
         total_coin_value: 65_000_004_233_578_496,
         gas_price: 0,

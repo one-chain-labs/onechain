@@ -286,7 +286,7 @@ pub async fn bridge_token(
         ])
         .with_type_args(vec![token_type])
         .build();
-    let signed_tn = context.sign_transaction(&tx);
+    let signed_tn = context.sign_transaction(&tx).await;
     let resp = context.execute_transaction_must_succeed(signed_tn).await;
     let events = resp.events.unwrap();
     let bridge_events =
@@ -340,7 +340,7 @@ pub async fn approve_action_with_validator_secrets(
     let gas_obj_ref = wallet_context.get_one_gas_object().await.unwrap().unwrap().1;
     let tx_data =
         build_sui_transaction(sui_address, &gas_obj_ref, action_certificate, bridge_obj_org, id_token_map, rgp).unwrap();
-    let signed_tx = wallet_context.sign_transaction(&tx_data);
+    let signed_tx = wallet_context.sign_transaction(&tx_data).await;
     let resp = wallet_context.execute_transaction_must_succeed(signed_tx).await;
 
     // If `expected_token_receiver` is None, return

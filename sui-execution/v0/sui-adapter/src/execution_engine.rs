@@ -5,7 +5,7 @@ pub use checked::*;
 
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use std::{collections::HashSet, sync::Arc};
+    use std::sync::Arc;
 
     use move_binary_format::CompiledModule;
     use move_vm_runtime::move_vm::MoveVM;
@@ -19,8 +19,8 @@ mod checked {
         committee::EpochId,
         effects::TransactionEffects,
         error::{ExecutionError, ExecutionErrorKind},
-        execution::is_certificate_denied,
         execution_config_utils::to_binary_config,
+        execution_params::ExecutionOrEarlyError,
         execution_status::ExecutionStatus,
         gas::{GasCostSummary, SuiGasStatus},
         gas_coin::GAS,
@@ -75,7 +75,7 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
     ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Mode::ExecutionResults, ExecutionError>) {
         let input_objects = input_objects.into_inner();
         let shared_object_refs = input_objects.filter_shared_objects();
@@ -90,12 +90,14 @@ mod checked {
             epoch_timestamp_ms,
             // Those values are unused in execution versions before 3 (or latest)
             1,
+            1,
+            1_000_000,
             None,
+            protocol_config,
         );
 
         let is_epoch_change = matches!(transaction_kind, TransactionKind::ChangeEpoch(_));
 
-        let deny_cert = is_certificate_denied(&transaction_digest, certificate_deny_set);
         let (gas_cost_summary, execution_result) = execute_transaction::<Mode>(
             &mut temporary_store,
             transaction_kind,
@@ -105,8 +107,7 @@ mod checked {
             protocol_config,
             metrics,
             enable_expensive_checks,
-            deny_cert,
-            false,
+            execution_params,
         );
 
         let status = if let Err(error) = &execution_result {
@@ -216,8 +217,7 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        deny_cert: bool,
-        contains_deleted_input: bool,
+        execution_params: ExecutionOrEarlyError,
     ) -> (GasCostSummary, Result<Mode::ExecutionResults, ExecutionError>) {
         gas_charger.smash_gas(temporary_store);
 
@@ -230,12 +230,11 @@ mod checked {
         // we must still ensure an effect is committed and all objects versions incremented
         let result = gas_charger.charge_input_objects(temporary_store);
         let mut result = result.and_then(|()| {
-            let mut execution_result = if deny_cert {
-                Err(ExecutionError::new(ExecutionErrorKind::CertificateDenied, None))
-            } else if contains_deleted_input {
-                Err(ExecutionError::new(ExecutionErrorKind::InputObjectDeleted, None))
-            } else {
-                execution_loop::<Mode>(
+            let mut execution_result = match execution_params {
+                ExecutionOrEarlyError::Err(early_execution_error) => {
+                    Err(ExecutionError::new(early_execution_error, None))
+                }
+                ExecutionOrEarlyError::Ok(()) => execution_loop::<Mode>(
                     temporary_store,
                     transaction_kind,
                     tx_ctx,
@@ -243,7 +242,7 @@ mod checked {
                     gas_charger,
                     protocol_config,
                     metrics.clone(),
-                )
+                ),
             };
 
             let effects_estimated_size = temporary_store.estimate_effects_size_upperbound();
@@ -467,6 +466,9 @@ mod checked {
             }
             TransactionKind::EndOfEpochTransaction(_) => {
                 panic!("EndOfEpochTransaction should not exist in execution layer v0");
+            }
+            TransactionKind::ProgrammableSystemTransaction(_) => {
+                panic!("ProgrammableSystemTransaction should not exist in execution layer v0");
             }
         }
     }

@@ -7,11 +7,11 @@ use fastcrypto::hash::MultisetHash;
 use futures::future::AbortHandle;
 use indicatif::MultiProgress;
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
-use sui_core::{authority::authority_store_tables::AuthorityPerpetualTables, state_accumulator::StateAccumulator};
+use sui_core::{authority::authority_store_tables::AuthorityPerpetualTables, global_state_hasher::GlobalStateHasher};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
-    accumulator::Accumulator,
     base_types::ObjectID,
+    global_state_hash::GlobalStateHash,
     messages_checkpoint::ECMHLiveObjectSetDigest,
     object::Object,
 };
@@ -20,7 +20,7 @@ use tempfile::tempdir;
 use crate::{reader::StateSnapshotReaderV1, writer::StateSnapshotWriterV1, FileCompression};
 
 fn temp_dir() -> std::path::PathBuf {
-    tempdir().expect("Failed to open temporary directory").into_path()
+    tempdir().expect("Failed to open temporary directory").keep()
 }
 
 pub fn insert_keys(db: &AuthorityPerpetualTables, total_unique_object_ids: u64) -> Result<(), anyhow::Error> {
@@ -49,10 +49,13 @@ fn compare_live_objects(
     Ok(())
 }
 
-fn accumulate_live_object_set(perpetual_db: &AuthorityPerpetualTables, include_wrapped_tombstone: bool) -> Accumulator {
-    let mut acc = Accumulator::default();
+fn accumulate_live_object_set(
+    perpetual_db: &AuthorityPerpetualTables,
+    include_wrapped_tombstone: bool,
+) -> GlobalStateHash {
+    let mut acc = GlobalStateHash::default();
     perpetual_db.iter_live_object_set(include_wrapped_tombstone).for_each(|live_object| {
-        StateAccumulator::accumulate_live_object(&mut acc, &live_object);
+        GlobalStateHasher::accumulate_live_object(&mut acc, &live_object);
     });
     acc
 }
@@ -76,7 +79,7 @@ async fn test_snapshot_basic() -> Result<(), anyhow::Error> {
         NonZeroUsize::new(1).unwrap(),
     )
     .await?;
-    let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path, None));
+    let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path, None, None));
     insert_keys(&perpetual_db, 1000)?;
     let root_accumulator = ECMHLiveObjectSetDigest::from(accumulate_live_object_set(&perpetual_db, true).digest());
     snapshot_writer.write_internal(0, true, perpetual_db.clone(), root_accumulator).await?;
@@ -92,9 +95,10 @@ async fn test_snapshot_basic() -> Result<(), anyhow::Error> {
         NonZeroUsize::new(1).unwrap(),
         MultiProgress::new(),
         false, // skip_reset_local_store
+        3,     // max_retries
     )
     .await?;
-    let restored_perpetual_db = AuthorityPerpetualTables::open(&restored_db_path, None);
+    let restored_perpetual_db = AuthorityPerpetualTables::open(&restored_db_path, None, None);
     let (_abort_handle, abort_registration) = AbortHandle::new_pair();
     snapshot_reader.read(&restored_perpetual_db, abort_registration, None).await?;
     compare_live_objects(&perpetual_db, &restored_perpetual_db, true)?;
@@ -120,7 +124,7 @@ async fn test_snapshot_empty_db() -> Result<(), anyhow::Error> {
         NonZeroUsize::new(1).unwrap(),
     )
     .await?;
-    let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path, None));
+    let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path, None, None));
     let root_accumulator = ECMHLiveObjectSetDigest::from(accumulate_live_object_set(&perpetual_db, true).digest());
     snapshot_writer.write_internal(0, true, perpetual_db.clone(), root_accumulator).await?;
     let local_store_restore_config = ObjectStoreConfig {
@@ -135,9 +139,10 @@ async fn test_snapshot_empty_db() -> Result<(), anyhow::Error> {
         NonZeroUsize::new(1).unwrap(),
         MultiProgress::new(),
         false, // skip_reset_local_store
+        3,     // max_retries
     )
     .await?;
-    let restored_perpetual_db = AuthorityPerpetualTables::open(&restored_db_path, None);
+    let restored_perpetual_db = AuthorityPerpetualTables::open(&restored_db_path, None, None);
     let (_abort_handle, abort_registration) = AbortHandle::new_pair();
     snapshot_reader.read(&restored_perpetual_db, abort_registration, None).await?;
     compare_live_objects(&perpetual_db, &restored_perpetual_db, include_wrapped_tombstone)?;

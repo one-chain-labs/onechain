@@ -4,12 +4,13 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use consensus_config::{AuthorityIndex, Stake};
+use consensus_types::block::{BlockRef, Round};
 use parking_lot::RwLock;
 use tracing::warn;
 
 use crate::{
-    block::{BlockAPI, BlockRef, Round, Slot, VerifiedBlock},
-    commit::{LeaderStatus, WaveNumber, DEFAULT_WAVE_LENGTH, MINIMUM_WAVE_LENGTH},
+    block::{BlockAPI, Slot, VerifiedBlock},
+    commit::{LeaderStatus, WaveNumber, DEFAULT_WAVE_LENGTH},
     context::Context,
     dag_state::DagState,
     leader_schedule::LeaderSchedule,
@@ -67,7 +68,6 @@ impl BaseCommitter {
         dag_state: Arc<RwLock<DagState>>,
         options: BaseCommitterOptions,
     ) -> Self {
-        assert!(options.wave_length >= MINIMUM_WAVE_LENGTH);
         Self { context, leader_schedule, dag_state, options }
     }
 
@@ -97,7 +97,7 @@ impl BaseCommitter {
         // There can be at most one leader with enough support for each round, otherwise it means
         // the BFT assumption is broken.
         if leaders_with_enough_support.len() > 1 {
-            panic!("[{self}] More than one certified block for {leader}")
+            panic!("[{self}] More than one candidate for {leader}: {leaders_with_enough_support:?}");
         }
 
         leaders_with_enough_support.pop().unwrap_or(LeaderStatus::Undecided(leader))
@@ -215,10 +215,7 @@ impl BaseCommitter {
         leader_block: &VerifiedBlock,
         all_votes: &mut HashMap<BlockRef, bool>,
     ) -> bool {
-        let (gc_enabled, gc_round) = {
-            let dag_state = self.dag_state.read();
-            (dag_state.gc_enabled(), dag_state.gc_round())
-        };
+        let gc_round = self.dag_state.read().gc_round();
 
         let mut votes_stake_aggregator = StakeAggregator::<QuorumThreshold>::new();
         for reference in potential_certificate.ancestors() {
@@ -227,7 +224,7 @@ impl BaseCommitter {
             } else {
                 let potential_vote = self.dag_state.read().get_block(reference);
 
-                let is_vote = if gc_enabled {
+                let is_vote = {
                     if let Some(potential_vote) = potential_vote {
                         self.is_vote(&potential_vote, leader_block)
                     } else {
@@ -238,10 +235,6 @@ impl BaseCommitter {
                         );
                         false
                     }
-                } else {
-                    let potential_vote =
-                        potential_vote.unwrap_or_else(|| panic!("Block not found in storage: {:?}", reference));
-                    self.is_vote(&potential_vote, leader_block)
                 };
 
                 all_votes.insert(*reference, is_vote);
@@ -295,7 +288,7 @@ impl BaseCommitter {
 
         // There can be at most one certified leader, otherwise it means the BFT assumption is broken.
         if certified_leader_blocks.len() > 1 {
-            panic!("More than one certified block at wave {wave} from leader {leader_slot}")
+            panic!("More than one certified leader at wave {wave} in {leader_slot}: {certified_leader_blocks:?}");
         }
 
         // We commit the target leader if it has a certificate that is an ancestor of the anchor.
@@ -337,7 +330,7 @@ impl BaseCommitter {
         // the potential certificates.
         let total_stake: Stake = decision_blocks.iter().map(|b| self.context.committee.stake(b.author())).sum();
         if !self.context.committee.reached_quorum(total_stake) {
-            tracing::debug!(
+            tracing::trace!(
                 "Not enough support for {leader_block}. Stake not enough: {total_stake} < {}",
                 self.context.committee.quorum_threshold()
             );

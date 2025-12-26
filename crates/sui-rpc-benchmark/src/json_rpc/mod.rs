@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use anyhow::Result;
 use request_loader::load_json_rpc_requests;
@@ -13,11 +13,18 @@ use crate::config::BenchmarkConfig;
 pub mod request_loader;
 pub mod runner;
 
-pub async fn run_benchmark(endpoint: &str, file_path: &str, concurrency: usize, duration_secs: u64) -> Result<()> {
+pub async fn run_benchmark(
+    endpoint: &str,
+    file_path: &str,
+    concurrency: usize,
+    duration_secs: Option<u64>,
+    json_rpc_methods_to_skip: HashSet<String>,
+) -> Result<()> {
     let config = BenchmarkConfig {
         concurrency,
-        duration: Duration::from_secs(duration_secs),
+        duration: duration_secs.map(Duration::from_secs),
         json_rpc_file_path: Some(file_path.to_string()),
+        json_rpc_methods_to_skip,
     };
 
     info!("Loading JSON RPC requests from {}", file_path);

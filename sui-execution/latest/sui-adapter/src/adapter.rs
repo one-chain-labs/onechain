@@ -4,15 +4,13 @@
 pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+    use std::{cell::RefCell, collections::BTreeMap, rc::Rc, sync::Arc};
 
     use anyhow::Result;
     use move_binary_format::file_format::CompiledModule;
     use move_bytecode_verifier::verify_module_with_config_metered;
     use move_bytecode_verifier_meter::{Meter, Scope};
     use move_core_types::account_address::AccountAddress;
-    #[cfg(feature = "tracing")]
-    use move_vm_config::runtime::VMProfilerConfig;
     use move_vm_config::{
         runtime::{VMConfig, VMRuntimeLimitsConfig},
         verifier::VerifierConfig,
@@ -22,7 +20,12 @@ mod checked {
         native_extensions::NativeContextExtensions,
         native_functions::NativeFunctionTable,
     };
-    use sui_move_natives::{object_runtime, object_runtime::ObjectRuntime, NativesCostTable};
+    use sui_move_natives::{
+        object_runtime,
+        object_runtime::ObjectRuntime,
+        transaction_context::TransactionContext,
+        NativesCostTable,
+    };
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::*,
@@ -34,19 +37,7 @@ mod checked {
     use sui_verifier::{check_for_verifier_timeout, verifier::sui_verify_module_metered_check_timeout_only};
     use tracing::instrument;
 
-    pub fn new_move_vm(
-        natives: NativeFunctionTable,
-        protocol_config: &ProtocolConfig,
-        _enable_profiler: Option<PathBuf>,
-    ) -> Result<MoveVM, SuiError> {
-        #[cfg(not(feature = "tracing"))]
-        let vm_profiler_config = None;
-        #[cfg(feature = "tracing")]
-        let vm_profiler_config = _enable_profiler.clone().map(|path| VMProfilerConfig {
-            full_path: path,
-            track_bytecode_instructions: false,
-            use_long_function_name: false,
-        });
+    pub fn new_move_vm(natives: NativeFunctionTable, protocol_config: &ProtocolConfig) -> Result<MoveVM, SuiError> {
         MoveVM::new_with_config(natives, VMConfig {
             verifier: protocol_config.verifier_config(/* signing_limits */ None),
             max_binary_format_version: protocol_config.move_binary_format_version(),
@@ -58,7 +49,6 @@ mod checked {
             enable_invariant_violation_check_in_swap_loc: !protocol_config
                 .disable_invariant_violation_check_in_swap_loc(),
             check_no_extraneous_bytes_during_deserialization: protocol_config.no_extraneous_module_bytes(),
-            profiler_config: vm_profiler_config,
             // Don't augment errors with execution state on-chain
             error_execution_state: false,
             binary_config: to_binary_config(protocol_config),
@@ -75,8 +65,9 @@ mod checked {
         is_metered: bool,
         protocol_config: &'r ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
-        current_epoch_id: EpochId,
+        tx_context: Rc<RefCell<TxContext>>,
     ) -> NativeContextExtensions<'r> {
+        let current_epoch_id: EpochId = tx_context.borrow().epoch();
         let mut extensions = NativeContextExtensions::default();
         extensions.add(ObjectRuntime::new(
             child_resolver,
@@ -87,6 +78,7 @@ mod checked {
             current_epoch_id,
         ));
         extensions.add(NativesCostTable::from_protocol_config(protocol_config));
+        extensions.add(TransactionContext::new(tx_context));
         extensions
     }
 

@@ -7,9 +7,11 @@ use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use sui_config::NodeConfig;
 use sui_types::{
+    accumulator_root::get_accumulator_root_obj_initial_shared_version,
     authenticator_state::get_authenticator_state_obj_initial_shared_version,
     base_types::SequenceNumber,
     bridge::{get_bridge_obj_initial_shared_version, is_bridge_committee_initiated},
+    coin_registry::get_coin_registry_obj_initial_shared_version,
     deny_list_v1::get_deny_list_obj_initial_shared_version,
     epoch_data::EpochData,
     error::SuiResult,
@@ -29,10 +31,8 @@ pub trait EpochStartConfigTrait {
     fn coin_deny_list_obj_initial_shared_version(&self) -> Option<SequenceNumber>;
     fn bridge_obj_initial_shared_version(&self) -> Option<SequenceNumber>;
     fn bridge_committee_initiated(&self) -> bool;
-
-    fn use_version_assignment_tables_v3(&self) -> bool {
-        self.flags().contains(&EpochFlag::UseVersionAssignmentTablesV3)
-    }
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber>;
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber>;
 
     fn is_data_quarantine_active_from_beginning_of_epoch(&self) -> bool {
         self.flags().contains(&EpochFlag::DataQuarantineFromBeginningOfEpoch)
@@ -56,16 +56,19 @@ pub enum EpochFlag {
     _PerEpochFinalizedTransactionsDeprecated = 1,
     _ObjectLockSplitTablesDeprecated = 2,
     _WritebackCacheEnabledDeprecated = 3,
-    _StateAccumulatorV2EnabledDeprecated = 4,
-    _StateAccumulatorV2EnabledTestnetDeprecated = 5,
-    _StateAccumulatorV2EnabledMainnetDeprecated = 6,
+    _GlobalStateHashV2EnabledDeprecated = 4,
+    _GlobalStateHashV2EnabledTestnetDeprecated = 5,
+    _GlobalStateHashV2EnabledMainnetDeprecated = 6,
     _ExecutedInEpochTableDeprecated = 7,
-
-    UseVersionAssignmentTablesV3 = 8,
+    _UseVersionAssignmentTablesV3 = 8,
 
     // This flag indicates whether data quarantining has been enabled from the
     // beginning of the epoch.
     DataQuarantineFromBeginningOfEpoch = 9,
+
+    // Used for `test_epoch_flag_upgrade`.
+    #[cfg(msim)]
+    DummyFlag = 10,
 }
 
 impl EpochFlag {
@@ -75,13 +78,24 @@ impl EpochFlag {
         Self::default_flags_impl()
     }
 
+    // Return flags that are mandatory for the current version of the code. This is used
+    // so that `test_epoch_flag_upgrade` can still work correctly even when there are no
+    // optional flags.
+    pub fn mandatory_flags() -> Vec<Self> {
+        vec![EpochFlag::DataQuarantineFromBeginningOfEpoch]
+    }
+
     /// For situations in which there is no config available (e.g. setting up a downloaded snapshot).
     pub fn default_for_no_config() -> Vec<Self> {
         Self::default_flags_impl()
     }
 
     fn default_flags_impl() -> Vec<Self> {
-        vec![EpochFlag::UseVersionAssignmentTablesV3, EpochFlag::DataQuarantineFromBeginningOfEpoch]
+        vec![
+            EpochFlag::DataQuarantineFromBeginningOfEpoch,
+            #[cfg(msim)]
+            EpochFlag::DummyFlag,
+        ]
     }
 }
 
@@ -101,23 +115,27 @@ impl fmt::Display for EpochFlag {
             EpochFlag::_WritebackCacheEnabledDeprecated => {
                 write!(f, "WritebackCacheEnabled (DEPRECATED)")
             }
-            EpochFlag::_StateAccumulatorV2EnabledDeprecated => {
-                write!(f, "StateAccumulatorV2EnabledDeprecated (DEPRECATED)")
+            EpochFlag::_GlobalStateHashV2EnabledDeprecated => {
+                write!(f, "GlobalStateHashV2EnabledDeprecated (DEPRECATED)")
             }
             EpochFlag::_ExecutedInEpochTableDeprecated => {
                 write!(f, "ExecutedInEpochTable (DEPRECATED)")
             }
-            EpochFlag::_StateAccumulatorV2EnabledTestnetDeprecated => {
-                write!(f, "StateAccumulatorV2EnabledTestnet (DEPRECATED)")
+            EpochFlag::_GlobalStateHashV2EnabledTestnetDeprecated => {
+                write!(f, "GlobalStateHashV2EnabledTestnet (DEPRECATED)")
             }
-            EpochFlag::_StateAccumulatorV2EnabledMainnetDeprecated => {
-                write!(f, "StateAccumulatorV2EnabledMainnet (DEPRECATED)")
+            EpochFlag::_GlobalStateHashV2EnabledMainnetDeprecated => {
+                write!(f, "GlobalStateHashV2EnabledMainnet (DEPRECATED)")
             }
-            EpochFlag::UseVersionAssignmentTablesV3 => {
-                write!(f, "UseVersionAssignmentTablesV3")
+            EpochFlag::_UseVersionAssignmentTablesV3 => {
+                write!(f, "UseVersionAssignmentTablesV3 (DEPRECATED)")
             }
             EpochFlag::DataQuarantineFromBeginningOfEpoch => {
                 write!(f, "DataQuarantineFromBeginningOfEpoch")
+            }
+            #[cfg(msim)]
+            EpochFlag::DummyFlag => {
+                write!(f, "DummyFlag")
             }
         }
     }
@@ -133,6 +151,8 @@ pub enum EpochStartConfiguration {
     V4(EpochStartConfigurationV4),
     V5(EpochStartConfigurationV5),
     V6(EpochStartConfigurationV6),
+    V7(EpochStartConfigurationV7),
+    V8(EpochStartConfigurationV8),
 }
 
 impl EpochStartConfiguration {
@@ -146,8 +166,10 @@ impl EpochStartConfiguration {
         let randomness_obj_initial_shared_version = get_randomness_state_obj_initial_shared_version(object_store)?;
         let coin_deny_list_obj_initial_shared_version = get_deny_list_obj_initial_shared_version(object_store);
         let bridge_obj_initial_shared_version = get_bridge_obj_initial_shared_version(object_store)?;
+        let accumulator_root_obj_initial_shared_version = get_accumulator_root_obj_initial_shared_version(object_store)?;
+        let coin_registry_obj_initial_shared_version = get_coin_registry_obj_initial_shared_version(object_store)?;
         let bridge_committee_initiated = is_bridge_committee_initiated(object_store)?;
-        Ok(Self::V6(EpochStartConfigurationV6 {
+        Ok(Self::V8(EpochStartConfigurationV8 {
             system_state,
             epoch_digest,
             flags: initial_epoch_flags,
@@ -156,6 +178,8 @@ impl EpochStartConfiguration {
             coin_deny_list_obj_initial_shared_version,
             bridge_obj_initial_shared_version,
             bridge_committee_initiated,
+            accumulator_root_obj_initial_shared_version,
+            coin_registry_obj_initial_shared_version,
         }))
     }
 
@@ -163,7 +187,7 @@ impl EpochStartConfiguration {
         // We only need to implement this function for the latest version.
         // When a new version is introduced, this function should be updated.
         match self {
-            Self::V6(config) => Self::V6(EpochStartConfigurationV6 {
+            Self::V8(config) => Self::V8(EpochStartConfigurationV8 {
                 system_state: config.system_state.new_at_next_epoch_for_testing(),
                 epoch_digest: config.epoch_digest,
                 flags: config.flags.clone(),
@@ -172,6 +196,8 @@ impl EpochStartConfiguration {
                 coin_deny_list_obj_initial_shared_version: config.coin_deny_list_obj_initial_shared_version,
                 bridge_obj_initial_shared_version: config.bridge_obj_initial_shared_version,
                 bridge_committee_initiated: config.bridge_committee_initiated,
+                accumulator_root_obj_initial_shared_version: config.accumulator_root_obj_initial_shared_version,
+                coin_registry_obj_initial_shared_version: config.coin_registry_obj_initial_shared_version,
             }),
             _ => panic!("This function is only implemented for the latest version of EpochStartConfiguration"),
         }
@@ -250,6 +276,35 @@ pub struct EpochStartConfigurationV6 {
     bridge_committee_initiated: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct EpochStartConfigurationV7 {
+    system_state: EpochStartSystemState,
+    epoch_digest: CheckpointDigest,
+    flags: Vec<EpochFlag>,
+    /// Do the state objects exist at the beginning of the epoch?
+    authenticator_obj_initial_shared_version: Option<SequenceNumber>,
+    randomness_obj_initial_shared_version: Option<SequenceNumber>,
+    coin_deny_list_obj_initial_shared_version: Option<SequenceNumber>,
+    bridge_obj_initial_shared_version: Option<SequenceNumber>,
+    bridge_committee_initiated: bool,
+    accumulator_root_obj_initial_shared_version: Option<SequenceNumber>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct EpochStartConfigurationV8 {
+    system_state: EpochStartSystemState,
+    epoch_digest: CheckpointDigest,
+    flags: Vec<EpochFlag>,
+    /// Do the state objects exist at the beginning of the epoch?
+    authenticator_obj_initial_shared_version: Option<SequenceNumber>,
+    randomness_obj_initial_shared_version: Option<SequenceNumber>,
+    coin_deny_list_obj_initial_shared_version: Option<SequenceNumber>,
+    bridge_obj_initial_shared_version: Option<SequenceNumber>,
+    bridge_committee_initiated: bool,
+    accumulator_root_obj_initial_shared_version: Option<SequenceNumber>,
+    coin_registry_obj_initial_shared_version: Option<SequenceNumber>,
+}
+
 impl EpochStartConfigurationV1 {
     pub fn new(system_state: EpochStartSystemState, epoch_digest: CheckpointDigest) -> Self {
         Self { system_state, epoch_digest }
@@ -282,6 +337,14 @@ impl EpochStartConfigTrait for EpochStartConfigurationV1 {
     }
 
     fn bridge_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
         None
     }
 
@@ -322,6 +385,14 @@ impl EpochStartConfigTrait for EpochStartConfigurationV2 {
     fn bridge_committee_initiated(&self) -> bool {
         false
     }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
 }
 
 impl EpochStartConfigTrait for EpochStartConfigurationV3 {
@@ -355,6 +426,14 @@ impl EpochStartConfigTrait for EpochStartConfigurationV3 {
 
     fn bridge_committee_initiated(&self) -> bool {
         false
+    }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
     }
 }
 
@@ -390,6 +469,14 @@ impl EpochStartConfigTrait for EpochStartConfigurationV4 {
     fn bridge_committee_initiated(&self) -> bool {
         false
     }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
 }
 
 impl EpochStartConfigTrait for EpochStartConfigurationV5 {
@@ -424,6 +511,14 @@ impl EpochStartConfigTrait for EpochStartConfigurationV5 {
     fn bridge_committee_initiated(&self) -> bool {
         false
     }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
 }
 
 impl EpochStartConfigTrait for EpochStartConfigurationV6 {
@@ -457,5 +552,97 @@ impl EpochStartConfigTrait for EpochStartConfigurationV6 {
 
     fn bridge_committee_initiated(&self) -> bool {
         self.bridge_committee_initiated
+    }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+}
+
+impl EpochStartConfigTrait for EpochStartConfigurationV7 {
+    fn epoch_digest(&self) -> CheckpointDigest {
+        self.epoch_digest
+    }
+
+    fn epoch_start_state(&self) -> &EpochStartSystemState {
+        &self.system_state
+    }
+
+    fn flags(&self) -> &[EpochFlag] {
+        &self.flags
+    }
+
+    fn authenticator_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.authenticator_obj_initial_shared_version
+    }
+
+    fn randomness_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.randomness_obj_initial_shared_version
+    }
+
+    fn coin_deny_list_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.coin_deny_list_obj_initial_shared_version
+    }
+
+    fn bridge_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.bridge_obj_initial_shared_version
+    }
+
+    fn bridge_committee_initiated(&self) -> bool {
+        self.bridge_committee_initiated
+    }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.accumulator_root_obj_initial_shared_version
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        None
+    }
+}
+
+impl EpochStartConfigTrait for EpochStartConfigurationV8 {
+    fn epoch_digest(&self) -> CheckpointDigest {
+        self.epoch_digest
+    }
+
+    fn epoch_start_state(&self) -> &EpochStartSystemState {
+        &self.system_state
+    }
+
+    fn flags(&self) -> &[EpochFlag] {
+        &self.flags
+    }
+
+    fn authenticator_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.authenticator_obj_initial_shared_version
+    }
+
+    fn randomness_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.randomness_obj_initial_shared_version
+    }
+
+    fn coin_deny_list_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.coin_deny_list_obj_initial_shared_version
+    }
+
+    fn bridge_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.bridge_obj_initial_shared_version
+    }
+
+    fn bridge_committee_initiated(&self) -> bool {
+        self.bridge_committee_initiated
+    }
+
+    fn accumulator_root_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.accumulator_root_obj_initial_shared_version
+    }
+
+    fn coin_registry_obj_initial_shared_version(&self) -> Option<SequenceNumber> {
+        self.coin_registry_obj_initial_shared_version
     }
 }

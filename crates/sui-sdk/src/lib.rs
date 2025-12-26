@@ -71,7 +71,9 @@
 //! in the [main repository](https://github.com/one-chain-labs/onechain/tree/main/crates/sui-sdk/examples).
 
 use std::{
+    collections::HashMap,
     fmt::{Debug, Formatter},
+    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -85,6 +87,7 @@ use jsonrpsee::{
     ws_client::{WsClient, WsClientBuilder},
 };
 use move_core_types::language_storage::StructTag;
+use reqwest::header::HeaderName;
 use serde_json::Value;
 pub use sui_json as json;
 use sui_json_rpc_api::{CLIENT_SDK_TYPE_HEADER, CLIENT_SDK_VERSION_HEADER, CLIENT_TARGET_API_VERSION_HEADER};
@@ -115,7 +118,7 @@ pub mod wallet_context;
 pub const SUI_COIN_TYPE: &str = "0x2::oct::OCT";
 pub const SUI_LOCAL_NETWORK_URL: &str = "http://127.0.0.1:9000";
 pub const SUI_LOCAL_NETWORK_URL_0: &str = "http://0.0.0.0:9000";
-pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/gas";
+pub const SUI_LOCAL_NETWORK_GAS_URL: &str = "http://127.0.0.1:5003/v2/gas";
 pub const SUI_DEVNET_URL: &str = "https://rpc-devnet.onelabs.cc:443";
 pub const SUI_TESTNET_URL: &str = "https://rpc-testnet.onelabs.cc:443";
 pub const SUI_MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
@@ -149,6 +152,7 @@ pub struct SuiClientBuilder {
     ws_url: Option<String>,
     ws_ping_interval: Option<Duration>,
     basic_auth: Option<(String, String)>,
+    headers: Option<HashMap<String, String>>,
 }
 
 impl Default for SuiClientBuilder {
@@ -159,6 +163,7 @@ impl Default for SuiClientBuilder {
             ws_url: None,
             ws_ping_interval: None,
             basic_auth: None,
+            headers: None,
         }
     }
 }
@@ -191,6 +196,12 @@ impl SuiClientBuilder {
     /// Set the basic auth credentials for the HTTP client
     pub fn basic_auth(mut self, username: impl AsRef<str>, password: impl AsRef<str>) -> Self {
         self.basic_auth = Some((username.as_ref().to_string(), password.as_ref().to_string()));
+        self
+    }
+
+    /// Set custom headers for the HTTP client
+    pub fn custom_headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = Some(headers);
         self
     }
 
@@ -229,6 +240,16 @@ impl SuiClientBuilder {
                 // reqwest::header::AUTHORIZATION,
                 HeaderValue::from_str(&format!("Basic {}", auth)).unwrap(),
             );
+        }
+
+        if let Some(custom_headers) = self.headers {
+            for (key, value) in custom_headers {
+                let header_name = HeaderName::from_str(&key).map_err(|e| Error::CustomHeadersError(e.to_string()))?;
+
+                let header_value =
+                    HeaderValue::from_str(&value).map_err(|e| Error::CustomHeadersError(e.to_string()))?;
+                headers.insert(header_name, header_value);
+            }
         }
 
         let ws = if let Some(url) = self.ws_url {

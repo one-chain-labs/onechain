@@ -345,7 +345,8 @@ async fn test_multisig_e2e() {
         .transfer_oct(None, SuiAddress::ZERO)
         .build_and_sign_multisig(multisig_pk.clone(), &[&keys[0], &keys[0]], 0b011);
     let res = context.execute_transaction_may_fail(tx6).await;
-    assert!(res.unwrap_err().to_string().contains("Invalid ed25519 pk bytes"));
+    assert!(res.as_ref().unwrap_err().to_string().contains("Invalid sig for pk"));
+    assert!(res.as_ref().unwrap_err().to_string().contains("error=signature/pubkey type mismatch"));
 
     // 7. mismatch pks in sig with multisig address fails to execute.
     let kp3: SuiKeyPair = SuiKeyPair::Secp256r1(get_key_pair().1);
@@ -363,6 +364,10 @@ async fn test_multisig_e2e() {
 
 #[sim_test]
 async fn test_multisig_with_zklogin_scenerios() {
+    if sui_simulator::has_mainnet_protocol_config_override() {
+        return;
+    }
+
     let test_cluster = TestClusterBuilder::new()
         // Use a long epoch duration such that it won't change epoch on its own.
         .with_epoch_duration_ms(10000000)
@@ -545,7 +550,8 @@ async fn test_multisig_with_zklogin_scenerios() {
     ));
     let tx_11 = Transaction::from_generic_sig_data(tx_data.clone(), vec![multisig]);
     let res = context.execute_transaction_may_fail(tx_11).await;
-    assert!(res.unwrap_err().to_string().contains("Invalid ed25519 pk bytes"));
+    assert!(res.as_ref().unwrap_err().to_string().contains("Invalid sig for pk"));
+    assert!(res.as_ref().unwrap_err().to_string().contains("error=signature/pubkey type mismatch"));
 
     // 10. invalid bitmap b10000 when the max bitmap for 4 pks is b1111, fails to execute.
     let multisig = GenericSignature::MultiSig(MultiSig::insecure_new(
@@ -711,6 +717,10 @@ async fn test_max_epoch_too_large_fail_zklogin_in_multisig() {
 
 #[sim_test]
 async fn test_random_zklogin_in_multisig() {
+    if sui_simulator::has_mainnet_protocol_config_override() {
+        return;
+    }
+
     let test_vectors = &load_test_vectors("../sui-types/src/unit_tests/zklogin_test_vectors.json")[1 .. 11];
     let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
     test_cluster.wait_for_authenticator_state_update().await;

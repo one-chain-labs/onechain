@@ -23,7 +23,7 @@ const NO_LOCK_FILE: &str = "Expected a `Move.lock` file to exist in the package 
 #[group(id = "sui-move-manage-package")]
 pub struct ManagePackage {
     #[clap(long)]
-    /// The environment to associate this package information with (consider using `sui client active-env`).
+    /// The environment to associate this package information with (consider using `one client active-env`).
     pub environment: String,
     #[clap(long = "network-id")]
     /// The network chain identifer. Use '35834a8a' for mainnet.

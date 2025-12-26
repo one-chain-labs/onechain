@@ -13,6 +13,16 @@ use diesel::{
     TextExpressionMethods,
 };
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
+use sui_bridge_schema::{
+    models::ProgressStore,
+    schema,
+    schema::{
+        progress_store::{columns, dsl},
+        sui_error_transactions,
+        token_transfer,
+        token_transfer_data,
+    },
+};
 use sui_indexer_builder::{
     indexer_builder::{IndexerProgressStore, Persistent},
     progress::ProgressSavingPolicy,
@@ -21,18 +31,7 @@ use sui_indexer_builder::{
     LIVE_TASK_TARGET_CHECKPOINT,
 };
 
-use crate::{
-    models::ProgressStore,
-    postgres_manager::PgPool,
-    schema,
-    schema::{
-        progress_store::{columns, dsl},
-        sui_error_transactions,
-        token_transfer,
-        token_transfer_data,
-    },
-    ProcessedTxnData,
-};
+use crate::{postgres_manager::PgPool, ProcessedTxnData};
 
 /// Persistent layer impl
 #[derive(Clone)]

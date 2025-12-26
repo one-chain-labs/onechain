@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use mysten_metrics::RegistryService;
 use once_cell::sync::OnceCell;
 use prometheus::{
     register_histogram_vec_with_registry,
@@ -943,21 +944,24 @@ pub struct DBMetrics {
     pub cf_metrics: ColumnFamilyMetrics,
     pub read_perf_ctx_metrics: ReadPerfContextMetrics,
     pub write_perf_ctx_metrics: WritePerfContextMetrics,
+    pub registry_serivce: RegistryService,
 }
 
 static ONCE: OnceCell<Arc<DBMetrics>> = OnceCell::new();
 
 impl DBMetrics {
-    fn new(registry: &Registry) -> Self {
+    fn new(registry_service: RegistryService) -> Self {
+        let registry = registry_service.default_registry();
         DBMetrics {
-            op_metrics: OperationMetrics::new(registry),
-            cf_metrics: ColumnFamilyMetrics::new(registry),
-            read_perf_ctx_metrics: ReadPerfContextMetrics::new(registry),
-            write_perf_ctx_metrics: WritePerfContextMetrics::new(registry),
+            op_metrics: OperationMetrics::new(&registry),
+            cf_metrics: ColumnFamilyMetrics::new(&registry),
+            read_perf_ctx_metrics: ReadPerfContextMetrics::new(&registry),
+            write_perf_ctx_metrics: WritePerfContextMetrics::new(&registry),
+            registry_serivce: registry_service,
         }
     }
 
-    pub fn init(registry: &Registry) -> &'static Arc<DBMetrics> {
+    pub fn init(registry_service: RegistryService) -> &'static Arc<DBMetrics> {
         // Initialize this before creating any instance of DBMap
         // TODO: Remove static initialization because this basically means we can
         // only ever initialize db metrics once with a registry whereas
@@ -966,7 +970,7 @@ impl DBMetrics {
         // or prometheus complains. We essentially need to pass in DBMetrics
         // everywhere we create DBMap as the right fix
         let _ = ONCE
-            .set(Arc::new(DBMetrics::new(registry)))
+            .set(Arc::new(DBMetrics::new(registry_service)))
             // this happens many times during tests
             .tap_err(|_| warn!("DBMetrics registry overwritten"));
         ONCE.get().unwrap()
@@ -981,6 +985,6 @@ impl DBMetrics {
     }
 
     pub fn get() -> &'static Arc<DBMetrics> {
-        ONCE.get().unwrap_or_else(|| DBMetrics::init(prometheus::default_registry()))
+        ONCE.get().unwrap_or_else(|| DBMetrics::init(RegistryService::new(prometheus::default_registry().clone())))
     }
 }

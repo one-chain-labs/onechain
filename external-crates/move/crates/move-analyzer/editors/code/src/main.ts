@@ -72,7 +72,7 @@ async function suiMoveCmd(context: Readonly<Context>, cmd: string): Promise<void
     if (version.stdout) {
         const pkgRoot = await findPkgRoot();
         if (pkgRoot !== undefined) {
-            const terminalName = 'sui move';
+            const terminalName = 'one move';
             let terminal = vscode.window.terminals.find(t => t.name === terminalName);
             if (!terminal) {
                 terminal = vscode.window.createTerminal(terminalName);
@@ -125,7 +125,7 @@ async function traceProject(context: Readonly<Context>): Promise<void> {
         ignoreFocusOut: true, // Keeps the input box open when it loses focus
     });
     if (filter !== undefined) {
-        const cmd = filter.length > 0 ? `test ${filter} --trace-execution` : 'test --trace-execution';
+        const cmd = filter.length > 0 ? `test ${filter} --trace` : 'test --trace';
         return suiMoveCmd(context, cmd);
     }
     return Promise.resolve();

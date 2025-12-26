@@ -72,8 +72,8 @@ use crate::{
     RpcClient,
 };
 
-const WAIT_FOR_LOCAL_EXECUTION_TIMEOUT: Duration = Duration::from_secs(60);
 const WAIT_FOR_LOCAL_EXECUTION_DELAY: Duration = Duration::from_millis(200);
+
 const WAIT_FOR_LOCAL_EXECUTION_INTERVAL: Duration = Duration::from_secs(2);
 
 /// The main read API structure with functions for retrieving data about different objects and transactions
@@ -1077,7 +1077,13 @@ impl QuorumDriverApi {
         }
 
         // JSON-RPC ignores WaitForLocalExecution, so simulate it by polling for the transaction.
-        let mut poll_response = tokio::time::timeout(WAIT_FOR_LOCAL_EXECUTION_TIMEOUT, async {
+        let wait_for_local_execution_timeout: Duration = if cfg!(msim) {
+            // In simtests, fullnodes can stop receiving checkpoints for > 30s.
+            Duration::from_secs(120)
+        } else {
+            Duration::from_secs(60)
+        };
+        let mut poll_response = tokio::time::timeout(wait_for_local_execution_timeout, async {
             // Apply a short delay to give the full node a chance to catch up.
             tokio::time::sleep(WAIT_FOR_LOCAL_EXECUTION_DELAY).await;
 

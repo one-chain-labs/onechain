@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{net::SocketAddr, num::NonZeroUsize, string::ToString, sync::Arc};
+use std::{net::SocketAddr, num::NonZeroUsize, str::FromStr, string::ToString, sync::Arc};
 
 use axum::{routing::post, Extension, Router};
 use lru::LruCache;
@@ -34,7 +34,9 @@ pub mod types;
 pub static SUI: Lazy<Currency> = Lazy::new(|| Currency {
     symbol: "SUI".to_string(),
     decimals: 9,
-    metadata: CurrencyMetadata { coin_type: SUI_COIN_TYPE.to_string() },
+    metadata: CurrencyMetadata {
+        coin_type: sui_types::TypeTag::from_str(SUI_COIN_TYPE).map(|t| t.to_canonical_string(true)).unwrap(),
+    },
 });
 
 pub struct RosettaOnlineServer {
@@ -119,7 +121,7 @@ impl CoinMetadataCache {
             let ccy = Currency {
                 symbol: metadata.symbol,
                 decimals: metadata.decimals as u64,
-                metadata: CurrencyMetadata { coin_type: type_tag.to_string() },
+                metadata: CurrencyMetadata { coin_type: type_tag.clone().to_canonical_string(true) },
             };
             cache.push(type_tag.clone(), ccy);
         }

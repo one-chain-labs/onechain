@@ -14,7 +14,7 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 
-use crate::NativesCostTable;
+use crate::{get_extension, NativesCostTable};
 
 pub const INVALID_INPUT: u64 = 0;
 
@@ -45,8 +45,7 @@ pub fn check_zklogin_id_internal(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
-    let check_zklogin_id_cost_params =
-        &context.extensions().get::<NativesCostTable>().check_zklogin_id_cost_params.clone();
+    let check_zklogin_id_cost_params = get_extension!(context, NativesCostTable)?.check_zklogin_id_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(
@@ -140,7 +139,7 @@ pub fn check_zklogin_issuer_internal(
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
     let check_zklogin_issuer_cost_params =
-        &context.extensions().get::<NativesCostTable>().check_zklogin_issuer_cost_params.clone();
+        get_extension!(context, NativesCostTable)?.check_zklogin_issuer_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(

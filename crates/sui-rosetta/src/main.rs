@@ -17,9 +17,9 @@ use fastcrypto::{
     encoding::{Encoding, Hex},
     traits::EncodeDecodeBase64,
 };
-use one_node::SuiNode;
 use serde_json::{json, Value};
 use sui_config::{sui_config_dir, Config, NodeConfig, SUI_FULLNODE_CONFIG, SUI_KEYSTORE_FILENAME};
+use one_node::SuiNode;
 use sui_rosetta::{
     types::{CurveType, PrefundedAccount, SuiEnv},
     RosettaOfflineServer,
@@ -118,7 +118,7 @@ impl RosettaServerCommand {
                 server.serve(addr).await;
             }
             RosettaServerCommand::StartOnlineRemoteServer { env, addr, full_node_url, data_path } => {
-                info!("Starting Rosetta Online Server with remove OneChain full node [{full_node_url}].");
+                info!("Starting Rosetta Online Server with remote OneChain full node [{full_node_url}].");
                 let sui_client = wait_for_sui_client(full_node_url).await;
                 let rosetta_path = data_path.join("rosetta_db");
                 info!("Rosetta db path : {rosetta_path:?}");
@@ -143,7 +143,7 @@ impl RosettaServerCommand {
                 let registry_service = mysten_metrics::start_prometheus_server(config.metrics_address);
                 // Staring a full node for the rosetta server.
                 let rpc_address = format!("http://127.0.0.1:{}", config.json_rpc_address.port());
-                let _node = SuiNode::start(config, registry_service, None).await?;
+                let _node = SuiNode::start(config, registry_service).await?;
 
                 let sui_client = wait_for_sui_client(rpc_address).await;
 
@@ -197,26 +197,46 @@ fn read_prefunded_account(path: &Path) -> Result<Vec<PrefundedAccount>, anyhow::
         .collect())
 }
 
-#[test]
-fn test_read_keystore() {
-    use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
+#[tokio::test]
+async fn test_read_keystore() {
+    use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, GenerateOptions, Keystore, LocalGenerate};
     use sui_types::crypto::SignatureScheme;
 
     let temp_dir = tempfile::tempdir().unwrap();
     let path = temp_dir.path().join("sui.keystore");
-    let mut ks = Keystore::from(FileBasedKeystore::new(&path).unwrap());
-    let key1 = ks.generate_and_add_new_key(SignatureScheme::ED25519, None, None, None).unwrap();
-    let key2 = ks.generate_and_add_new_key(SignatureScheme::Secp256k1, None, None, None).unwrap();
+    let mut ks = Keystore::from(FileBasedKeystore::load_or_create(&path).unwrap());
+    let key1 = ks
+        .generate(
+            None,
+            GenerateOptions::Local(LocalGenerate {
+                key_scheme: SignatureScheme::ED25519,
+                derivation_path: None,
+                word_length: None,
+            }),
+        )
+        .await
+        .unwrap();
+    let key2 = ks
+        .generate(
+            None,
+            GenerateOptions::Local(LocalGenerate {
+                key_scheme: SignatureScheme::Secp256k1,
+                derivation_path: None,
+                word_length: None,
+            }),
+        )
+        .await
+        .unwrap();
 
     let accounts = read_prefunded_account(&path).unwrap();
     let acc_map = accounts.into_iter().map(|acc| (acc.account_identifier.address, acc)).collect::<BTreeMap<_, _>>();
 
     assert_eq!(2, acc_map.len());
-    assert!(acc_map.contains_key(&key1.0));
-    assert!(acc_map.contains_key(&key2.0));
+    assert!(acc_map.contains_key(&key1.address));
+    assert!(acc_map.contains_key(&key2.address));
 
-    let acc1 = acc_map[&key1.0].clone();
-    let acc2 = acc_map[&key2.0].clone();
+    let acc1 = acc_map[&key1.address].clone();
+    let acc2 = acc_map[&key2.address].clone();
 
     let schema1: SignatureScheme = acc1.curve_type.into();
     let schema2: SignatureScheme = acc2.curve_type.into();

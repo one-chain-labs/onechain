@@ -51,7 +51,7 @@ where
                     response
                 } else {
                     let response = service.call(req).await;
-                    handle_traffic_resp(&traffic_controller, client, &response);
+                    handle_traffic_resp(&traffic_controller, client, &response).await;
                     response
                 }
             } else {
@@ -63,7 +63,7 @@ where
 }
 
 async fn handle_traffic_req(
-    traffic_controller: &TrafficController,
+    traffic_controller: &Arc<TrafficController>,
     client: &Option<IpAddr>,
 ) -> Result<(), MethodResponse> {
     if !traffic_controller.check(client, &None).await {
@@ -75,7 +75,11 @@ async fn handle_traffic_req(
     }
 }
 
-fn handle_traffic_resp(traffic_controller: &TrafficController, client: Option<IpAddr>, response: &MethodResponse) {
+async fn handle_traffic_resp(
+    traffic_controller: &Arc<TrafficController>,
+    client: Option<IpAddr>,
+    response: &MethodResponse,
+) {
     let error = response.as_error_code().map(ErrorCode::from);
     traffic_controller.tally(TrafficTally {
         direct: client,

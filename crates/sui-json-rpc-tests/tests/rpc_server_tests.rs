@@ -121,7 +121,7 @@ async fn test_public_transfer_object() -> Result<(), anyhow::Error> {
     let transaction_bytes: TransactionBlockBytes =
         http_client.transfer_object(address, obj, Some(gas), 1_000_000.into(), address).await?;
 
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
     let tx_bytes1 = tx_bytes.clone();
     let dryrun_response = http_client.dry_run_transaction_block(tx_bytes).await?;
@@ -190,7 +190,7 @@ async fn test_publish() -> Result<(), anyhow::Error> {
         .publish(address, compiled_modules_bytes, dependencies, Some(gas.object_id), 100_000_000.into())
         .await?;
 
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
     let tx_response = http_client
@@ -245,7 +245,7 @@ async fn test_move_call() -> Result<(), anyhow::Error> {
         )
         .await?;
 
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
 
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
@@ -425,7 +425,7 @@ async fn test_get_metadata() -> Result<(), anyhow::Error> {
         .publish(address, compiled_modules_bytes, dependencies, Some(gas.object_id), 100_000_000.into())
         .await?;
 
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
     let tx_response = http_client
@@ -477,7 +477,7 @@ async fn test_get_total_supply() -> Result<(), anyhow::Error> {
     // Publish test coin package
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.extend(["tests", "data", "dummy_modules_publish"]);
-    let compiled_package = BuildConfig::default().build(&path)?;
+    let compiled_package = BuildConfig::new_for_testing().build(&path)?;
     let compiled_modules_bytes = compiled_package.get_package_base64(/* with_unpublished_deps */ false);
     let dependencies = compiled_package.get_dependency_storage_package_ids();
 
@@ -485,7 +485,7 @@ async fn test_get_total_supply() -> Result<(), anyhow::Error> {
         .publish(address, compiled_modules_bytes, dependencies, Some(gas.object_id), 100_000_000.into())
         .await?;
 
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
     let tx_response: SuiTransactionBlockResponse = http_client
@@ -540,7 +540,7 @@ async fn test_get_total_supply() -> Result<(), anyhow::Error> {
         )
         .await?;
 
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
     let tx_response = http_client
@@ -592,7 +592,7 @@ async fn test_staking() -> Result<(), anyhow::Error> {
     let transaction_bytes: TransactionBlockBytes = http_client
         .request_add_stake(address, vec![coin], Some(1000000000.into()), validator, None, 100_000_000.into())
         .await?;
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
 
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
@@ -644,7 +644,7 @@ async fn test_unstaking() -> Result<(), anyhow::Error> {
                 100_000_000.into(),
             )
             .await?;
-        let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+        let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
 
         let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
@@ -679,7 +679,7 @@ async fn test_unstaking() -> Result<(), anyhow::Error> {
     let transaction_bytes: TransactionBlockBytes = http_client
         .request_withdraw_stake(address, staked_oct_copy[0].stakes[2].staked_oct_id, None, 1_000_000.into())
         .await?;
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
 
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
@@ -736,7 +736,7 @@ async fn test_staking_multiple_coins() -> Result<(), anyhow::Error> {
             100_000_000.into(),
         )
         .await?;
-    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?);
+    let tx = cluster.wallet.sign_transaction(&transaction_bytes.to_data()?).await;
 
     let (tx_bytes, signatures) = tx.to_tx_bytes_and_signatures();
 
@@ -776,6 +776,10 @@ async fn test_staking_multiple_coins() -> Result<(), anyhow::Error> {
 
 #[sim_test]
 async fn test_zklogin_verify() -> Result<(), anyhow::Error> {
+    if sui_simulator::has_mainnet_protocol_config_override() {
+        return Ok(());
+    }
+
     let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
     test_cluster.wait_for_epoch(Some(1)).await;
     test_cluster.wait_for_authenticator_state_update().await;

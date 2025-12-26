@@ -52,7 +52,7 @@ async fn run_thread<F, Fut>(
     loop {
         let gas = test_env.get_latest_object_ref(&gas_id).await;
         let tx_data = tx_creation_func(test_env.clone(), gas).await;
-        let tx = test_env.test_cluster.sign_transaction(&tx_data);
+        let tx = test_env.test_cluster.sign_transaction(&tx_data).await;
         let Ok(effects) =
             test_env.test_cluster.wallet.execute_transaction_may_fail(tx).await.map(|r| r.effects.unwrap())
         else {

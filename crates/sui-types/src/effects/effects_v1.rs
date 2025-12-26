@@ -8,12 +8,13 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{IDOperation, ObjectChange};
+use super::{object_change::AccumulatorWriteV1, IDOperation, ObjectChange};
 use crate::{
+    accumulator_event::AccumulatorEvent,
     base_types::{random_object_ref, EpochId, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
     digests::{ObjectDigest, TransactionEventsDigest},
-    effects::{InputSharedObject, TransactionEffectsAPI, UnchangedSharedKind},
-    execution_status::ExecutionStatus,
+    effects::{InputConsensusObject, TransactionEffectsAPI, UnchangedConsensusKind},
+    execution_status::{ExecutionFailureStatus, ExecutionStatus, MoveLocation},
     gas::GasCostSummary,
     object::Owner,
 };
@@ -120,6 +121,10 @@ impl TransactionEffectsV1 {
     pub fn wrapped(&self) -> &[ObjectRef] {
         &self.wrapped
     }
+
+    pub fn shared_objects(&self) -> &[ObjectRef] {
+        &self.shared_objects
+    }
 }
 
 impl TransactionEffectsAPI for TransactionEffectsV1 {
@@ -151,6 +156,15 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             .collect()
     }
 
+    fn move_abort(&self) -> Option<(MoveLocation, u64)> {
+        let ExecutionStatus::Failure { error: ExecutionFailureStatus::MoveAbort(move_location, code), .. } =
+            self.status()
+        else {
+            return None;
+        };
+        Some((move_location.clone(), *code))
+    }
+
     fn lamport_version(&self) -> SequenceNumber {
         SequenceNumber::lamport_increment(self.modified_at_versions.iter().map(|(_, v)| *v))
     }
@@ -159,19 +173,17 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
         unimplemented!("Only supposed by v2 and above");
     }
 
-    fn input_shared_objects(&self) -> Vec<InputSharedObject> {
+    fn input_consensus_objects(&self) -> Vec<InputConsensusObject> {
         let modified: HashSet<_> = self.modified_at_versions.iter().map(|(r, _)| r).collect();
         self.shared_objects
             .iter()
-            .map(
-                |r| {
-                    if modified.contains(&r.0) {
-                        InputSharedObject::Mutate(*r)
-                    } else {
-                        InputSharedObject::ReadOnly(*r)
-                    }
-                },
-            )
+            .map(|r| {
+                if modified.contains(&r.0) {
+                    InputConsensusObject::Mutate(*r)
+                } else {
+                    InputConsensusObject::ReadOnly(*r)
+                }
+            })
             .collect()
     }
 
@@ -197,6 +209,21 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
 
     fn wrapped(&self) -> Vec<ObjectRef> {
         self.wrapped.clone()
+    }
+
+    fn transferred_from_consensus(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
+    }
+
+    fn transferred_to_consensus(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
+    }
+
+    fn consensus_owner_changed(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
     }
 
     fn object_changes(&self) -> Vec<ObjectChange> {
@@ -259,6 +286,15 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
         created.chain(mutated).chain(unwrapped).chain(deleted).chain(unwrapped_then_deleted).chain(wrapped).collect()
     }
 
+    fn written(&self) -> Vec<ObjectRef> {
+        unimplemented!("TransactionEffectsV1::written() never called in V1");
+    }
+
+    fn accumulator_events(&self) -> Vec<AccumulatorEvent> {
+        // v1 did not have accumulator events
+        vec![]
+    }
+
     fn gas_object(&self) -> (ObjectRef, Owner) {
         self.gas_object.clone()
     }
@@ -279,15 +315,21 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
         &self.gas_used
     }
 
-    fn unchanged_shared_objects(&self) -> Vec<(ObjectID, UnchangedSharedKind)> {
-        self.input_shared_objects()
+    fn unchanged_consensus_objects(&self) -> Vec<(ObjectID, UnchangedConsensusKind)> {
+        self.input_consensus_objects()
             .iter()
             .filter_map(|o| match o {
-                // In effects v1, the only unchanged shared objects are read-only shared objects.
-                InputSharedObject::ReadOnly(oref) => Some((oref.0, UnchangedSharedKind::ReadOnlyRoot((oref.1, oref.2)))),
+                // In effects v1, the only unchanged consensus objects are read-only shared objects.
+                InputConsensusObject::ReadOnly(oref) => {
+                    Some((oref.0, UnchangedConsensusKind::ReadOnlyRoot((oref.1, oref.2))))
+                }
                 _ => None,
             })
             .collect()
+    }
+
+    fn accumulator_updates(&self) -> Vec<(ObjectID, AccumulatorWriteV1)> {
+        vec![]
     }
 
     fn status_mut_for_testing(&mut self) -> &mut ExecutionStatus {
@@ -306,19 +348,20 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
         &mut self.dependencies
     }
 
-    fn unsafe_add_input_shared_object_for_testing(&mut self, kind: InputSharedObject) {
+    fn unsafe_add_input_consensus_object_for_testing(&mut self, kind: InputConsensusObject) {
         match kind {
-            InputSharedObject::Mutate(obj_ref) => {
+            InputConsensusObject::Mutate(obj_ref) => {
                 self.shared_objects.push(obj_ref);
                 self.modified_at_versions.push((obj_ref.0, obj_ref.1));
             }
-            InputSharedObject::ReadOnly(obj_ref) => {
+            InputConsensusObject::ReadOnly(obj_ref) => {
                 self.shared_objects.push(obj_ref);
             }
-            InputSharedObject::ReadDeleted(id, version) | InputSharedObject::MutateDeleted(id, version) => {
+            InputConsensusObject::ReadConsensusStreamEnded(id, version)
+            | InputConsensusObject::MutateConsensusStreamEnded(id, version) => {
                 self.shared_objects.push((id, version, ObjectDigest::OBJECT_DIGEST_DELETED));
             }
-            InputSharedObject::Cancelled(..) => {
+            InputConsensusObject::Cancelled(..) => {
                 panic!("Transaction cancellation is not supported in effect v1");
             }
         }

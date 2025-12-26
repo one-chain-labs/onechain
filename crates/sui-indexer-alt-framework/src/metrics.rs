@@ -49,7 +49,7 @@ const BATCH_SIZE_BUCKETS: &[f64] =
     &[1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0];
 
 #[derive(Clone)]
-pub(crate) struct IndexerMetrics {
+pub struct IndexerMetrics {
     // Statistics related to fetching data from the remote store.
     pub total_ingested_checkpoints: IntCounter,
     pub total_ingested_transactions: IntCounter,
@@ -151,46 +151,49 @@ pub(crate) struct CheckpointLagMetricReporter {
 }
 
 impl IndexerMetrics {
-    pub(crate) fn new(registry: &Registry) -> Arc<Self> {
+    pub fn new(prefix: Option<&str>, registry: &Registry) -> Arc<Self> {
+        let prefix = prefix.unwrap_or("indexer");
+        let name = |n| format!("{prefix}_{n}");
         Arc::new(Self {
             total_ingested_checkpoints: register_int_counter_with_registry!(
-                "indexer_total_ingested_checkpoints",
+                name("total_ingested_checkpoints"),
                 "Total number of checkpoints fetched from the remote store",
                 registry,
             )
             .unwrap(),
             total_ingested_transactions: register_int_counter_with_registry!(
-                "indexer_total_ingested_transactions",
+                name("total_ingested_transactions"),
                 "Total number of transactions fetched from the remote store",
                 registry,
             )
             .unwrap(),
             total_ingested_events: register_int_counter_with_registry!(
-                "indexer_total_ingested_events",
+                name("total_ingested_events"),
                 "Total number of events fetched from the remote store",
                 registry,
             )
             .unwrap(),
             total_ingested_inputs: register_int_counter_with_registry!(
-                "indexer_total_ingested_inputs",
+                name("total_ingested_inputs"),
                 "Total number of input objects fetched from the remote store",
                 registry,
             )
             .unwrap(),
             total_ingested_outputs: register_int_counter_with_registry!(
-                "indexer_total_ingested_outputs",
+                name("total_ingested_outputs"),
                 "Total number of output objects fetched from the remote store",
                 registry,
             )
             .unwrap(),
             total_ingested_bytes: register_int_counter_with_registry!(
-                "indexer_total_ingested_bytes",
-                "Total number of bytes fetched from the remote store",
+                name("total_ingested_bytes"),
+                "Total number of bytes fetched from the remote store, this metric will not \
+                be updated when data are fetched over gRPC.",
                 registry,
             )
             .unwrap(),
             total_ingested_transient_retries: register_int_counter_vec_with_registry!(
-                "indexer_total_ingested_retries",
+                name("total_ingested_retries"),
                 "Total number of retries due to transient errors while fetching data from the \
                  remote store",
                 &["reason"],
@@ -198,27 +201,27 @@ impl IndexerMetrics {
             )
             .unwrap(),
             total_ingested_not_found_retries: register_int_counter_with_registry!(
-                "indexer_total_ingested_not_found_retries",
+                name("total_ingested_not_found_retries"),
                 "Total number of retries due to the not found errors while fetching data from the \
                  remote store",
                 registry,
             )
             .unwrap(),
             latest_ingested_checkpoint: register_int_gauge_with_registry!(
-                "indexer_latest_ingested_checkpoint",
+                name("latest_ingested_checkpoint"),
                 "Latest checkpoint sequence number fetched from the remote store",
                 registry,
             )
             .unwrap(),
             latest_ingested_checkpoint_timestamp_lag_ms: register_int_gauge_with_registry!(
-                "latest_ingested_checkpoint_timestamp_lag_ms",
+                name("latest_ingested_checkpoint_timestamp_lag_ms"),
                 "Difference between the system timestamp when the latest checkpoint was fetched and the \
                  timestamp in the checkpoint, in milliseconds",
                 registry,
             )
             .unwrap(),
             ingested_checkpoint_timestamp_lag: register_histogram_with_registry!(
-                "indexer_ingested_checkpoint_timestamp_lag",
+                name("ingested_checkpoint_timestamp_lag"),
                 "Difference between the system timestamp when a checkpoint was fetched and the \
                  timestamp in each checkpoint, in seconds",
                 LAG_SEC_BUCKETS.to_vec(),
@@ -226,42 +229,42 @@ impl IndexerMetrics {
             )
             .unwrap(),
             ingested_checkpoint_latency: register_histogram_with_registry!(
-                "indexer_ingested_checkpoint_latency",
+                name("ingested_checkpoint_latency"),
                 "Time taken to fetch a checkpoint from the remote store, including retries",
                 INGESTION_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
             )
             .unwrap(),
             total_handler_checkpoints_received: register_int_counter_vec_with_registry!(
-                "indexer_total_handler_checkpoints_received",
+                name("total_handler_checkpoints_received"),
                 "Total number of checkpoints received by this handler",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_handler_checkpoints_processed: register_int_counter_vec_with_registry!(
-                "indexer_total_handler_checkpoints_processed",
+                name("total_handler_checkpoints_processed"),
                 "Total number of checkpoints processed (converted into rows) by this handler",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_handler_rows_created: register_int_counter_vec_with_registry!(
-                "indexer_total_handler_rows_created",
+                name("total_handler_rows_created"),
                 "Total number of rows created by this handler",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             latest_processed_checkpoint: register_int_gauge_vec_with_registry!(
-                "indexer_latest_processed_checkpoint",
+                name("latest_processed_checkpoint"),
                 "Latest checkpoint sequence number processed by this handler",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             latest_processed_checkpoint_timestamp_lag_ms: register_int_gauge_vec_with_registry!(
-                "indexer_latest_processed_checkpoint_timestamp_lag_ms",
+                name("latest_processed_checkpoint_timestamp_lag_ms"),
                 "Difference between the system timestamp when the latest checkpoint was processed and the \
                  timestamp in the checkpoint, in milliseconds",
                 &["pipeline"],
@@ -269,7 +272,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             processed_checkpoint_timestamp_lag: register_histogram_vec_with_registry!(
-                "indexer_processed_checkpoint_timestamp_lag",
+                name("processed_checkpoint_timestamp_lag"),
                 "Difference between the system timestamp when a checkpoint was processed and the \
                  timestamp in each checkpoint, in seconds",
                 &["pipeline"],
@@ -278,7 +281,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             handler_checkpoint_latency: register_histogram_vec_with_registry!(
-                "indexer_handler_checkpoint_latency",
+                name("handler_checkpoint_latency"),
                 "Time taken to process a checkpoint by this handler",
                 &["pipeline"],
                 PROCESSING_LATENCY_SEC_BUCKETS.to_vec(),
@@ -286,98 +289,98 @@ impl IndexerMetrics {
             )
             .unwrap(),
             total_collector_checkpoints_received: register_int_counter_vec_with_registry!(
-                "indexer_total_collector_checkpoints_received",
+                name("total_collector_checkpoints_received"),
                 "Total number of checkpoints received by this collector",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_collector_rows_received: register_int_counter_vec_with_registry!(
-                "indexer_total_collector_rows_received",
+                name("total_collector_rows_received"),
                 "Total number of rows received by this collector",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_collector_batches_created: register_int_counter_vec_with_registry!(
-                "indexer_total_collector_batches_created",
+                name("total_collector_batches_created"),
                 "Total number of batches created by this collector",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_committer_batches_attempted: register_int_counter_vec_with_registry!(
-                "indexer_total_committer_batches_attempted",
+                name("total_committer_batches_attempted"),
                 "Total number of batches writes attempted by this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_committer_batches_succeeded: register_int_counter_vec_with_registry!(
-                "indexer_total_committer_batches_succeeded",
+                name("total_committer_batches_succeeded"),
                 "Total number of successful batches writes by this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_committer_batches_failed: register_int_counter_vec_with_registry!(
-                "indexer_total_committer_batches_failed",
+                name("total_committer_batches_failed"),
                 "Total number of failed batches writes by this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_committer_rows_committed: register_int_counter_vec_with_registry!(
-                "indexer_total_committer_rows_committed",
+                name("total_committer_rows_committed"),
                 "Total number of rows sent to the database by this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_committer_rows_affected: register_int_counter_vec_with_registry!(
-                "indexer_total_committer_rows_affected",
+                name("total_committer_rows_affected"),
                 "Total number of rows actually written to the database by this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_watermarks_out_of_order: register_int_counter_vec_with_registry!(
-                "indexer_watermark_out_of_order",
+                name("watermark_out_of_order"),
                 "Number of times this committer encountered a batch for a checkpoint before its watermark",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_pruner_chunks_attempted: register_int_counter_vec_with_registry!(
-                "indexer_pruner_chunks_attempted",
+                name("pruner_chunks_attempted"),
                 "Number of chunks this pruner attempted to delete",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_pruner_chunks_deleted: register_int_counter_vec_with_registry!(
-                "indexer_pruner_chunks_deleted",
+                name("pruner_chunks_deleted"),
                 "Number of chunks this pruner successfully deleted",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             total_pruner_rows_deleted: register_int_counter_vec_with_registry!(
-                "indexer_pruner_rows_deleted",
+                name("pruner_rows_deleted"),
                 "Number of rows this pruner successfully deleted",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             latest_collected_checkpoint: register_int_gauge_vec_with_registry!(
-                "indexer_latest_collected_checkpoint",
+                name("latest_collected_checkpoint"),
                 "Latest checkpoint sequence number collected by this collector",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             latest_collected_checkpoint_timestamp_lag_ms: register_int_gauge_vec_with_registry!(
-                "indexer_latest_collected_checkpoint_timestamp_lag_ms",
+                name("latest_collected_checkpoint_timestamp_lag_ms"),
                 "Difference between the system timestamp when the latest checkpoint was collected and the \
                  timestamp in the checkpoint, in milliseconds",
                 &["pipeline"],
@@ -385,7 +388,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             collected_checkpoint_timestamp_lag: register_histogram_vec_with_registry!(
-                "indexer_collected_checkpoint_timestamp_lag",
+                name("collected_checkpoint_timestamp_lag"),
                 "Difference between the system timestamp when a checkpoint was collected and the \
                  timestamp in each checkpoint, in seconds",
                 &["pipeline"],
@@ -394,14 +397,14 @@ impl IndexerMetrics {
             )
             .unwrap(),
             latest_partially_committed_checkpoint: register_int_gauge_vec_with_registry!(
-                "indexer_latest_partially_committed_checkpoint",
+                name("latest_partially_committed_checkpoint"),
                 "Latest checkpoint sequence number partially committed by this collector",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             latest_partially_committed_checkpoint_timestamp_lag_ms: register_int_gauge_vec_with_registry!(
-                "indexer_latest_partially_committed_checkpoint_timestamp_lag_ms",
+                name("latest_partially_committed_checkpoint_timestamp_lag_ms"),
                 "Difference between the system timestamp when the latest checkpoint was partially committed and the \
                  timestamp in the checkpoint, in milliseconds",
                 &["pipeline"],
@@ -409,7 +412,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             partially_committed_checkpoint_timestamp_lag: register_histogram_vec_with_registry!(
-                "indexer_partially_committed_checkpoint_timestamp_lag",
+                name("partially_committed_checkpoint_timestamp_lag"),
                 "Difference between the system timestamp when a checkpoint was partially committed and the \
                  timestamp in each checkpoint, in seconds",
                 &["pipeline"],
@@ -418,7 +421,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             latest_watermarked_checkpoint_timestamp_lag_ms: register_int_gauge_vec_with_registry!(
-                "indexer_latest_watermarked_checkpoint_timestamp_lag_ms",
+                name("latest_watermarked_checkpoint_timestamp_lag_ms"),
                 "Difference between the system timestamp when the latest checkpoint was watermarked and the \
                  timestamp in the checkpoint, in milliseconds",
                 &["pipeline"],
@@ -426,7 +429,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             watermarked_checkpoint_timestamp_lag: register_histogram_vec_with_registry!(
-                "indexer_watermarked_checkpoint_timestamp_lag",
+                name("watermarked_checkpoint_timestamp_lag"),
                 "Difference between the system timestamp when a checkpoint was watermarked and the \
                  timestamp in each checkpoint, in seconds",
                 &["pipeline"],
@@ -435,7 +438,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             collector_gather_latency: register_histogram_vec_with_registry!(
-                "indexer_collector_gather_latency",
+                name("collector_gather_latency"),
                 "Time taken to gather rows into a batch by this collector",
                 &["pipeline"],
                 PROCESSING_LATENCY_SEC_BUCKETS.to_vec(),
@@ -443,7 +446,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             collector_batch_size: register_histogram_vec_with_registry!(
-                "indexer_collector_batch_size",
+                name("collector_batch_size"),
                 "Number of rows in a batch written to the database by this collector",
                 &["pipeline"],
                 BATCH_SIZE_BUCKETS.to_vec(),
@@ -451,7 +454,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             committer_commit_latency: register_histogram_vec_with_registry!(
-                "indexer_committer_commit_latency",
+                name("committer_commit_latency"),
                 "Time taken to write a batch of rows to the database by this committer",
                 &["pipeline"],
                 DB_UPDATE_LATENCY_SEC_BUCKETS.to_vec(),
@@ -459,7 +462,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             committer_tx_rows: register_histogram_vec_with_registry!(
-                "indexer_committer_tx_rows",
+                name("committer_tx_rows"),
                 "Number of rows written to the database in a single database transaction by this committer",
                 &["pipeline"],
                 BATCH_SIZE_BUCKETS.to_vec(),
@@ -467,7 +470,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             watermark_gather_latency: register_histogram_vec_with_registry!(
-                "indexer_watermark_gather_latency",
+                name("watermark_gather_latency"),
                 "Time taken to calculate the new high watermark after a write by this committer",
                 &["pipeline"],
                 PROCESSING_LATENCY_SEC_BUCKETS.to_vec(),
@@ -475,7 +478,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             watermark_commit_latency: register_histogram_vec_with_registry!(
-                "indexer_watermark_commit_latency",
+                name("watermark_commit_latency"),
                 "Time taken to write the new high watermark to the database by this committer",
                 &["pipeline"],
                 DB_UPDATE_LATENCY_SEC_BUCKETS.to_vec(),
@@ -483,7 +486,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             watermark_pruner_read_latency: register_histogram_vec_with_registry!(
-                "indexer_watermark_pruner_read_latency",
+                name("watermark_pruner_read_latency"),
                 "Time taken to read pruner's next upper and lowerbounds from the database by this pruner",
                 &["pipeline"],
                 DB_UPDATE_LATENCY_SEC_BUCKETS.to_vec(),
@@ -491,7 +494,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             watermark_pruner_write_latency: register_histogram_vec_with_registry!(
-                "indexer_watermark_pruner_write_latency",
+                name("watermark_pruner_write_latency"),
                 "Time taken to write the pruner's new upperbound to the database by this pruner",
                 &["pipeline"],
                 DB_UPDATE_LATENCY_SEC_BUCKETS.to_vec(),
@@ -499,7 +502,7 @@ impl IndexerMetrics {
             )
             .unwrap(),
             pruner_delete_latency: register_histogram_vec_with_registry!(
-                "indexer_pruner_delete_latency",
+                name("pruner_delete_latency"),
                 "Time taken to delete a chunk of data from the database by this pruner",
                 &["pipeline"],
                 DB_UPDATE_LATENCY_SEC_BUCKETS.to_vec(),
@@ -507,84 +510,84 @@ impl IndexerMetrics {
             )
             .unwrap(),
             watermark_epoch: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_epoch",
+                name("watermark_epoch"),
                 "Current epoch high watermark for this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_checkpoint: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_checkpoint",
+                name("watermark_checkpoint"),
                 "Current checkpoint high watermark for this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_transaction: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_transaction",
+                name("watermark_transaction"),
                 "Current transaction high watermark for this committer",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_timestamp_ms: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_timestamp_ms",
+                name("watermark_timestamp_ms"),
                 "Current timestamp high watermark for this committer, in milliseconds",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_reader_lo: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_reader_lo",
+                name("watermark_reader_lo"),
                 "Current reader low watermark for this pruner",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_pruner_hi: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_pruner_hi",
+                name("watermark_pruner_hi"),
                 "Current pruner high watermark for this pruner",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_epoch_in_db: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_epoch_in_db",
+                name("watermark_epoch_in_db"),
                 "Last epoch high watermark this committer wrote to the DB",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_checkpoint_in_db: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_checkpoint_in_db",
+                name("watermark_checkpoint_in_db"),
                 "Last checkpoint high watermark this committer wrote to the DB",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_transaction_in_db: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_transaction_in_db",
+                name("watermark_transaction_in_db"),
                 "Last transaction high watermark this committer wrote to the DB",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_timestamp_in_db_ms: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_timestamp_ms_in_db",
+                name("watermark_timestamp_ms_in_db"),
                 "Last timestamp high watermark this committer wrote to the DB, in milliseconds",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_reader_lo_in_db: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_reader_lo_in_db",
+                name("watermark_reader_lo_in_db"),
                 "Last reader low watermark this pruner wrote to the DB",
                 &["pipeline"],
                 registry,
             )
             .unwrap(),
             watermark_pruner_hi_in_db: register_int_gauge_vec_with_registry!(
-                "indexer_watermark_pruner_hi_in_db",
+                name("watermark_pruner_hi_in_db"),
                 "Last pruner high watermark this pruner wrote to the DB",
                 &["pipeline"],
                 registry,
@@ -652,6 +655,6 @@ pub(crate) mod tests {
 
     /// Construct metrics for test purposes.
     pub fn test_metrics() -> Arc<IndexerMetrics> {
-        IndexerMetrics::new(&Registry::new())
+        IndexerMetrics::new(None, &Registry::new())
     }
 }

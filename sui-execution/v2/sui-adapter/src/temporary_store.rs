@@ -3,7 +3,6 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use move_core_types::{account_address::AccountAddress, language_storage::StructTag, resolver::ResourceResolver};
 use parking_lot::RwLock;
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
@@ -11,16 +10,15 @@ use sui_types::{
     committee::EpochId,
     digests::ObjectDigest,
     effects::{EffectsObjectChange, TransactionEffects, TransactionEvents},
-    error::{ExecutionError, SuiError, SuiResult},
+    error::{ExecutionError, SuiResult},
     execution::{DynamicallyLoadedObjectMetadata, ExecutionResults, ExecutionResultsV2, SharedInput},
     execution_config_utils::to_binary_config,
     execution_status::ExecutionStatus,
-    fp_bail,
     gas::GasCostSummary,
     inner_temporary_store::InnerTemporaryStore,
     is_system_package,
     layout_resolver::LayoutResolver,
-    object::{Data, Object, Owner},
+    object::{Object, Owner},
     storage::{
         BackingPackageStore,
         BackingStore,
@@ -78,7 +76,7 @@ impl<'backing> TemporaryStore<'backing> {
     ) -> Self {
         let mutable_input_refs = input_objects.mutable_inputs();
         let lamport_timestamp = input_objects.lamport_timestamp(&receiving_objects);
-        let deleted_consensus_objects = input_objects.deleted_consensus_objects();
+        let deleted_consensus_objects = input_objects.consensus_stream_ended_objects();
         let objects = input_objects.into_object_map();
         #[cfg(debug_assertions)]
         {
@@ -131,9 +129,11 @@ impl<'backing> TemporaryStore<'backing> {
         InnerTemporaryStore {
             input_objects: self.input_objects,
             mutable_inputs: self.mutable_input_refs,
-            deleted_consensus_objects: self.deleted_consensus_objects,
+            stream_ended_consensus_objects: self.deleted_consensus_objects,
             written: results.written_objects,
             events: TransactionEvents { data: results.user_events },
+            // no accumulator events for v2
+            accumulator_events: vec![],
             loaded_runtime_objects: self.loaded_runtime_objects,
             runtime_packages_loaded_from_db: self.runtime_packages_loaded_from_db.into_inner(),
             lamport_version: self.lamport_timestamp,
@@ -232,7 +232,7 @@ impl<'backing> TemporaryStore<'backing> {
                 .into_iter()
                 .map(|shared_input| match shared_input {
                     SharedInput::Existing(oref) => oref,
-                    SharedInput::Deleted(_) => {
+                    SharedInput::ConsensusStreamEnded(_) => {
                         unreachable!("Shared object deletion not supported in effects v1")
                     }
                     SharedInput::Cancelled(_) => {
@@ -651,8 +651,8 @@ impl TemporaryStore<'_> {
                     Owner::ObjectOwner(_parent) => {
                         unreachable!("Input objects must be address owned, shared, or immutable")
                     }
-                    Owner::ConsensusV2 { .. } => {
-                        unimplemented!("ConsensusV2 does not exist for this execution version")
+                    Owner::ConsensusAddressOwner { .. } => {
+                        unimplemented!("ConsensusAddressOwner does not exist for this execution version")
                     }
                 }
             })
@@ -717,8 +717,8 @@ impl TemporaryStore<'_> {
                         assert!(is_system_package(to_authenticate), "Only system packages can be upgraded");
                         continue;
                     }
-                    Owner::ConsensusV2 { .. } => {
-                        unimplemented!("ConsensusV2 does not exist for this execution version")
+                    Owner::ConsensusAddressOwner { .. } => {
+                        unimplemented!("ConsensusAddressOwner does not exist for this execution version")
                     }
                 }
             };
@@ -1035,20 +1035,12 @@ impl ChildObjectResolver for TemporaryStore<'_> {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         // You should never be able to try and receive an object after deleting it or writing it in the same
         // transaction since `Receiving` doesn't have copy.
         debug_assert!(!self.execution_results.written_objects.contains_key(receiving_object_id));
         debug_assert!(!self.execution_results.deleted_object_ids.contains(receiving_object_id));
-        self.store.get_object_received_at_version(
-            owner,
-            receiving_object_id,
-            receive_object_at_version,
-            epoch_id,
-            use_object_per_epoch_marker_table_v2,
-        )
+        self.store.get_object_received_at_version(owner, receiving_object_id, receive_object_at_version, epoch_id)
     }
 }
 
@@ -1085,6 +1077,10 @@ impl Storage for TemporaryStore<'_> {
     fn check_coin_deny_list(&self, _written_objects: &BTreeMap<ObjectID, Object>) -> DenyListResult {
         unreachable!("Coin denylist v2 is not supported in sui-execution v2");
     }
+
+    fn record_generated_object_ids(&mut self, _generated_ids: BTreeSet<ObjectID>) {
+        unreachable!("Generated object IDs are not recorded in ExecutionResults in sui-execution v2");
+    }
 }
 
 impl BackingPackageStore for TemporaryStore<'_> {
@@ -1110,37 +1106,6 @@ impl BackingPackageStore for TemporaryStore<'_> {
                     }
                 }
             })
-        }
-    }
-}
-
-impl ResourceResolver for TemporaryStore<'_> {
-    type Error = SuiError;
-
-    fn get_resource(&self, address: &AccountAddress, struct_tag: &StructTag) -> Result<Option<Vec<u8>>, Self::Error> {
-        let object = match self.read_object(&ObjectID::from(*address)) {
-            Some(x) => x,
-            None => match self.read_object(&ObjectID::from(*address)) {
-                None => return Ok(None),
-                Some(x) => {
-                    if !x.is_immutable() {
-                        fp_bail!(SuiError::ExecutionInvariantViolation);
-                    }
-                    x
-                }
-            },
-        };
-
-        match &object.data {
-            Data::Move(m) => {
-                assert!(
-                    m.is_type(struct_tag),
-                    "Invariant violation: ill-typed object in storage \
-                    or bad object request from caller"
-                );
-                Ok(Some(m.contents().to_vec()))
-            }
-            other => unimplemented!("Bad object lookup: expected Move object, but got {:?}", other),
         }
     }
 }

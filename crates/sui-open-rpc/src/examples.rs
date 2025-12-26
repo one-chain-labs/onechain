@@ -86,6 +86,7 @@ use sui_types::{
     balance::Supply,
     base_types::{
         random_object_ref,
+        FullObjectRef,
         MoveObjectType,
         ObjectDigest,
         ObjectID,
@@ -222,7 +223,14 @@ impl RpcExampleProvider {
                 )
                 .unwrap();
             builder
-                .transfer_object(recipient, (object_id, SequenceNumber::from_u64(1), ObjectDigest::new(self.rng.gen())))
+                .transfer_object(
+                    recipient,
+                    FullObjectRef::from_fastpath_ref((
+                        object_id,
+                        SequenceNumber::from_u64(1),
+                        ObjectDigest::new(self.rng.gen()),
+                    )),
+                )
                 .unwrap();
             builder.finish()
         };
@@ -585,7 +593,8 @@ impl RpcExampleProvider {
         let recipient = SuiAddress::from(ObjectID::new(self.rng.gen()));
         let obj_id = ObjectID::new(self.rng.gen());
         let gas_ref = (ObjectID::new(self.rng.gen()), SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.gen()));
-        let object_ref = (obj_id, SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.gen()));
+        let object_ref =
+            FullObjectRef::from_fastpath_ref((obj_id, SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.gen())));
 
         let data = TransactionData::new_transfer(
             recipient,
@@ -607,7 +616,7 @@ impl RpcExampleProvider {
             sender: signer,
             recipient: Owner::AddressOwner(recipient),
             object_type: parse_sui_struct_tag("0x2::example::Object").unwrap(),
-            object_id: object_ref.0,
+            object_id: object_ref.0.id(),
             version: object_ref.1,
             digest: ObjectDigest::new(self.rng.gen()),
         };
@@ -636,7 +645,10 @@ impl RpcExampleProvider {
                 created: vec![],
                 mutated: vec![
                     OwnedObjectRef { owner: Owner::AddressOwner(signer), reference: gas_ref.into() },
-                    OwnedObjectRef { owner: Owner::AddressOwner(recipient), reference: object_ref.into() },
+                    OwnedObjectRef {
+                        owner: Owner::AddressOwner(recipient),
+                        reference: object_ref.as_object_ref().into(),
+                    },
                 ],
                 unwrapped: vec![],
                 deleted: vec![],
@@ -645,13 +657,14 @@ impl RpcExampleProvider {
                 gas_object: OwnedObjectRef { owner: Owner::ObjectOwner(signer), reference: SuiObjectRef::from(gas_ref) },
                 events_digest: Some(TransactionEventsDigest::new(self.rng.gen())),
                 dependencies: vec![],
+                abort_error: None,
             })),
             events: None,
             object_changes: Some(vec![object_change]),
             balance_changes: None,
             timestamp_ms: None,
             transaction: Some(SuiTransactionBlock {
-                data: SuiTransactionBlockData::try_from(data1, &&mut NoOpsModuleResolver).unwrap(),
+                data: SuiTransactionBlockData::try_from_with_module_cache(data1, &&mut NoOpsModuleResolver).unwrap(),
                 tx_signatures: signatures.clone(),
             }),
             raw_transaction,

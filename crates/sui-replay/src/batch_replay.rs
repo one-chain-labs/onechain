@@ -161,7 +161,7 @@ async fn execute_transaction(
     };
     let sandbox_state = loop {
         let result = executor
-            .execute_transaction(digest, expensive_safety_check_config.clone(), use_authority, None, None, None, None)
+            .execute_transaction(digest, expensive_safety_check_config.clone(), use_authority, None, None, None)
             .await;
         match result {
             Ok(sandbox_state) => break sandbox_state,

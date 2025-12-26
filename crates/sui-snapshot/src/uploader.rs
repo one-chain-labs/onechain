@@ -133,14 +133,17 @@ impl StateSnapshotUploader {
                 let db = Arc::new(AuthorityPerpetualTables::open(
                     &path_to_filesystem(self.db_checkpoint_path.clone(), &db_path.child("store"))?,
                     None,
+                    None,
                 ));
                 let commitments = self
                     .checkpoint_store
                     .get_epoch_state_commitments(*epoch)
                     .expect("Expected last checkpoint of epoch to have end of epoch data")
                     .expect("Expected end of epoch data to be present");
-                let ECMHLiveObjectSetDigest(state_hash_commitment) =
-                    commitments.last().expect("Expected at least one commitment").clone();
+                let state_hash_commitment = match commitments.last().expect("Expected at least one commitment").clone() {
+                    ECMHLiveObjectSetDigest(digest) => digest,
+                    _ => return Err(anyhow::anyhow!("Expected ECMHLiveObjectSetDigest")),
+                };
                 state_snapshot_writer.write(*epoch, db, state_hash_commitment, self.chain_identifier).await?;
                 info!("State snapshot creation successful for epoch: {}", *epoch);
                 // Drop marker in the output directory that upload completed successfully

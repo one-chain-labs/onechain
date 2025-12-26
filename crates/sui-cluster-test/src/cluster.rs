@@ -325,7 +325,7 @@ impl Cluster for Box<dyn Cluster + Send + Sync> {
     }
 }
 
-pub fn new_wallet_context_from_cluster(
+pub async fn new_wallet_context_from_cluster(
     cluster: &(dyn Cluster + Sync + Send),
     key_pair: AccountKeyPair,
 ) -> WalletContext {
@@ -334,11 +334,12 @@ pub fn new_wallet_context_from_cluster(
     let fullnode_url = cluster.fullnode_url();
     info!("Use RPC: {}", &fullnode_url);
     let keystore_path = config_dir.join(SUI_KEYSTORE_FILENAME);
-    let mut keystore = Keystore::from(FileBasedKeystore::new(&keystore_path).unwrap());
+    let mut keystore = Keystore::from(FileBasedKeystore::load_or_create(&keystore_path).unwrap());
     let address: SuiAddress = key_pair.public().into();
-    keystore.add_key(None, SuiKeyPair::Ed25519(key_pair)).unwrap();
+    keystore.import(None, SuiKeyPair::Ed25519(key_pair)).await.unwrap();
     SuiClientConfig {
         keystore,
+        external_keys: None,
         envs: vec![SuiEnv { alias: "localnet".to_string(), rpc: fullnode_url.into(), ws: None, basic_auth: None }],
         active_address: Some(address),
         active_env: Some("localnet".to_string()),
@@ -349,6 +350,6 @@ pub fn new_wallet_context_from_cluster(
 
     info!("Initialize wallet from config path: {:?}", wallet_config_path);
 
-    WalletContext::new(&wallet_config_path, None, None)
+    WalletContext::new(&wallet_config_path)
         .unwrap_or_else(|e| panic!("Failed to init wallet context from path {:?}, error: {e}", wallet_config_path))
 }

@@ -17,22 +17,31 @@ use sui_types::{
     base_types::*,
     committee::*,
     crypto::AuthorityPublicKeyBytes,
-    effects::{SignedTransactionEffects, TransactionEffectsAPI},
+    digests::TransactionEventsDigest,
+    effects::{SignedTransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, SuiResult},
     fp_ensure,
     messages_checkpoint::{CertifiedCheckpointSummary, CheckpointRequest, CheckpointResponse, CheckpointSequenceNumber},
     messages_grpc::{
+        ExecutedData,
         HandleCertificateRequestV3,
         HandleCertificateResponseV2,
         HandleCertificateResponseV3,
         ObjectInfoRequest,
         ObjectInfoResponse,
+        SubmitTxRequest,
+        SubmitTxResponse,
         SystemStateRequest,
         TransactionInfoRequest,
         TransactionStatus,
+        ValidatorHealthRequest,
+        ValidatorHealthResponse,
         VerifiedObjectInfoResponse,
+        WaitForEffectsRequest,
+        WaitForEffectsResponse,
     },
     messages_safe_client::PlainTransactionInfoResponse,
+    object::Object,
     sui_system_state::SuiSystemState,
     transaction::*,
 };
@@ -275,6 +284,38 @@ impl<C> SafeClient<C>
 where
     C: AuthorityAPI + Send + Sync + Clone + 'static,
 {
+    /// Submit a transaction for certification and execution.
+    pub async fn submit_transaction(
+        &self,
+        request: SubmitTxRequest,
+        client_addr: Option<SocketAddr>,
+    ) -> Result<SubmitTxResponse, SuiError> {
+        let _timer = self.metrics.handle_certificate_latency.start_timer();
+        self.authority_client.submit_transaction(request, client_addr).await
+    }
+
+    /// Wait for effects of a transaction that has been submitted to the network
+    /// through the `submit_transaction` API.
+    pub async fn wait_for_effects(
+        &self,
+        request: WaitForEffectsRequest,
+        client_addr: Option<SocketAddr>,
+    ) -> Result<WaitForEffectsResponse, SuiError> {
+        let _timer = self.metrics.handle_certificate_latency.start_timer();
+        let wait_for_effects_resp = self.authority_client.wait_for_effects(request, client_addr).await?;
+
+        match &wait_for_effects_resp {
+            WaitForEffectsResponse::Executed { effects_digest: _, fast_path: _, details: Some(details) } => {
+                self.verify_executed_data((**details).clone())?;
+            }
+            _ => {
+                // No additional verification needed for other response types
+            }
+        };
+
+        Ok(wait_for_effects_resp)
+    }
+
     /// Initiate a new transfer to a Sui or Primary account.
     pub async fn handle_transaction(
         &self,
@@ -324,6 +365,53 @@ where
         Ok(verified)
     }
 
+    fn verify_events(
+        &self,
+        events: &Option<TransactionEvents>,
+        events_digest: Option<&TransactionEventsDigest>,
+    ) -> SuiResult {
+        match (events, events_digest) {
+            (None, None) | (None, Some(_)) => Ok(()),
+            (Some(events), None) => {
+                if !events.data.is_empty() {
+                    Err(SuiError::ByzantineAuthoritySuspicion {
+                        authority: self.address,
+                        reason: "Returned events but no event digest present in effects".to_string(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+            (Some(events), Some(events_digest)) => {
+                fp_ensure!(&events.digest() == events_digest, SuiError::ByzantineAuthoritySuspicion {
+                    authority: self.address,
+                    reason: "Returned events don't match events digest in effects".to_string(),
+                });
+                Ok(())
+            }
+        }
+    }
+
+    fn verify_objects<I>(&self, objects: &Option<Vec<Object>>, expected_refs: I) -> SuiResult
+    where
+        I: IntoIterator<Item = (ObjectID, ObjectRef)>,
+    {
+        if let Some(objects) = objects {
+            let expected: HashMap<_, _> = expected_refs.into_iter().collect();
+
+            for object in objects {
+                let object_ref = object.compute_object_reference();
+                if expected.get(&object_ref.0).is_none_or(|expect| &object_ref != expect) {
+                    return Err(SuiError::ByzantineAuthoritySuspicion {
+                        authority: self.address,
+                        reason: "Returned object that wasn't present in effects".to_string(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn verify_certificate_response_v3(
         &self,
         digest: &TransactionDigest,
@@ -338,60 +426,43 @@ where
         let effects = self.check_signed_effects_plain(digest, effects, None)?;
 
         // Check Events
-        match (&events, effects.events_digest()) {
-            (None, None) | (None, Some(_)) => {}
-            (Some(events), None) => {
-                if !events.data.is_empty() {
-                    return Err(SuiError::ByzantineAuthoritySuspicion {
-                        authority: self.address,
-                        reason: "Returned events but no event digest present in the signed effects".to_string(),
-                    });
-                }
-            }
-            (Some(events), Some(events_digest)) => {
-                fp_ensure!(&events.digest() == events_digest, SuiError::ByzantineAuthoritySuspicion {
-                    authority: self.address,
-                    reason: "Returned events don't match events digest in the signed effects".to_string()
-                });
-            }
-        }
+        self.verify_events(&events, effects.events_digest())?;
 
         // Check Input Objects
-        if let Some(input_objects) = &input_objects {
-            let expected: HashMap<_, _> = effects
-                .old_object_metadata()
-                .into_iter()
-                .map(|(object_ref, _owner)| (object_ref.0, object_ref))
-                .collect();
-
-            for object in input_objects {
-                let object_ref = object.compute_object_reference();
-                if expected.get(&object_ref.0).is_none_or(|expect| &object_ref != expect) {
-                    return Err(SuiError::ByzantineAuthoritySuspicion {
-                        authority: self.address,
-                        reason: "Returned input object that wasn't present in the signed effects".to_string(),
-                    });
-                }
-            }
-        }
+        self.verify_objects(
+            &input_objects,
+            effects.old_object_metadata().into_iter().map(|(object_ref, _owner)| (object_ref.0, object_ref)),
+        )?;
 
         // Check Output Objects
-        if let Some(output_objects) = &output_objects {
-            let expected: HashMap<_, _> =
-                effects.all_changed_objects().into_iter().map(|(object_ref, _, _)| (object_ref.0, object_ref)).collect();
-
-            for object in output_objects {
-                let object_ref = object.compute_object_reference();
-                if expected.get(&object_ref.0).is_none_or(|expect| &object_ref != expect) {
-                    return Err(SuiError::ByzantineAuthoritySuspicion {
-                        authority: self.address,
-                        reason: "Returned output object that wasn't present in the signed effects".to_string(),
-                    });
-                }
-            }
-        }
+        self.verify_objects(
+            &output_objects,
+            effects.all_changed_objects().into_iter().map(|(object_ref, _, _)| (object_ref.0, object_ref)),
+        )?;
 
         Ok(HandleCertificateResponseV3 { effects, events, input_objects, output_objects, auxiliary_data })
+    }
+
+    fn verify_executed_data(
+        &self,
+        ExecutedData { effects, events, input_objects, output_objects }: ExecutedData,
+    ) -> SuiResult<()> {
+        // Check Events
+        self.verify_events(&events, effects.events_digest())?;
+
+        // Check Input Objects
+        self.verify_objects(
+            &Some(input_objects).filter(|v| !v.is_empty()),
+            effects.old_object_metadata().into_iter().map(|(object_ref, _owner)| (object_ref.0, object_ref)),
+        )?;
+
+        // Check Output Objects
+        self.verify_objects(
+            &Some(output_objects).filter(|v| !v.is_empty()),
+            effects.all_changed_objects().into_iter().map(|(object_ref, _, _)| (object_ref.0, object_ref)),
+        )?;
+
+        Ok(())
     }
 
     /// Execute a certificate.
@@ -429,6 +500,7 @@ where
     }
 
     /// Handle Transaction information requests for a given digest.
+    /// Only used for testing.
     #[instrument(level = "trace", skip_all, fields(authority = ?self.address.concise()))]
     pub async fn handle_transaction_info_request(
         &self,
@@ -509,5 +581,11 @@ where
     #[instrument(level = "trace", skip_all, fields(authority = ?self.address.concise()))]
     pub async fn handle_system_state_object(&self) -> Result<SuiSystemState, SuiError> {
         self.authority_client.handle_system_state_object(SystemStateRequest { _unused: false }).await
+    }
+
+    /// Handle validator health check requests (for latency measurement)
+    #[instrument(level = "trace", skip_all, fields(authority = ?self.address.concise()))]
+    pub async fn validator_health(&self, request: ValidatorHealthRequest) -> Result<ValidatorHealthResponse, SuiError> {
+        self.authority_client.validator_health(request).await
     }
 }

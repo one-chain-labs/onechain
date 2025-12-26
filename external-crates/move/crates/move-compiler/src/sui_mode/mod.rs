@@ -4,7 +4,7 @@
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
 
-use crate::diagnostics::codes::{custom, DiagnosticInfo, Severity};
+use crate::diagnostics::codes::{DiagnosticInfo, Severity, custom};
 
 pub mod id_leak;
 pub mod info;
@@ -33,6 +33,9 @@ pub const SUI_ADDR_NAME: Symbol = symbol!("one");
 pub const OBJECT_MODULE_NAME: Symbol = symbol!("object");
 pub const OBJECT_NEW: Symbol = symbol!("new");
 pub const OBJECT_NEW_UID_FROM_HASH: Symbol = symbol!("new_uid_from_hash");
+pub const DERIVED_OBJECT_MODULE_NAME: Symbol = symbol!("derived_object");
+pub const DERIVED_OBJECT_CLAIM: Symbol = symbol!("claim");
+
 pub const TEST_SCENARIO_MODULE_NAME: Symbol = symbol!("test_scenario");
 pub const TS_NEW_OBJECT: Symbol = symbol!("new_object");
 pub const UID_TYPE_NAME: Symbol = symbol!("UID");
@@ -60,9 +63,15 @@ pub const BRIDGE_ADDR_NAME: Symbol = symbol!("bridge");
 pub const BRIDGE_MODULE_NAME: Symbol = symbol!("bridge");
 pub const BRIDGE_TYPE_NAME: Symbol = symbol!("Bridge");
 pub const BRIDGE_CREATE: Symbol = symbol!("create");
+pub const ACCUMULATOR_MODULE_NAME: Symbol = symbol!("accumulator");
+pub const ACCUMULATOR_CREATE: Symbol = symbol!("create");
 
 pub const EVENT_MODULE_NAME: Symbol = symbol!("event");
 pub const EVENT_FUNCTION_NAME: Symbol = symbol!("emit");
+
+pub const COIN_REGISTRY_MODULE_NAME: Symbol = symbol!("coin_registry");
+pub const DYNAMIC_COIN_CREATION_FUNCTION_NAME: Symbol = symbol!("new_currency");
+pub const COIN_REGISTRY_CREATE: Symbol = symbol!("create");
 
 pub const TRANSFER_MODULE_NAME: Symbol = symbol!("transfer");
 pub const TRANSFER_FUNCTION_NAME: Symbol = symbol!("transfer");
@@ -70,12 +79,14 @@ pub const FREEZE_FUNCTION_NAME: Symbol = symbol!("freeze_object");
 pub const SHARE_FUNCTION_NAME: Symbol = symbol!("share_object");
 pub const RECEIVE_FUNCTION_NAME: Symbol = symbol!("receive");
 pub const RECEIVING_TYPE_NAME: Symbol = symbol!("Receiving");
+pub const PARTY_FUNCTION_NAME: Symbol = symbol!("party_transfer");
 
 pub const PRIVATE_TRANSFER_FUNCTIONS: &[Symbol] = &[
     TRANSFER_FUNCTION_NAME,
     FREEZE_FUNCTION_NAME,
     SHARE_FUNCTION_NAME,
     RECEIVE_FUNCTION_NAME,
+    PARTY_FUNCTION_NAME,
 ];
 
 //**************************************************************************************************
@@ -151,6 +162,13 @@ pub const PRIVATE_TRANSFER_CALL_DIAG: DiagnosticInfo = custom(
     /* category */ TYPING,
     /* code */ 9,
     "invalid private transfer call",
+);
+pub const DYNAMIC_COIN_CREATION_CALL_DIAG: DiagnosticInfo = custom(
+    SUI_DIAG_PREFIX,
+    Severity::NonblockingError,
+    /* category */ TYPING,
+    /* code */ 10,
+    "invalid coin creation call",
 );
 
 // Bridge supported asset

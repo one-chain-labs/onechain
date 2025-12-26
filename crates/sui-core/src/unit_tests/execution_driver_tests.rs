@@ -10,7 +10,7 @@ use std::{
 
 use itertools::Itertools;
 use sui_config::node::AuthorityOverloadConfig;
-use sui_protocol_config::ProtocolConfig;
+use sui_protocol_config::{Chain, PerObjectCongestionControlMode, ProtocolConfig, ProtocolVersion};
 use sui_test_transaction_builder::TestTransactionBuilder;
 use sui_types::{
     base_types::TransactionDigest,
@@ -18,6 +18,7 @@ use sui_types::{
     crypto::{get_key_pair, AccountKeyPair},
     effects::{TransactionEffects, TransactionEffectsAPI},
     error::{SuiError, SuiResult},
+    executable_transaction::VerifiedExecutableTransaction,
     object::{Object, Owner},
     transaction::{
         CertifiedTransaction,
@@ -34,8 +35,10 @@ use tokio::{
 use crate::{
     authority::{
         authority_tests::{send_consensus, send_consensus_no_execution},
+        shared_object_version_manager::Schedulable,
         test_authority_builder::TestAuthorityBuilder,
         AuthorityState,
+        ExecutionEnv,
     },
     authority_aggregator::authority_aggregator_tests::{
         create_object_move_transaction,
@@ -267,7 +270,7 @@ async fn execute_owned_on_first_three_authorities(
 
 pub async fn do_cert_with_shared_objects(authority: &AuthorityState, cert: &VerifiedCertificate) -> TransactionEffects {
     send_consensus(authority, cert).await;
-    authority.get_transaction_cache_reader().notify_read_executed_effects(&[*cert.digest()]).await.pop().unwrap()
+    authority.get_transaction_cache_reader().notify_read_executed_effects("", &[*cert.digest()]).await.pop().unwrap()
 }
 
 async fn execute_shared_on_first_three_authorities(
@@ -295,6 +298,7 @@ async fn test_execution_with_dependencies() {
     // Disable randomness, it can't be constructed with fake authorities in this test anyway.
     let _guard = ProtocolConfig::apply_overrides_for_testing(|_, mut config| {
         config.set_random_beacon_for_testing(false);
+        config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
         config
     });
 
@@ -388,23 +392,34 @@ async fn test_execution_with_dependencies() {
 
     // ---- Execute transactions in reverse dependency order on the last authority.
 
-    // Sets shared object locks in the executed order.
+    // Assign shared object versions in the executed order.
+
+    let mut certs = Vec::new();
     for cert in executed_shared_certs.iter() {
-        send_consensus_no_execution(&authorities[3], cert).await;
+        let assigned_versions = send_consensus_no_execution(&authorities[3], cert).await;
+        certs.push((
+            Schedulable::Transaction(VerifiedExecutableTransaction::new_from_certificate(cert.clone())),
+            ExecutionEnv::new().with_assigned_versions(assigned_versions),
+        ));
     }
 
     // Enqueue certs out of dependency order for executions.
-    for cert in executed_shared_certs.iter().rev() {
-        authorities[3].enqueue_certificates_for_execution(vec![cert.clone()], &authorities[3].epoch_store_for_testing());
+    for (cert, env) in certs.iter().rev() {
+        authorities[3]
+            .execution_scheduler()
+            .enqueue(vec![(cert.clone(), env.clone())], &authorities[3].epoch_store_for_testing());
     }
     for cert in executed_owned_certs.iter().rev() {
-        authorities[3].enqueue_certificates_for_execution(vec![cert.clone()], &authorities[3].epoch_store_for_testing());
+        authorities[3].execution_scheduler().enqueue(
+            vec![(VerifiedExecutableTransaction::new_from_certificate(cert.clone()).into(), ExecutionEnv::new())],
+            &authorities[3].epoch_store_for_testing(),
+        );
     }
 
     // All certs should get executed eventually.
     let digests: Vec<_> =
         executed_shared_certs.iter().chain(executed_owned_certs.iter()).map(|cert| *cert.digest()).collect();
-    authorities[3].get_transaction_cache_reader().notify_read_executed_effects(&digests).await;
+    authorities[3].get_transaction_cache_reader().notify_read_executed_effects("", &digests).await;
 }
 
 fn make_socket_addr() -> std::net::SocketAddr {
@@ -431,14 +446,22 @@ async fn test_per_object_overload() {
     // Disable randomness, it can't be constructed with fake authorities in this test anyway.
     let _guard = ProtocolConfig::apply_overrides_for_testing(|_, mut config| {
         config.set_random_beacon_for_testing(false);
+        config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
         config
     });
 
-    // Initialize a network with 1 account and 2000 gas objects.
+    // Initialize a network with 1 account and gas objects.
     let (addr, key): (_, AccountKeyPair) = get_key_pair();
-    const NUM_GAS_OBJECTS_PER_ACCOUNT: usize = 2000;
+    // Use a small threshold for testing to avoid creating too many objects
+    const TEST_PER_OBJECT_QUEUE_LENGTH: usize = 20;
+    const NUM_GAS_OBJECTS_PER_ACCOUNT: usize = TEST_PER_OBJECT_QUEUE_LENGTH + 10; // Some buffer
     let gas_objects = (0 .. NUM_GAS_OBJECTS_PER_ACCOUNT).map(|_| Object::with_owner_for_testing(addr)).collect_vec();
-    let (aggregator, authorities, _genesis, package) = init_local_authorities(4, gas_objects.clone()).await;
+    let (aggregator, authorities, _genesis, package) =
+        init_local_authorities_with_overload_thresholds(4, gas_objects.clone(), AuthorityOverloadConfig {
+            max_transaction_manager_per_object_queue_length: TEST_PER_OBJECT_QUEUE_LENGTH,
+            ..Default::default()
+        })
+        .await;
     let rgp = authorities.first().unwrap().reference_gas_price_for_testing().unwrap();
     let authority_clients: Vec<_> = authorities.iter().map(|a| aggregator.authority_clients[&a.name].clone()).collect();
 
@@ -456,7 +479,7 @@ async fn test_per_object_overload() {
     for authority in authorities.iter().take(3) {
         authority
             .get_transaction_cache_reader()
-            .notify_read_executed_effects(&[*create_counter_cert.digest()])
+            .notify_read_executed_effects("", &[*create_counter_cert.digest()])
             .await
             .pop()
             .unwrap();
@@ -467,7 +490,7 @@ async fn test_per_object_overload() {
     send_consensus(&authorities[3], &create_counter_cert).await;
     let create_counter_effects = authorities[3]
         .get_transaction_cache_reader()
-        .notify_read_executed_effects(&[*create_counter_cert.digest()])
+        .notify_read_executed_effects("", &[*create_counter_cert.digest()])
         .await
         .pop()
         .unwrap();
@@ -497,6 +520,8 @@ async fn test_per_object_overload() {
         }
         send_consensus(&authorities[3], &shared_cert).await;
     }
+    // Give enough time to schedule the transactions.
+    sleep(Duration::from_secs(3)).await;
 
     // Trying to sign a new transaction would now fail.
     let gas_ref = get_latest_ref(authority_clients[0].clone(), gas_objects[num_txns].id()).await;
@@ -504,7 +529,7 @@ async fn test_per_object_overload() {
         .call_counter_increment(package, shared_counter_ref.0, shared_counter_initial_version)
         .build_and_sign(&key);
     let res = authorities[3]
-        .transaction_manager()
+        .execution_scheduler()
         .check_execution_overload(authorities[3].overload_config(), shared_txn.data());
     let message = format!("{res:?}");
     assert!(message.contains("TooManyTransactionsPendingOnObject"), "{}", message);
@@ -517,6 +542,7 @@ async fn test_txn_age_overload() {
     // Disable randomness, it can't be constructed with fake authorities in this test anyway.
     let _guard = ProtocolConfig::apply_overrides_for_testing(|_, mut config| {
         config.set_random_beacon_for_testing(false);
+        config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
         config
     });
 
@@ -546,7 +572,7 @@ async fn test_txn_age_overload() {
     for authority in authorities.iter().take(3) {
         authority
             .get_transaction_cache_reader()
-            .notify_read_executed_effects(&[*create_counter_cert.digest()])
+            .notify_read_executed_effects("", &[*create_counter_cert.digest()])
             .await
             .pop()
             .unwrap();
@@ -557,7 +583,7 @@ async fn test_txn_age_overload() {
     send_consensus(&authorities[3], &create_counter_cert).await;
     let create_counter_effects = authorities[3]
         .get_transaction_cache_reader()
-        .notify_read_executed_effects(&[*create_counter_cert.digest()])
+        .notify_read_executed_effects("", &[*create_counter_cert.digest()])
         .await
         .pop()
         .unwrap();
@@ -596,7 +622,7 @@ async fn test_txn_age_overload() {
         .call_counter_increment(package, shared_counter_ref.0, shared_counter_initial_version)
         .build_and_sign(&key);
     let res = authorities[3]
-        .transaction_manager()
+        .execution_scheduler()
         .check_execution_overload(authorities[3].overload_config(), shared_txn.data());
     let message = format!("{res:?}");
     assert!(message.contains("TooOldTransactionPendingOnObject"), "{}", message);
@@ -621,7 +647,13 @@ async fn test_authority_txn_signing_pushback() {
         max_load_shedding_percentage: 0,
         ..Default::default()
     };
-    let authority_state = TestAuthorityBuilder::new().with_authority_overload_config(overload_config).build().await;
+    let mut protocol_config = ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
+    protocol_config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
+    let authority_state = TestAuthorityBuilder::new()
+        .with_authority_overload_config(overload_config)
+        .with_protocol_config(protocol_config)
+        .build()
+        .await;
     authority_state.insert_genesis_objects(&[gas_object1.clone(), gas_object2.clone()]).await;
 
     // Create a validator service around the `authority_state`.
@@ -722,7 +754,13 @@ async fn test_authority_txn_execution_pushback() {
         max_load_shedding_percentage: 0,
         ..Default::default()
     };
-    let authority_state = TestAuthorityBuilder::new().with_authority_overload_config(overload_config).build().await;
+    let mut protocol_config = ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
+    protocol_config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
+    let authority_state = TestAuthorityBuilder::new()
+        .with_authority_overload_config(overload_config)
+        .with_protocol_config(protocol_config)
+        .build()
+        .await;
     authority_state.insert_genesis_objects(&[gas_object1.clone(), gas_object2.clone()]).await;
 
     // Create a validator service around the `authority_state`.

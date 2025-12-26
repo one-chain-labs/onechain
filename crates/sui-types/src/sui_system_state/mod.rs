@@ -18,6 +18,7 @@ use crate::{
     committee::CommitteeWithNetworkMetadata,
     dynamic_field::{get_dynamic_field_from_store, get_dynamic_field_object_from_store, Field},
     error::SuiError,
+    gas::GasCostSummary,
     id::UID,
     object::{MoveObject, Object},
     storage::ObjectStore,
@@ -32,6 +33,7 @@ use crate::{
 };
 
 pub mod epoch_start_sui_system_state;
+pub mod mock;
 pub mod sui_system_state_inner_v1;
 pub mod sui_system_state_inner_v2;
 pub mod sui_system_state_summary;
@@ -153,8 +155,8 @@ impl SuiSystemStateWrapper {
         );
         let new_contents = bcs::to_bytes(&field).expect("bcs serialization should never fail");
         move_object
-            .update_contents(new_contents, protocol_config)
-            .expect("Update sui system object content cannot fail since it should be small");
+            .update_contents_advance_epoch_safe_mode(new_contents, protocol_config)
+            .expect("Update sui system object content cannot fail since it should be small or unbounded");
     }
 }
 
@@ -168,6 +170,7 @@ pub trait SuiSystemStateTrait {
     fn epoch_start_timestamp_ms(&self) -> u64;
     fn epoch_duration_ms(&self) -> u64;
     fn safe_mode(&self) -> bool;
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary;
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams);
     fn get_current_epoch_committee(&self) -> CommitteeWithNetworkMetadata;
     fn get_pending_active_validators<S: ObjectStore + ?Sized>(
@@ -302,7 +305,7 @@ pub fn get_validator_from_table<K>(
     key: &K,
 ) -> Result<SuiValidatorSummary, SuiError>
 where
-    K: MoveTypeTagTrait + Serialize + DeserializeOwned + fmt::Debug,
+    K: Clone + MoveTypeTagTrait + Serialize + DeserializeOwned + fmt::Debug,
 {
     let field: ValidatorWrapper = get_dynamic_field_from_store(object_store, table_id, key).map_err(|err| {
         SuiError::SuiSystemStateReadError(format!("Failed to load validator wrapper from table: {:?}", err))

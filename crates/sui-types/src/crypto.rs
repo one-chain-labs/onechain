@@ -1194,14 +1194,18 @@ impl<const STRONG_THRESHOLD: bool> AuthoritySignInfoTrait for AuthorityQuorumSig
         let selected_public_keys =
             obligation.public_keys.get_mut(message_index).ok_or(SuiError::InvalidAuthenticator)?;
 
+        let mut seen = std::collections::BTreeSet::new();
         for authority_index in self.signers_map.iter() {
+            if !seen.insert(authority_index) {
+                continue;
+            }
+
+            // Update weight when seeing the authority for the first time.
             let authority = committee.authority_by_index(authority_index).ok_or_else(|| SuiError::UnknownSigner {
                 signer: None,
                 index: Some(authority_index),
                 committee: Box::new(committee.clone()),
             })?;
-
-            // Update weight.
             let voting_rights = committee.weight(authority);
             fp_ensure!(voting_rights > 0, SuiError::UnknownSigner {
                 signer: Some(authority.concise().to_string()),
@@ -1320,7 +1324,7 @@ mod bcs_signable {
     impl BcsSignable for crate::transaction::SenderSignedData {}
     impl BcsSignable for crate::object::ObjectInner {}
 
-    impl BcsSignable for crate::accumulator::Accumulator {}
+    impl BcsSignable for crate::global_state_hash::GlobalStateHash {}
 
     impl BcsSignable for super::bcs_signable_test::Foo {}
     #[cfg(test)]

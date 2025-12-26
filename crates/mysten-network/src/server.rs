@@ -9,11 +9,11 @@ use std::{
 use eyre::{eyre, Result};
 use tokio_rustls::rustls::ServerConfig;
 use tonic::{
-    body::BoxBody,
+    body::Body,
     codegen::http::{HeaderValue, Request, Response},
     server::NamedService,
 };
-use tower::{Layer, Service, ServiceBuilder};
+use tower::{Layer, Service, ServiceBuilder, ServiceExt};
 use tower_http::{propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer, trace::TraceLayer};
 
 use crate::{
@@ -44,10 +44,11 @@ impl<M: MetricsCallbackProvider> ServerBuilder<M> {
     /// Add a new service to this Server.
     pub fn add_service<S>(mut self, svc: S) -> Self
     where
-        S: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
+        S: Service<Request<Body>, Response = Response<Body>, Error = Infallible>
             + NamedService
             + Clone
             + Send
+            + Sync
             + 'static,
         S::Future: Send + 'static,
     {
@@ -101,7 +102,12 @@ impl<M: MetricsCallbackProvider> ServerBuilder<M> {
         }
 
         let server_handle = builder
-            .serve(addr, limiting_layers.service(self.router.into_axum_router().layer(route_layers)))
+            .serve(
+                addr,
+                limiting_layers.service(
+                    self.router.into_axum_router().layer(route_layers).into_service().map_err(tower::BoxError::from),
+                ),
+            )
             .map_err(|e| eyre!(e))?;
 
         let local_addr = update_tcp_port_in_multiaddr(addr, server_handle.local_addr().port());
@@ -156,6 +162,7 @@ mod test {
         time::Duration,
     };
 
+    use fastcrypto::{ed25519::Ed25519KeyPair, traits::KeyPair};
     use tonic::Code;
     use tonic_health::pb::{health_client::HealthClient, HealthCheckRequest};
 
@@ -199,11 +206,22 @@ mod test {
 
         let address: Multiaddr = "/ip4/127.0.0.1/tcp/0/http".parse().unwrap();
         let config = Config::new();
+        let keypair = Ed25519KeyPair::generate(&mut rand::thread_rng());
 
-        let server = config.server_builder_with_metrics(metrics.clone()).bind(&address, None).await.unwrap();
+        let server = config
+            .server_builder_with_metrics(metrics.clone())
+            .bind(&address, Some(sui_tls::create_rustls_server_config(keypair.copy().private(), "test".to_string())))
+            .await
+            .unwrap();
 
         let address = server.local_addr().to_owned();
-        let channel = config.connect(&address, None).await.unwrap();
+        let channel = config
+            .connect(
+                &address,
+                sui_tls::create_rustls_client_config(keypair.public().to_owned(), "test".to_string(), None),
+            )
+            .await
+            .unwrap();
         let mut client = HealthClient::new(channel);
 
         client.check(HealthCheckRequest { service: "".to_owned() }).await.unwrap();
@@ -242,11 +260,21 @@ mod test {
 
         let address: Multiaddr = "/ip4/127.0.0.1/tcp/0/http".parse().unwrap();
         let config = Config::new();
+        let keypair = Ed25519KeyPair::generate(&mut rand::thread_rng());
 
-        let server = config.server_builder_with_metrics(metrics.clone()).bind(&address, None).await.unwrap();
-
+        let server = config
+            .server_builder_with_metrics(metrics.clone())
+            .bind(&address, Some(sui_tls::create_rustls_server_config(keypair.copy().private(), "test".to_string())))
+            .await
+            .unwrap();
         let address = server.local_addr().to_owned();
-        let channel = config.connect(&address, None).await.unwrap();
+        let channel = config
+            .connect(
+                &address,
+                sui_tls::create_rustls_client_config(keypair.public().to_owned(), "test".to_string(), None),
+            )
+            .await
+            .unwrap();
         let mut client = HealthClient::new(channel);
 
         // Call the healthcheck for a service that doesn't exist
@@ -261,9 +289,21 @@ mod test {
 
     async fn test_multiaddr(address: Multiaddr) {
         let config = Config::new();
-        let server_handle = config.server_builder().bind(&address, None).await.unwrap();
+        let keypair = Ed25519KeyPair::generate(&mut rand::thread_rng());
+
+        let server_handle = config
+            .server_builder()
+            .bind(&address, Some(sui_tls::create_rustls_server_config(keypair.copy().private(), "test".to_string())))
+            .await
+            .unwrap();
         let address = server_handle.local_addr().to_owned();
-        let channel = config.connect(&address, None).await.unwrap();
+        let channel = config
+            .connect(
+                &address,
+                sui_tls::create_rustls_client_config(keypair.public().to_owned(), "test".to_string(), None),
+            )
+            .await
+            .unwrap();
         let mut client = HealthClient::new(channel);
 
         client.check(HealthCheckRequest { service: "".to_owned() }).await.unwrap();

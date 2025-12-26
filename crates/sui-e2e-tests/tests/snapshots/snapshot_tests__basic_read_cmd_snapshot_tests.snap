@@ -3,7 +3,7 @@ source: crates/sui-e2e-tests/tests/snapshot_tests.rs
 expression: "run_one(cmds, context).await?"
 ---
 [
-  "sui client objects {ME}",
+  "one client objects {ME}",
   [
     {
       "data": {
@@ -126,9 +126,9 @@ expression: "run_one(cmds, context).await?"
       }
     }
   ],
-  "sui client objects 0x0000000000000000000000000000000000000000000000000000000000000000",
+  "one client objects 0x0000000000000000000000000000000000000000000000000000000000000000",
   [],
-  "sui client object 0x5",
+  "one client object 0x5",
   [
     {
       "data": {
@@ -159,7 +159,7 @@ expression: "run_one(cmds, context).await?"
       }
     }
   ],
-  "sui client object 0x5 --bcs",
+  "one client object 0x5 --bcs",
   [
     {
       "data": {
@@ -188,7 +188,7 @@ expression: "run_one(cmds, context).await?"
       }
     }
   ],
-  "sui client object 0x0000000000000000000000000000000000000000000000000000000000000000",
+  "one client object 0x0000000000000000000000000000000000000000000000000000000000000000",
   [
     {
       "error": {
@@ -197,8 +197,8 @@ expression: "run_one(cmds, context).await?"
       }
     }
   ],
-  "sui client tx-block Duwr9uSk9ZvNdEa8oDHunx345i6oyrp3e78MYHVAbYdv",
+  "one client tx-block Duwr9uSk9ZvNdEa8oDHunx345i6oyrp3e78MYHVAbYdv",
   "RPC call failed: ErrorObject { code: InvalidParams, message: \"Could not find the referenced transaction [TransactionDigest(Duwr9uSk9ZvNdEa8oDHunx345i6oyrp3e78MYHVAbYdv)].\", data: None }",
-  "sui client tx-block EgMTHQygMi6SRsBqrPHAEKZCNrpShXurCp9rcb9qbSg8",
+  "one client tx-block EgMTHQygMi6SRsBqrPHAEKZCNrpShXurCp9rcb9qbSg8",
   "RPC call failed: ErrorObject { code: InvalidParams, message: \"Could not find the referenced transaction [TransactionDigest(EgMTHQygMi6SRsBqrPHAEKZCNrpShXurCp9rcb9qbSg8)].\", data: None }"
 ]

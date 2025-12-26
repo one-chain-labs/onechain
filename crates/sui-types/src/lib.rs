@@ -23,20 +23,24 @@ use crate::{
 
 #[macro_use]
 pub mod error;
-
-pub mod accumulator;
+pub mod accumulator_event;
+pub mod accumulator_metadata;
+pub mod accumulator_root;
 pub mod authenticator_state;
 pub mod balance;
+pub mod balance_change;
 pub mod base_types;
 pub mod bridge;
 pub mod clock;
 pub mod coin;
+pub mod coin_registry;
 pub mod collection_types;
 pub mod committee;
 pub mod config;
 pub mod crypto;
 pub mod deny_list_v1;
 pub mod deny_list_v2;
+pub mod derived_object;
 pub mod digests;
 pub mod display;
 pub mod dynamic_field;
@@ -46,11 +50,13 @@ pub mod event;
 pub mod executable_transaction;
 pub mod execution;
 pub mod execution_config_utils;
+pub mod execution_params;
 pub mod execution_status;
 pub mod full_checkpoint_content;
 pub mod gas;
 pub mod gas_coin;
 pub mod gas_model;
+pub mod global_state_hash;
 pub mod governance;
 pub mod id;
 pub mod in_memory_storage;
@@ -70,8 +76,12 @@ pub mod nitro_attestation;
 pub mod object;
 pub mod passkey_authenticator;
 pub mod programmable_transaction_builder;
+pub mod proto_value;
+pub mod ptb_trace;
 pub mod quorum_driver_types;
 pub mod randomness_state;
+pub mod rpc_proto_conversions;
+pub mod rpc_proto_conversions_v2beta2;
 pub mod signature;
 pub mod signature_verification;
 pub mod storage;
@@ -125,12 +135,13 @@ built_in_ids! {
     SUI_AUTHENTICATOR_STATE_ADDRESS / SUI_AUTHENTICATOR_STATE_OBJECT_ID = 0x7;
     SUI_RANDOMNESS_STATE_ADDRESS / SUI_RANDOMNESS_STATE_OBJECT_ID = 0x8;
     SUI_BRIDGE_ADDRESS / SUI_BRIDGE_OBJECT_ID = 0x9;
+    SUI_COIN_REGISTRY_ADDRESS / SUI_COIN_REGISTRY_OBJECT_ID = 0xc;
     SUI_DENY_LIST_ADDRESS / SUI_DENY_LIST_OBJECT_ID = 0x403;
+    SUI_ACCUMULATOR_ROOT_ADDRESS / SUI_ACCUMULATOR_ROOT_OBJECT_ID = 0xacc;
 }
 
 pub const SUI_SYSTEM_STATE_OBJECT_SHARED_VERSION: SequenceNumber = OBJECT_START_VERSION;
 pub const SUI_CLOCK_OBJECT_SHARED_VERSION: SequenceNumber = OBJECT_START_VERSION;
-pub const SUI_AUTHENTICATOR_STATE_OBJECT_SHARED_VERSION: SequenceNumber = OBJECT_START_VERSION;
 
 pub fn sui_framework_address_concat_string(suffix: &str) -> String {
     format!("{}{suffix}", SUI_FRAMEWORK_ADDRESS.to_hex_literal())
@@ -196,6 +207,10 @@ pub fn resolve_address(addr: &str) -> Option<AccountAddress> {
 
 pub trait MoveTypeTagTrait {
     fn get_type_tag() -> TypeTag;
+
+    fn get_instance_type_tag(&self) -> TypeTag {
+        Self::get_type_tag()
+    }
 }
 
 impl MoveTypeTagTrait for u8 {
@@ -226,6 +241,10 @@ impl<T: MoveTypeTagTrait> MoveTypeTagTrait for Vec<T> {
     fn get_type_tag() -> TypeTag {
         TypeTag::Vector(Box::new(T::get_type_tag()))
     }
+}
+
+pub trait MoveTypeTagTraitGeneric {
+    fn get_type_tag(type_params: &[TypeTag]) -> TypeTag;
 }
 
 pub fn is_primitive(view: &CompiledModule, function_type_args: &[AbilitySet], s: &SignatureToken) -> bool {

@@ -239,7 +239,7 @@ impl DBCheckpointHandler {
     }
 
     async fn prune_and_compact(&self, db_path: PathBuf, epoch: u64, epoch_duration_ms: u64) -> Result<()> {
-        let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path.join("store"), None));
+        let perpetual_db = Arc::new(AuthorityPerpetualTables::open(&db_path.join("store"), None, None));
         let checkpoint_store = Arc::new(CheckpointStore::new_for_db_checkpoint_handler(&db_path.join("checkpoints")));
         let rpc_index = RpcIndexStore::new_without_init(&db_path);
         let metrics = AuthorityStorePruningMetrics::new(&Registry::default());

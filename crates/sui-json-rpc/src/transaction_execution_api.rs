@@ -11,7 +11,7 @@ use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, IntentVer
 use sui_core::{
     authority::AuthorityState,
     authority_client::NetworkAuthorityClient,
-    transaction_orchestrator::TransactiondOrchestrator,
+    transaction_orchestrator::TransactionOrchestrator,
 };
 use sui_json_rpc_api::{JsonRpcMetrics, WriteApiOpenRpc, WriteApiServer};
 use sui_json_rpc_types::{
@@ -49,14 +49,14 @@ use crate::{
 
 pub struct TransactionExecutionApi {
     state: Arc<dyn StateRead>,
-    transaction_orchestrator: Arc<TransactiondOrchestrator<NetworkAuthorityClient>>,
+    transaction_orchestrator: Arc<TransactionOrchestrator<NetworkAuthorityClient>>,
     metrics: Arc<JsonRpcMetrics>,
 }
 
 impl TransactionExecutionApi {
     pub fn new(
         state: Arc<AuthorityState>,
-        transaction_orchestrator: Arc<TransactiondOrchestrator<NetworkAuthorityClient>>,
+        transaction_orchestrator: Arc<TransactionOrchestrator<NetworkAuthorityClient>>,
         metrics: Arc<JsonRpcMetrics>,
     ) -> Self {
         Self { state, transaction_orchestrator, metrics }
@@ -269,6 +269,8 @@ impl TransactionExecutionApi {
             object_changes,
             balance_changes,
             input: resp.input,
+            execution_error_source: resp.execution_error_source,
+            suggested_gas_price: resp.suggested_gas_price,
         })
     }
 }
