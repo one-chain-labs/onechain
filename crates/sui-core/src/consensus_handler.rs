@@ -685,12 +685,12 @@ impl<C: CheckpointServiceNotify + Send + Sync> ConsensusHandler<C> {
         let protocol_config = self.epoch_store.protocol_config();
 
         // Assert all protocol config settings for which we don't support old behavior.
-        // assert!(protocol_config.ignore_execution_time_observations_after_certs_closed());
-        // assert!(protocol_config.record_time_estimate_processed());
-        // assert!(protocol_config.prepend_prologue_tx_in_consensus_commit_in_checkpoints());
-        // assert!(protocol_config.consensus_checkpoint_signature_key_includes_digest());
-        // assert!(protocol_config.authority_capabilities_v2());
-        // assert!(protocol_config.cancel_for_failed_dkg_early());
+        assert!(protocol_config.ignore_execution_time_observations_after_certs_closed());
+        assert!(protocol_config.record_time_estimate_processed());
+        assert!(protocol_config.prepend_prologue_tx_in_consensus_commit_in_checkpoints());
+        assert!(protocol_config.consensus_checkpoint_signature_key_includes_digest());
+        assert!(protocol_config.authority_capabilities_v2());
+        assert!(protocol_config.cancel_for_failed_dkg_early());
 
         // This may block until one of two conditions happens:
         // - Number of uncommitted transactions in the writeback cache goes below the
