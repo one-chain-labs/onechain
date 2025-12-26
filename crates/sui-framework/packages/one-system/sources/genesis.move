@@ -166,7 +166,7 @@ fun create(
     );
 
     one_system::create(
-        //sui_system_state_id,
+        sui_system_state_id,
         validators,
         storage_fund,
         genesis_chain_parameters.protocol_version,
