@@ -39,8 +39,8 @@ module one::oct {
         let (treasury, metadata) = coin::create_currency(
             SUI {},
             9,
-            b"SUI",
-            b"Sui",
+            b"OCT",
+            b"oct",
             // TODO: add appropriate description and logo url
             b"",
             option::none(),
