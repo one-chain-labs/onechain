@@ -35,7 +35,7 @@ export class Configuration {
 
     constructor() {
         this.configuration = vscode.workspace.getConfiguration(MOVE_CONF_NAME);
-        this.defaultServerDir = vscode.Uri.joinPath(vscode.Uri.file(os.homedir()), '.sui', 'bin');
+        this.defaultServerDir = vscode.Uri.joinPath(vscode.Uri.file(os.homedir()), '.one', 'bin');
         if (process.platform === 'win32') {
             this.serverName = 'move-analyzer.exe';
         } else {

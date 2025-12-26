@@ -36,7 +36,7 @@ struct Args {
     #[clap(
         long,
         short,
-        default_value = "./sui-proxy.yaml",
+        default_value = "./one-proxy.yaml",
         help = "Specify the config file path to use"
     )]
     config: String,
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
     let prometheus_registry = registry_service.default_registry();
     prometheus_registry
         .register(mysten_metrics::uptime_metric(
-            "sui-proxy",
+            "one-proxy",
             VERSION,
             "unavailable",
         ))

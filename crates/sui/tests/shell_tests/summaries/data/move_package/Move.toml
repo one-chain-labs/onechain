@@ -3,7 +3,7 @@ name = "move_package"
 edition = "2024"
 
 [dependencies]
-Sui = { local = "../../sui-framework" }
+One = { local = "../../sui-framework" }
 
 [addresses]
 move_package = "0x0"

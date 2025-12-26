@@ -9,7 +9,7 @@ dependencies = [
   { id = "C", name = "C" },
   { id = "D", name = "D" },
   { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
+  { id = "Sui", name = "One" },
   { id = "OneSystem", name = "OneSystem" },
 ]
 
@@ -19,7 +19,7 @@ source = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11a
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
+  { id = "Sui", name = "One" },
   { id = "OneSystem", name = "OneSystem" },
 ]
 
@@ -31,7 +31,7 @@ dependencies = [
   { id = "Bridge", name = "Bridge" },
   { id = "D", name = "D" },
   { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
+  { id = "Sui", name = "One" },
   { id = "OneSystem", name = "OneSystem" },
 ]
 
@@ -42,7 +42,7 @@ source = { local = "../D" }
 dependencies = [
   { id = "Bridge", name = "Bridge" },
   { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
+  { id = "Sui", name = "One" },
   { id = "OneSystem", name = "OneSystem" },
 ]
 
@@ -64,7 +64,7 @@ source = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11a
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
+  { id = "Sui", name = "One" },
 ]
 
 [move.toolchain-version]

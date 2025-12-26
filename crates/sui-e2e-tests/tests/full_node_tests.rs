@@ -27,7 +27,7 @@ use sui_test_transaction_builder::{
     publish_basics_package, publish_basics_package_and_make_counter, publish_nfts_package,
     TestTransactionBuilder,
 };
-use sui_tool::restore_from_db_checkpoint;
+use one_tool::restore_from_db_checkpoint;
 use sui_types::base_types::{FullObjectRef, ObjectID, SuiAddress, TransactionDigest};
 use sui_types::base_types::{ObjectRef, SequenceNumber};
 use sui_types::crypto::{get_key_pair, SuiKeyPair};

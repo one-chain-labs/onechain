@@ -17,12 +17,12 @@ At C
         Bridge = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/bridge" }
         D = { local = "../D" }
         MoveStdlib = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/move-stdlib" }
-        Sui = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-framework" }
+        One = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-framework" }
         OneSystem = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-system" }
 At B -> C
         Bridge = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/bridge" }
         D = { local = "../D" }
         MoveStdlib = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/move-stdlib" }
-        Sui = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-framework" }
+        One = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-framework" }
         OneSystem = { git = "https://github.com/one-chain-labs/onechain.git", rev = "04f11afaf5e0", subdir = "crates/sui-framework/packages/one-system" }.
 ```

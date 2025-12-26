@@ -223,7 +223,7 @@ async fn test_generate_lock_file() {
         deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
         dependencies = [
           { id = "Examples", name = "Examples" },
-          { id = "Sui", name = "Sui" },
+          { id = "Sui", name = "One" },
         ]
 
         [[move.package]]
@@ -231,7 +231,7 @@ async fn test_generate_lock_file() {
         source = { local = "../object_basics" }
 
         dependencies = [
-          { id = "Sui", name = "Sui" },
+          { id = "Sui", name = "One" },
         ]
 
         [[move.package]]

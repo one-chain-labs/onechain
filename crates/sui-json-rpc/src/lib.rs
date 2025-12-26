@@ -56,18 +56,18 @@ pub struct JsonRpcServerBuilder {
     policy_config: Option<PolicyConfig>,
 }
 
-pub fn sui_rpc_doc(version: &str) -> Project {
-    Project::new(
-        version,
-        "Sui JSON-RPC",
-        "Sui JSON-RPC API for interaction with Sui Full node. Make RPC calls using https://fullnode.NETWORK.sui.io:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
-        "Mysten Labs",
-        "https://mystenlabs.com",
-        "build@mystenlabs.com",
-        "Apache-2.0",
-        "https://raw.githubusercontent.com/MystenLabs/sui/main/LICENSE",
-    )
-}
+  pub fn sui_rpc_doc(version: &str) -> Project {
+      Project::new(
+          version,
+          "OneChain JSON-RPC",
+          "OneChain JSON-RPC API for interaction with OneChain Full node. Make RPC calls using https://rpc-NETWORK.onelabs.cc:443, where NETWORK is the network you want to use (testnet, devnet, mainnet). By default, local networks use port 9000.",
+          "OneChain Labs",
+          "https://onelabs.cc",
+          "build@onelabs.cc",
+          "Apache-2.0",
+          "https://raw.githubusercontent.com/one-chain-labs/onechain/main/LICENSE",
+      )
+  }
 
 impl JsonRpcServerBuilder {
     pub fn new(
