@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::stake_subsidy;
+module one_system::stake_subsidy;
 
 use one::bag::{Self, Bag};
 use one::balance::Balance;

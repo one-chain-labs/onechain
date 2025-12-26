@@ -6,7 +6,7 @@
 // `rewards_distribution_tests`.
 
 #[test_only]
-module oct_system::sui_system_tests;
+module one_system::sui_system_tests;
 
 use std::unit_test::assert_eq;
 use one_system::test_runner;

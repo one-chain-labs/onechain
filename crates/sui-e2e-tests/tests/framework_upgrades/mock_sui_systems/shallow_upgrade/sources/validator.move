@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::validator {
+module one_system::validator {
     use std::ascii;
 
     use one::tx_context::TxContext;

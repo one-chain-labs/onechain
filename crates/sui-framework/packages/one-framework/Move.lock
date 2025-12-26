@@ -11,3 +11,8 @@ dependencies = [
 [[move.package]]
 id = "MoveStdlib"
 source = { local = "../move-stdlib" }
+
+[move.toolchain-version]
+compiler-version = "1.0.7"
+edition = "2024.beta"
+flavor = "one"

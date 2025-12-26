@@ -7,7 +7,7 @@
 /// creating a `Validator` or `ValidatorMetadata` struct.
 ///
 /// It can be used in the `TestRunner` module to set up validators in the system.
-module oct_system::validator_builder;
+module one_system::validator_builder;
 
 use one::bag;
 use one::balance;

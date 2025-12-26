@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::staking_pool_tests;
+module one_system::staking_pool_tests;
 
 use std::unit_test::assert_eq;
 use one::balance;

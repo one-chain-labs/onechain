@@ -16,7 +16,7 @@ message Epoch {
   // The committee governing this epoch.
   optional ValidatorCommittee committee = 2;
 
-  // Snapshot of Oct's SystemState (`0x3::oct_system::SystemState`) at the
+  // Snapshot of Oct's SystemState (`0x3::one_system::SystemState`) at the
   // beginning of the epoch, for past epochs, or the current state for the
   // current epoch.
   optional SystemState system_state = 3;

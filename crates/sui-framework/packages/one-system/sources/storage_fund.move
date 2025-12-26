@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::storage_fund;
+module one_system::storage_fund;
 
 use one::balance::{Self, Balance};
 use one::oct::OCT;

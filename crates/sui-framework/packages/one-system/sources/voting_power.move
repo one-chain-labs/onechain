@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::voting_power;
+module one_system::voting_power;
 
 use one_system::validator::Validator;
 

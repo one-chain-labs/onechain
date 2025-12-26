@@ -4,7 +4,7 @@
 #[test_only]
 /// Test Runner is a context-specific wrapper around the `Scenario` struct, which
 /// provides a set of convenience methods for testing the Sui System.
-module oct_system::test_runner;
+module one_system::test_runner;
 
 use one::balance::{Self, Balance};
 use one::coin::{Self, Coin};

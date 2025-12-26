@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[test_only]
-module oct_system::delegation_tests;
+module one_system::delegation_tests;
 
 use std::unit_test::assert_eq;
 use one::table::Table;

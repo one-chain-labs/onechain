@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module oct_system::validator_wrapper {
+module one_system::validator_wrapper {
     use one::versioned::Versioned;
     use one::versioned;
     use one::tx_context::TxContext;
