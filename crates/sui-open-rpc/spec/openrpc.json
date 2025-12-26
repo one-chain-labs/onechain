@@ -1294,7 +1294,7 @@
             "name": "Result",
             "value": {
               "minSupportedProtocolVersion": "1",
-              "maxSupportedProtocolVersion": "91",
+              "maxSupportedProtocolVersion": "92",
               "protocolVersion": "6",
               "featureFlags": {
                 "accept_passkey_in_multisig": false,
@@ -3116,7 +3116,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's OneChain address",
+          "description": "the owner's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3167,7 +3167,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's OneChain address",
+          "description": "the owner's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3261,7 +3261,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's OneChain address",
+          "description": "the owner's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3365,7 +3365,7 @@
       "params": [
         {
           "name": "owner",
-          "description": "the owner's OneChain address",
+          "description": "the owner's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3740,7 +3740,7 @@
       "params": [
         {
           "name": "address",
-          "description": "the owner's OneChain address",
+          "description": "the owner's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -3943,18 +3943,20 @@
                 "stakingPool": "0x9a95cf69368e31b4dbe8ee9bdb3c0587bbc79d8fc6edf4007e185a962fd906df",
                 "stakes": [
                   {
-                    "StakedOctId": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
+                    "stakedOctId": "0xb4eeb46b70f0bebcae832aeef9f7c5db76052ab656e5f81853d0cf701cdbc8eb",
                     "stakeRequestEpoch": "62",
                     "stakeActiveEpoch": "63",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Active",
                     "estimatedReward": "520000000"
                   },
                   {
-                    "StakedOctId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
+                    "stakedOctId": "0xf27ab513fc6ef8c344406c78da3d5ad3a5fcc295dc8803c15989a62d33ee8590",
                     "stakeRequestEpoch": "142",
                     "stakeActiveEpoch": "143",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Pending"
                   }
                 ]
@@ -3964,10 +3966,11 @@
                 "stakingPool": "0x14cc7fee4100fdcabda6d15c63c4b49c45ae23f2b936495cd38b1a4b04010295",
                 "stakes": [
                   {
-                    "StakedOctId": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
+                    "stakedOctId": "0xbaa75ac72e548aeecf2ce8b4e88530651d6e8f93e0fb79b4bc65a512beb5b9f3",
                     "stakeRequestEpoch": "244",
                     "stakeActiveEpoch": "245",
                     "principal": "200000000000",
+                    "lock": false,
                     "status": "Unstaked"
                   }
                 ]
@@ -4026,18 +4029,20 @@
               "stakingPool": "0x63ee67e81398729f87d81d62f399c041b0f8d0938923ea7e3917608ee62df437",
               "stakes": [
                 {
-                  "StakedOctId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
+                  "stakedOctId": "0x378423de90ed03b694cecf443c72b5387b29a731d26d98108d7abc4902107d7d",
                   "stakeRequestEpoch": "62",
                   "stakeActiveEpoch": "63",
                   "principal": "200000000000",
+                  "lock": false,
                   "status": "Active",
                   "estimatedReward": "520000000"
                 },
                 {
-                  "StakedOctId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
+                  "stakedOctId": "0x6a8e0f8fea6fda5488462e58724c034462b6064a08845e2ae2942fe7c4ee816d",
                   "stakeRequestEpoch": "244",
                   "stakeActiveEpoch": "245",
                   "principal": "200000000000",
+                  "lock": false,
                   "status": "Unstaked"
                 }
               ]
@@ -4557,7 +4562,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4616,7 +4621,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4673,7 +4678,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4767,7 +4772,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4837,11 +4842,11 @@
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Send all OCT coins to one recipient. This is for OneChain coin only and does not require a separate gas coin object. Specifically, what pay_all_oct does are: 1. accumulate all OCT from input coins and deposit all OCT to the first input coin 2. transfer the updated first coin to the recipient and also use this first coin as gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - actual_gas_cost. 4. all other input coins other than the first are deleted.",
+      "description": "Send all SUI coins to one recipient. This is for SUI coin only and does not require a separate gas coin object. Specifically, what pay_all_oct does are: 1. accumulate all SUI from input coins and deposit all SUI to the first input coin 2. transfer the updated first coin to the recipient and also use this first coin as gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - actual_gas_cost. 4. all other input coins other than the first are deleted.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4890,11 +4895,11 @@
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Send OCT coins to a list of addresses, following a list of amounts. This is for OneChain coin only and does not require a separate gas coin object. Specifically, what pay_oct does are: 1. debit each input_coin to create new coin following the order of amounts and assign it to the corresponding recipient. 2. accumulate all residual OCT from input coins left and deposit all OCT to the first input coin, then use the first input coin as the gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost 4. all other input coints other than the first one are deleted.",
+      "description": "Send SUI coins to a list of addresses, following a list of amounts. This is for SUI coin only and does not require a separate gas coin object. Specifically, what pay_oct does are: 1. debit each input_coin to create new coin following the order of amounts and assign it to the corresponding recipient. 2. accumulate all residual SUI from input coins left and deposit all SUI to the first input coin, then use the first input coin as the gas coin object. 3. the balance of the first input coin after tx is sum(input_coins) - sum(amounts) - actual_gas_cost 4. all other input coints other than the first one are deleted.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -4961,7 +4966,7 @@
       "params": [
         {
           "name": "sender",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5024,7 +5029,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5050,7 +5055,7 @@
         },
         {
           "name": "validator",
-          "description": "the validator's OneChain address",
+          "description": "the validator's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5091,7 +5096,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5140,7 +5145,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5200,7 +5205,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5257,7 +5262,7 @@
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5288,7 +5293,7 @@
         },
         {
           "name": "recipient",
-          "description": "the recipient's OneChain address",
+          "description": "the recipient's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5310,11 +5315,11 @@
           "name": "Transaction Builder API"
         }
       ],
-      "description": "Create an unsigned transaction to send OneChain coin object to a OneChain address. The OneChain object is also used as the gas object.",
+      "description": "Create an unsigned transaction to send SUI coin object to a Sui address. The SUI object is also used as the gas object.",
       "params": [
         {
           "name": "signer",
-          "description": "the transaction signer's OneChain address",
+          "description": "the transaction signer's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -5322,7 +5327,7 @@
         },
         {
           "name": "sui_object_id",
-          "description": "the OneChain coin object to be used in this transaction",
+          "description": "the Sui coin object to be used in this transaction",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/ObjectID"
@@ -5338,7 +5343,7 @@
         },
         {
           "name": "recipient",
-          "description": "the recipient's OneChain address",
+          "description": "the recipient's Sui address",
           "required": true,
           "schema": {
             "$ref": "#/components/schemas/SuiAddress"
@@ -6345,7 +6350,7 @@
             "description": "Parsed json value of the event"
           },
           "sender": {
-            "description": "Sender's OneChain address.",
+            "description": "Sender's Sui address.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/SuiAddress"
@@ -8508,12 +8513,16 @@
           }
         ],
         "required": [
+          "lock",
           "principal",
           "stakeActiveEpoch",
           "stakeRequestEpoch",
-          "StakedOctId"
+          "stakedOctId"
         ],
         "properties": {
+          "lock": {
+            "type": "boolean"
+          },
           "principal": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
@@ -8523,7 +8532,7 @@
           "stakeRequestEpoch": {
             "$ref": "#/components/schemas/BigInt_for_uint64"
           },
-          "StakedOctId": {
+          "stakedOctId": {
             "description": "ID of the StakedOct receipt object.",
             "allOf": [
               {
@@ -9627,8 +9636,22 @@
           }
         ]
       },
+      "SuiSupperCommitteeSummary": {
+        "description": "This is the JSON-RPC type for the OCT system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the OCT system state type.",
+        "type": "object",
+        "required": [
+          "proposalList"
+        ],
+        "properties": {
+          "proposalList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectID"
+            }
+          }
+        }
+      },
       "SuiSystemStateSummary": {
-        "description": "This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them top-level fields such that it as minimum dependencies to the internal data structures of the SUI system state type.",
         "type": "object",
         "required": [
           "activeValidators",
@@ -9640,6 +9663,7 @@
           "inactivePoolsSize",
           "maxValidatorCount",
           "minValidatorJoiningStake",
+          "onlyTrustedValidator",
           "pendingActiveValidatorsId",
           "pendingActiveValidatorsSize",
           "pendingRemovals",
@@ -9660,8 +9684,10 @@
           "stakingPoolMappingsSize",
           "storageFundNonRefundableBalance",
           "storageFundTotalObjectStorageRebates",
+          "supperCommittee",
           "systemStateVersion",
           "totalStake",
+          "trustedValidators",
           "validatorCandidatesId",
           "validatorCandidatesSize",
           "validatorLowStakeGracePeriod",
@@ -9750,6 +9776,9 @@
               }
             ]
           },
+          "onlyTrustedValidator": {
+            "type": "boolean"
+          },
           "pendingActiveValidatorsId": {
             "description": "ID of the object that contains the list of new validators that will join at the end of the epoch.",
             "allOf": [
@@ -9826,7 +9855,7 @@
             ]
           },
           "stakeSubsidyBalance": {
-            "description": "Balance of SUI set aside for stake subsidies that will be drawn down over time.",
+            "description": "Balance of OCT set aside for stake subsidies that will be drawn down over time.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BigInt_for_uint64"
@@ -9903,6 +9932,9 @@
               }
             ]
           },
+          "supperCommittee": {
+            "$ref": "#/components/schemas/SuiSupperCommitteeSummary"
+          },
           "systemStateVersion": {
             "description": "The current version of the system state data structure type.",
             "allOf": [
@@ -9918,6 +9950,12 @@
                 "$ref": "#/components/schemas/BigInt_for_uint64"
               }
             ]
+          },
+          "trustedValidators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuiAddress"
+            }
           },
           "validatorCandidatesId": {
             "description": "ID of the object that stores preactive validators, mapping their addresses to their `Validator` structs.",
@@ -10170,7 +10208,7 @@
         ]
       },
       "SuiValidatorSummary": {
-        "description": "This is the JSON-RPC type for the SUI validator. It flattens all inner structures to top-level fields so that they are decoupled from the internal definitions.",
+        "description": "This is the JSON-RPC type for the OCT validator. It flattens all inner structures to top-level fields so that they are decoupled from the internal definitions.",
         "type": "object",
         "required": [
           "commissionRate",
@@ -10185,19 +10223,21 @@
           "nextEpochCommissionRate",
           "nextEpochGasPrice",
           "nextEpochStake",
+          "onlyValidatorStaking",
           "operationCapId",
           "p2pAddress",
           "pendingPoolTokenWithdraw",
           "pendingStake",
-          "pendingTotalSuiWithdraw",
+          "pendingTotalOctWithdraw",
           "poolTokenBalance",
           "primaryAddress",
           "projectUrl",
           "proofOfPossessionBytes",
           "protocolPubkeyBytes",
+          "revenueReceivingAddress",
           "rewardsPool",
           "stakingPoolId",
-          "stakingPoolSuiBalance",
+          "stakingPoolOctBalance",
           "suiAddress",
           "votingPower",
           "workerAddress",
@@ -10318,6 +10358,9 @@
               }
             ]
           },
+          "onlyValidatorStaking": {
+            "type": "boolean"
+          },
           "operationCapId": {
             "$ref": "#/components/schemas/ObjectID"
           },
@@ -10340,7 +10383,7 @@
               }
             ]
           },
-          "pendingTotalSuiWithdraw": {
+          "pendingTotalOctWithdraw": {
             "description": "Pending stake withdrawn during the current epoch, emptied at epoch boundaries.",
             "allOf": [
               {
@@ -10367,6 +10410,9 @@
           },
           "protocolPubkeyBytes": {
             "$ref": "#/components/schemas/Base64"
+          },
+          "revenueReceivingAddress": {
+            "$ref": "#/components/schemas/SuiAddress"
           },
           "rewardsPool": {
             "description": "The epoch stake rewards will be added here at the end of each epoch.",
@@ -10408,8 +10454,8 @@
               }
             ]
           },
-          "stakingPoolSuiBalance": {
-            "description": "The total number of SUI tokens in this pool.",
+          "stakingPoolOctBalance": {
+            "description": "The total number of OCT tokens in this pool.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BigInt_for_uint64"

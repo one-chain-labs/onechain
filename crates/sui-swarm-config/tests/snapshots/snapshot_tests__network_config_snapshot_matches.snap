@@ -82,9 +82,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -96,9 +99,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -110,12 +116,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -241,9 +250,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -255,9 +267,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -269,12 +284,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -400,9 +418,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -414,9 +435,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -428,12 +452,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -559,9 +586,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -573,9 +603,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -587,12 +620,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -718,9 +754,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -732,9 +771,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -746,12 +788,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -877,9 +922,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -891,9 +939,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -905,12 +956,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
@@ -1036,9 +1090,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Testnet:
@@ -1050,9 +1107,12 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - KarrierOne
         - Onefc
         - Playtron
+        - Telegram
+        - TestHuionepay
         - Threedos
         - Twitch
       Unknown:
@@ -1064,12 +1124,15 @@ validator_configs:
         - Facebook
         - FanTV
         - Google
+        - Huionepay
         - Kakao
         - KarrierOne
         - Microsoft
         - Onefc
         - Playtron
         - Slack
+        - Telegram
+        - TestHuionepay
         - TestIssuer
         - Threedos
         - Twitch
