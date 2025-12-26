@@ -326,8 +326,8 @@ mod tests {
                     type_parameters: [
                         Datatype {
                             package: "0x0000000000000000000000000000000000000000000000000000000000000002",
-                            module: "sui",
-                            type_: "SUI",
+                            module: "oct",
+                            type_: "OCT",
                             type_parameters: [],
                         },
                     ],
