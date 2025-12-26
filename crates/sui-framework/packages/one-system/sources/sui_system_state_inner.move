@@ -34,7 +34,7 @@ const EBpsTooLarge: u64 = 5;
 const ESafeModeGasNotProcessed: u64 = 7;
 const EAdvancedToWrongEpoch: u64 = 8;
 
-const EUnsupportedActionType:u64 = 101;  //1. Occupied
+const EUnsupportedActionType:u64 = 1; 
 
 const BASIS_POINT_DENOMINATOR: u64 = 100_00;
 
