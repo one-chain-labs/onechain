@@ -119,9 +119,7 @@ fn main() {
     let server_version = ServerVersion::new(env!("CARGO_BIN_NAME"), VERSION);
     runtimes.sui_node.spawn(async move {
         match one_node::SuiNode::start_async(config, registry_service, server_version).await {
-            Ok(sui_node) => node_once_cell_clone
-                .set(sui_node)
-                .expect("Failed to set node in AsyncOnceCell"),
+            Ok(sui_node) => node_once_cell_clone.set(sui_node).expect("Failed to set node in AsyncOnceCell"),
 
             Err(e) => {
                 error!("Failed to start node: {e:?}");
