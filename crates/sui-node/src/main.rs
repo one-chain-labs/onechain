@@ -8,6 +8,7 @@ use mysten_common::sync::async_once_cell::AsyncOnceCell;
 use sui_config::{node::RunWithRange, Config, NodeConfig};
 use sui_core::runtime::SuiRuntimes;
 use sui_rpc_api::ServerVersion;
+use sui_telemetry::send_telemetry_event;
 use sui_types::{
     committee::EpochId,
     crypto::KeypairTraits,
