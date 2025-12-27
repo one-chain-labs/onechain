@@ -237,7 +237,7 @@ impl ValidatorConfigBuilder {
             chain_override_for_testing: self.chain_override,
             validator_client_monitor_config: None,
             fork_recovery: None,
-            transaction_driver_config: None, 
+            transaction_driver_config: None,
         }
     }
 
