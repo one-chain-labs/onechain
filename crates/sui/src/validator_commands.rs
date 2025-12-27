@@ -60,7 +60,7 @@ use sui_types::{
     sui_system_state::{
         sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
         sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        SUI_SYSTEM_MODULE_NAME
+        SUI_SYSTEM_MODULE_NAME,
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
     SUI_SYSTEM_PACKAGE_ID,
@@ -710,7 +710,7 @@ async fn construct_unsigned_0x5_txn(
     )
 }
 
-async fn call_0x5(
+pub(crate) async fn call_0x5(
     context: &mut WalletContext,
     function: &'static str,
     call_args: Vec<CallArg>,

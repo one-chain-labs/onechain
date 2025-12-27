@@ -50,7 +50,7 @@ use sui_graphql_rpc::{
     config::{ConnectionConfig, ServiceConfig},
     test_infra::cluster::start_graphql_server_with_fn_rpc,
 };
-use one_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
+use sui_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiRawData};
 use sui_keys::{
     key_derive::generate_new_key,
@@ -412,8 +412,9 @@ impl SuiCommand {
         match self {
             SuiCommand::Network { config, dump_addresses } => {
                 let config_path = config.unwrap_or(sui_config_dir()?.join(SUI_NETWORK_CONFIG));
-                let config: NetworkConfig = PersistedConfig::read(&config_path)
-                    .map_err(|err| err.context(format!("Cannot open OneChain network config file at {:?}", config_path)))?;
+                let config: NetworkConfig = PersistedConfig::read(&config_path).map_err(|err| {
+                    err.context(format!("Cannot open OneChain network config file at {:?}", config_path))
+                })?;
 
                 if dump_addresses {
                     for validator in config.validator_configs() {
@@ -884,8 +885,9 @@ async fn start(
         };
 
         // Load the config of the OneChain authority.
-        let network_config: NetworkConfig = PersistedConfig::read(&network_config_path)
-            .map_err(|err| err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path)))?;
+        let network_config: NetworkConfig = PersistedConfig::read(&network_config_path).map_err(|err| {
+            err.context(format!("Cannot open OneChain network config file at {:?}", network_config_path))
+        })?;
 
         swarm_builder = swarm_builder.dir(sui_config_path.clone()).with_network_config(network_config);
 
@@ -1083,10 +1085,12 @@ async fn genesis(
                     }
                 }
             } else {
-                fs::remove_dir_all(sui_config_dir)
-                    .map_err(|err| anyhow!(err).context(format!("Cannot remove OneChain config dir {:?}", sui_config_dir)))?;
-                fs::create_dir(sui_config_dir)
-                    .map_err(|err| anyhow!(err).context(format!("Cannot create OneChain config dir {:?}", sui_config_dir)))?;
+                fs::remove_dir_all(sui_config_dir).map_err(|err| {
+                    anyhow!(err).context(format!("Cannot remove OneChain config dir {:?}", sui_config_dir))
+                })?;
+                fs::create_dir(sui_config_dir).map_err(|err| {
+                    anyhow!(err).context(format!("Cannot create OneChain config dir {:?}", sui_config_dir))
+                })?;
             }
         } else if files.len() != 2 || !client_path.exists() || !keystore_path.exists() {
             bail!("Cannot run genesis with non-empty OneChain config directory {}, please use the --force/-f option to remove the existing configuration", sui_config_dir.to_str().unwrap());

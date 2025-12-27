@@ -35,6 +35,7 @@ use sui_types::{
     committee::EpochId,
     crypto::{generate_proof_of_possession, get_authority_key_pair, get_key_pair, SuiKeyPair},
     multiaddr::{Multiaddr, Protocol},
+    sui_system_state::SUI_SYSTEM_MODULE_NAME,
     transaction::{CallArg, Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_GENERIC},
     SUI_SYSTEM_PACKAGE_ID,
 };
