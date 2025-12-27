@@ -1361,7 +1361,9 @@ impl SuiClientCommands {
                         let network = match env.rpc.as_str() {
                             SUI_DEVNET_URL => "https://faucet-devnet.onelabs.cc/v1/gas",
                             SUI_TESTNET_URL => {
-                                bail!("For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas");
+                                bail!(
+                                    "For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas"
+                                );
                             }
                             SUI_LOCAL_NETWORK_URL | SUI_LOCAL_NETWORK_URL_0 => "http://127.0.0.1:9123/gas",
                             _ => bail!("Cannot recognize the active network. Please provide the gas faucet full URL."),

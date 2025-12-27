@@ -248,7 +248,6 @@ impl GenesisConfig {
                 address
             };
 
-
             // Populate gas itemized objects
             account.gas_amounts.iter().for_each(|a| {
                 allocations.push(TokenAllocation {

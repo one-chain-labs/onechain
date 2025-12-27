@@ -12,6 +12,7 @@ use std::{
 
 use anyhow::Result;
 use futures::future::try_join_all;
+use one_node::SuiNodeHandle;
 use rand::rngs::OsRng;
 #[cfg(msim)]
 use sui_config::node::ExecutionTimeObserverConfig;
@@ -21,7 +22,6 @@ use sui_config::{
     NodeConfig,
 };
 use sui_macros::nondeterministic;
-use one_node::SuiNodeHandle;
 use sui_protocol_config::{Chain, ProtocolVersion};
 use sui_swarm_config::{
     genesis_config::{AccountConfig, GenesisConfig, ValidatorGenesisConfig},

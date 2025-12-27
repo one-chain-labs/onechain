@@ -5,11 +5,11 @@ use std::{sync::Arc, time::Duration};
 
 use futures::future::join_all;
 use move_core_types::ident_str;
+use one_node::SuiNodeHandle;
 use rand::rngs::OsRng;
 use sui_core::consensus_adapter::position_submit_certificate;
 use sui_json_rpc_types::{ObjectChange, SuiTransactionBlockEffectsAPI};
 use sui_macros::sim_test;
-use one_node::SuiNodeHandle;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use sui_swarm_config::genesis_config::{
     AccountConfig,
