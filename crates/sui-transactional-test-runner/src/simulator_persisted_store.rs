@@ -9,7 +9,10 @@ use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use simulacrum::Simulacrum;
 use sui_config::genesis;
 use sui_protocol_config::ProtocolVersion;
-use sui_swarm_config::{genesis_config::AccountConfig, network_config_builder::ConfigBuilder};
+use sui_swarm_config::{
+    genesis_config::AccountConfig,
+    network_config_builder::{ConfigBuilder, KeyPairWrapper},
+};
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress, VersionNumber},
     committee::{Committee, EpochId},
@@ -128,7 +131,11 @@ impl PersistedStore {
             .with_accounts(account_configs);
 
         if let Some(validator_keys) = validator_keys {
-            builder = builder.deterministic_committee_validators(validator_keys)
+            let keys = validator_keys
+                .into_iter()
+                .map(|key| KeyPairWrapper { account_key_pair: key, protocol_key_pair: None })
+                .collect();
+            builder = builder.deterministic_committee_validators(keys)
         };
         if let Some(reference_gas_price) = reference_gas_price {
             builder = builder.with_reference_gas_price(reference_gas_price)
