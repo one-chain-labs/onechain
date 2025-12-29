@@ -22,9 +22,9 @@ jobs:
       matrix:
         working-directory:
           - examples # run on all examples
-          - crates/sui-framework/packages/sui-framework # sui framework
+          - crates/sui-framework/packages/one-framework # sui framework
           - crates/sui-framework/packages/move-stdlib # move stdlib
-          - crates/sui-framework/packages/sui-system # sui system
+          - crates/sui-framework/packages/one-system # sui system
           - crates/sui-framework/packages/bridge # bridge
     defaults:
       run:
