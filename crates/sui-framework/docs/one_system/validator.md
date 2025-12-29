@@ -785,7 +785,7 @@ Validator trying to set gas price higher than threshold.
 Max gas price a validator can set is 100K MIST.
 
 
-<pre><code><b>const</b> <a href="../one_system/validator.md#one_system_validator_MAX_VALIDATOR_GAS_PRICE">MAX_VALIDATOR_GAS_PRICE</a>: u64 = 10000;
+<pre><code><b>const</b> <a href="../one_system/validator.md#one_system_validator_MAX_VALIDATOR_GAS_PRICE">MAX_VALIDATOR_GAS_PRICE</a>: u64 = 100000;
 </code></pre>
 
 
