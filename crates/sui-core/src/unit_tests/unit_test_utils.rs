@@ -57,6 +57,7 @@ async fn init_genesis(
             protocol_key: authority_name,
             worker_key: worker_name,
             account_address: SuiAddress::from(&account_key_pair.public()),
+            revenue_receiving_address: SuiAddress::from(&account_key_pair.public()),
             network_key: network_key_pair.public().clone(),
             gas_price: 1,
             commission_rate: 0,
