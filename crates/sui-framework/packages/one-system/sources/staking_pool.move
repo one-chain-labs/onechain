@@ -80,6 +80,8 @@ public struct StakedOct has key, store {
     stake_activation_epoch: u64,
     /// The staked OCT tokens.
     principal: Balance<OCT>,
+    /// coin lock
+    lock: bool,
 }
 
 /// An alternative to `StakedOct` that holds the pool token amount instead of the SUI balance.
@@ -136,6 +138,7 @@ public(package) fun request_add_stake(
     pool: &mut StakingPool,
     stake: Balance<OCT>,
     stake_activation_epoch: u64,
+    lock: bool,
     ctx: &mut TxContext,
 ): StakedOct {
     let sui_amount = stake.value();
@@ -148,6 +151,7 @@ public(package) fun request_add_stake(
         pool_id: object::id(pool),
         stake_activation_epoch,
         principal: stake,
+        lock,
     }
 }
 
@@ -276,7 +280,7 @@ public(package) fun convert_to_fungible_staked_oct(
     staked_oct: StakedOct,
     ctx: &mut TxContext,
 ): FungibleStakedOct {
-    let StakedOct { id, pool_id, stake_activation_epoch, principal } = staked_oct;
+    let StakedOct { id, pool_id, stake_activation_epoch, principal ,lock:_} = staked_oct;
 
     assert!(pool_id == object::id(pool), EWrongPool);
     assert!(ctx.epoch() >= stake_activation_epoch, ECannotMintFungibleStakedOctYet);
@@ -337,7 +341,7 @@ public(package) fun withdraw_from_principal(
 use fun unwrap_staked_oct as StakedOct.into_balance;
 
 fun unwrap_staked_oct(staked_oct: StakedOct): Balance<OCT> {
-    let StakedOct { id, principal, .. } = staked_oct;
+    let StakedOct { id, principal,lock: _, .. } = staked_oct;
     id.delete();
     principal
 }
@@ -477,6 +481,8 @@ public use fun staked_oct_amount as StakedOct.amount;
 /// Returns the principal amount of `StakedOct`.
 public fun staked_oct_amount(staked_oct: &StakedOct): u64 { staked_oct.principal.value() }
 
+public fun lock(staked_oct:&StakedOct):bool{staked_oct.lock}
+
 public use fun stake_activation_epoch as StakedOct.activation_epoch;
 
 /// Returns the activation epoch of `StakedOct`.
@@ -551,6 +557,7 @@ public fun split(self: &mut StakedOct, split_amount: u64, ctx: &mut TxContext): 
         pool_id: self.pool_id,
         stake_activation_epoch: self.stake_activation_epoch,
         principal: self.principal.split(split_amount),
+        lock:self.lock,
     }
 }
 
@@ -572,7 +579,7 @@ public use fun join_staked_oct as StakedOct.join;
 /// Aborts if some of the staking parameters are incompatible (pool id, stake activation epoch, etc.)
 public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
     assert!(is_equal_staking_metadata(self, &other), EIncompatibleStakedOct);
-    let StakedOct { id, principal, .. } = other;
+    let StakedOct { id, principal,lock:_, .. } = other;
 
     id.delete();
     self.principal.join(principal);
@@ -581,7 +588,8 @@ public entry fun join_staked_oct(self: &mut StakedOct, other: StakedOct) {
 /// Returns true if all the staking parameters of the staked sui except the principal are identical
 public fun is_equal_staking_metadata(self: &StakedOct, other: &StakedOct): bool {
     (self.pool_id == other.pool_id) &&
-    (self.stake_activation_epoch == other.stake_activation_epoch)
+    (self.stake_activation_epoch == other.stake_activation_epoch)&&
+    (self.lock == other.lock)
 }
 
 public fun pool_token_exchange_rate_at_epoch(

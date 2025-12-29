@@ -56,6 +56,10 @@ use one_system::sui_system_state_inner::{
 };
 use one_system::validator::Validator;
 use one_system::validator_cap::UnverifiedValidatorOperationCap;
+use one::clock::Clock;
+use one::coin_vesting::CoinVesting;
+use one_system::supper_committee::Proposal;
+
 
 #[test_only]
 use one::balance;
@@ -106,6 +110,53 @@ public(package) fun create(
 
 // ==== entry functions ====
 
+public entry fun create_update_trusted_validator_proposal(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    operate: bool,
+    validator: address,
+    clock: &Clock,
+    ctx:&mut TxContext
+){
+    let self = load_system_state_mut(wrapper);
+    self.create_update_trusted_validator_proposal(cap,operate, validator, clock, ctx);
+}
+
+public entry fun create_update_only_trusted_validator_proposal(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    only_trusted_validator:bool,
+    clock: &Clock,
+    ctx: &mut TxContext
+){
+    let self = load_system_state_mut(wrapper);
+    self.create_update_only_trusted_validator_proposal(cap, only_trusted_validator, clock, ctx)
+}
+
+public entry fun create_update_only_validator_staking_proposal(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    only_validator_staking:bool,
+    clock: &Clock,
+    ctx: &mut TxContext
+){
+    let self = load_system_state_mut(wrapper);
+    self.create_update_only_validator_staking_proposal(cap,only_validator_staking, clock, ctx);
+}
+
+public entry fun vote_proposal(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    proposal: &mut Proposal,
+    agree: bool,
+    clock: &Clock,
+    ctx: &TxContext
+){
+    let self = load_system_state_mut(wrapper);
+    self.vote_proposal(cap,proposal, agree, clock, ctx);
+}
+
+
 #[allow(lint(public_entry))]
 /// Can be called by anyone who wishes to become a validator candidate and starts accruing delegated
 /// stakes in their staking pool. Once they have at least `MIN_VALIDATOR_JOINING_STAKE` amount of stake they
@@ -127,6 +178,7 @@ public entry fun request_add_validator_candidate(
     p2p_address: vector<u8>,
     primary_address: vector<u8>,
     worker_address: vector<u8>,
+    revenue_receiving_address:address,
     gas_price: u64,
     commission_rate: u64,
     ctx: &mut TxContext,
@@ -203,6 +255,17 @@ public entry fun set_candidate_validator_gas_price(
 }
 
 #[allow(lint(public_entry))]
+public entry fun request_set_revenue_receiving_address(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    revenue_receiving_address:address,
+){
+    let self = load_system_state_mut(wrapper);
+    self.request_set_revenue_receiving_address(cap, revenue_receiving_address);
+}
+
+
+#[allow(lint(public_entry))]
 /// A validator can call this entry function to set a new commission rate, updated at the end of
 /// the epoch.
 public entry fun request_set_commission_rate(
@@ -237,6 +300,18 @@ public entry fun request_add_stake(
     transfer::public_transfer(staked_oct, ctx.sender());
 }
 
+#[allow(lint(public_entry))]
+public entry fun request_add_val_stake(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    stake: Coin<OCT>,
+    ctx: &mut TxContext,
+){
+    let staked_oct = request_add_val_stake_non_entry(wrapper, cap, stake, ctx);
+    transfer::public_transfer(staked_oct, ctx.sender());
+}
+
+
 /// The non-entry version of `request_add_stake`, which returns the staked OCT instead of transferring it to the sender.
 public fun request_add_stake_non_entry(
     wrapper: &mut SuiSystemState,
@@ -245,6 +320,16 @@ public fun request_add_stake_non_entry(
     ctx: &mut TxContext,
 ): StakedOct {
     wrapper.load_system_state_mut().request_add_stake(stake, validator_address, ctx)
+}
+
+public fun request_add_val_stake_non_entry(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    stake: Coin<OCT>,
+    ctx: &mut TxContext,
+): StakedOct{
+    let self = load_system_state_mut(wrapper);
+    self.request_add_val_stake(cap, stake, ctx)
 }
 
 #[allow(lint(public_entry))]
@@ -264,14 +349,32 @@ public entry fun request_add_stake_mul_coin(
 }
 
 #[allow(lint(public_entry))]
+public entry fun request_add_val_stake_mul_coin(
+    wrapper: &mut SuiSystemState,
+    cap: &UnverifiedValidatorOperationCap,
+    stakes: vector<Coin<OCT>>,
+    stake_amount: option::Option<u64>,
+    ctx: &mut TxContext,
+){
+    let self = load_system_state_mut(wrapper);
+    let staked_oct = self.request_add_val_stake_mul_coin(cap, stakes, stake_amount, ctx);
+    transfer::public_transfer(staked_oct, ctx.sender());
+}
+
+#[allow(lint(public_entry))]
 /// Withdraw stake from a validator's staking pool.
 public entry fun request_withdraw_stake(
     wrapper: &mut SuiSystemState,
     staked_oct: StakedOct,
     ctx: &mut TxContext,
 ) {
-    let withdrawn_stake = wrapper.request_withdraw_stake_non_entry(staked_oct, ctx);
+    let (withdrawn_stake,coin_vesting) = request_withdraw_stake_non_entry(wrapper, staked_oct, ctx);
     transfer::public_transfer(withdrawn_stake.into_coin(ctx), ctx.sender());
+    if(coin_vesting.is_some()){
+        transfer::public_transfer(coin_vesting.destroy_some(),ctx.sender());
+    }else {
+        coin_vesting.destroy_none();
+    }
 }
 
 /// Convert StakedOct into a FungibleStakedOct object.
@@ -297,7 +400,7 @@ public fun request_withdraw_stake_non_entry(
     wrapper: &mut SuiSystemState,
     staked_oct: StakedOct,
     ctx: &mut TxContext,
-): Balance<OCT> {
+) :(Balance<OCT>,Option<CoinVesting<OCT>>) {
     wrapper.load_system_state_mut().request_withdraw_stake(staked_oct, ctx)
 }
 
@@ -661,6 +764,25 @@ fun validator_voting_powers(wrapper: &mut SuiSystemState): VecMap<address, u64> 
 fun store_execution_time_estimates(wrapper: &mut SuiSystemState, estimates_bytes: vector<u8>) {
     wrapper.load_system_state_mut().store_execution_time_estimates(estimates_bytes)
 }
+
+#[test_only]
+public fun execute_update_only_trusted_validator_action(wrapper: &mut SuiSystemState,only_trusted_validator:bool){
+    let self = load_system_state_mut(wrapper);
+    self.execute_update_only_trusted_validator_action(only_trusted_validator)
+}
+
+#[test_only]
+public fun execute_update_only_validator_staking_action(wrapper: &mut SuiSystemState,validator_address: address, only_validator_staking: bool){
+    let self = load_system_state_mut(wrapper);
+    self.execute_update_only_validator_staking_action(validator_address, only_validator_staking)
+}
+
+#[test_only]
+public fun execute_update_trusted_validators_action(wrapper: &mut SuiSystemState,operate: bool,validator: address){
+    let self = load_system_state_mut(wrapper);
+    self.execute_update_trusted_validators_action(operate, validator)
+}
+
 
 #[test_only]
 public fun validator_voting_powers_for_testing(wrapper: &mut SuiSystemState): VecMap<address, u64> {

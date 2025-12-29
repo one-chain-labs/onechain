@@ -11,7 +11,7 @@ use one::oct::OCT;
 use one::table::{Self, Table};
 use one::table_vec::{Self, TableVec};
 use one::vec_map::{Self, VecMap};
-use one::vec_set::VecSet;
+use one::vec_set::{Self,VecSet};
 use one_system::staking_pool::{
     PoolTokenExchangeRate,
     StakedOct,
@@ -23,6 +23,7 @@ use one_system::validator::{Validator, staking_pool_id, sui_address};
 use one_system::validator_cap::{UnverifiedValidatorOperationCap, ValidatorOperationCap};
 use one_system::validator_wrapper::ValidatorWrapper;
 use one_system::voting_power;
+use one::coin_vesting::CoinVesting;
 
 // Errors
 const ENonValidatorInReportRecords: u64 = 0;
@@ -41,6 +42,11 @@ const EValidatorAlreadyRemoved: u64 = 11;
 const ENotAPendingValidator: u64 = 12;
 const EValidatorSetEmpty: u64 = 13;
 const EInvalidCap: u64 = 101;
+
+const EOnlyTrustValidatorJoin: u64 = 201;
+const EValidatorOnlyStakingSame: u64 = 202;
+const ETrustValidatorExist: u64  = 203;
+const ETrustValidatorNotExist: u64 = 204;
 
 // same as in sui_system
 const ACTIVE_VALIDATOR_ONLY: u8 = 1;
@@ -78,8 +84,26 @@ public struct ValidatorSet has store {
     validator_candidates: Table<address, ValidatorWrapper>,
     /// Table storing the number of epochs during which a validator's stake has been below the low stake threshold.
     at_risk_validators: VecMap<address, u64>,
+
+    only_trusted_validator: bool,
+
+    trusted_validators: VecSet<address>,
     /// Any extra fields that's not defined statically.
     extra_fields: Bag,
+}
+
+public struct UpdateOnlyTrustedValidatorAction has store,copy,drop {
+    only_trusted_validator: bool
+}
+
+public struct UpdateTrustedValidatorsAction has store,copy,drop {
+    operate: bool,
+    validator: address
+}
+
+public struct UpdateOnlyValidatorStakingAction has store,copy,drop {
+    validator_address: address,
+    only_validator_staking: bool
 }
 
 #[allow(unused_field)]
@@ -145,6 +169,10 @@ public(package) fun new(
     init_active_validators.do_ref!(|v| {
         staking_pool_mappings.add(v.staking_pool_id(), v.sui_address());
     });
+    
+    let mut trusted_validators = vec_set::empty<address>();
+    init_active_validators.do_ref!(|val|trusted_validators.insert(val.sui_address()) );
+
     let mut validators = ValidatorSet {
         total_stake,
         active_validators: init_active_validators,
@@ -154,10 +182,86 @@ public(package) fun new(
         inactive_validators: table::new(ctx),
         validator_candidates: table::new(ctx),
         at_risk_validators: vec_map::empty(),
+        only_trusted_validator: true,
+        trusted_validators,
         extra_fields: bag::new(ctx),
     };
     voting_power::set_voting_power(&mut validators.active_validators, total_stake);
     validators
+}
+
+
+public(package) fun create_update_only_trusted_validator_action(
+    self: &ValidatorSet,
+    only_trusted_validator: bool,
+):UpdateOnlyTrustedValidatorAction{
+    assert!(self.only_trusted_validator != only_trusted_validator,EValidatorOnlyStakingSame);
+    UpdateOnlyTrustedValidatorAction{
+        only_trusted_validator
+    }
+}
+
+public(package) fun execute_update_only_trusted_validator_action(
+    self:&mut ValidatorSet,
+    action: &UpdateOnlyTrustedValidatorAction,
+){
+    self.only_trusted_validator = action.only_trusted_validator;
+}
+
+public(package) fun create_update_trusted_validator_action(
+    self: &ValidatorSet,
+    operate: bool,
+    validator: address
+):UpdateTrustedValidatorsAction{
+    if(operate){
+        assert!(!self.trusted_validators.contains(&validator),ETrustValidatorExist);
+    }else {
+        assert!(self.trusted_validators.contains(&validator),ETrustValidatorNotExist);
+    };
+    UpdateTrustedValidatorsAction{
+        operate,
+        validator
+    }
+}
+
+public(package) fun execute_update_trusted_validators_action(
+    self:&mut ValidatorSet,
+    action: &UpdateTrustedValidatorsAction,
+){
+    if(action.operate && !self.trusted_validators.contains(&action.validator)){
+        self.trusted_validators.insert(action.validator);
+    }else if(!action.operate && self.trusted_validators.contains(&action.validator)){
+        self.trusted_validators.remove(&action.validator);
+        if (find_validator(&self.active_validators, action.validator).is_some()){
+            // remove valdiator
+            self.remove_validator(action.validator);
+        }
+    }
+}
+
+public(package) fun create_update_only_validator_staking_action(
+    self: &ValidatorSet,
+    validator_address: address,
+    only_validator_staking: bool,
+): UpdateOnlyValidatorStakingAction {
+    let active_idx_opt = find_validator(&self.active_validators, validator_address);
+    let pending_idx_opt = find_validator_from_table_vec(&self.pending_active_validators, validator_address);
+    let candidates = self.validator_candidates.contains(validator_address);
+
+    assert!(active_idx_opt.is_some() || pending_idx_opt.is_some() || candidates,ENotAValidator);
+
+    UpdateOnlyValidatorStakingAction {
+        validator_address,
+        only_validator_staking
+    }
+}
+
+public(package) fun execute_update_only_validator_staking_action(
+    self:& mut ValidatorSet,
+    action: &UpdateOnlyValidatorStakingAction,
+){
+    let validator =  self.get_active_or_pending_or_candidate_validator_mut(action.validator_address, true);
+    validator.set_only_validator_staking(action.only_validator_staking);
 }
 
 // ==== functions to add or remove validators ====
@@ -211,6 +315,7 @@ public(package) fun request_remove_validator_candidate(
 public(package) fun request_add_validator(self: &mut ValidatorSet, ctx: &TxContext) {
     let validator_address = ctx.sender();
     assert!(self.validator_candidates.contains(validator_address), ENotValidatorCandidate);
+    assert!(self.is_trusted_validator(validator_address),EOnlyTrustValidatorJoin);
     let validator = self.validator_candidates.remove(validator_address).destroy();
     assert!(
         !self.is_duplicate_with_active_validator(&validator)
@@ -268,9 +373,19 @@ public(package) fun assert_no_pending_or_active_duplicates(
 /// The index of the validator is added to `pending_removals` and
 /// will be processed at the end of epoch.
 /// Only an active validator can request to be removed.
-public(package) fun request_remove_validator(self: &mut ValidatorSet, ctx: &TxContext) {
+public(package) fun request_remove_validator(
+    self: &mut ValidatorSet,
+    ctx: &TxContext,
+) {
     let validator_address = ctx.sender();
-    let validator_index = find_validator(
+    self.remove_validator(validator_address)
+}
+
+fun remove_validator(
+    self: &mut ValidatorSet,
+    validator_address:address,
+){
+     let validator_index = find_validator(
         &self.active_validators,
         validator_address,
     ).destroy_or!(abort ENotAValidator);
@@ -288,13 +403,14 @@ public(package) fun request_add_stake(
     self: &mut ValidatorSet,
     validator_address: address,
     stake: Balance<OCT>,
+    is_validator: bool,
     ctx: &mut TxContext,
 ): StakedOct {
     let sui_amount = stake.value();
     assert!(sui_amount >= MIN_STAKING_THRESHOLD, EStakingBelowThreshold);
     self
         .get_candidate_or_active_validator_mut(validator_address)
-        .request_add_stake(stake, ctx.sender(), ctx)
+        .request_add_stake(stake, ctx.sender(), is_validator, ctx)
 }
 
 /// Called by `sui_system`, to withdraw some share of a stake from the validator. The share to withdraw
@@ -307,7 +423,7 @@ public(package) fun request_withdraw_stake(
     self: &mut ValidatorSet,
     staked_oct: StakedOct,
     ctx: &TxContext,
-): Balance<OCT> {
+) : (Balance<OCT>,Option<CoinVesting<OCT>>) {
     let staking_pool_id = staked_oct.pool_id();
     let validator = if (self.staking_pool_mappings.contains(staking_pool_id)) {
         // This is an active validator.
@@ -741,6 +857,14 @@ public(package) fun is_duplicate_validator(
 
 fun count_duplicates_vec(validators: &vector<Validator>, validator: &Validator): u64 {
     validators.count!(|v| v.is_duplicate(validator))
+}
+
+fun is_trusted_validator(self: &ValidatorSet,validator: address):bool{
+    if(!self.only_trusted_validator){
+        true
+    }else {
+        self.trusted_validators.contains(&validator)
+    }
 }
 
 /// Checks whether `new_validator` is duplicate with any currently pending validators.
@@ -1284,13 +1408,9 @@ fun distribute_reward(
 
         // Add rewards to the validator. Don't try and distribute rewards though if the payout is zero.
         if (validator_reward.value() > 0) {
-            let validator_address = validator.sui_address();
-            let rewards_stake = validator.request_add_stake(
-                validator_reward,
-                validator_address,
-                ctx,
-            );
-            transfer::public_transfer(rewards_stake, validator_address);
+            let revenue_receiving_address =  validator.revenue_receiving_address();
+            let rewards_stake = validator.request_add_stake_no_check(validator_reward, revenue_receiving_address,false, ctx);
+            transfer::public_transfer(rewards_stake, revenue_receiving_address);
         } else {
             validator_reward.destroy_zero();
         };
