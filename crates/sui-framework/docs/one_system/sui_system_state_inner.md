@@ -753,7 +753,7 @@ the epoch advancement transaction.
 
 
 
-<pre><code><b>const</b> <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_EUnsupportedActionType">EUnsupportedActionType</a>: u64 = 101;
+<pre><code><b>const</b> <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_EUnsupportedActionType">EUnsupportedActionType</a>: u64 = 1;
 </code></pre>
 
 
