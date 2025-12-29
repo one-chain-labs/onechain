@@ -166,7 +166,7 @@ impl GovernanceReadApi {
                     stake_request_epoch: stake.activation_epoch() - 1,
                     stake_active_epoch: stake.activation_epoch(),
                     principal: stake.principal(),
-                    lock: false,
+                    lock: stake.lock(),
                     status,
                 })
             }
