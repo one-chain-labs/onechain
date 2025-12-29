@@ -54,6 +54,7 @@ fun validator_set_flow() {
         let stake = validator_set.request_add_stake(
             @0x1,
             coin::mint_for_testing(500 * MIST_PER_OCT, ctx1).into_balance(),
+            false,
             ctx1,
         );
         transfer::public_transfer(stake, @0x1);
@@ -159,6 +160,7 @@ fun staking_below_threshold() {
     let stake = validator_set.request_add_stake(
         @0x1,
         balance::create_for_testing(MIST_PER_OCT - 1), // 1 MIST lower than the threshold
+        false,
         ctx1,
     );
     transfer::public_transfer(stake, @0x1);
@@ -183,6 +185,7 @@ fun staking_min_threshold() {
     let stake = validator_set.request_add_stake(
         @0x1,
         balance::create_for_testing(MIST_PER_OCT), // min possible stake
+        false,
         ctx1,
     );
     transfer::public_transfer(stake, @0x1);
@@ -334,13 +337,14 @@ fun request_add_then_pull_stake() {
     let stake = validator_set.request_add_stake(
         @0xA,
         balance::create_for_testing(3 * MIST_PER_OCT),
+        false,
         scenario.ctx(),
     );
     validator_set.request_add_validator(scenario.ctx()); // can be admitted
-    let bal = validator_set.request_withdraw_stake(stake, scenario.ctx()); // should fail here with ENotAValidator
-
+    let (withdrawn_balance, coin_vesting)  = validator_set.request_withdraw_stake(stake, scenario.ctx()); // should fail here with ENotAValidator
+    coin_vesting.destroy_none();
     test_utils::destroy(validator_set);
-    test_utils::destroy(bal);
+    test_utils::destroy(withdrawn_balance);
     scenario_val.end();
 }
 
@@ -360,6 +364,7 @@ fun withdraw_all() {
     let stake = validator_set.request_add_stake(
         @0xB,
         balance::create_for_testing(4 * MIST_PER_OCT),
+        false,
         scenario.ctx(),
     );
     validator_set.request_add_validator(scenario.ctx()); // can be admitted
@@ -368,7 +373,9 @@ fun withdraw_all() {
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 3);
     let num_validators = validator_set.active_validators().length();
     // withdraw all the stake. validator will now have voting power 0 + must be kicked out immediately
-    let bal = validator_set.request_withdraw_stake(stake, scenario.ctx());
+    let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(stake, scenario.ctx());
+        coin_vesting.destroy_none();
+
     // use "low stake" grace period of 10 epochs to ensure that validator actually did hit the "very low stake" threshold
     advance_epoch_with_low_stake_grace_period(&mut validator_set, 10, scenario);
     assert!(!validator_set.is_active_validator(@0xB));
@@ -377,7 +384,7 @@ fun withdraw_all() {
     assert_eq!(effects.num_user_events(), num_validators + 1);
 
     test_utils::destroy(validator_set);
-    test_utils::destroy(bal);
+    test_utils::destroy(withdrawn_balance);
     scenario_val.end();
 }
 
@@ -398,6 +405,7 @@ fun very_low_voting_power_departure() {
     let mut stake = validator_set.request_add_stake(
         @0xB,
         balance::create_for_testing(4 * MIST_PER_OCT),
+        false,
         scenario.ctx(),
     );
     validator_set.request_add_validator(scenario.ctx()); // can be admitted
@@ -406,10 +414,12 @@ fun very_low_voting_power_departure() {
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 3);
     let num_validators = validator_set.active_validators().length();
     // withdraw most of the stake. validator will now have voting power 1 and will be kicked out immediately
-    let bal = validator_set.request_withdraw_stake(
+    let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(
         stake.split(3 * MIST_PER_OCT, scenario.ctx()),
         scenario.ctx(),
-    );
+    );            
+    coin_vesting.destroy_none();
+
     advance_epoch_with_low_stake_grace_period(&mut validator_set, grace_period, scenario);
     assert!(!validator_set.is_active_validator(@0xB));
     // epoch change should emit one ValidatorEpochInfoEvent per validator and one ValidatorLeaveEvent for the departed validator
@@ -417,7 +427,7 @@ fun very_low_voting_power_departure() {
     assert_eq!(effects.num_user_events(), num_validators + 1);
 
     test_utils::destroy(validator_set);
-    test_utils::destroy(bal);
+    test_utils::destroy(withdrawn_balance);
     test_utils::destroy(stake);
     scenario_val.end();
 }
@@ -439,6 +449,7 @@ fun low_voting_power_departure() {
     let mut stake = validator_set.request_add_stake(
         @0xB,
         balance::create_for_testing(4 * MIST_PER_OCT),
+        false,
         scenario.ctx(),
     );
     validator_set.request_add_validator(scenario.ctx()); // can be admitted
@@ -447,10 +458,12 @@ fun low_voting_power_departure() {
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 3);
     let num_validators = validator_set.active_validators().length();
     // withdraw part of the stake. validator will now have voting power 2 and is now at risk
-    let bal = validator_set.request_withdraw_stake(
+    let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(
         stake.split(2 * MIST_PER_OCT, scenario.ctx()),
         scenario.ctx(),
     );
+        coin_vesting.destroy_none();
+
     advance_epoch_with_low_stake_grace_period(&mut validator_set, grace_period, scenario);
     assert!(validator_set.is_active_validator(@0xB));
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 1);
@@ -475,7 +488,7 @@ fun low_voting_power_departure() {
     assert_eq!(effects.num_user_events(), num_validators + 1);
 
     test_utils::destroy(validator_set);
-    test_utils::destroy(bal);
+    test_utils::destroy(withdrawn_balance);
     test_utils::destroy(stake);
     scenario_val.end();
 }
@@ -498,6 +511,7 @@ fun low_voting_power_recovery() {
     let mut stake1 = validator_set.request_add_stake(
         @0xB,
         balance::create_for_testing(4 * MIST_PER_OCT),
+        false,
         scenario.ctx(),
     );
     validator_set.request_add_validator(scenario.ctx()); // can be admitted
@@ -505,17 +519,19 @@ fun low_voting_power_recovery() {
     assert!(validator_set.is_active_validator(@0xB));
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 3);
     // withdraw part of the stake. validator will now have voting power 2 and is now at risk
-    let bal = validator_set.request_withdraw_stake(
+    let (withdrawn_balance, coin_vesting) = validator_set.request_withdraw_stake(
         stake1.split(2 * MIST_PER_OCT, scenario.ctx()),
         scenario.ctx(),
     );
+        coin_vesting.destroy_none();
+
     advance_epoch_with_low_stake_grace_period(&mut validator_set, grace_period, scenario);
     assert!(validator_set.is_active_validator(@0xB));
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 1);
     assert!(validator_set.is_at_risk_validator(@0xB));
 
     // add back the stake and get the validator above the threshold. should no longer be at risk
-    let stake2 = validator_set.request_add_stake(@0xB, bal, scenario.ctx());
+    let stake2 = validator_set.request_add_stake(@0xB, withdrawn_balance, false,scenario.ctx());
     advance_epoch_with_low_stake_grace_period(&mut validator_set, grace_period, scenario);
     assert!(validator_set.is_active_validator(@0xB));
     assert!(validator_set.find_for_testing(@0xB).voting_power() == 3);
@@ -543,6 +559,7 @@ fun add_then_increase_stake_of_others() {
     let stake = validator_set.request_add_stake(
         @0xB,
         balance::create_for_testing(1000 * MIST_PER_OCT),
+        false,
         scenario.ctx(),
     );
     test_utils::destroy(stake);
@@ -556,6 +573,7 @@ fun add_then_increase_stake_of_others() {
         let stake = validator_set.request_add_stake(
             address::from_u256((i + 1 as u256)),
             balance::create_for_testing(to_add),
+            false,
             scenario.ctx(),
         );
         new_total_stake = new_total_stake + to_add;

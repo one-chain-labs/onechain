@@ -65,16 +65,18 @@ fun pending_validator_flow() {
         .build(runner.ctx());
 
     // add extra stake, but don't send it to the inventory just yet
-    let extra_stake = validator.request_add_stake(test_runner::mint(30), @2, runner.ctx());
+    let extra_stake = validator.request_add_stake(test_runner::mint(30), @2, false,runner.ctx());
 
     assert_eq!(validator.total_stake(), initial_stake);
     assert_eq!(validator.pending_stake_amount(), added_stake);
 
     // take initial stake out of inventory
     runner.owned_tx!<StakedOct>(|staked_oct| {
-        let withdrawn_balance = validator
-            .request_withdraw_stake(staked_oct, runner.ctx())
-            .destroy_for_testing();
+        let (withdrawn_balance,coin_vesting) = validator
+            .request_withdraw_stake(staked_oct, runner.ctx());
+
+        let withdrawn_balance = withdrawn_balance.destroy_for_testing();
+                coin_vesting.destroy_none();
 
         assert_eq!(withdrawn_balance, initial_stake);
         assert_eq!(validator.total_stake(), initial_stake);

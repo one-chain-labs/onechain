@@ -229,6 +229,7 @@ public fun add_validator_full_flow(
         net_addr,
         net_addr,
         net_addr,
+        validator,
         1,
         0,
         ctx,
@@ -268,7 +269,8 @@ public fun add_validator_candidate(
         net_addr,
         net_addr,
         net_addr,
-        1,
+            validator,
+            1,
         0,
         ctx,
     );

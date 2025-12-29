@@ -347,6 +347,7 @@ fun add_validator_candidate_failure_invalid_metadata() {
             b"/ip4/127.0.0.2/udp/80",
             b"/ip4/127.0.0.1/udp/80",
             b"/ip4/127.0.0.1/udp/80",
+            new_validator_addr,
             1,
             0,
             ctx,

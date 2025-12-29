@@ -1073,6 +1073,7 @@ public(package) fun new_for_testing(
             &mut validator,
             balance,
             sui_address, // give the stake to the validator
+            false,
             ctx,
         );
     });

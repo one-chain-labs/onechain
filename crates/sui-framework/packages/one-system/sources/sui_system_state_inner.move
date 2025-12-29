@@ -1352,14 +1352,12 @@ public(package) fun request_add_validator_candidate_for_testing(
     p2p_address: vector<u8>,
     primary_address: vector<u8>,
     worker_address: vector<u8>,
-    revenue_receiving_address:address,
     gas_price: u64,
     commission_rate: u64,
     ctx: &mut TxContext,
 ) {
     let validator = validator::new_for_testing(
         ctx.sender(),
-        revenue_receiving_address,
         pubkey_bytes,
         network_pubkey_bytes,
         worker_pubkey_bytes,

@@ -99,7 +99,8 @@ fun convert_to_fungible_staked_oct_fail_too_early() {
     let sui = balance::create_for_testing(1_000_000_000);
     let staked_oct = staking_pool.request_add_stake(
         sui,
-        scenario.ctx().epoch() + 1,
+        scenario.ctx().epoch() + 1,       
+        false,
         scenario.ctx(),
     );
     let _fungible_staked_oct = staking_pool.convert_to_fungible_staked_oct(
@@ -120,6 +121,7 @@ fun convert_to_fungible_staked_oct_fail_too_early_preactive() {
     let staked_oct = staking_pool.request_add_stake(
         sui,
         activation_epoch,
+        false,
         scenario.ctx(),
     );
 
@@ -142,6 +144,7 @@ fun convert_to_fungible_staked_oct_fail_too_early_inactive() {
     let staked_oct = staking_pool.request_add_stake(
         sui,
         activation_epoch,
+        false,
         scenario.ctx(),
     );
 
@@ -165,6 +168,7 @@ fun convert_to_fungible_staked_oct_fail_wrong_pool() {
     let staked_oct = staking_pool_1.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
@@ -188,6 +192,7 @@ fun convert_to_fungible_staked_oct_happy() {
     let staked_oct_1 = staking_pool.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
@@ -201,6 +206,7 @@ fun convert_to_fungible_staked_oct_happy() {
     let staked_oct_2 = staking_pool.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
@@ -256,7 +262,7 @@ fun test_process_pending_stake_withdraw_no_underflow() {
     staking_pool.activate_staking_pool(0);
 
     let sui = balance::create_for_testing(1_000_000_000);
-    let staked_oct_1 = staking_pool.request_add_stake(sui, test.ctx().epoch() + 1, test.ctx());
+    let staked_oct_1 = staking_pool.request_add_stake(sui, test.ctx().epoch() + 1,false, test.ctx());
     assert_eq!(distribute_rewards_and_advance_epoch(&mut staking_pool, &mut test, 0), 1);
 
     staking_pool.increase_pending_pool_token_withdraw_for_testing(1_000_000_000);
@@ -286,6 +292,7 @@ fun redeem_fungible_staked_oct_happy() {
     let staked_oct_1 = staking_pool.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
@@ -299,6 +306,7 @@ fun redeem_fungible_staked_oct_happy() {
     let staked_oct_2 = staking_pool.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
@@ -393,6 +401,7 @@ fun redeem_fungible_staked_oct_regression_rounding() {
     let staked_oct_1 = staking_pool.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
@@ -406,6 +415,7 @@ fun redeem_fungible_staked_oct_regression_rounding() {
     let staked_oct_2 = staking_pool.request_add_stake(
         sui,
         scenario.ctx().epoch() + 1,
+        false,
         scenario.ctx(),
     );
 
