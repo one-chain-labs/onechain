@@ -8,15 +8,11 @@ use mysten_common::sync::async_once_cell::AsyncOnceCell;
 use sui_config::{node::RunWithRange, Config, NodeConfig};
 use sui_core::runtime::SuiRuntimes;
 use sui_rpc_api::ServerVersion;
-use sui_telemetry::send_telemetry_event;
 use sui_types::{
-    committee::EpochId,
-    crypto::KeypairTraits,
-    messages_checkpoint::CheckpointSequenceNumber,
-    multiaddr::Multiaddr,
+    committee::EpochId, crypto::KeypairTraits, messages_checkpoint::CheckpointSequenceNumber, multiaddr::Multiaddr,
     supported_protocol_versions::SupportedProtocolVersions,
 };
-use tokio::{sync::broadcast, time::sleep};
+use tokio::sync::broadcast;
 use tracing::{error, info};
 
 // Define the `GIT_REVISION` and `VERSION` consts
