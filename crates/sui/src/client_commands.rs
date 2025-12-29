@@ -1919,7 +1919,7 @@ impl Display for SuiClientCommandResult {
                 }
 
                 let mut builder = TableBuilder::default();
-                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "suiBalance (SUI)"]);
+                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "Balance (OCT)"]);
                 for coin in &gas_coins {
                     builder.push_record(vec![
                         coin.gas_coin_id.to_string(),
