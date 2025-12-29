@@ -422,7 +422,7 @@ public(package) fun request_add_stake(
 public(package) fun request_withdraw_stake(
     self: &mut ValidatorSet,
     staked_oct: StakedOct,
-    ctx: &TxContext,
+    ctx: &mut TxContext,
 ) : (Balance<OCT>,Option<CoinVesting<OCT>>) {
     let staking_pool_id = staked_oct.pool_id();
     let validator = if (self.staking_pool_mappings.contains(staking_pool_id)) {

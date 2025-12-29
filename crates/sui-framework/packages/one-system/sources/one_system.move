@@ -110,6 +110,7 @@ public(package) fun create(
 
 // ==== entry functions ====
 
+#[allow(lint(public_entry))]
 public entry fun create_update_trusted_validator_proposal(
     wrapper: &mut SuiSystemState,
     cap: &UnverifiedValidatorOperationCap,
@@ -122,6 +123,7 @@ public entry fun create_update_trusted_validator_proposal(
     self.create_update_trusted_validator_proposal(cap,operate, validator, clock, ctx);
 }
 
+#[allow(lint(public_entry))]
 public entry fun create_update_only_trusted_validator_proposal(
     wrapper: &mut SuiSystemState,
     cap: &UnverifiedValidatorOperationCap,
@@ -133,6 +135,7 @@ public entry fun create_update_only_trusted_validator_proposal(
     self.create_update_only_trusted_validator_proposal(cap, only_trusted_validator, clock, ctx)
 }
 
+#[allow(lint(public_entry))]
 public entry fun create_update_only_validator_staking_proposal(
     wrapper: &mut SuiSystemState,
     cap: &UnverifiedValidatorOperationCap,
@@ -144,6 +147,7 @@ public entry fun create_update_only_validator_staking_proposal(
     self.create_update_only_validator_staking_proposal(cap,only_validator_staking, clock, ctx);
 }
 
+#[allow(lint(public_entry))]
 public entry fun vote_proposal(
     wrapper: &mut SuiSystemState,
     cap: &UnverifiedValidatorOperationCap,
@@ -198,6 +202,7 @@ public entry fun request_add_validator_candidate(
             p2p_address,
             primary_address,
             worker_address,
+            revenue_receiving_address,
             gas_price,
             commission_rate,
             ctx,

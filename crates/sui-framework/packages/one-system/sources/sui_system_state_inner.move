@@ -559,7 +559,7 @@ public(package) fun request_add_val_stake_mul_coin(
 public(package) fun request_withdraw_stake(
     self: &mut SuiSystemStateInnerV2,
     staked_oct: StakedOct,
-    ctx: &TxContext,
+    ctx: &mut TxContext,
 ) :  (Balance<OCT>,Option<CoinVesting<OCT>>){
     self.validators.request_withdraw_stake(staked_oct, ctx)
 }
