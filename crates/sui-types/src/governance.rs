@@ -112,6 +112,7 @@ pub struct StakedOct {
     pool_id: ID,
     stake_activation_epoch: u64,
     principal: Balance,
+    lock: bool,
 }
 
 impl StakedOct {
@@ -150,6 +151,10 @@ impl StakedOct {
 
     pub fn principal(&self) -> u64 {
         self.principal.value()
+    }
+
+    pub fn lock(&self) -> bool {
+        self.lock
     }
 }
 
