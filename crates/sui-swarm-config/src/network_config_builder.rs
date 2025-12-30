@@ -12,7 +12,7 @@ use rand::rngs::OsRng;
 #[cfg(msim)]
 use sui_config::node::ExecutionTimeObserverConfig;
 use sui_config::{
-    genesis::{TokenAllocation, TokenDistributionScheduleBuilder},
+    genesis::{TokenAllocation, TokenDistributionSchedule, TokenDistributionScheduleBuilder},
     node::AuthorityOverloadConfig,
     ExecutionCacheConfig,
 };
@@ -109,6 +109,7 @@ pub struct ConfigBuilder<R = OsRng> {
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
     global_state_hash_v2_enabled_config: Option<GlobalStateHashV2EnabledConfig>,
+    custom_distribution_schedule: Option<TokenDistributionSchedule>,
     #[cfg(msim)]
     execution_time_observer_config: Option<ExecutionTimeObserverConfig>,
 }
@@ -136,6 +137,7 @@ impl ConfigBuilder {
             max_submit_position: None,
             submit_delay_step_override_millis: None,
             global_state_hash_v2_enabled_config: None,
+            custom_distribution_schedule: None,
             #[cfg(msim)]
             execution_time_observer_config: None,
         }
@@ -303,6 +305,11 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
+    pub fn with_custom_distribution_schedule(mut self, schedule: TokenDistributionSchedule) -> Self {
+        self.custom_distribution_schedule = Some(schedule);
+        self
+    }
+
     pub fn rng<N: rand::RngCore + rand::CryptoRng>(self, rng: N) -> ConfigBuilder<N> {
         ConfigBuilder {
             rng: Some(rng),
@@ -323,6 +330,7 @@ impl<R> ConfigBuilder<R> {
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
             global_state_hash_v2_enabled_config: self.global_state_hash_v2_enabled_config,
+            custom_distribution_schedule: self.custom_distribution_schedule,
             #[cfg(msim)]
             execution_time_observer_config: self.execution_time_observer_config,
         }
@@ -413,7 +421,10 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
 
         let (account_keys, allocations) = genesis_config.generate_accounts(&mut rng).unwrap();
 
-        let token_distribution_schedule = {
+        let token_distribution_schedule = 
+        if let Some(schedule) = self.custom_distribution_schedule {
+            schedule
+        } else {            
             let mut builder = TokenDistributionScheduleBuilder::new();
             for allocation in allocations {
                 builder.add_allocation(allocation);

@@ -1422,10 +1422,6 @@ impl SuiClientCommands {
             SuiClientCommands::Faucet { address, url } => {
                 let address = get_identity_address(address, context)?;
                 let url = if let Some(url) = url {
-                    ensure!(
-                        !url.starts_with("https://faucet-testnet.onelabs.cc"),
-                        "For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas"
-                    );
                     url
                 } else {
                     let active_env = context.get_active_env();
@@ -1433,9 +1429,7 @@ impl SuiClientCommands {
                     if let Ok(env) = active_env {
                         let network = match env.rpc.as_str() {
                             SUI_DEVNET_URL => "https://faucet-devnet.onelabs.cc/v1/gas",
-                            SUI_TESTNET_URL => {
-                                bail!("For testnet tokens, please use the Web UI: https://faucet-devnet.onelabs.cc/v1/gas");
-                            }
+                            SUI_TESTNET_URL => "https://faucet-testnet.onelabs.cc/v1/gas",
                             SUI_LOCAL_NETWORK_URL | SUI_LOCAL_NETWORK_URL_0 => "http://127.0.0.1:9123/gas",
                             _ => bail!("Cannot recognize the active network. Please provide the gas faucet full URL."),
                         };
@@ -1954,7 +1948,7 @@ impl Display for SuiClientCommandResult {
                 }
 
                 let mut builder = TableBuilder::default();
-                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "suiBalance (SUI)"]);
+                builder.set_header(vec!["gasCoinId", "mistBalance (MIST)", "Balance (OCT)"]);
                 for coin in &gas_coins {
                     builder.push_record(vec![
                         coin.gas_coin_id.to_string(),
