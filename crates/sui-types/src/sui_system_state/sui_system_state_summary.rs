@@ -14,7 +14,7 @@ use crate::{
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     crypto::NetworkPublicKey,
     dynamic_field::get_dynamic_field_from_store,
-    error::{SuiError, SuiErrorKind},
+    error::SuiError,
     id::ID,
     multiaddr::Multiaddr,
     storage::ObjectStore,
@@ -468,7 +468,7 @@ where
     let candidate_address: SuiAddress =
         get_dynamic_field_from_store(&object_store, system_state_summary.staking_pool_mappings_id, &ID::new(pool_id))
             .map_err(|err| {
-                SuiErrorKind::SuiSystemStateReadError(format!(
+                SuiError::SuiSystemStateReadError(format!(
                     "Failed to load candidate address from pool mappings: {:?}",
                     err
                 ))
