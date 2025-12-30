@@ -5,6 +5,7 @@
 use core::default::Default;
 
 use fastcrypto::{hash::MultisetHash, traits::KeyPair};
+use sui_protocol_config::Chain;
 use sui_types::{
     crypto::{AccountKeyPair, AuthorityKeyPair},
     messages_consensus::ConsensusTransaction,
@@ -12,7 +13,11 @@ use sui_types::{
 };
 
 use super::{test_authority_builder::TestAuthorityBuilder, *};
-use crate::{checkpoints::CheckpointServiceNoop, consensus_handler::SequencedConsensusTransaction};
+use crate::{
+    checkpoints::CheckpointServiceNoop,
+    consensus_handler::SequencedConsensusTransaction,
+    execution_scheduler::ExecutionSchedulerAPI,
+};
 
 pub async fn send_and_confirm_transaction(
     authority: &AuthorityState,
@@ -71,7 +76,7 @@ pub async fn execute_certificate_with_execution_error(
     // for testing and regression detection.
     // We must do this before sending to consensus, otherwise consensus may already
     // lead to transaction execution and state change.
-    let state_acc = StateAccumulator::new_for_tests(authority.get_accumulator_store().clone());
+    let state_acc = GlobalStateHasher::new_for_tests(authority.get_global_state_hash_store().clone());
     let include_wrapped_tombstone =
         !authority.epoch_store_for_testing().protocol_config().simplified_unwrap_then_delete();
     let mut state = state_acc.accumulate_cached_live_object_set_for_testing(include_wrapped_tombstone);
@@ -132,7 +137,14 @@ pub async fn init_state_validator_with_fullnode() -> (Arc<AuthorityState>, Arc<A
 }
 
 pub async fn init_state_with_committee(genesis: &Genesis, authority_key: &AuthorityKeyPair) -> Arc<AuthorityState> {
-    TestAuthorityBuilder::new().with_genesis_and_keypair(genesis, authority_key).build().await
+    let mut protocol_config = ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
+    protocol_config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
+
+    TestAuthorityBuilder::new()
+        .with_genesis_and_keypair(genesis, authority_key)
+        .with_protocol_config(protocol_config)
+        .build()
+        .await
 }
 
 pub async fn init_state_with_ids<I: IntoIterator<Item = (SuiAddress, ObjectID)>>(objects: I) -> Arc<AuthorityState> {
@@ -305,7 +317,7 @@ pub async fn send_consensus(authority: &AuthorityState, cert: &VerifiedCertifica
         .await
         .unwrap();
 
-    authority.transaction_manager().enqueue(certs, &authority.epoch_store_for_testing());
+    authority.execution_scheduler().enqueue(certs, &authority.epoch_store_for_testing());
 }
 
 pub async fn send_consensus_no_execution(authority: &AuthorityState, cert: &VerifiedCertificate) {

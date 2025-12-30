@@ -7,11 +7,11 @@ use fastcrypto::hash::MultisetHash;
 use futures::future::AbortHandle;
 use indicatif::MultiProgress;
 use sui_config::object_storage_config::{ObjectStoreConfig, ObjectStoreType};
-use sui_core::{authority::authority_store_tables::AuthorityPerpetualTables, state_accumulator::StateAccumulator};
+use sui_core::{authority::authority_store_tables::AuthorityPerpetualTables, global_state_hasher::GlobalStateHasher};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
-    accumulator::Accumulator,
     base_types::ObjectID,
+    global_state_hash::GlobalStateHash,
     messages_checkpoint::ECMHLiveObjectSetDigest,
     object::Object,
 };
@@ -20,7 +20,7 @@ use tempfile::tempdir;
 use crate::{reader::StateSnapshotReaderV1, writer::StateSnapshotWriterV1, FileCompression};
 
 fn temp_dir() -> std::path::PathBuf {
-    tempdir().expect("Failed to open temporary directory").into_path()
+    tempdir().expect("Failed to open temporary directory").keep()
 }
 
 pub fn insert_keys(db: &AuthorityPerpetualTables, total_unique_object_ids: u64) -> Result<(), anyhow::Error> {
@@ -49,10 +49,13 @@ fn compare_live_objects(
     Ok(())
 }
 
-fn accumulate_live_object_set(perpetual_db: &AuthorityPerpetualTables, include_wrapped_tombstone: bool) -> Accumulator {
-    let mut acc = Accumulator::default();
+fn accumulate_live_object_set(
+    perpetual_db: &AuthorityPerpetualTables,
+    include_wrapped_tombstone: bool,
+) -> GlobalStateHash {
+    let mut acc = GlobalStateHash::default();
     perpetual_db.iter_live_object_set(include_wrapped_tombstone).for_each(|live_object| {
-        StateAccumulator::accumulate_live_object(&mut acc, &live_object);
+        GlobalStateHasher::accumulate_live_object(&mut acc, &live_object);
     });
     acc
 }

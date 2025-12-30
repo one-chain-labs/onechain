@@ -8,12 +8,12 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{IDOperation, ObjectChange};
+use super::{object_change::AccumulatorWriteV1, IDOperation, ObjectChange};
 use crate::{
     base_types::{random_object_ref, EpochId, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
     digests::{ObjectDigest, TransactionEventsDigest},
     effects::{InputSharedObject, TransactionEffectsAPI, UnchangedSharedKind},
-    execution_status::ExecutionStatus,
+    execution_status::{ExecutionFailureStatus, ExecutionStatus, MoveLocation},
     gas::GasCostSummary,
     object::Owner,
 };
@@ -151,6 +151,15 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             .collect()
     }
 
+    fn move_abort(&self) -> Option<(MoveLocation, u64)> {
+        let ExecutionStatus::Failure { error: ExecutionFailureStatus::MoveAbort(move_location, code), .. } =
+            self.status()
+        else {
+            return None;
+        };
+        Some((move_location.clone(), *code))
+    }
+
     fn lamport_version(&self) -> SequenceNumber {
         SequenceNumber::lamport_increment(self.modified_at_versions.iter().map(|(_, v)| *v))
     }
@@ -197,6 +206,21 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
 
     fn wrapped(&self) -> Vec<ObjectRef> {
         self.wrapped.clone()
+    }
+
+    fn transferred_from_consensus(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
+    }
+
+    fn transferred_to_consensus(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
+    }
+
+    fn consensus_owner_changed(&self) -> Vec<ObjectRef> {
+        // Transferrable consensus objects cannot exist with effects v1
+        vec![]
     }
 
     fn object_changes(&self) -> Vec<ObjectChange> {
@@ -290,6 +314,10 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             .collect()
     }
 
+    fn accumulator_updates(&self) -> Vec<(ObjectID, AccumulatorWriteV1)> {
+        vec![]
+    }
+
     fn status_mut_for_testing(&mut self) -> &mut ExecutionStatus {
         &mut self.status
     }
@@ -315,7 +343,8 @@ impl TransactionEffectsAPI for TransactionEffectsV1 {
             InputSharedObject::ReadOnly(obj_ref) => {
                 self.shared_objects.push(obj_ref);
             }
-            InputSharedObject::ReadDeleted(id, version) | InputSharedObject::MutateDeleted(id, version) => {
+            InputSharedObject::ReadConsensusStreamEnded(id, version)
+            | InputSharedObject::MutateConsensusStreamEnded(id, version) => {
                 self.shared_objects.push((id, version, ObjectDigest::OBJECT_DIGEST_DELETED));
             }
             InputSharedObject::Cancelled(..) => {

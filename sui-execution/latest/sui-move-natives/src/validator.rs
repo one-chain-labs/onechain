@@ -32,7 +32,7 @@ pub fn validate_metadata_bcs(
     debug_assert!(args.len() == 1);
 
     let validator_validate_metadata_bcs_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().validator_validate_metadata_bcs_cost_params.clone();
+        context.extensions_mut().get::<NativesCostTable>()?.validator_validate_metadata_bcs_cost_params.clone();
 
     native_charge_gas_early_exit!(
         context,

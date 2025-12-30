@@ -4,7 +4,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use futures::{stream::FuturesUnordered, StreamExt};
-use sui_pg_db::Db;
 use tokio::{
     sync::Semaphore,
     task::JoinHandle,
@@ -16,8 +15,8 @@ use tracing::{debug, error, info, warn};
 use super::{Handler, PrunerConfig};
 use crate::{
     metrics::IndexerMetrics,
-    models::watermarks::PrunerWatermark,
     pipeline::logging::{LoggerWatermark, WatermarkLogger},
+    store::{Connection, Store},
 };
 
 #[derive(Default)]
@@ -92,7 +91,7 @@ impl PendingRanges {
 pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
     handler: Arc<H>,
     config: Option<PrunerConfig>,
-    db: Db,
+    store: H::Store,
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {
@@ -133,12 +132,12 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
                         .with_label_values(&[H::NAME])
                         .start_timer();
 
-                    let Ok(mut conn) = db.connect().await else {
+                    let Ok(mut conn) = store.connect().await else {
                         warn!(pipeline = H::NAME, "Pruner failed to connect, while fetching watermark");
                         continue;
                     };
 
-                    match PrunerWatermark::get(&mut conn, H::NAME, config.delay()).await {
+                    match conn.pruner_watermark(H::NAME, config.delay()).await {
                         Ok(Some(current)) => {
                             guard.stop_and_record();
                             current
@@ -171,10 +170,11 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
                 }
             }
 
-            // Keep a copy of the watermark for the db_watermark.
-            // This is because we can only advance db_watermark when all checkpoints
-            // up to it have been pruned.
-            let mut db_watermark = watermark.clone();
+            // Tracks the current highest `pruner_hi` not yet written to db. This is updated as
+            // chunks complete.
+            let mut highest_pruned = watermark.pruner_hi;
+            // Tracks the `pruner_hi` that has been written to the db.
+            let mut highest_watermarked = watermark.pruner_hi;
 
             // (3) Collect all the new chunks that are ready to be pruned.
             // This will also advance the watermark.
@@ -192,9 +192,10 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
             for (from, to_exclusive) in pending_prune_ranges.iter() {
                 let semaphore = semaphore.clone();
                 let cancel = cancel.child_token();
-                let db = db.clone();
                 let metrics = metrics.clone();
                 let handler = handler.clone();
+
+                let db = store.clone();
 
                 tasks.push(tokio::spawn(async move {
                     let _permit = tokio::select! {
@@ -210,9 +211,6 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
                 }));
             }
 
-            // Track highest successful prune
-            let mut highest_pruned = db_watermark.pruner_hi;
-
             // (4) Wait for all tasks to finish. For each task, if it succeeds, remove the range
             // from the pending_prune_ranges. Otherwise the range will remain in the map and will be
             // retried in the next iteration. Update the highest_pruned watermark if the task
@@ -223,7 +221,7 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
                 match result {
                     Ok(()) => {
                         pending_prune_ranges.remove(&from);
-                        let pruner_hi = pending_prune_ranges.get_pruner_hi() as i64;
+                        let pruner_hi = pending_prune_ranges.get_pruner_hi();
                         highest_pruned = highest_pruned.max(pruner_hi);
                     }
                     Err(e) => {
@@ -231,18 +229,17 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
                     }
                 }
 
-                if highest_pruned > db_watermark.pruner_hi {
-                    metrics.watermark_pruner_hi.with_label_values(&[H::NAME]).set(highest_pruned);
+                if highest_pruned > highest_watermarked {
+                    metrics.watermark_pruner_hi.with_label_values(&[H::NAME]).set(highest_pruned as i64);
 
                     let guard = metrics.watermark_pruner_write_latency.with_label_values(&[H::NAME]).start_timer();
 
-                    let Ok(mut conn) = db.connect().await else {
-                        warn!(pipeline = H::NAME, "Pruner failed to connect, while updating watermark");
+                    let Ok(mut conn) = store.connect().await else {
+                        warn!(pipeline = H::NAME, "Pruner failed to connect while updating watermark");
                         continue;
                     };
 
-                    db_watermark.pruner_hi = highest_pruned;
-                    match db_watermark.update(&mut conn).await {
+                    match conn.set_pruner_watermark(H::NAME, highest_pruned).await {
                         Err(e) => {
                             let elapsed = guard.stop_and_record();
                             error!(
@@ -252,10 +249,14 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
                             )
                         }
                         Ok(true) => {
+                            highest_watermarked = highest_pruned;
                             let elapsed = guard.stop_and_record();
-                            logger.log::<H>(&db_watermark, elapsed);
+                            logger.log::<H>(LoggerWatermark::checkpoint(highest_watermarked), elapsed);
 
-                            metrics.watermark_pruner_hi_in_db.with_label_values(&[H::NAME]).set(db_watermark.pruner_hi);
+                            metrics
+                                .watermark_pruner_hi_in_db
+                                .with_label_values(&[H::NAME])
+                                .set(highest_watermarked as i64);
                         }
                         Ok(false) => {}
                     }
@@ -269,7 +270,7 @@ pub(super) fn pruner<H: Handler + Send + Sync + 'static>(
 
 async fn prune_task_impl<H: Handler + Send + Sync + 'static>(
     metrics: Arc<IndexerMetrics>,
-    db: Db,
+    db: H::Store,
     handler: Arc<H>,
     from: u64,
     to_exclusive: u64,
@@ -299,4 +300,277 @@ async fn prune_task_impl<H: Handler + Send + Sync + 'static>(
     metrics.total_pruner_rows_deleted.with_label_values(&[H::NAME]).inc_by(affected as u64);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    };
+
+    use async_trait::async_trait;
+    use prometheus::Registry;
+    use sui_indexer_alt_framework_store_traits::{CommitterWatermark, PrunerWatermark, ReaderWatermark, Store};
+    use sui_types::full_checkpoint_content::CheckpointData;
+
+    use super::*;
+    use crate::{pipeline::Processor, store::Connection, FieldCount};
+
+    #[derive(Clone, Default)]
+    pub struct MockWatermark {
+        epoch_hi_inclusive: u64,
+        checkpoint_hi_inclusive: u64,
+        tx_hi: u64,
+        timestamp_ms_hi_inclusive: u64,
+        reader_lo: u64,
+        pruner_timestamp: u64,
+        pruner_hi: u64,
+    }
+
+    #[derive(Clone)]
+    pub struct MockStore {
+        pub watermarks: Arc<Mutex<MockWatermark>>,
+        /// Map of checkpoint sequence number to list of transaction sequence numbers.
+        pub data: Arc<Mutex<HashMap<u64, Vec<u64>>>>,
+    }
+
+    #[derive(Clone)]
+    pub struct MockConnection<'c>(pub &'c MockStore);
+
+    #[async_trait]
+    impl Connection for MockConnection<'_> {
+        async fn committer_watermark(
+            &mut self,
+            _pipeline: &'static str,
+        ) -> Result<Option<CommitterWatermark>, anyhow::Error> {
+            let watermarks = self.0.watermarks.lock().unwrap();
+            Ok(Some(CommitterWatermark {
+                epoch_hi_inclusive: watermarks.epoch_hi_inclusive,
+                checkpoint_hi_inclusive: watermarks.checkpoint_hi_inclusive,
+                tx_hi: watermarks.tx_hi,
+                timestamp_ms_hi_inclusive: watermarks.timestamp_ms_hi_inclusive,
+            }))
+        }
+
+        async fn reader_watermark(&mut self, _pipeline: &'static str) -> Result<Option<ReaderWatermark>, anyhow::Error> {
+            let watermarks = self.0.watermarks.lock().unwrap();
+            Ok(Some(ReaderWatermark {
+                checkpoint_hi_inclusive: watermarks.checkpoint_hi_inclusive,
+                reader_lo: watermarks.reader_lo,
+            }))
+        }
+
+        async fn pruner_watermark(
+            &mut self,
+            _pipeline: &'static str,
+            delay: Duration,
+        ) -> Result<Option<PrunerWatermark>, anyhow::Error> {
+            let watermarks = self.0.watermarks.lock().unwrap();
+            let elapsed_ms = watermarks.pruner_timestamp as i64
+                - SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+            let wait_for_ms = delay.as_millis() as i64 + elapsed_ms;
+            Ok(Some(PrunerWatermark { pruner_hi: watermarks.pruner_hi, reader_lo: watermarks.reader_lo, wait_for_ms }))
+        }
+
+        async fn set_committer_watermark(
+            &mut self,
+            _pipeline: &'static str,
+            watermark: CommitterWatermark,
+        ) -> anyhow::Result<bool> {
+            let mut watermarks = self.0.watermarks.lock().unwrap();
+            watermarks.epoch_hi_inclusive = watermark.epoch_hi_inclusive;
+            watermarks.checkpoint_hi_inclusive = watermark.checkpoint_hi_inclusive;
+            watermarks.tx_hi = watermark.tx_hi;
+            watermarks.timestamp_ms_hi_inclusive = watermark.timestamp_ms_hi_inclusive;
+            Ok(true)
+        }
+
+        async fn set_reader_watermark(&mut self, _pipeline: &'static str, reader_lo: u64) -> anyhow::Result<bool> {
+            let mut watermarks = self.0.watermarks.lock().unwrap();
+            watermarks.reader_lo = reader_lo;
+            watermarks.pruner_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+            Ok(true)
+        }
+
+        async fn set_pruner_watermark(&mut self, _pipeline: &'static str, pruner_hi: u64) -> anyhow::Result<bool> {
+            let mut watermarks = self.0.watermarks.lock().unwrap();
+            watermarks.pruner_hi = pruner_hi;
+            Ok(true)
+        }
+    }
+
+    #[async_trait]
+    impl Store for MockStore {
+        type Connection<'c> = MockConnection<'c>;
+
+        async fn connect<'c>(&'c self) -> Result<Self::Connection<'c>, anyhow::Error> {
+            Ok(MockConnection(self))
+        }
+    }
+
+    #[derive(FieldCount)]
+    pub struct StoredData {
+        pub cp_sequence_number: u64,
+        pub tx_sequence_numbers: Vec<u64>,
+    }
+
+    pub struct DataPipeline;
+
+    impl Processor for DataPipeline {
+        type Value = StoredData;
+
+        const NAME: &'static str = "data";
+
+        fn process(&self, checkpoint: &Arc<CheckpointData>) -> anyhow::Result<Vec<Self::Value>> {
+            let start_tx =
+                checkpoint.checkpoint_summary.network_total_transactions as usize - checkpoint.transactions.len();
+            let tx_sequence_numbers =
+                checkpoint.transactions.iter().enumerate().map(|(i, _)| (start_tx + i) as u64).collect();
+            let value =
+                StoredData { cp_sequence_number: checkpoint.checkpoint_summary.sequence_number, tx_sequence_numbers };
+
+            Ok(vec![value])
+        }
+    }
+
+    #[async_trait]
+    impl Handler for DataPipeline {
+        type Store = MockStore;
+
+        async fn commit<'a>(values: &[Self::Value], conn: &mut MockConnection<'a>) -> anyhow::Result<usize> {
+            let mut data = conn.0.data.lock().unwrap();
+            for value in values {
+                data.insert(value.cp_sequence_number, value.tx_sequence_numbers.clone());
+            }
+            Ok(values.len())
+        }
+
+        async fn prune<'a>(&self, from: u64, to_exclusive: u64, conn: &mut MockConnection<'a>) -> anyhow::Result<usize> {
+            let mut data = conn.0.data.lock().unwrap();
+            for cp_sequence_number in from .. to_exclusive {
+                data.remove(&cp_sequence_number);
+            }
+            Ok((to_exclusive - from) as usize)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pruner() {
+        let handler = Arc::new(DataPipeline);
+        let pruner_config =
+            PrunerConfig { interval_ms: 10, delay_ms: 2000, retention: 1, max_chunk_size: 100, prune_concurrency: 1 };
+        let registry = Registry::new_custom(Some("test".to_string()), None).unwrap();
+        let metrics = IndexerMetrics::new(&registry);
+        let cancel = CancellationToken::new();
+
+        // Update data
+        let test_data = HashMap::from([(1, vec![1, 2, 3]), (2, vec![4, 5, 6]), (3, vec![7, 8, 9])]);
+        // Update committer watermark
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+
+        let watermark = MockWatermark {
+            epoch_hi_inclusive: 0,
+            checkpoint_hi_inclusive: 3,
+            tx_hi: 9,
+            timestamp_ms_hi_inclusive: timestamp,
+            reader_lo: 3,
+            pruner_timestamp: timestamp,
+            pruner_hi: 0,
+        };
+        let store =
+            MockStore { watermarks: Arc::new(Mutex::new(watermark)), data: Arc::new(Mutex::new(test_data.clone())) };
+
+        // Start the pruner
+        let store_clone = store.clone();
+        let cancel_clone = cancel.clone();
+        let pruner_handle =
+            tokio::spawn(async move { pruner(handler, Some(pruner_config), store_clone, metrics, cancel_clone).await });
+
+        // Wait a short time within delay_ms
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        {
+            let data = store.data.lock().unwrap();
+            assert!(data.contains_key(&1), "Checkpoint 1 shouldn't be pruned before delay");
+            assert!(data.contains_key(&2), "Checkpoint 2 shouldn't be pruned before delay");
+            assert!(data.contains_key(&3), "Checkpoint 3 shouldn't be pruned before delay");
+        }
+
+        // Wait for the delay to expire
+        tokio::time::sleep(Duration::from_millis(2000)).await;
+
+        // Now checkpoint 1 should be pruned
+        {
+            let data = store.data.lock().unwrap();
+            assert!(!data.contains_key(&1), "Checkpoint 1 should be pruned after delay");
+
+            // Checkpoint 3 should never be pruned (it's the reader_lo)
+            assert!(data.contains_key(&3), "Checkpoint 3 should be preserved");
+
+            // Check that the pruner_hi was updated past 1
+            let watermark = store.watermarks.lock().unwrap();
+            assert!(watermark.pruner_hi > 1, "Pruner watermark should be updated");
+        }
+
+        // Clean up
+        cancel.cancel();
+        let _ = tokio::time::timeout(Duration::from_millis(1000), pruner_handle).await;
+    }
+
+    #[tokio::test]
+    async fn test_pruner_timestamp_in_the_past() {
+        let handler = Arc::new(DataPipeline);
+        let pruner_config =
+            PrunerConfig { interval_ms: 10, delay_ms: 20_000, retention: 1, max_chunk_size: 100, prune_concurrency: 1 };
+        let registry = Registry::new_custom(Some("test".to_string()), None).unwrap();
+        let metrics = IndexerMetrics::new(&registry);
+        let cancel = CancellationToken::new();
+
+        // Update data
+        let test_data = HashMap::from([(1, vec![1, 2, 3]), (2, vec![4, 5, 6]), (3, vec![7, 8, 9])]);
+        // Update committer watermark
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+
+        let watermark = MockWatermark {
+            epoch_hi_inclusive: 0,
+            checkpoint_hi_inclusive: 3,
+            tx_hi: 9,
+            timestamp_ms_hi_inclusive: timestamp,
+            reader_lo: 3,
+            pruner_timestamp: 0,
+            pruner_hi: 0,
+        };
+        let store =
+            MockStore { watermarks: Arc::new(Mutex::new(watermark)), data: Arc::new(Mutex::new(test_data.clone())) };
+
+        // Start the pruner
+        let store_clone = store.clone();
+        let cancel_clone = cancel.clone();
+        let pruner_handle =
+            tokio::spawn(async move { pruner(handler, Some(pruner_config), store_clone, metrics, cancel_clone).await });
+
+        // Because the `pruner_timestamp` is in the past, even with the delay_ms it should be pruned
+        // close to immediately. To be safe, sleep for 1000ms before checking, which is well under
+        // the delay_ms of 20_000 ms.
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        {
+            let data = store.data.lock().unwrap();
+            assert!(!data.contains_key(&1), "Checkpoint 1 should be pruned");
+
+            assert!(!data.contains_key(&2), "Checkpoint 2 should be pruned");
+
+            // Checkpoint 3 should never be pruned (it's the reader_lo)
+            assert!(data.contains_key(&3), "Checkpoint 3 should be preserved");
+
+            // Check that the pruner_hi was updated past 1
+            let watermark = store.watermarks.lock().unwrap();
+            assert!(watermark.pruner_hi > 1, "Pruner watermark should be updated");
+        }
+
+        // Clean up
+        cancel.cancel();
+        let _ = tokio::time::timeout(Duration::from_millis(1000), pruner_handle).await;
+    }
 }

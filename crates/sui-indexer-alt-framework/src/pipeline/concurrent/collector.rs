@@ -194,14 +194,17 @@ pub(super) fn collector<H: Handler + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use sui_field_count::FieldCount;
-    use sui_pg_db as db;
-    use sui_types::full_checkpoint_content::CheckpointData;
+    use std::time::Duration;
+
+    use sui_pg_db::{Connection, Db};
+    use tokio::sync::mpsc;
 
     use super::*;
     use crate::{
         metrics::tests::test_metrics,
         pipeline::{concurrent::max_chunk_rows, Processor},
+        types::full_checkpoint_content::CheckpointData,
+        FieldCount,
     };
 
     #[derive(Clone)]
@@ -211,10 +214,6 @@ mod tests {
         // Fake a large number of fields to test max_chunk_rows.
         const FIELD_COUNT: usize = 32;
     }
-
-    use std::time::Duration;
-
-    use tokio::sync::mpsc;
 
     struct TestHandler;
     impl Processor for TestHandler {
@@ -230,9 +229,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Handler for TestHandler {
+        type Store = Db;
+
         const MAX_PENDING_ROWS: usize = 10000;
 
-        async fn commit(_values: &[Self::Value], _conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
+        async fn commit<'a>(_values: &[Self::Value], _conn: &mut Connection<'a>) -> anyhow::Result<usize> {
             tokio::time::sleep(Duration::from_millis(1000)).await;
             Ok(0)
         }

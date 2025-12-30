@@ -581,7 +581,7 @@ async fn get_object_arg(read_api: &ReadApi, id: ObjectID, is_mutable_ref: bool) 
     let owner = obj.owner.clone();
     Ok(match owner {
         Owner::Shared { initial_shared_version }
-        | Owner::ConsensusV2 { start_version: initial_shared_version, authenticator: _ } => {
+        | Owner::ConsensusAddressOwner { start_version: initial_shared_version, .. } => {
             ObjectArg::SharedObject { id, initial_shared_version, mutable: is_mutable_ref }
         }
         Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => ObjectArg::ImmOrOwnedObject(obj_ref),

@@ -4,7 +4,6 @@
 use std::{sync::Arc, time::Duration};
 
 use backoff::ExponentialBackoff;
-use sui_pg_db::Db;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
@@ -14,6 +13,7 @@ use super::{BatchedRows, Handler};
 use crate::{
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
     pipeline::{Break, CommitterConfig, WatermarkPart},
+    store::Store,
     task::TrySpawnStreamExt,
 };
 
@@ -38,7 +38,7 @@ pub(super) fn committer<H: Handler + 'static>(
     skip_watermark: bool,
     rx: mpsc::Receiver<BatchedRows<H>>,
     tx: mpsc::Sender<Vec<WatermarkPart>>,
-    db: Db,
+    db: H::Store,
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {

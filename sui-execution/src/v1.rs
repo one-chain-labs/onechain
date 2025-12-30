@@ -167,10 +167,12 @@ impl executor::Executor for Executor {
             transaction_digest,
             &epoch_id,
             epoch_timestamp_ms,
-            // genesis transaction: RGP: 1, sponsor: None
+            // genesis transaction: RGP: 1, budget: 1M, sponsor: None
             // Those values are unused anyway in execution versions before 3 (or latest)
             1,
+            1_000_000,
             None,
+            protocol_config,
         );
         execute_genesis_state_update(store, protocol_config, metrics, &self.0, tx_context, input_objects, pt)
     }

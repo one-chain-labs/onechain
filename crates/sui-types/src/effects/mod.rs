@@ -3,15 +3,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use effects_v1::TransactionEffectsV1;
+pub use effects_v1::TransactionEffectsV1;
 pub use effects_v2::UnchangedSharedKind;
 use enum_dispatch::enum_dispatch;
-pub use object_change::{EffectsObjectChange, ObjectIn, ObjectOut};
+use object_change::AccumulatorWriteV1;
+pub use object_change::{AccumulatorOperation, AccumulatorValue, EffectsObjectChange, ObjectIn, ObjectOut};
 use serde::{Deserialize, Serialize};
 use shared_crypto::intent::{Intent, IntentScope};
 pub use test_effects_builder::TestEffectsBuilder;
 
-use self::effects_v2::TransactionEffectsV2;
+pub use self::effects_v2::TransactionEffectsV2;
 use crate::{
     base_types::{ExecutionDigests, ObjectID, ObjectRef, SequenceNumber},
     committee::{Committee, EpochId},
@@ -20,7 +21,7 @@ use crate::{
     error::SuiResult,
     event::Event,
     execution::SharedInput,
-    execution_status::ExecutionStatus,
+    execution_status::{ExecutionStatus, MoveLocation},
     gas::GasCostSummary,
     message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope},
     object::Owner,
@@ -253,21 +254,29 @@ impl TransactionEffects {
 pub enum InputSharedObject {
     Mutate(ObjectRef),
     ReadOnly(ObjectRef),
-    ReadDeleted(ObjectID, SequenceNumber),
-    MutateDeleted(ObjectID, SequenceNumber),
+    ReadConsensusStreamEnded(ObjectID, SequenceNumber),
+    MutateConsensusStreamEnded(ObjectID, SequenceNumber),
     Cancelled(ObjectID, SequenceNumber),
 }
 
 impl InputSharedObject {
     pub fn id_and_version(&self) -> (ObjectID, SequenceNumber) {
-        let oref = self.object_ref();
-        (oref.0, oref.1)
+        match self {
+            InputSharedObject::Mutate(oref) | InputSharedObject::ReadOnly(oref) => (oref.0, oref.1),
+            InputSharedObject::ReadConsensusStreamEnded(id, version)
+            | InputSharedObject::MutateConsensusStreamEnded(id, version) => (*id, *version),
+            InputSharedObject::Cancelled(id, version) => (*id, *version),
+        }
     }
 
+    // NOTE: When `ObjectDigest::OBJECT_DIGEST_DELETED` is returned, the object's consensus stream
+    // has ended, but it may not be deleted.
+    #[deprecated]
     pub fn object_ref(&self) -> ObjectRef {
         match self {
             InputSharedObject::Mutate(oref) | InputSharedObject::ReadOnly(oref) => *oref,
-            InputSharedObject::ReadDeleted(id, version) | InputSharedObject::MutateDeleted(id, version) => {
+            InputSharedObject::ReadConsensusStreamEnded(id, version)
+            | InputSharedObject::MutateConsensusStreamEnded(id, version) => {
                 (*id, *version, ObjectDigest::OBJECT_DIGEST_DELETED)
             }
             InputSharedObject::Cancelled(id, version) => (*id, *version, ObjectDigest::OBJECT_DIGEST_CANCELLED),
@@ -281,6 +290,7 @@ pub trait TransactionEffectsAPI {
     fn into_status(self) -> ExecutionStatus;
     fn executed_epoch(&self) -> EpochId;
     fn modified_at_versions(&self) -> Vec<(ObjectID, SequenceNumber)>;
+    fn move_abort(&self) -> Option<(MoveLocation, u64)>;
 
     /// The version assigned to all output objects (apart from packages).
     fn lamport_version(&self) -> SequenceNumber;
@@ -303,6 +313,9 @@ pub trait TransactionEffectsAPI {
     fn deleted(&self) -> Vec<ObjectRef>;
     fn unwrapped_then_deleted(&self) -> Vec<ObjectRef>;
     fn wrapped(&self) -> Vec<ObjectRef>;
+    fn transferred_from_consensus(&self) -> Vec<ObjectRef>;
+    fn transferred_to_consensus(&self) -> Vec<ObjectRef>;
+    fn consensus_owner_changed(&self) -> Vec<ObjectRef>;
 
     fn object_changes(&self) -> Vec<ObjectChange>;
 
@@ -318,14 +331,14 @@ pub trait TransactionEffectsAPI {
 
     fn gas_cost_summary(&self) -> &GasCostSummary;
 
-    fn deleted_mutably_accessed_shared_objects(&self) -> Vec<ObjectID> {
+    fn stream_ended_mutably_accessed_consensus_objects(&self) -> Vec<ObjectID> {
         self.input_shared_objects()
             .into_iter()
             .filter_map(|kind| match kind {
-                InputSharedObject::MutateDeleted(id, _) => Some(id),
+                InputSharedObject::MutateConsensusStreamEnded(id, _) => Some(id),
                 InputSharedObject::Mutate(..)
                 | InputSharedObject::ReadOnly(..)
-                | InputSharedObject::ReadDeleted(..)
+                | InputSharedObject::ReadConsensusStreamEnded(..)
                 | InputSharedObject::Cancelled(..) => None,
             })
             .collect()
@@ -333,6 +346,9 @@ pub trait TransactionEffectsAPI {
 
     /// Returns all root shared objects (i.e. not child object) that are read-only in the transaction.
     fn unchanged_shared_objects(&self) -> Vec<(ObjectID, UnchangedSharedKind)>;
+
+    /// Returns all accumulator updates in the transaction.
+    fn accumulator_updates(&self) -> Vec<(ObjectID, AccumulatorWriteV1)>;
 
     // All of these should be #[cfg(test)], but they are used by tests in other crates, and
     // dependencies don't get built with cfg(test) set as far as I can tell.

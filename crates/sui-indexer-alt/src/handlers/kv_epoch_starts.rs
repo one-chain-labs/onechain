@@ -7,16 +7,17 @@ use anyhow::{bail, Context, Result};
 use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
 use sui_indexer_alt_framework::{
-    models::cp_sequence_numbers::epoch_interval,
     pipeline::{concurrent::Handler, Processor},
+    postgres::{Connection, Db},
+    types::{
+        full_checkpoint_content::CheckpointData,
+        sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
+        transaction::{TransactionDataAPI, TransactionKind},
+    },
 };
 use sui_indexer_alt_schema::{epochs::StoredEpochStart, schema::kv_epoch_starts};
-use sui_pg_db as db;
-use sui_types::{
-    full_checkpoint_content::CheckpointData,
-    sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
-    transaction::{TransactionDataAPI, TransactionKind},
-};
+
+use crate::handlers::cp_sequence_numbers::epoch_interval;
 
 pub(crate) struct KvEpochStarts;
 
@@ -62,13 +63,15 @@ impl Processor for KvEpochStarts {
 
 #[async_trait::async_trait]
 impl Handler for KvEpochStarts {
+    type Store = Db;
+
     const MIN_EAGER_ROWS: usize = 1;
 
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn commit<'a>(values: &[Self::Value], conn: &mut Connection<'a>) -> Result<usize> {
         Ok(diesel::insert_into(kv_epoch_starts::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 
-    async fn prune(&self, from: u64, to_exclusive: u64, conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn prune<'a>(&self, from: u64, to_exclusive: u64, conn: &mut Connection<'a>) -> Result<usize> {
         let Range { start: from_epoch, end: to_epoch } = epoch_interval(conn, from .. to_exclusive).await?;
         if from_epoch < to_epoch {
             let filter =

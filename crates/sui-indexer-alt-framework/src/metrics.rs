@@ -49,7 +49,7 @@ const BATCH_SIZE_BUCKETS: &[f64] =
     &[1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0];
 
 #[derive(Clone)]
-pub(crate) struct IndexerMetrics {
+pub struct IndexerMetrics {
     // Statistics related to fetching data from the remote store.
     pub total_ingested_checkpoints: IntCounter,
     pub total_ingested_transactions: IntCounter,
@@ -151,7 +151,7 @@ pub(crate) struct CheckpointLagMetricReporter {
 }
 
 impl IndexerMetrics {
-    pub(crate) fn new(registry: &Registry) -> Arc<Self> {
+    pub fn new(registry: &Registry) -> Arc<Self> {
         Arc::new(Self {
             total_ingested_checkpoints: register_int_counter_with_registry!(
                 "indexer_total_ingested_checkpoints",
@@ -185,7 +185,8 @@ impl IndexerMetrics {
             .unwrap(),
             total_ingested_bytes: register_int_counter_with_registry!(
                 "indexer_total_ingested_bytes",
-                "Total number of bytes fetched from the remote store",
+                "Total number of bytes fetched from the remote store, this metric will not \
+                be updated when data are fetched over gRPC.",
                 registry,
             )
             .unwrap(),

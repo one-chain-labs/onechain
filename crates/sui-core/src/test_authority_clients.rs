@@ -15,6 +15,7 @@ use sui_types::{
     crypto::AuthorityKeyPair,
     effects::TransactionEffectsAPI,
     error::{SuiError, SuiResult},
+    executable_transaction::VerifiedExecutableTransaction,
     messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
     messages_grpc::{
         HandleCertificateRequestV3,
@@ -25,6 +26,10 @@ use sui_types::{
         HandleTransactionResponse,
         ObjectInfoRequest,
         ObjectInfoResponse,
+        RawSubmitTxRequest,
+        RawSubmitTxResponse,
+        RawWaitForEffectsRequest,
+        RawWaitForEffectsResponse,
         SystemStateRequest,
         TransactionInfoRequest,
         TransactionInfoResponse,
@@ -42,9 +47,12 @@ use crate::{
 pub struct LocalAuthorityClientFaultConfig {
     pub fail_before_handle_transaction: bool,
     pub fail_after_handle_transaction: bool,
+    pub fail_before_submit_transaction: bool,
+    pub fail_after_vote_transaction: bool,
     pub fail_before_handle_confirmation: bool,
     pub fail_after_handle_confirmation: bool,
     pub overload_retry_after_handle_transaction: Option<Duration>,
+    pub overload_retry_after_vote_transaction: Option<Duration>,
 }
 
 impl LocalAuthorityClientFaultConfig {
@@ -61,6 +69,112 @@ pub struct LocalAuthorityClient {
 
 #[async_trait]
 impl AuthorityAPI for LocalAuthorityClient {
+    async fn submit_transaction(
+        &self,
+        request: RawSubmitTxRequest,
+        _client_addr: Option<SocketAddr>,
+    ) -> Result<RawSubmitTxResponse, SuiError> {
+        if self.fault_config.fail_before_submit_transaction {
+            return Err(SuiError::from("Mock error before submit_transaction"));
+        }
+        let state = self.state.clone();
+        let epoch_store = self.state.load_epoch_store_one_call_per_task();
+        let deserialized_transaction = bcs::from_bytes::<Transaction>(&request.transaction)
+            .map_err(|e| SuiError::TransactionDeserializationError { error: e.to_string() })?;
+        let transaction = epoch_store
+            .verify_transaction(deserialized_transaction.clone())
+            .map(|_| VerifiedTransaction::new_from_verified(deserialized_transaction))?;
+        let tx_output = state.handle_vote_transaction(&epoch_store, transaction.clone())?;
+        if self.fault_config.fail_after_vote_transaction {
+            return Err(SuiError::GenericAuthorityError {
+                error: "Mock error after vote transaction in submit_transaction".to_owned(),
+            });
+        }
+        if let Some(duration) = self.fault_config.overload_retry_after_vote_transaction {
+            return Err(SuiError::ValidatorOverloadedRetryAfter { retry_after_secs: duration.as_secs() });
+        }
+
+        if let Some((effects, events)) = tx_output {
+            let input_objects = request
+                .include_input_objects
+                .then(|| state.get_transaction_input_objects(&effects))
+                .and_then(Result::ok);
+            let output_objects = request
+                .include_output_objects
+                .then(|| state.get_transaction_output_objects(&effects))
+                .and_then(Result::ok);
+
+            return Ok(RawSubmitTxResponse {
+                effects: bcs::to_bytes(&effects)
+                    .map_err(|e| SuiError::TransactionEffectsSerializationError { error: e.to_string() })?
+                    .into(),
+                events: request.include_events.then_some(
+                    bcs::to_bytes(&events)
+                        .map_err(|e| SuiError::TransactionEventsSerializationError { error: e.to_string() })?
+                        .into(),
+                ),
+                input_objects: input_objects
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|obj| {
+                        bcs::to_bytes(&obj).map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })
+                    })
+                    .collect::<Result<_, _>>()?,
+                output_objects: output_objects
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|obj| {
+                        bcs::to_bytes(&obj).map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() })
+                    })
+                    .collect::<Result<_, _>>()?,
+            });
+        }
+
+        let effects = self
+            .state
+            .wait_for_transaction_execution(
+                &VerifiedExecutableTransaction::new_from_consensus(transaction.clone(), epoch_store.epoch()),
+                &epoch_store,
+            )
+            .await?;
+        let events = (request.include_events && effects.events_digest().is_some())
+            .then(|| self.state.get_transaction_events(effects.transaction_digest()))
+            .transpose()?;
+
+        let input_objects = request
+            .include_input_objects
+            .then(|| self.state.get_transaction_input_objects(&effects))
+            .and_then(Result::ok);
+
+        let output_objects = request
+            .include_output_objects
+            .then(|| self.state.get_transaction_output_objects(&effects))
+            .and_then(Result::ok);
+
+        Ok::<_, SuiError>(RawSubmitTxResponse {
+            effects: bcs::to_bytes(&effects)
+                .map_err(|e| SuiError::TransactionEffectsSerializationError { error: e.to_string() })?
+                .into(),
+            events: events
+                .map(|e| {
+                    bcs::to_bytes(&e)
+                        .map(|v| v.into())
+                        .map_err(|e| SuiError::TransactionEventsSerializationError { error: e.to_string() })
+                })
+                .transpose()?,
+            input_objects: input_objects
+                .unwrap_or_default()
+                .into_iter()
+                .map(|obj| bcs::to_bytes(&obj).map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() }))
+                .collect::<Result<_, _>>()?,
+            output_objects: output_objects
+                .unwrap_or_default()
+                .into_iter()
+                .map(|obj| bcs::to_bytes(&obj).map_err(|e| SuiError::ObjectSerializationError { error: e.to_string() }))
+                .collect::<Result<_, _>>()?,
+        })
+    }
+
     async fn handle_transaction(
         &self,
         transaction: Transaction,
@@ -123,6 +237,14 @@ impl AuthorityAPI for LocalAuthorityClient {
         _request: HandleSoftBundleCertificatesRequestV3,
         _client_addr: Option<SocketAddr>,
     ) -> Result<HandleSoftBundleCertificatesResponseV3, SuiError> {
+        unimplemented!()
+    }
+
+    async fn wait_for_effects(
+        &self,
+        _request: RawWaitForEffectsRequest,
+        _client_addr: Option<SocketAddr>,
+    ) -> Result<RawWaitForEffectsResponse, SuiError> {
         unimplemented!()
     }
 
@@ -197,8 +319,8 @@ impl LocalAuthorityClient {
         .into_inner();
 
         let events = if request.include_events {
-            if let Some(digest) = signed_effects.events_digest() {
-                Some(state.get_transaction_events(digest)?)
+            if signed_effects.events_digest().is_some() {
+                Some(state.get_transaction_events(signed_effects.transaction_digest())?)
             } else {
                 None
             }
@@ -251,6 +373,15 @@ impl MockAuthorityApi {
 
 #[async_trait]
 impl AuthorityAPI for MockAuthorityApi {
+    /// Submit a new transaction to a Sui or Primary account.
+    async fn submit_transaction(
+        &self,
+        _request: RawSubmitTxRequest,
+        _client_addr: Option<SocketAddr>,
+    ) -> Result<RawSubmitTxResponse, SuiError> {
+        unimplemented!();
+    }
+
     /// Initiate a new transaction to a Sui or Primary account.
     async fn handle_transaction(
         &self,
@@ -282,6 +413,14 @@ impl AuthorityAPI for MockAuthorityApi {
         _request: HandleSoftBundleCertificatesRequestV3,
         _client_addr: Option<SocketAddr>,
     ) -> Result<HandleSoftBundleCertificatesResponseV3, SuiError> {
+        unimplemented!()
+    }
+
+    async fn wait_for_effects(
+        &self,
+        _request: RawWaitForEffectsRequest,
+        _client_addr: Option<SocketAddr>,
+    ) -> Result<RawWaitForEffectsResponse, SuiError> {
         unimplemented!()
     }
 
@@ -333,6 +472,14 @@ pub struct HandleTransactionTestAuthorityClient {
 
 #[async_trait]
 impl AuthorityAPI for HandleTransactionTestAuthorityClient {
+    async fn submit_transaction(
+        &self,
+        _request: RawSubmitTxRequest,
+        _client_addr: Option<SocketAddr>,
+    ) -> Result<RawSubmitTxResponse, SuiError> {
+        unimplemented!()
+    }
+
     async fn handle_transaction(
         &self,
         _transaction: Transaction,
@@ -368,6 +515,14 @@ impl AuthorityAPI for HandleTransactionTestAuthorityClient {
         _request: HandleSoftBundleCertificatesRequestV3,
         _client_addr: Option<SocketAddr>,
     ) -> Result<HandleSoftBundleCertificatesResponseV3, SuiError> {
+        unimplemented!()
+    }
+
+    async fn wait_for_effects(
+        &self,
+        _request: RawWaitForEffectsRequest,
+        _client_addr: Option<SocketAddr>,
+    ) -> Result<RawWaitForEffectsResponse, SuiError> {
         unimplemented!()
     }
 

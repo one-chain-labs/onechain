@@ -4,6 +4,27 @@ AccountAddress:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 32
+AccumulatorOperation:
+  ENUM:
+    0:
+      Merge: UNIT
+    1:
+      Split: UNIT
+AccumulatorValue:
+  ENUM:
+    0:
+      U64:
+        NEWTYPE: U64
+AccumulatorWriteV1:
+  STRUCT:
+    - recipient:
+        TYPENAME: SuiAddress
+    - accumulator_type:
+        TYPENAME: StructTag
+    - operation:
+        TYPENAME: AccumulatorOperation
+    - value:
+        TYPENAME: AccumulatorValue
 ActiveJwk:
   STRUCT:
     - jwk_id:
@@ -29,12 +50,6 @@ Argument:
         TUPLE:
           - U16
           - U16
-Authenticator:
-  ENUM:
-    0:
-      SingleOwner:
-        NEWTYPE:
-          TYPENAME: SuiAddress
 AuthenticatorStateExpire:
   STRUCT:
     - min_epoch: U64
@@ -242,6 +257,8 @@ CommandArgumentError:
       InvalidObjectByMutRef: UNIT
     11:
       SharedObjectOperationNotAllowed: UNIT
+    12:
+      InvalidArgumentArity: UNIT
 CompressedSignature:
   ENUM:
     0:
@@ -557,6 +574,16 @@ ExecutionFailureStatus:
           - coin_type: STR
     36:
       ExecutionCancelledDueToRandomnessUnavailable: UNIT
+    37:
+      MoveVectorElemTooBig:
+        STRUCT:
+          - value_size: U64
+          - max_scaled_size: U64
+    38:
+      MoveRawValueTooBig:
+        STRUCT:
+          - value_size: U64
+          - max_scaled_size: U64
 ExecutionStatus:
   ENUM:
     0:
@@ -817,6 +844,10 @@ ObjectOut:
           TUPLE:
             - TYPENAME: SequenceNumber
             - TYPENAME: ObjectDigest
+    3:
+      AccumulatorWriteV1:
+        NEWTYPE:
+          TYPENAME: AccumulatorWriteV1
 Owner:
   ENUM:
     0:
@@ -835,12 +866,12 @@ Owner:
     3:
       Immutable: UNIT
     4:
-      ConsensusV2:
+      ConsensusAddressOwner:
         STRUCT:
           - start_version:
               TYPENAME: SequenceNumber
-          - authenticator:
-              TYPENAME: Authenticator
+          - owner:
+              TYPENAME: SuiAddress
 PackageUpgradeError:
   ENUM:
     0:
@@ -1267,11 +1298,11 @@ UnchangedSharedKind:
             - TYPENAME: SequenceNumber
             - TYPENAME: ObjectDigest
     1:
-      MutateDeleted:
+      MutateConsensusStreamEnded:
         NEWTYPE:
           TYPENAME: SequenceNumber
     2:
-      ReadDeleted:
+      ReadConsensusStreamEnded:
         NEWTYPE:
           TYPENAME: SequenceNumber
     3:

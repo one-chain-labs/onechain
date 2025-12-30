@@ -82,7 +82,7 @@ pub fn ecrecover(
 
     // Load the cost parameters from the protocol config
     let (ecdsa_k1_ecrecover_cost_params, crypto_invalid_arguments_cost) = {
-        let cost_table = &context.extensions().get::<NativesCostTable>();
+        let cost_table = &context.extensions().get::<NativesCostTable>()?;
         (cost_table.ecdsa_k1_ecrecover_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
     let (base_cost, cost_per_byte, cost_per_block, block_size) = match hash {
@@ -153,7 +153,7 @@ pub fn decompress_pubkey(
 
     // Load the cost parameters from the protocol config
     let ecdsa_k1_decompress_pubkey_cost_params =
-        &context.extensions().get::<NativesCostTable>().ecdsa_k1_decompress_pubkey_cost_params.clone();
+        &context.extensions().get::<NativesCostTable>()?.ecdsa_k1_decompress_pubkey_cost_params.clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(context, ecdsa_k1_decompress_pubkey_cost_params.ecdsa_k1_decompress_pubkey_cost_base);
 
@@ -210,7 +210,7 @@ pub fn secp256k1_verify(
 
     // Load the cost parameters from the protocol config
     let (ecdsa_k1_secp256k1_verify_cost_params, crypto_invalid_arguments_cost) = {
-        let cost_table = &context.extensions().get::<NativesCostTable>();
+        let cost_table = &context.extensions().get::<NativesCostTable>()?;
         (cost_table.ecdsa_k1_secp256k1_verify_cost_params.clone(), cost_table.crypto_invalid_arguments_cost)
     };
 

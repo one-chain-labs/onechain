@@ -106,15 +106,13 @@ jobs:
         run: |
           mkdir -p ${{ env.TMP_BUILD_DIR }}
           aws s3 cp s3://sui-releases/releases/sui-${{ env.sui_tag }}-${os_type}.tgz ./tmp/sui-${{ env.sui_tag }}-${os_type}.tgz
-          tar -xf ./tmp/sui-${{ env.sui_tag }}-${os_type}.tgz -C ${{ env.TMP_BUILD_DIR }}
-
-      - name: Setup caching
-        if: ${{ env.s3_archive_exist == '' }}
-        uses: bmwill/rust-cache@v1 # Fork of 'Swatinem/rust-cache' which allows caching additional paths          
+          tar -xf ./tmp/sui-${{ env.sui_tag }}-${os_type}.tgz -C ${{ env.TMP_BUILD_DIR }}     
 
       - name: Install nexttest (Windows)
         if: ${{ matrix.os == 'windows-ghcloud' && env.s3_archive_exist == '' }}
-        uses: taiki-e/install-action@33022ba120c3f523d134bbbee12278fc11a3df1a # pin@nextest
+        uses: taiki-e/install-action@7bf3bbf3104a2e9a77906ccbdf6d4aa6a87b0210 # pin@2.52.5
+        with:
+          tool: cargo-hack
 
       - name: Install postgres (Windows)
         if: ${{ matrix.os == 'windows-ghcloud' && env.s3_archive_exist == '' }}
@@ -244,6 +242,7 @@ jobs:
 
   # Tag all sui images with release tag, so that they can be easily found
   tag-docker-hub-images:
+    name: Tag sui docker images in DockerHub
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch Tagging of images in DockerHub, in MystenLabs/sui-operations
@@ -253,3 +252,16 @@ jobs:
           token: ${{ secrets.DOCKER_BINARY_BUILDS_DISPATCH }}
           event-type: tag-docker-images
           client-payload: '{"sui_commit": "${{ github.sha }}", "repo_name": "all", "tag": "${{ env.TAG_NAME }}"}'
+
+  # Tag all sui images with release tag, so that they can be easily found
+  tag-release-binaries-in-s3:
+    name: Tag sui binaries in s3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Release binaries builds in MystenLabs/sui-operations
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # pin@v3.0.0
+        with:
+          repository: MystenLabs/sui-operations
+          token: ${{ secrets.DOCKER_BINARY_BUILDS_DISPATCH }}
+          event-type: build-release-binaries
+          client-payload: '{"sui_commit": "${{ github.sha }}", "tag_name": "${{ env.TAG_NAME }}"}'

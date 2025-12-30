@@ -112,16 +112,23 @@ impl MyEndpoint {
         });
 
         if disable_caching_resolver {
+            let mut http = HttpConnector::new();
+            http.enforce_http(false);
+            http.set_nodelay(true);
+            http.set_keepalive(None);
+            http.set_connect_timeout(None);
+
             if let Some(tls_config) = self.tls_config {
-                self.endpoint.connect_with_connector_lazy(
+                Channel::new(
                     hyper_rustls::HttpsConnectorBuilder::new()
                         .with_tls_config(tls_config)
                         .https_only()
                         .enable_http2()
-                        .build(),
+                        .wrap_connector(http),
+                    self.endpoint,
                 )
             } else {
-                self.endpoint.connect_lazy()
+                self.endpoint.connect_with_connector_lazy(http)
             }
         } else {
             let mut http = HttpConnector::new_with_resolver(CachingResolver::new());
@@ -134,9 +141,9 @@ impl MyEndpoint {
                 let https = hyper_rustls::HttpsConnectorBuilder::new()
                     .with_tls_config(tls_config)
                     .https_only()
-                    .enable_http1()
+                    .enable_http2()
                     .wrap_connector(http);
-                self.endpoint.connect_with_connector_lazy(https)
+                Channel::new(https, self.endpoint)
             } else {
                 self.endpoint.connect_with_connector_lazy(http)
             }
@@ -150,7 +157,7 @@ impl MyEndpoint {
                 .https_only()
                 .enable_http2()
                 .build();
-            self.endpoint.connect_with_connector(https_connector).await.map_err(Into::into)
+            Channel::connect(https_connector, self.endpoint).await.map_err(Into::into)
         } else {
             self.endpoint.connect().await.map_err(Into::into)
         }

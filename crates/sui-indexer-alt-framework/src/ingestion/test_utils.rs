@@ -3,7 +3,8 @@
 
 use rand::{prelude::StdRng, SeedableRng};
 use sui_storage::blob::{Blob, BlobEncoding};
-use sui_types::{
+
+use crate::types::{
     crypto::KeypairTraits,
     full_checkpoint_content::CheckpointData,
     gas::GasCostSummary,

@@ -3,7 +3,9 @@
 
 use std::{collections::HashSet, path::Path, sync::Arc};
 
+use either::Either;
 use futures::{future::BoxFuture, FutureExt};
+use itertools::Itertools;
 use mysten_common::fatal;
 use prometheus::Registry;
 use sui_config::ExecutionCacheConfig;
@@ -11,7 +13,7 @@ use sui_protocol_config::ProtocolVersion;
 use sui_types::{
     base_types::{EpochId, FullObjectID, ObjectID, ObjectRef, SequenceNumber, VerifiedExecutionData},
     bridge::Bridge,
-    digests::{TransactionDigest, TransactionEffectsDigest, TransactionEventsDigest},
+    digests::{TransactionDigest, TransactionEffectsDigest},
     effects::{TransactionEffects, TransactionEvents},
     error::{SuiError, SuiResult, UserInputError},
     executable_transaction::VerifiedExecutableTransaction,
@@ -34,6 +36,7 @@ use sui_types::{
     transaction::{VerifiedSignedTransaction, VerifiedTransaction},
 };
 use tracing::instrument;
+use typed_store::rocks::DBBatch;
 
 use crate::{
     authority::{
@@ -43,7 +46,7 @@ use crate::{
         epoch_start_configuration::{EpochFlag, EpochStartConfiguration},
         AuthorityStore,
     },
-    state_accumulator::AccumulatorStore,
+    global_state_hasher::GlobalStateHashStore,
     transaction_outputs::TransactionOutputs,
 };
 
@@ -68,7 +71,7 @@ pub struct ExecutionCacheTraitPointers {
     pub backing_package_store: Arc<dyn BackingPackageStore + Send + Sync>,
     pub object_store: Arc<dyn ObjectStore + Send + Sync>,
     pub reconfig_api: Arc<dyn ExecutionCacheReconfigAPI>,
-    pub accumulator_store: Arc<dyn AccumulatorStore>,
+    pub global_state_hash_store: Arc<dyn GlobalStateHashStore>,
     pub checkpoint_cache: Arc<dyn CheckpointCache>,
     pub state_sync_store: Arc<dyn StateSyncAPI>,
     pub cache_commit: Arc<dyn ExecutionCacheCommit>,
@@ -85,7 +88,7 @@ impl ExecutionCacheTraitPointers {
             + BackingPackageStore
             + ObjectStore
             + ExecutionCacheReconfigAPI
-            + AccumulatorStore
+            + GlobalStateHashStore
             + CheckpointCache
             + StateSyncAPI
             + ExecutionCacheCommit
@@ -100,7 +103,7 @@ impl ExecutionCacheTraitPointers {
             backing_package_store: cache.clone(),
             object_store: cache.clone(),
             reconfig_api: cache.clone(),
-            accumulator_store: cache.clone(),
+            global_state_hash_store: cache.clone(),
             checkpoint_cache: cache.clone(),
             state_sync_store: cache.clone(),
             cache_commit: cache.clone(),
@@ -141,17 +144,16 @@ pub fn build_execution_cache_from_env(
     )
 }
 
+pub type Batch = (Vec<Arc<TransactionOutputs>>, DBBatch);
+
 pub trait ExecutionCacheCommit: Send + Sync {
+    /// Build a DBBatch containing the given transaction outputs.
+    fn build_db_batch(&self, epoch: EpochId, digests: &[TransactionDigest]) -> Batch;
+
     /// Durably commit the outputs of the given transactions to the database.
     /// Will be called by CheckpointExecutor to ensure that transaction outputs are
     /// written durably before marking a checkpoint as finalized.
-    fn commit_transaction_outputs(
-        &self,
-        epoch: EpochId,
-        digests: &[TransactionDigest],
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
-    );
+    fn commit_transaction_outputs(&self, epoch: EpochId, batch: Batch, digests: &[TransactionDigest]);
 
     /// Durably commit a transaction to the database. Used to store any transactions
     /// that cannot be reconstructed at start-up by consensus replay. Currently the only
@@ -224,81 +226,69 @@ pub trait ObjectCacheRead: Send + Sync {
         Ok(result)
     }
 
-    /// Used by transaction manager to determine if input objects are ready. Distinct from multi_get_object_by_key
+    /// Used by execution scheduler to determine if input objects are ready. Distinct from multi_get_object_by_key
     /// because it also consults markers to handle the case where an object will never become available (e.g.
     /// because it has been received by some other transaction already).
     fn multi_input_objects_available(
         &self,
         keys: &[InputKey],
-        receiving_objects: HashSet<InputKey>,
-        epoch: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
+        receiving_objects: &HashSet<InputKey>,
+        epoch: &EpochId,
     ) -> Vec<bool> {
-        let (keys_with_version, keys_without_version): (Vec<_>, Vec<_>) =
-            keys.iter().enumerate().partition(|(_, key)| key.version().is_some());
+        let mut results = vec![false; keys.len()];
+        let non_canceled_keys = keys.iter().enumerate().filter(|(idx, key)| {
+            if key.is_cancelled() {
+                // Shared objects in canceled transactions are always available.
+                results[*idx] = true;
+                false
+            } else {
+                true
+            }
+        });
+        let (move_object_keys, package_object_keys): (Vec<_>, Vec<_>) =
+            non_canceled_keys.partition_map(|(idx, key)| match key {
+                InputKey::VersionedObject { id, version } => Either::Left((idx, (id, version))),
+                InputKey::Package { id } => Either::Right((idx, id)),
+            });
 
-        let mut versioned_results = vec![];
-        for ((idx, input_key), has_key) in keys_with_version.iter().zip(
+        for ((idx, (id, version)), has_key) in move_object_keys.iter().zip(
             self.multi_object_exists_by_key(
-                &keys_with_version.iter().map(|(_, k)| ObjectKey(k.id().id(), k.version().unwrap())).collect::<Vec<_>>(),
+                &move_object_keys.iter().map(|(_, k)| ObjectKey(k.0.id(), *k.1)).collect::<Vec<_>>(),
             )
             .into_iter(),
         ) {
-            assert!(
-                input_key.version().is_none() || input_key.version().unwrap().is_valid(),
-                "Shared objects in cancelled transaction should always be available immediately, 
-                 but it appears that transaction manager is waiting for {:?} to become available",
-                input_key
-            );
             // If the key exists at the specified version, then the object is available.
             if has_key {
-                versioned_results.push((*idx, true))
-            } else if receiving_objects.contains(input_key) {
+                results[*idx] = true;
+            } else if receiving_objects.contains(&InputKey::VersionedObject { id: **id, version: **version }) {
                 // There could be a more recent version of this object, and the object at the
                 // specified version could have already been pruned. In such a case `has_key` will
                 // be false, but since this is a receiving object we should mark it as available if
                 // we can determine that an object with a version greater than or equal to the
                 // specified version exists or was deleted. We will then let mark it as available
                 // to let the transaction through so it can fail at execution.
-                let is_available = self
-                    .get_object(&input_key.id().id())
-                    .map(|obj| obj.version() >= input_key.version().unwrap())
-                    .unwrap_or(false)
-                    || self.have_deleted_fastpath_object_at_version_or_after(
-                        input_key.id().id(),
-                        input_key.version().unwrap(),
-                        epoch,
-                        use_object_per_epoch_marker_table_v2,
-                    );
-                versioned_results.push((*idx, is_available));
-            } else if self
-                .get_deleted_shared_object_previous_tx_digest(
-                    FullObjectKey::new(input_key.id(), input_key.version().unwrap()),
-                    epoch,
-                    use_object_per_epoch_marker_table_v2,
-                )
-                .is_some()
-            {
-                // If the object is an already deleted shared object, mark it as available if the
-                // version for that object is in the shared deleted marker table.
-                versioned_results.push((*idx, true));
+                let is_available = self.get_object(&id.id()).map(|obj| obj.version() >= **version).unwrap_or(false)
+                    || self.fastpath_stream_ended_at_version_or_after(id.id(), **version, *epoch);
+                results[*idx] = is_available;
             } else {
-                versioned_results.push((*idx, false));
+                // If the object is an already-removed consensus object, mark it as available if the
+                // version for that object is in the marker table.
+                let is_consensus_stream_ended =
+                    self.get_consensus_stream_end_tx_digest(FullObjectKey::new(**id, **version), *epoch).is_some();
+                results[*idx] = is_consensus_stream_ended;
             }
         }
 
-        let unversioned_results = keys_without_version.into_iter().map(|(idx, key)| {
-            (idx, match self.get_latest_object_ref_or_tombstone(key.id().id()) {
-                None => false,
-                Some(entry) => entry.2.is_alive(),
-            })
+        package_object_keys.into_iter().for_each(|(idx, id)| {
+            // unwrap is safe since this only errors when the object is not a package,
+            // which is impossible if we have a certificate for execution.
+            results[idx] = self.get_package_object(id).unwrap().is_some();
         });
 
-        let mut results = versioned_results.into_iter().chain(unversioned_results).collect::<Vec<_>>();
-        results.sort_by_key(|(idx, _)| *idx);
-        results.into_iter().map(|(_, result)| result).collect()
+        results
     }
+
+    fn multi_input_objects_available_cache_only(&self, keys: &[InputKey]) -> Vec<bool>;
 
     /// Return the object with version less then or eq to the provided seq number.
     /// This is used by indexer to find the correct version of dynamic field child object.
@@ -322,81 +312,70 @@ pub trait ObjectCacheRead: Send + Sync {
     // Marker methods
 
     /// Get the marker at a specific version
-    fn get_marker_value(
-        &self,
-        object_key: FullObjectKey,
-        epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
-    ) -> Option<MarkerValue>;
+    fn get_marker_value(&self, object_key: FullObjectKey, epoch_id: EpochId) -> Option<MarkerValue>;
 
     /// Get the latest marker for a given object.
-    fn get_latest_marker(
-        &self,
-        object_id: FullObjectID,
-        epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
-    ) -> Option<(SequenceNumber, MarkerValue)>;
+    fn get_latest_marker(&self, object_id: FullObjectID, epoch_id: EpochId) -> Option<(SequenceNumber, MarkerValue)>;
 
-    /// If the shared object was deleted, return deletion info for the current live version
-    fn get_last_shared_object_deletion_info(
+    /// If the given consensus object stream was ended, return related
+    /// version and transaction digest.
+    fn get_last_consensus_stream_end_info(
         &self,
         object_id: FullObjectID,
         epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
     ) -> Option<(SequenceNumber, TransactionDigest)> {
-        match self.get_latest_marker(object_id, epoch_id, use_object_per_epoch_marker_table_v2) {
-            Some((version, MarkerValue::SharedDeleted(digest))) => Some((version, digest)),
+        match self.get_latest_marker(object_id, epoch_id) {
+            Some((version, MarkerValue::ConsensusStreamEnded(digest))) => Some((version, digest)),
             _ => None,
         }
     }
 
-    /// If the shared object was deleted, return deletion info for the specified version.
-    fn get_deleted_shared_object_previous_tx_digest(
+    /// If the given consensus object stream was ended at the specified version,
+    /// return related transaction digest.
+    fn get_consensus_stream_end_tx_digest(
         &self,
         object_key: FullObjectKey,
         epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
     ) -> Option<TransactionDigest> {
-        match self.get_marker_value(object_key, epoch_id, use_object_per_epoch_marker_table_v2) {
-            Some(MarkerValue::SharedDeleted(digest)) => Some(digest),
+        match self.get_marker_value(object_key, epoch_id) {
+            Some(MarkerValue::ConsensusStreamEnded(digest)) => Some(digest),
             _ => None,
         }
     }
 
-    fn have_received_object_at_version(
-        &self,
-        object_key: FullObjectKey,
-        epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
-    ) -> bool {
-        matches!(
-            self.get_marker_value(object_key, epoch_id, use_object_per_epoch_marker_table_v2),
-            Some(MarkerValue::Received)
-        )
+    fn have_received_object_at_version(&self, object_key: FullObjectKey, epoch_id: EpochId) -> bool {
+        matches!(self.get_marker_value(object_key, epoch_id), Some(MarkerValue::Received))
     }
 
-    fn have_deleted_fastpath_object_at_version_or_after(
+    fn fastpath_stream_ended_at_version_or_after(
         &self,
         object_id: ObjectID,
         version: SequenceNumber,
         epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
     ) -> bool {
-        let full_id = FullObjectID::Fastpath(object_id); // function explicilty assumes "fastpath"
+        let full_id = FullObjectID::Fastpath(object_id); // function explicitly assumes "fastpath"
         matches!(
-            self.get_latest_marker(full_id, epoch_id, use_object_per_epoch_marker_table_v2),
-            Some((marker_version, MarkerValue::OwnedDeleted)) if marker_version >= version
+            self.get_latest_marker(full_id, epoch_id),
+            Some((marker_version, MarkerValue::FastpathStreamEnded)) if marker_version >= version
         )
     }
 
     /// Return the watermark for the highest checkpoint for which we've pruned objects.
-    fn get_highest_pruned_checkpoint(&self) -> CheckpointSequenceNumber;
+    fn get_highest_pruned_checkpoint(&self) -> Option<CheckpointSequenceNumber>;
+
+    /// Given a list of input and receiving objects for a transaction,
+    /// wait until all of them become available, so that the transaction
+    /// can start execution.
+    /// `input_and_receiving_keys` contains both input objects and receiving
+    /// input objects, including canceled objects.
+    /// TODO: Eventually this can return the objects read results,
+    /// so that execution does not need to load them again.
+    fn notify_read_input_objects<'a>(
+        &'a self,
+        input_and_receiving_keys: &'a [InputKey],
+        receiving_keys: &'a HashSet<InputKey>,
+        epoch: &'a EpochId,
+    ) -> BoxFuture<'a, ()>;
 }
 
 pub trait TransactionCacheRead: Send + Sync {
@@ -472,9 +451,9 @@ pub trait TransactionCacheRead: Send + Sync {
         self.multi_get_effects(&[*digest]).pop().expect("multi-get must return correct number of items")
     }
 
-    fn multi_get_events(&self, event_digests: &[TransactionEventsDigest]) -> Vec<Option<TransactionEvents>>;
+    fn multi_get_events(&self, digests: &[TransactionDigest]) -> Vec<Option<TransactionEvents>>;
 
-    fn get_events(&self, digest: &TransactionEventsDigest) -> Option<TransactionEvents> {
+    fn get_events(&self, digest: &TransactionDigest) -> Option<TransactionEvents> {
         self.multi_get_events(&[*digest]).pop().expect("multi-get must return correct number of items")
     }
 
@@ -524,13 +503,7 @@ pub trait ExecutionCacheWrite: Send + Sync {
     /// Any write performed by this method immediately notifies any waiter that has previously
     /// called notify_read_objects_for_execution or notify_read_objects_for_signing for the object
     /// in question.
-    fn write_transaction_outputs(
-        &self,
-        epoch_id: EpochId,
-        tx_outputs: Arc<TransactionOutputs>,
-        // TODO: Delete this parameter once table migration is complete.
-        use_object_per_epoch_marker_table_v2: bool,
-    );
+    fn write_transaction_outputs(&self, epoch_id: EpochId, tx_outputs: Arc<TransactionOutputs>);
 
     /// Attempt to acquire object locks for all of the owned input locks.
     fn acquire_transaction_locks(
@@ -540,6 +513,12 @@ pub trait ExecutionCacheWrite: Send + Sync {
         tx_digest: TransactionDigest,
         signed_transaction: Option<VerifiedSignedTransaction>,
     ) -> SuiResult;
+
+    /// Write an object entry directly to the cache for testing.
+    /// This allows us to write an object without constructing the entire
+    /// transaction outputs.
+    #[cfg(test)]
+    fn write_object_entry_for_test(&self, object: Object);
 }
 
 pub trait CheckpointCache: Send + Sync {
@@ -655,8 +634,6 @@ macro_rules! implement_storage_traits {
                 receiving_object_id: &ObjectID,
                 receive_object_at_version: SequenceNumber,
                 epoch_id: EpochId,
-                // TODO: Delete this parameter once table migration is complete.
-                use_object_per_epoch_marker_table_v2: bool,
             ) -> SuiResult<Option<Object>> {
                 let Some(recv_object) =
                     ObjectCacheRead::get_object_by_key(self, receiving_object_id, receive_object_at_version)
@@ -671,10 +648,9 @@ macro_rules! implement_storage_traits {
                 // transaction replay due to possible reordering of transactions during replay.
                 if recv_object.owner != Owner::AddressOwner((*owner).into())
                     || self.have_received_object_at_version(
-                        // TODO: Add support for receiving ConsensusV2 objects. For now this assumes fastpath.
+                        // TODO: Add support for receiving consensus objects. For now this assumes fastpath.
                         FullObjectKey::new(FullObjectID::new(*receiving_object_id, None), receive_object_at_version),
                         epoch_id,
-                        use_object_per_epoch_marker_table_v2,
                     )
                 {
                     return Ok(None);

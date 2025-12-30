@@ -8,7 +8,6 @@ use std::{
     fs,
     io,
     num::NonZeroUsize,
-    ops::Range,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
@@ -30,14 +29,8 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use prometheus::Registry;
 use serde::{Deserialize, Serialize};
-use sui_archival::{
-    reader::{ArchiveReader, ArchiveReaderMetrics},
-    verify_archive_with_checksums,
-    verify_archive_with_genesis_config,
-};
 use sui_config::{
     genesis::Genesis,
-    node::ArchiveReaderConfig,
     object_storage_config::{ObjectStoreConfig, ObjectStoreType},
     NodeConfig,
 };
@@ -49,6 +42,7 @@ use sui_core::{
     execution_cache::build_execution_cache_from_env,
     storage::RocksDbStore,
 };
+use sui_data_ingestion_core::{end_of_epoch_data, setup_single_workflow, ReaderOptions};
 use sui_network::default_mysten_network_config;
 use sui_protocol_config::Chain;
 use sui_sdk::{SuiClient, SuiClientBuilder};
@@ -62,10 +56,10 @@ use sui_storage::{
     verify_checkpoint_range,
 };
 use sui_types::{
-    accumulator::Accumulator,
     base_types::*,
     committee::QUORUM_THRESHOLD,
     crypto::AuthorityPublicKeyBytes,
+    global_state_hash::GlobalStateHash,
     messages_checkpoint::{CheckpointCommitment, ECMHLiveObjectSetDigest},
     messages_grpc::{
         LayoutGenerationOption,
@@ -77,13 +71,16 @@ use sui_types::{
     },
     multiaddr::Multiaddr,
     object::Owner,
-    storage::{ReadStore, SharedInMemoryStore},
+    storage::ReadStore,
 };
 use tokio::{sync::mpsc, task::JoinHandle, time::Instant};
 use tracing::info;
 
+use crate::formal_snapshot_util::{read_summaries_for_list_no_verify, FormalSnapshotWorker};
+
 pub mod commands;
 pub mod db_tool;
+mod formal_snapshot_util;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Copy, PartialOrd, Ord, Eq, ValueEnum, Default)]
 pub enum SnapshotVerifyMode {
@@ -104,6 +101,7 @@ pub enum SnapshotVerifyMode {
 // This functions requires at least one of genesis or fullnode_rpc to be `Some`.
 async fn make_clients(
     sui_client: &Arc<SuiClient>,
+    use_tls: bool,
 ) -> Result<BTreeMap<AuthorityName, (Multiaddr, NetworkAuthorityClient)>> {
     let mut net_config = default_mysten_network_config();
     net_config.connect_timeout = Some(Duration::from_secs(5));
@@ -112,14 +110,17 @@ async fn make_clients(
     let active_validators = sui_client.governance_api().get_latest_sui_system_state().await?.active_validators;
 
     for validator in active_validators {
-        let net_addr = Multiaddr::try_from(validator.net_address).unwrap();
-        // TODO: Enable TLS on this interface with below config, once support is rolled out to validators.
-        // let tls_config = sui_tls::create_rustls_client_config(
-        //     sui_types::crypto::NetworkPublicKey::from_bytes(&validator.network_pubkey_bytes)?,
-        //     sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
-        //     None,
-        // );
-        let channel = net_config.connect_lazy(&net_addr, None).map_err(|err| anyhow!(err.to_string()))?;
+        let mut net_addr = Multiaddr::try_from(validator.net_address).unwrap();
+        let tls_config = sui_tls::create_rustls_client_config(
+            sui_types::crypto::NetworkPublicKey::from_bytes(&validator.network_pubkey_bytes)?,
+            sui_tls::SUI_VALIDATOR_SERVER_NAME.to_string(),
+            None,
+        );
+        if use_tls {
+            net_addr = net_addr.rewrite_http_to_https();
+        }
+        let channel =
+            net_config.connect_lazy(&net_addr, use_tls.then_some(tls_config)).map_err(|err| anyhow!(err.to_string()))?;
         let client = NetworkAuthorityClient::new(channel);
         let public_key_bytes = AuthorityPublicKeyBytes::from_bytes(&validator.protocol_pubkey_bytes)?;
         authority_clients.insert(public_key_bytes, (net_addr.clone(), client));
@@ -314,9 +315,10 @@ pub async fn get_transaction_block(
     tx_digest: TransactionDigest,
     show_input_tx: bool,
     fullnode_rpc: String,
+    use_tls: bool,
 ) -> Result<String> {
     let sui_client = Arc::new(SuiClientBuilder::default().build(fullnode_rpc).await?);
-    let clients = make_clients(&sui_client).await?;
+    let clients = make_clients(&sui_client, use_tls).await?;
     let timer = Instant::now();
     let responses = join_all(clients.iter().map(|(name, (address, client))| async {
         let result =
@@ -489,7 +491,7 @@ fn start_summary_sync(
     checkpoint_store: Arc<CheckpointStore>,
     m: MultiProgress,
     genesis: Genesis,
-    archive_store_config: ObjectStoreConfig,
+    ingestion_url: String,
     epoch: u64,
     num_parallel_downloads: usize,
     verify: bool,
@@ -506,19 +508,10 @@ fn start_summary_sync(
             checkpoint_store.insert_verified_checkpoint(&genesis.checkpoint())?;
             checkpoint_store.update_highest_synced_checkpoint(&genesis.checkpoint())?;
         }
-        // set up download of checkpoint summaries
-        let config = ArchiveReaderConfig {
-            remote_store_config: archive_store_config,
-            download_concurrency: NonZeroUsize::new(num_parallel_downloads).unwrap(),
-            use_for_pruning_watermark: false,
-        };
-        let metrics = ArchiveReaderMetrics::new(&Registry::default());
-        let archive_reader = ArchiveReader::new(config, &metrics)?;
-        archive_reader.sync_manifest_once().await?;
-        let manifest = archive_reader.get_manifest().await?;
 
-        let end_of_epoch_checkpoint_seq_nums =
-            (0 ..= epoch).map(|e| manifest.next_checkpoint_after_epoch(e) - 1).collect::<Vec<_>>();
+        let end_of_epoch_checkpoint_seq_nums: Vec<_> =
+            end_of_epoch_data(ingestion_url.clone(), vec![], 5).await?.into_iter().take((epoch + 1) as usize).collect();
+
         let last_checkpoint = end_of_epoch_checkpoint_seq_nums.last().expect("Expected at least one checkpoint");
 
         let num_to_sync = if all_checkpoints { *last_checkpoint } else { end_of_epoch_checkpoint_seq_nums.len() as u64 };
@@ -551,21 +544,29 @@ fn start_summary_sync(
         });
 
         if all_checkpoints {
-            archive_reader
-                .read_summaries_for_range_no_verify(
-                    state_sync_store.clone(),
-                    s_start .. last_checkpoint + 1,
-                    sync_checkpoint_counter,
-                )
-                .await?;
+            let reader_options = ReaderOptions {
+                batch_size: num_parallel_downloads,
+                upper_limit: Some(last_checkpoint + 1),
+                ..Default::default()
+            };
+            let (executor, _exit_sender) = setup_single_workflow(
+                FormalSnapshotWorker(state_sync_store.clone(), sync_checkpoint_counter),
+                ingestion_url,
+                s_start,
+                1,
+                Some(reader_options),
+            )
+            .await?;
+            executor.await?;
         } else {
-            archive_reader
-                .read_summaries_for_list_no_verify(
-                    state_sync_store.clone(),
-                    end_of_epoch_checkpoint_seq_nums.clone(),
-                    sync_checkpoint_counter,
-                )
-                .await?;
+            read_summaries_for_list_no_verify(
+                ingestion_url,
+                num_parallel_downloads,
+                state_sync_store.clone(),
+                end_of_epoch_checkpoint_seq_nums.clone(),
+                sync_checkpoint_counter,
+            )
+            .await?;
         }
         sync_progress_bar.finish_with_message("Checkpoint summary sync is complete");
 
@@ -685,7 +686,7 @@ pub async fn download_formal_snapshot(
     epoch: EpochId,
     genesis: &Path,
     snapshot_store_config: ObjectStoreConfig,
-    archive_store_config: ObjectStoreConfig,
+    ingestion_url: &str,
     num_parallel_downloads: usize,
     network: Chain,
     verify: SnapshotVerifyMode,
@@ -712,7 +713,7 @@ pub async fn download_formal_snapshot(
         checkpoint_store.clone(),
         m.clone(),
         genesis.clone(),
-        archive_store_config.clone(),
+        ingestion_url.to_string(),
         epoch,
         num_parallel_downloads,
         verify != SnapshotVerifyMode::None,
@@ -753,11 +754,11 @@ pub async fn download_formal_snapshot(
             .unwrap_or_else(|err| panic!("Failed during read: {}", err));
         Ok::<(), anyhow::Error>(())
     });
-    let mut root_accumulator = Accumulator::default();
+    let mut root_global_state_hash = GlobalStateHash::default();
     let mut num_live_objects = 0;
-    while let Some((partial_acc, num_objects)) = receiver.recv().await {
+    while let Some((partial_hash, num_objects)) = receiver.recv().await {
         num_live_objects += num_objects;
-        root_accumulator.union(&partial_acc);
+        root_global_state_hash.union(&partial_hash);
     }
     summaries_handle.await.expect("Task join failed").expect("Summaries task failed");
 
@@ -788,7 +789,7 @@ pub async fn download_formal_snapshot(
             );
         match commitment {
             CheckpointCommitment::ECMHLiveObjectSetDigest(consensus_digest) => {
-                let local_digest: ECMHLiveObjectSetDigest = root_accumulator.digest().into();
+                let local_digest: ECMHLiveObjectSetDigest = root_global_state_hash.digest().into();
                 assert_eq!(
                     *consensus_digest, local_digest,
                     "End of epoch {} root state digest {} does not match \
@@ -823,7 +824,7 @@ pub async fn download_formal_snapshot(
 
     setup_db_state(
         epoch,
-        root_accumulator.clone(),
+        root_global_state_hash.clone(),
         perpetual_db.clone(),
         checkpoint_store,
         committee_store,
@@ -946,52 +947,4 @@ pub async fn download_db_snapshot(
         fs::remove_dir_all(&epochs_dir)?;
     }
     Ok(())
-}
-
-pub async fn verify_archive(
-    genesis: &Path,
-    remote_store_config: ObjectStoreConfig,
-    concurrency: usize,
-    interactive: bool,
-) -> Result<()> {
-    verify_archive_with_genesis_config(genesis, remote_store_config, concurrency, interactive, 10).await
-}
-
-pub async fn dump_checkpoints_from_archive(
-    remote_store_config: ObjectStoreConfig,
-    start_checkpoint: u64,
-    end_checkpoint: u64,
-    max_content_length: usize,
-) -> Result<()> {
-    let metrics = ArchiveReaderMetrics::new(&Registry::default());
-    let config = ArchiveReaderConfig {
-        remote_store_config,
-        download_concurrency: NonZeroUsize::new(1).unwrap(),
-        use_for_pruning_watermark: false,
-    };
-    let store = SharedInMemoryStore::default();
-    let archive_reader = ArchiveReader::new(config, &metrics)?;
-    archive_reader.sync_manifest_once().await?;
-    let checkpoint_counter = Arc::new(AtomicU64::new(0));
-    let txn_counter = Arc::new(AtomicU64::new(0));
-    archive_reader
-        .read(
-            store.clone(),
-            Range { start: start_checkpoint, end: end_checkpoint },
-            txn_counter,
-            checkpoint_counter,
-            false,
-        )
-        .await?;
-    for key in store.inner().checkpoints().values().sorted_by(|a, b| a.sequence_number().cmp(&b.sequence_number)) {
-        let mut content =
-            serde_json::to_string(&store.get_full_checkpoint_contents_by_sequence_number(key.sequence_number).unwrap())?;
-        content.truncate(max_content_length);
-        info!("{}:{}:{:?}", key.sequence_number, key.content_digest, content);
-    }
-    Ok(())
-}
-
-pub async fn verify_archive_by_checksum(remote_store_config: ObjectStoreConfig, concurrency: usize) -> Result<()> {
-    verify_archive_with_checksums(remote_store_config, concurrency).await
 }

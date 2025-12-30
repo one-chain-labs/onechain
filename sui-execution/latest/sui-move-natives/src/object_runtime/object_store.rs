@@ -143,7 +143,10 @@ macro_rules! fetch_child_object_unbounded {
                         )));
                     }
                 }
-                Owner::AddressOwner(_) | Owner::Immutable | Owner::Shared { .. } | Owner::ConsensusV2 { .. } => {
+                Owner::AddressOwner(_)
+                | Owner::Immutable
+                | Owner::Shared { .. }
+                | Owner::ConsensusAddressOwner { .. } => {
                     return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                         "Bad owner for {}. \
                             Expected an id owner {} but found an address, \
@@ -177,13 +180,7 @@ impl Inner<'_> {
     ) -> PartialVMResult<LoadedWithMetadataResult<MoveObject>> {
         let child_opt = self
             .resolver
-            .get_object_received_at_version(
-                &owner,
-                &child,
-                version,
-                self.current_epoch_id,
-                self.protocol_config.use_object_per_epoch_marker_table_v2_as_option().unwrap_or(false),
-            )
+            .get_object_received_at_version(&owner, &child, version, self.current_epoch_id)
             .map_err(|msg| PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!("{msg}")))?;
         let obj_opt = if let Some(object) = child_opt {
             // guard against bugs in `receive_object_at_version`: if it returns a child object such that

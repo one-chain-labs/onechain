@@ -14,7 +14,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use sui_types::{
-    base_types::{ObjectID, SequenceNumber, VersionNumber},
+    base_types::{ObjectID, SequenceNumber},
     digests::{CheckpointContentsDigest, CheckpointDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiError, SuiResult},
@@ -53,8 +53,8 @@ pub fn encoded_tagged_key(key: &TaggedKey) -> String {
     base64_url::encode(&bytes)
 }
 
-pub fn encode_object_key(object_id: &ObjectID, version: &VersionNumber) -> String {
-    let bytes = bcs::to_bytes(&ObjectKey(*object_id, *version)).expect("failed to serialize object key");
+pub fn encode_object_key(object_key: &ObjectKey) -> String {
+    let bytes = bcs::to_bytes(object_key).expect("failed to serialize object key");
     base64_url::encode(&bytes)
 }
 
@@ -80,7 +80,7 @@ pub enum Key {
     CheckpointContentsByDigest(CheckpointContentsDigest),
     CheckpointSummaryByDigest(CheckpointDigest),
     TxToCheckpoint(TransactionDigest),
-    ObjectKey(ObjectID, VersionNumber),
+    ObjectKey(ObjectKey),
     EventsByTxDigest(TransactionDigest),
 }
 
@@ -95,7 +95,7 @@ impl Key {
             Key::CheckpointContentsByDigest(_) => "cc",
             Key::CheckpointSummaryByDigest(_) => "cs",
             Key::TxToCheckpoint(_) => "tx2c",
-            Key::ObjectKey(_, _) => "ob",
+            Key::ObjectKey(_) => "ob",
             Key::EventsByTxDigest(_) => "evtx",
         }
     }
@@ -109,7 +109,7 @@ impl Key {
             Key::CheckpointContentsByDigest(digest) => encode_digest(digest),
             Key::CheckpointSummaryByDigest(digest) => encode_digest(digest),
             Key::TxToCheckpoint(digest) => encode_digest(digest),
-            Key::ObjectKey(object_id, version) => encode_object_key(object_id, version),
+            Key::ObjectKey(object_key) => encode_object_key(object_key),
             Key::EventsByTxDigest(digest) => encode_digest(digest),
         }
     }
@@ -162,7 +162,7 @@ pub fn path_elements_to_key(digest: &str, type_: &str) -> anyhow::Result<Key> {
         "tx2c" => Ok(Key::TxToCheckpoint(TransactionDigest::try_from(decoded_digest)?)),
         "ob" => {
             let object_key: ObjectKey = bcs::from_bytes(&decoded_digest)?;
-            Ok(Key::ObjectKey(object_key.0, object_key.1))
+            Ok(Key::ObjectKey(ObjectKey(object_key.0, object_key.1)))
         }
         _ => Err(anyhow::anyhow!("Invalid type: {}", type_)),
     }
@@ -399,7 +399,7 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
 
     #[instrument(level = "trace", skip_all)]
     async fn get_object(&self, object_id: ObjectID, version: SequenceNumber) -> SuiResult<Option<Object>> {
-        let key = Key::ObjectKey(object_id, version);
+        let key = Key::ObjectKey(ObjectKey(object_id, version));
         self.fetch(key).await.map(|maybe| {
             maybe
                 .and_then(|bytes| deser::<_, Object>(&key, bytes.as_ref()))
@@ -410,6 +410,22 @@ impl TransactionKeyValueStoreTrait for HttpKVStore {
                     self.metrics.key_value_store_num_fetches_not_found.with_label_values(&["http", key.ty()]).inc();
                 })
         })
+    }
+
+    #[instrument(level = "trace", skip_all)]
+    async fn multi_get_objects(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<Option<Object>>> {
+        let keys = object_keys.iter().map(|key| Key::ObjectKey(*key)).collect::<Vec<_>>();
+
+        let fetches = self.multi_fetch(keys).await;
+
+        let results = fetches
+            .iter()
+            .zip(object_keys.iter())
+            .map(map_fetch)
+            .map(|maybe_bytes| maybe_bytes.and_then(|(bytes, key)| deser::<_, Object>(&key, bytes)))
+            .collect::<Vec<_>>();
+
+        Ok(results)
     }
 
     #[instrument(level = "trace", skip_all)]

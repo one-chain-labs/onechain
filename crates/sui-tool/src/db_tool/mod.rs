@@ -15,7 +15,7 @@ use sui_types::{
     effects::TransactionEffectsAPI,
     messages_checkpoint::{CheckpointDigest, CheckpointSequenceNumber},
 };
-use typed_store::rocks::MetricConf;
+use typed_store::rocks::{safe_drop_db, MetricConf};
 
 use self::{
     db_dump::{dump_table, duplicate_objects_summary, list_tables, table_summary, StoreName},
@@ -195,7 +195,7 @@ pub async fn execute_db_tool_command(db_path: PathBuf, cmd: DbToolCommand) -> an
         DbToolCommand::PrintObject(o) => print_object(&db_path, o),
         DbToolCommand::PrintCheckpoint(d) => print_checkpoint(&db_path, d),
         DbToolCommand::PrintCheckpointContent(d) => print_checkpoint_content(&db_path, d),
-        DbToolCommand::ResetDB => reset_db_to_genesis(&db_path),
+        DbToolCommand::ResetDB => reset_db_to_genesis(&db_path).await,
         DbToolCommand::RewindCheckpointExecution(d) => {
             rewind_checkpoint_execution(&db_path, d.epoch, d.checkpoint_sequence_number)
         }
@@ -226,7 +226,7 @@ pub fn print_db_all_tables(db_path: PathBuf) -> anyhow::Result<()> {
 }
 
 pub fn print_db_duplicates_summary(db_path: PathBuf) -> anyhow::Result<()> {
-    let (total_count, duplicate_count, total_bytes, duplicated_bytes) = duplicate_objects_summary(db_path);
+    let (total_count, duplicate_count, total_bytes, duplicated_bytes) = duplicate_objects_summary(db_path)?;
     println!(
         "Total objects = {}, duplicated objects = {}, total bytes = {}, duplicated bytes = {}",
         total_count, duplicate_count, total_bytes, duplicated_bytes
@@ -296,7 +296,7 @@ pub fn print_checkpoint_content(path: &Path, opt: PrintCheckpointContentOptions)
     Ok(())
 }
 
-pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
+pub async fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
     // Follow the below steps to test:
     //
     // Get a db snapshot. Either generate one by running stress locally and enabling db checkpoints or download one from S3 bucket (pretty big in size though).
@@ -326,19 +326,10 @@ pub fn reset_db_to_genesis(path: &Path) -> anyhow::Result<()> {
     //   num-epochs-to-retain: 18446744073709551615
     //   max-checkpoints-in-batch: 10
     //   max-transactions-in-batch: 1000
-    let perpetual_db = AuthorityPerpetualTables::open_tables_read_write(
-        path.join("store").join("perpetual"),
-        MetricConf::default(),
-        None,
-        None,
-    );
-    perpetual_db.reset_db_for_execution_since_genesis()?;
+    safe_drop_db(path.join("store").join("perpetual"), std::time::Duration::from_secs(60)).await?;
 
     let checkpoint_db = CheckpointStore::new(&path.join("checkpoints"));
     checkpoint_db.reset_db_for_execution_since_genesis()?;
-
-    let epoch_db = AuthorityEpochTables::open_tables_read_write(path.join("store"), MetricConf::default(), None, None);
-    epoch_db.reset_db_for_execution_since_genesis()?;
 
     Ok(())
 }

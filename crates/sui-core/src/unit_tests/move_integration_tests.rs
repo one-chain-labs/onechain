@@ -207,7 +207,9 @@ async fn test_object_owning_another_object() {
     // Check that the child is now owned by the parent.
     let field_id = match child_effect.1 {
         Owner::ObjectOwner(field_id) => field_id.into(),
-        Owner::Shared { .. } | Owner::Immutable | Owner::AddressOwner(_) | Owner::ConsensusV2 { .. } => panic!(),
+        Owner::Shared { .. } | Owner::Immutable | Owner::AddressOwner(_) | Owner::ConsensusAddressOwner { .. } => {
+            panic!()
+        }
     };
     let field_object = authority.get_object(&field_id).await.unwrap();
     assert_eq!(field_object.owner, parent.0);

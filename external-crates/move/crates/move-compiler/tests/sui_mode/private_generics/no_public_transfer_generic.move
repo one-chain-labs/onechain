@@ -21,6 +21,10 @@ module a::m {
     public fun t4<T: key>(p: &mut UID, s: Receiving<T>): T {
         transfer::receive(p, s)
     }
+
+    public fun t5<T: key>(s: T, p: one::party::Party) {
+        transfer::party_transfer(s, p);
+    }
 }
 
 module one::object {
@@ -39,6 +43,14 @@ module one::transfer {
     }
 
     public fun public_transfer<T: key + store>(_: T, _: address) {
+        abort 0
+    }
+
+    public fun party_transfer<T: key>(_: T, _: one::party::Party) {
+        abort 0
+    }
+
+    public fun public_party_transfer<T: key + store>(_: T, _: one::party::Party) {
         abort 0
     }
 
@@ -65,4 +77,8 @@ module one::transfer {
     public fun public_receive<T: key + store>(_: &mut UID, _: Receiving<T>): T {
         abort 0
     }
+}
+
+module one::party {
+    struct Party has copy, drop {}
 }

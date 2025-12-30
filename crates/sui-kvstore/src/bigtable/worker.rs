@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use sui_data_ingestion_core::Worker;
 use sui_types::full_checkpoint_content::CheckpointData;
 
-use crate::{BigTableClient, KeyValueStoreWriter, TransactionData};
+use crate::{BigTableClient, KeyValueStoreReader, KeyValueStoreWriter, TransactionData};
 
 pub struct KvWorker {
     pub client: BigTableClient,
@@ -35,6 +35,16 @@ impl Worker for KvWorker {
         client.save_objects(&objects).await?;
         client.save_transactions(&transactions).await?;
         client.save_checkpoint(checkpoint).await?;
+        if let Some(epoch_info) = checkpoint.epoch_info()? {
+            if epoch_info.epoch > 0 {
+                if let Some(mut prev) = client.get_epoch(epoch_info.epoch - 1).await? {
+                    prev.end_checkpoint = epoch_info.start_checkpoint.map(|sq| sq - 1);
+                    prev.end_timestamp_ms = epoch_info.start_timestamp_ms;
+                    client.save_epoch(prev).await?;
+                }
+            }
+            client.save_epoch(epoch_info).await?;
+        }
         Ok(())
     }
 }

@@ -1,7 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{Arc, Weak};
+use std::{
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
 use consensus_core::BlockRef;
 use prometheus::Registry;
@@ -120,6 +123,15 @@ impl SubmitToConsensus for MockConsensusClient {
         _epoch_store: &Arc<AuthorityPerEpochStore>,
     ) -> SuiResult {
         self.submit_impl(transactions).map(|_response| ())
+    }
+
+    fn submit_best_effort(
+        &self,
+        transaction: &ConsensusTransaction,
+        _epoch_store: &Arc<AuthorityPerEpochStore>,
+        _timeout: Duration,
+    ) -> SuiResult {
+        self.submit_impl(&[transaction.clone()]).map(|_response| ())
     }
 }
 

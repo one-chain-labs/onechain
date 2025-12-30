@@ -247,6 +247,7 @@ async fn test_congestion_control_execution_cancellation() {
         Some(SharedObjectCongestionTracker::new(
             [(shared_object_1.0, 10)],
             PerObjectCongestionControlMode::TotalGasBudget,
+            false,
             Some(test_setup.protocol_config.max_accumulated_txn_cost_per_object_in_mysticeti_commit()),
             Some(1000), // Not used.
             None,       // Not used.

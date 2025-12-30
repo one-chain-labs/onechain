@@ -6,7 +6,8 @@ use std::collections::{hash_map, BTreeMap, BTreeSet, HashMap, VecDeque};
 use dashmap::DashMap;
 use fastcrypto_tbls::{dkg_v1, nodes::PartyId};
 use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
-use mysten_common::fatal;
+use moka::{policy::EvictionPolicy, sync::SegmentedCache as MokaCache};
+use mysten_common::{fatal, random_util::randomize_cache_capacity_in_tests};
 use parking_lot::Mutex;
 use sui_types::{
     authenticator_state::ActiveJwk,
@@ -236,14 +237,7 @@ impl ConsensusCommitOutput {
         batch.insert_batch(&tables.last_consensus_stats, [(LAST_CONSENSUS_STATS_ADDR, consensus_commit_stats)])?;
 
         if let Some(next_versions) = self.next_shared_object_versions {
-            if epoch_store.epoch_start_config().use_version_assignment_tables_v3() {
-                batch.insert_batch(&tables.next_shared_object_versions_v2, next_versions)?;
-            } else {
-                batch.insert_batch(
-                    &tables.next_shared_object_versions,
-                    next_versions.into_iter().map(|((id, _), v)| (id, v)),
-                )?;
-            }
+            batch.insert_batch(&tables.next_shared_object_versions_v2, next_versions)?;
         }
 
         batch.delete_batch(&tables.deferred_transactions, self.deleted_deferred_txns)?;
@@ -315,6 +309,9 @@ pub(crate) struct ConsensusOutputCache {
     // The critical sections are small in both cases so a DashMap is probably not helpful.
     pub(super) user_signatures_for_checkpoints: Mutex<HashMap<TransactionDigest, Vec<GenericSignature>>>,
 
+    executed_in_epoch: RwLock<DashMap<TransactionDigest, ()>>,
+    executed_in_epoch_cache: MokaCache<TransactionDigest, ()>,
+
     metrics: Arc<EpochMetrics>,
 }
 
@@ -327,26 +324,26 @@ impl ConsensusOutputCache {
         let deferred_transactions =
             tables.get_all_deferred_transactions().expect("load deferred transactions cannot fail");
 
-        if !epoch_start_configuration.is_data_quarantine_active_from_beginning_of_epoch() {
-            let shared_version_assignments = Self::get_all_shared_version_assignments(epoch_start_configuration, tables);
+        assert!(
+            epoch_start_configuration.is_data_quarantine_active_from_beginning_of_epoch(),
+            "This version of sui-node can only run after data quarantining has been enabled. Please run version 1.45.0 or later to the end of the current epoch and retry"
+        );
 
-            let user_signatures_for_checkpoints = tables
-                .get_all_user_signatures_for_checkpoints()
-                .expect("load user signatures for checkpoints cannot fail");
+        let executed_in_epoch_cache_capacity = 50_000;
 
-            Self {
-                shared_version_assignments: shared_version_assignments.into_iter().collect(),
-                deferred_transactions: Mutex::new(deferred_transactions),
-                user_signatures_for_checkpoints: Mutex::new(user_signatures_for_checkpoints),
-                metrics,
-            }
-        } else {
-            Self {
-                shared_version_assignments: Default::default(),
-                deferred_transactions: Mutex::new(deferred_transactions),
-                user_signatures_for_checkpoints: Default::default(),
-                metrics,
-            }
+        Self {
+            shared_version_assignments: Default::default(),
+            deferred_transactions: Mutex::new(deferred_transactions),
+            user_signatures_for_checkpoints: Default::default(),
+            executed_in_epoch: RwLock::new(DashMap::with_shard_amount(2048)),
+            executed_in_epoch_cache: MokaCache::builder(8)
+                // most queries should be for recent transactions
+                .max_capacity(randomize_cache_capacity_in_tests(
+                    executed_in_epoch_cache_capacity,
+                ))
+                .eviction_policy(EvictionPolicy::lru())
+                .build(),
+            metrics,
         }
     }
 
@@ -380,36 +377,52 @@ impl ConsensusOutputCache {
         self.shared_version_assignments.insert(TransactionKey::Digest(*tx_digest), assigned_versions.to_owned());
     }
 
-    pub fn remove_shared_object_assignments<'a>(&self, keys: impl IntoIterator<Item = &'a TransactionKey>) {
+    pub fn remove_shared_object_assignments(&self, keys: impl IntoIterator<Item = TransactionKey>) {
         let mut removed_count = 0;
         for tx_key in keys {
-            if self.shared_version_assignments.remove(tx_key).is_some() {
+            if self.shared_version_assignments.remove(&tx_key).is_some() {
                 removed_count += 1;
             }
         }
         self.metrics.shared_object_assignments_size.sub(removed_count as i64);
     }
 
-    // Used to read pre-existing shared object versions from the database after a crash.
-    // TODO: remove this once all nodes have upgraded to data-quarantining.
-    fn get_all_shared_version_assignments(
-        epoch_start_configuration: &EpochStartConfiguration,
-        tables: &AuthorityEpochTables,
-    ) -> Vec<(TransactionKey, Vec<(ConsensusObjectSequenceKey, SequenceNumber)>)> {
-        if epoch_start_configuration.use_version_assignment_tables_v3() {
-            tables.assigned_shared_object_versions_v3.safe_iter().collect::<Result<_, _>>().expect("db error")
-        } else {
-            tables
-                .assigned_shared_object_versions_v2
-                .safe_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .expect("db error")
-                .into_iter()
-                .map(|(key, value)| {
-                    (key, value.into_iter().map(|(id, v)| ((id, SequenceNumber::UNKNOWN), v)).collect::<Vec<_>>())
-                })
-                .collect()
+    pub fn executed_in_current_epoch(&self, digest: &TransactionDigest) -> bool {
+        self.executed_in_epoch
+            .read()
+            .contains_key(digest) ||
+            // we use get instead of contains key to mark the entry as read
+            self.executed_in_epoch_cache.get(digest).is_some()
+    }
+
+    // Called by execution
+    pub fn insert_executed_in_epoch(&self, tx_digest: TransactionDigest) {
+        assert!(self.executed_in_epoch.read().insert(tx_digest, ()).is_none(), "transaction already executed");
+        self.executed_in_epoch_cache.insert(tx_digest, ());
+    }
+
+    // CheckpointExecutor calls this (indirectly) in order to prune the in-memory cache of executed
+    // transactions. By the time this is called, the transaction digests will have been committed to
+    // the `executed_transactions_to_checkpoint` table.
+    pub fn remove_executed_in_epoch(&self, tx_digests: &[TransactionDigest]) {
+        let executed_in_epoch = self.executed_in_epoch.read();
+        for tx_digest in tx_digests {
+            executed_in_epoch.remove(tx_digest);
         }
+    }
+
+    pub fn remove_reverted_transaction(&self, tx_digest: &TransactionDigest) {
+        // reverted transactions are not guaranteed to have been executed
+        self.executed_in_epoch.read().remove(tx_digest);
+    }
+
+    /// At reconfig time, all checkpointed transactions must have been removed from self.executed_in_epoch
+    pub fn get_uncheckpointed_transactions(&self) -> Vec<TransactionDigest> {
+        self.executed_in_epoch
+            .write() // exclusive lock to ensure consistent view
+            .iter()
+            .map(|e| *e.key())
+            .collect()
     }
 }
 
@@ -577,8 +590,9 @@ impl ConsensusOutputQuarantine {
                 self.remove_shared_object_next_versions(&output);
                 self.remove_processed_consensus_messages(&output);
                 self.remove_congestion_control_debts(&output);
-                epoch_store
-                    .remove_shared_version_assignments(output.pending_checkpoints.iter().flat_map(|c| c.roots().iter()));
+                epoch_store.remove_shared_version_assignments(
+                    output.pending_checkpoints.iter().flat_map(|c| c.roots().iter()).copied(),
+                );
                 output.write_to_batch(epoch_store, batch)?;
             } else {
                 break;
@@ -670,7 +684,6 @@ impl ConsensusOutputQuarantine {
 
     pub(super) fn get_next_shared_object_versions(
         &self,
-        epoch_start_config: &EpochStartConfiguration,
         tables: &AuthorityEpochTables,
         objects_to_init: &[ConsensusObjectSequenceKey],
     ) -> SuiResult<Vec<Option<SequenceNumber>>> {
@@ -683,16 +696,7 @@ impl ConsensusOutputQuarantine {
                     CacheResult::Miss
                 }
             },
-            |object_keys| {
-                if epoch_start_config.use_version_assignment_tables_v3() {
-                    tables.next_shared_object_versions_v2.multi_get(object_keys).expect("db error")
-                } else {
-                    tables
-                        .next_shared_object_versions
-                        .multi_get(object_keys.iter().map(|(id, _)| *id))
-                        .expect("db error")
-                }
-            },
+            |object_keys| tables.next_shared_object_versions_v2.multi_get(object_keys).expect("db error"),
         ))
     }
 

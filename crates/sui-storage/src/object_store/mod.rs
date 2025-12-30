@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use object_store::{path::Path, DynObjectStore, ObjectMeta};
+use object_store::{path::Path, DynObjectStore, ObjectMeta, ObjectStore};
 
 pub mod http;
 pub mod util;
@@ -32,17 +32,24 @@ macro_rules! as_ref_get_ext_impl {
 as_ref_get_ext_impl!(Arc<dyn ObjectStoreGetExt>);
 as_ref_get_ext_impl!(Box<dyn ObjectStoreGetExt>);
 
-#[async_trait]
-impl ObjectStoreGetExt for Arc<DynObjectStore> {
-    async fn get_bytes(&self, src: &Path) -> Result<Bytes> {
-        self.get(src)
-            .await
-            .map_err(|e| anyhow!("Failed to get file {} with error: {:?}", src, e))?
-            .bytes()
-            .await
-            .map_err(|e| anyhow!("Failed to collect GET result for file {} into bytes with error: {:?}", src, e))
-    }
+macro_rules! as_ref_get_impl {
+    ($type:ty) => {
+        #[async_trait]
+        impl ObjectStoreGetExt for $type {
+            async fn get_bytes(&self, src: &Path) -> Result<Bytes> {
+                self.get(src)
+                    .await
+                    .map_err(|e| anyhow!("Failed to get file {} with error: {:?}", src, e))?
+                    .bytes()
+                    .await
+                    .map_err(|e| anyhow!("Failed to collect GET result for file {} into bytes with error: {:?}", src, e))
+            }
+        }
+    };
 }
+
+as_ref_get_impl!(Arc<dyn ObjectStore>);
+as_ref_get_impl!(Box<dyn ObjectStore>);
 
 #[async_trait]
 pub trait ObjectStoreListExt: Send + Sync + 'static {

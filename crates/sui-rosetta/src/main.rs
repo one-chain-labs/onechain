@@ -17,9 +17,9 @@ use fastcrypto::{
     encoding::{Encoding, Hex},
     traits::EncodeDecodeBase64,
 };
-use one_node::SuiNode;
 use serde_json::{json, Value};
 use sui_config::{sui_config_dir, Config, NodeConfig, SUI_FULLNODE_CONFIG, SUI_KEYSTORE_FILENAME};
+use one_node::SuiNode;
 use sui_rosetta::{
     types::{CurveType, PrefundedAccount, SuiEnv},
     RosettaOfflineServer,
@@ -143,7 +143,7 @@ impl RosettaServerCommand {
                 let registry_service = mysten_metrics::start_prometheus_server(config.metrics_address);
                 // Staring a full node for the rosetta server.
                 let rpc_address = format!("http://127.0.0.1:{}", config.json_rpc_address.port());
-                let _node = SuiNode::start(config, registry_service, None).await?;
+                let _node = SuiNode::start(config, registry_service).await?;
 
                 let sui_client = wait_for_sui_client(rpc_address).await;
 

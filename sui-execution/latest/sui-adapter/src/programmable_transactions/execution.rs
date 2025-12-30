@@ -6,8 +6,10 @@ pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
     use std::{
+        cell::{OnceCell, RefCell},
         collections::{BTreeMap, BTreeSet},
         fmt,
+        rc::Rc,
         sync::Arc,
         time::Instant,
     };
@@ -23,7 +25,7 @@ mod checked {
     use move_core_types::{
         account_address::AccountAddress,
         identifier::{IdentStr, Identifier},
-        language_storage::{ModuleId, TypeTag},
+        language_storage::{ModuleId, StructTag, TypeTag},
         u256::U256,
     };
     use move_trace_format::format::MoveTraceBuilder;
@@ -65,9 +67,9 @@ mod checked {
             UpgradeTicket,
         },
         storage::{get_package_objects, PackageObject},
-        transaction::{Argument, Command, ProgrammableMoveCall, ProgrammableTransaction},
+        transaction::{Command, ProgrammableMoveCall, ProgrammableTransaction},
         transfer::RESOLVED_RECEIVING_STRUCT,
-        type_input::TypeInput,
+        type_input::{StructInput, TypeInput},
         SUI_FRAMEWORK_ADDRESS,
     };
     use sui_verifier::{
@@ -79,9 +81,28 @@ mod checked {
     use crate::{
         adapter::substitute_package_id,
         execution_mode::ExecutionMode,
-        execution_value::{CommandKind, ExecutionState, ObjectContents, ObjectValue, RawValueType, Value},
+        execution_value::{
+            ensure_serialized_size,
+            CommandKind,
+            ExecutionState,
+            ObjectContents,
+            ObjectValue,
+            RawValueType,
+            Value,
+        },
         gas_charger::GasCharger,
-        programmable_transactions::context::*,
+        programmable_transactions::{
+            context::*,
+            data_store::SuiDataStore,
+            trace_utils::{
+                trace_move_call_end,
+                trace_move_call_start,
+                trace_ptb_summary,
+                trace_split_coins,
+                trace_transfer,
+            },
+        },
+        type_resolver::TypeTagResolver,
     };
 
     pub fn execute<Mode: ExecutionMode>(
@@ -89,7 +110,7 @@ mod checked {
         metrics: Arc<LimitsMetrics>,
         vm: &MoveVM,
         state_view: &mut dyn ExecutionState,
-        tx_context: &mut TxContext,
+        tx_context: Rc<RefCell<TxContext>>,
         gas_charger: &mut GasCharger,
         pt: ProgrammableTransaction,
         trace_builder_opt: &mut Option<MoveTraceBuilder>,
@@ -119,7 +140,7 @@ mod checked {
         metrics: Arc<LimitsMetrics>,
         vm: &MoveVM,
         state_view: &mut dyn ExecutionState,
-        tx_context: &mut TxContext,
+        tx_context: Rc<RefCell<TxContext>>,
         gas_charger: &mut GasCharger,
         pt: ProgrammableTransaction,
         trace_builder_opt: &mut Option<MoveTraceBuilder>,
@@ -127,12 +148,15 @@ mod checked {
         let ProgrammableTransaction { inputs, commands } = pt;
         let mut context =
             ExecutionContext::new(protocol_config, metrics, vm, state_view, tx_context, gas_charger, inputs)?;
+
+        trace_ptb_summary(trace_builder_opt, &commands)?;
+
         // execute commands
         let mut mode_results = Mode::empty_results();
         for (idx, command) in commands.into_iter().enumerate() {
             let start = Instant::now();
             if let Err(err) = execute_command::<Mode>(&mut context, &mut mode_results, command, trace_builder_opt) {
-                let object_runtime: &ObjectRuntime = context.object_runtime();
+                let object_runtime: &ObjectRuntime = context.object_runtime()?;
                 // We still need to record the loaded child objects for replay
                 let loaded_runtime_objects = object_runtime.loaded_runtime_objects();
                 // we do not save the wrapped objects since on error, they should not be modified
@@ -145,7 +169,7 @@ mod checked {
         }
 
         // Save loaded objects table in case we fail in post execution
-        let object_runtime: &ObjectRuntime = context.object_runtime();
+        let object_runtime: &ObjectRuntime = context.object_runtime()?;
         // We still need to record the loaded child objects for replay
         // Record the objects loaded at runtime (dynamic fields + received) for
         // storage rebate calculation.
@@ -189,13 +213,14 @@ mod checked {
                 })?;
 
                 let ty = Type::Vector(Box::new(elem_ty));
-                let abilities =
-                    context.vm.get_runtime().get_type_abilities(&ty).map_err(|e| context.convert_vm_error(e))?;
+                let abilities = context.get_type_abilities(&ty)?;
                 // BCS layout for any empty vector should be the same
                 let bytes = bcs::to_bytes::<Vec<u8>>(&vec![]).unwrap();
                 vec![Value::Raw(RawValueType::Loaded { ty, abilities, used_in_non_entry_move_call: false }, bytes)]
             }
             Command::MakeMoveVec(tag_opt, args) => {
+                let args = context.splat_args(0, args)?;
+                let elem_abilities = OnceCell::<AbilitySet>::new();
                 let mut res = vec![];
                 leb128::write::unsigned(&mut res, args.len() as u64).unwrap();
                 let mut arg_iter = args.into_iter().enumerate();
@@ -216,7 +241,8 @@ mod checked {
                         // empty args covered above
                         let (idx, arg) = arg_iter.next().unwrap();
                         let obj: ObjectValue = context.by_value_arg(CommandKind::MakeMoveVec, idx, arg)?;
-                        obj.write_bcs_bytes(&mut res);
+                        let bound = amplification_bound::<Mode>(context, &obj.type_, &elem_abilities)?;
+                        obj.write_bcs_bytes(&mut res, bound.map(|b| context.size_bound_vector_elem(b)))?;
                         (obj.used_in_non_entry_move_call, obj.type_)
                     }
                 };
@@ -224,20 +250,26 @@ mod checked {
                     let value: Value = context.by_value_arg(CommandKind::MakeMoveVec, idx, arg)?;
                     check_param_type::<Mode>(context, idx, &value, &elem_ty)?;
                     used_in_non_entry_move_call = used_in_non_entry_move_call || value.was_used_in_non_entry_move_call();
-                    value.write_bcs_bytes(&mut res);
+                    let bound = amplification_bound::<Mode>(context, &elem_ty, &elem_abilities)?;
+                    value.write_bcs_bytes(&mut res, bound.map(|b| context.size_bound_vector_elem(b)))?;
                 }
                 let ty = Type::Vector(Box::new(elem_ty));
-                let abilities =
-                    context.vm.get_runtime().get_type_abilities(&ty).map_err(|e| context.convert_vm_error(e))?;
+                let abilities = context.get_type_abilities(&ty)?;
                 vec![Value::Raw(RawValueType::Loaded { ty, abilities, used_in_non_entry_move_call }, res)]
             }
             Command::TransferObjects(objs, addr_arg) => {
+                let unsplat_objs_len = objs.len();
+                let objs = context.splat_args(0, objs)?;
+                let addr_arg = context.one_arg(unsplat_objs_len, addr_arg)?;
                 let objs: Vec<ObjectValue> = objs
                     .into_iter()
                     .enumerate()
                     .map(|(idx, arg)| context.by_value_arg(CommandKind::TransferObjects, idx, arg))
                     .collect::<Result<_, _>>()?;
                 let addr: SuiAddress = context.by_value_arg(CommandKind::TransferObjects, objs.len(), addr_arg)?;
+
+                trace_transfer(context, trace_builder_opt, &objs)?;
+
                 for obj in objs {
                     obj.ensure_public_transfer_eligible()?;
                     context.transfer_object(obj, addr)?;
@@ -245,13 +277,15 @@ mod checked {
                 vec![]
             }
             Command::SplitCoins(coin_arg, amount_args) => {
+                let coin_arg = context.one_arg(0, coin_arg)?;
+                let amount_args = context.splat_args(1, amount_args)?;
                 let mut obj: ObjectValue = context.borrow_arg_mut(0, coin_arg)?;
                 let ObjectContents::Coin(coin) = &mut obj.contents else {
                     let e = ExecutionErrorKind::command_argument_error(CommandArgumentError::TypeMismatch, 0);
                     let msg = "Expected a coin but got an non coin object".to_owned();
                     return Err(ExecutionError::new_with_source(e, msg));
                 };
-                let split_coins = amount_args
+                let split_coins: Vec<Value> = amount_args
                     .into_iter()
                     .map(|amount_arg| {
                         let amount: u64 = context.by_value_arg(CommandKind::SplitCoins, 1, amount_arg)?;
@@ -264,10 +298,15 @@ mod checked {
                         Ok(Value::Object(new_coin))
                     })
                     .collect::<Result<_, ExecutionError>>()?;
+
+                trace_split_coins(context, trace_builder_opt, &obj.type_, coin, &split_coins)?;
+
                 context.restore_arg::<Mode>(&mut argument_updates, coin_arg, Value::Object(obj))?;
                 split_coins
             }
             Command::MergeCoins(target_arg, coin_args) => {
+                let target_arg = context.one_arg(0, target_arg)?;
+                let coin_args = context.splat_args(1, coin_args)?;
                 let mut target: ObjectValue = context.borrow_arg_mut(0, target_arg)?;
                 let ObjectContents::Coin(target_coin) = &mut target.contents else {
                     let e = ExecutionErrorKind::command_argument_error(CommandArgumentError::TypeMismatch, 0);
@@ -302,6 +341,9 @@ mod checked {
             }
             Command::MoveCall(move_call) => {
                 let ProgrammableMoveCall { package, module, function, type_arguments, arguments } = *move_call;
+                trace_move_call_start(trace_builder_opt);
+
+                let arguments = context.splat_args(0, arguments)?;
 
                 let module = to_identifier(context, module)?;
                 let function = to_identifier(context, function)?;
@@ -329,13 +371,16 @@ mod checked {
                     trace_builder_opt,
                 );
 
-                context.linkage_view.reset_linkage();
+                trace_move_call_end(trace_builder_opt);
+
+                context.linkage_view.reset_linkage()?;
                 return_values?
             }
             Command::Publish(modules, dep_ids) => {
                 execute_move_publish::<Mode>(context, &mut argument_updates, modules, dep_ids, trace_builder_opt)?
             }
             Command::Upgrade(modules, dep_ids, current_package_id, upgrade_ticket) => {
+                let upgrade_ticket = context.one_arg(0, upgrade_ticket)?;
                 execute_move_upgrade::<Mode>(context, modules, dep_ids, current_package_id, upgrade_ticket)?
             }
         };
@@ -353,7 +398,7 @@ mod checked {
         runtime_id: &ModuleId,
         function: &IdentStr,
         type_arguments: Vec<Type>,
-        arguments: Vec<Argument>,
+        arguments: Vec<Arg>,
         is_init: bool,
         trace_builder_opt: &mut Option<MoveTraceBuilder>,
     ) -> Result<Vec<Value>, ExecutionError> {
@@ -405,7 +450,7 @@ mod checked {
     fn write_back_results<Mode: ExecutionMode>(
         context: &mut ExecutionContext<'_, '_, '_>,
         argument_updates: &mut Mode::ArgumentUpdates,
-        arguments: &[Argument],
+        arguments: &[Arg],
         non_entry_move_call: bool,
         mut_ref_values: impl IntoIterator<Item = (u8, Vec<u8>)>,
         mut_ref_kinds: impl IntoIterator<Item = (u8, ValueKind)>,
@@ -469,7 +514,7 @@ mod checked {
             // do not calculate or substitute id for predefined packages
             (*modules[0].self_id().address()).into()
         } else {
-            let id = context.tx_context.fresh_id();
+            let id = context.tx_context.borrow_mut().fresh_id();
             substitute_package_id(&mut modules, id)?;
             id
         };
@@ -488,7 +533,7 @@ mod checked {
         context.write_package(package);
         let res = publish_and_verify_modules(context, runtime_id, &modules)
             .and_then(|_| init_modules::<Mode>(context, argument_updates, &modules, trace_builder_opt));
-        context.linkage_view.reset_linkage();
+        context.linkage_view.reset_linkage()?;
         if res.is_err() {
             context.pop_package();
         }
@@ -515,7 +560,7 @@ mod checked {
         module_bytes: Vec<Vec<u8>>,
         dep_ids: Vec<ObjectID>,
         current_package_id: ObjectID,
-        upgrade_ticket_arg: Argument,
+        upgrade_ticket_arg: Arg,
     ) -> Result<Vec<Value>, ExecutionError> {
         assert_invariant!(!module_bytes.is_empty(), "empty package is checked in transaction input checker");
         context.gas_charger.charge_upgrade_package(module_bytes.iter().map(|v| v.len()).sum())?;
@@ -529,7 +574,8 @@ mod checked {
             let mut ticket_bytes = Vec::new();
             let ticket_val: Value = context.by_value_arg(CommandKind::Upgrade, 0, upgrade_ticket_arg)?;
             check_param_type::<Mode>(context, 0, &ticket_val, &upgrade_ticket_type)?;
-            ticket_val.write_bcs_bytes(&mut ticket_bytes);
+            let bound = amplification_bound::<Mode>(context, &upgrade_ticket_type, &OnceCell::new())?;
+            ticket_val.write_bcs_bytes(&mut ticket_bytes, bound.map(|b| context.size_bound_raw(b)))?;
             bcs::from_bytes(&ticket_bytes).map_err(|_| {
                 ExecutionError::from_kind(ExecutionErrorKind::CommandArgumentError {
                     arg_idx: 0,
@@ -566,7 +612,7 @@ mod checked {
         substitute_package_id(&mut modules, runtime_id)?;
 
         // Upgraded packages share their predecessor's runtime ID but get a new storage ID.
-        let storage_id = context.tx_context.fresh_id();
+        let storage_id = context.tx_context.borrow_mut().fresh_id();
 
         let dependencies = fetch_packages(context, &dep_ids)?;
         let package = context.upgrade_package(
@@ -578,7 +624,7 @@ mod checked {
 
         context.linkage_view.set_linkage(&package)?;
         let res = publish_and_verify_modules(context, runtime_id, &modules);
-        context.linkage_view.reset_linkage();
+        context.linkage_view.reset_linkage()?;
         res?;
 
         check_compatibility(context, current_package.move_package(), &modules, upgrade_ticket.policy)?;
@@ -607,8 +653,9 @@ mod checked {
             }));
         };
 
+        let pool = &mut normalized::RcPool::new();
         let binary_config = to_binary_config(context.protocol_config);
-        let Ok(current_normalized) = existing_package.normalize(&binary_config) else {
+        let Ok(current_normalized) = existing_package.normalize(pool, &binary_config, /* include code */ true) else {
             invariant_violation!("Tried to normalize modules in existing package but failed")
         };
 
@@ -627,7 +674,8 @@ mod checked {
             ));
         }
 
-        let mut new_normalized = normalize_deserialized_modules(upgrading_modules.iter());
+        let mut new_normalized =
+            normalize_deserialized_modules(pool, upgrading_modules.iter(), /* include code */ true);
         for (name, cur_module) in current_normalized {
             let Some(new_module) = new_normalized.remove(&name) else {
                 return Err(ExecutionError::new_with_source(
@@ -647,8 +695,8 @@ mod checked {
 
     fn check_module_compatibility(
         policy: &UpgradePolicy,
-        cur_module: &normalized::Module,
-        new_module: &normalized::Module,
+        cur_module: &move_binary_format::compatibility::Module,
+        new_module: &move_binary_format::compatibility::Module,
     ) -> Result<(), ExecutionError> {
         match policy {
             UpgradePolicy::Additive => InclusionCheck::Subset.check(cur_module, new_module),
@@ -718,7 +766,7 @@ mod checked {
         match tx_context_kind {
             TxContextKind::None => (),
             TxContextKind::Mutable | TxContextKind::Immutable => {
-                serialized_arguments.push(context.tx_context.to_bcs_legacy_context());
+                serialized_arguments.push(context.tx_context.borrow().to_bcs_legacy_context());
             }
         }
         // script visibility checked manually for entry points
@@ -746,7 +794,7 @@ mod checked {
             let updated_ctx: MoveLegacyTxContext = bcs::from_bytes(&ctx_bytes).map_err(|e| {
                 ExecutionError::invariant_violation(format!("Unable to deserialize TxContext bytes. {e}"))
             })?;
-            context.tx_context.update_state(updated_ctx)?;
+            context.tx_context.borrow_mut().update_state(updated_ctx)?;
         }
         Ok(result)
     }
@@ -945,7 +993,7 @@ mod checked {
                 check_non_entry_signature::<Mode>(context, module_id, function, &signature)?
             }
         };
-        check_private_generics(context, module_id, function, type_arguments)?;
+        check_private_generics(module_id, function)?;
         Ok(LoadedFunctionInfo {
             kind: function_kind,
             signature,
@@ -993,12 +1041,11 @@ mod checked {
                     Type::Reference(_) | Type::MutableReference(_) => {
                         return Err(ExecutionError::from_kind(ExecutionErrorKind::InvalidPublicFunctionReturnType {
                             idx: idx as u16,
-                        }))
+                        }));
                     }
                     t => t,
                 };
-                let abilities =
-                    context.vm.get_runtime().get_type_abilities(return_type).map_err(|e| context.convert_vm_error(e))?;
+                let abilities = context.get_type_abilities(return_type)?;
                 Ok(match return_type {
                     Type::MutableReference(_) | Type::Reference(_) => unreachable!(),
                     Type::TyParam(_) => {
@@ -1035,12 +1082,7 @@ mod checked {
             .collect()
     }
 
-    fn check_private_generics(
-        _context: &mut ExecutionContext,
-        module_id: &ModuleId,
-        function: &IdentStr,
-        _type_arguments: &[Type],
-    ) -> Result<(), ExecutionError> {
+    pub fn check_private_generics(module_id: &ModuleId, function: &IdentStr) -> Result<(), ExecutionError> {
         let module_ident = (module_id.address(), module_id.name());
         if module_ident == (&SUI_FRAMEWORK_ADDRESS, EVENT_MODULE) {
             return Err(ExecutionError::new_with_source(
@@ -1072,7 +1114,7 @@ mod checked {
         function: &IdentStr,
         function_kind: FunctionKind,
         signature: &LoadedFunctionInstantiation,
-        args: &[Argument],
+        args: &[Arg],
     ) -> Result<ArgInfo, ExecutionError> {
         // check the arity
         let parameters = &signature.parameters;
@@ -1126,11 +1168,7 @@ mod checked {
                         let type_ = (*struct_tag).into();
                         ValueKind::Object { type_, has_public_transfer: *has_public_transfer }
                     } else {
-                        let abilities = context
-                            .vm
-                            .get_runtime()
-                            .get_type_abilities(inner)
-                            .map_err(|e| context.convert_vm_error(e))?;
+                        let abilities = context.get_type_abilities(inner)?;
                         ValueKind::Raw((**inner).clone(), abilities)
                     };
                     by_mut_ref.push((idx as LocalIndex, object_info));
@@ -1150,7 +1188,7 @@ mod checked {
             check_param_type::<Mode>(context, idx, &value, non_ref_param_ty)?;
             let bytes = {
                 let mut v = vec![];
-                value.write_bcs_bytes(&mut v);
+                value.write_bcs_bytes(&mut v, None)?;
                 v
             };
             serialized_args.push(bytes);
@@ -1168,7 +1206,14 @@ mod checked {
         match value {
             // For dev-spect, allow any BCS bytes. This does mean internal invariants for types can
             // be violated (like for string or Option)
-            Value::Raw(RawValueType::Any, _) if Mode::allow_arbitrary_values() => return Ok(()),
+            Value::Raw(RawValueType::Any, bytes) if Mode::allow_arbitrary_values() => {
+                if let Some(bound) = amplification_bound_::<Mode>(context, param_ty)? {
+                    let bound = context.size_bound_raw(bound);
+                    return ensure_serialized_size(bytes.len() as u64, bound);
+                } else {
+                    return Ok(());
+                }
+            }
             // Any means this was just some bytes passed in as an argument (as opposed to being
             // generated from a Move function). Meaning we only allow "primitive" values
             // and might need to run validation in addition to the BCS layout
@@ -1241,19 +1286,63 @@ mod checked {
         }
     }
 
+    // Convert a type input which may refer to a type by multiple different IDs and convert it to a
+    // TypeTag that only uses defining IDs.
+    //
+    // It's suboptimal to traverse the type, load, and then go back to a typetag to resolve to
+    // defining IDs in the typetag, but it's the cleanest solution ATM without adding in additional
+    // machinery. With the new linkage resolution that we will be adding this will
+    // be much cleaner however, we'll hold off on adding that in here, and instead add it in the
+    // new execution code.
     fn to_type_tag(
         context: &mut ExecutionContext<'_, '_, '_>,
         type_input: TypeInput,
     ) -> Result<TypeTag, ExecutionError> {
-        if context.protocol_config.validate_identifier_inputs() {
-            type_input
-                .into_type_tag()
-                .map_err(|e| ExecutionError::new_with_source(ExecutionErrorKind::VMInvariantViolation, e.to_string()))
+        let type_tag_no_def_ids = to_type_tag_(context, type_input)?;
+        if context.protocol_config.resolve_type_input_ids_to_defining_id() {
+            let ty = context.load_type(&type_tag_no_def_ids).map_err(|e| context.convert_type_argument_error(0, e))?;
+            context.get_type_tag(&ty)
         } else {
-            // SAFETY: Preserving existing behaviour for identifier deserialization within type
-            // tags and inputs.
-            Ok(unsafe { type_input.into_type_tag_unchecked() })
+            Ok(type_tag_no_def_ids)
         }
+    }
+
+    fn to_type_tag_(
+        context: &mut ExecutionContext<'_, '_, '_>,
+        type_input: TypeInput,
+    ) -> Result<TypeTag, ExecutionError> {
+        use TypeInput as I;
+        use TypeTag as T;
+        let validate_identifiers = context.protocol_config.validate_identifier_inputs();
+        let to_ident = |s: String| {
+            if validate_identifiers {
+                Identifier::new(s).map_err(|e| {
+                    ExecutionError::new_with_source(ExecutionErrorKind::VMInvariantViolation, e.to_string())
+                })
+            } else {
+                // SAFETY: Preserving existing behaviour for identifier deserialization within type
+                // tags and inputs.
+                unsafe { Ok(Identifier::new_unchecked(s)) }
+            }
+        };
+
+        Ok(match type_input {
+            I::Bool => T::Bool,
+            I::U8 => T::U8,
+            I::U16 => T::U16,
+            I::U32 => T::U32,
+            I::U64 => T::U64,
+            I::U128 => T::U128,
+            I::U256 => T::U256,
+            I::Address => T::Address,
+            I::Signer => T::Signer,
+            I::Vector(t) => T::Vector(Box::new(to_type_tag_(context, *t)?)),
+            I::Struct(s) => {
+                let StructInput { address, module, name, type_params } = *s;
+                let type_params = type_params.into_iter().map(|t| to_type_tag_(context, t)).collect::<Result<_, _>>()?;
+                T::Struct(Box::new(StructTag { address, module: to_ident(module)?, name: to_ident(name)?, type_params }))
+            }
+        })
     }
 
     fn get_datatype_ident(s: &CachedDatatype) -> (&AccountAddress, &IdentStr, &IdentStr) {
@@ -1343,6 +1432,71 @@ mod checked {
                 }
             }
         })
+    }
+
+    // We use a `OnceCell` for two reasons. One to cache the ability set for the type so that it
+    // is not recomputed for each element of the vector. And two, to avoid computing the abilities
+    // in the case where `max_ptb_value_size_v2` is false--this removes any case of diverging
+    // based on the result of `get_type_abilities`.
+    fn amplification_bound<Mode: ExecutionMode>(
+        context: &mut ExecutionContext<'_, '_, '_>,
+        param_ty: &Type,
+        abilities: &OnceCell<AbilitySet>,
+    ) -> Result<Option<u64>, ExecutionError> {
+        if context.protocol_config.max_ptb_value_size_v2() {
+            if abilities.get().is_none() {
+                abilities.set(context.get_type_abilities(param_ty)?).unwrap();
+            }
+            if !abilities.get().unwrap().has_copy() {
+                return Ok(None);
+            }
+        }
+        amplification_bound_::<Mode>(context, param_ty)
+    }
+
+    fn amplification_bound_<Mode: ExecutionMode>(
+        context: &mut ExecutionContext<'_, '_, '_>,
+        param_ty: &Type,
+    ) -> Result<Option<u64>, ExecutionError> {
+        // Do not cap size for epoch change/genesis
+        if Mode::packages_are_predefined() {
+            return Ok(None);
+        }
+
+        let Some(bound) = context.protocol_config.max_ptb_value_size_as_option() else {
+            return Ok(None);
+        };
+
+        fn amplification(prim_layout: &PrimitiveArgumentLayout) -> Result<u64, ExecutionError> {
+            use PrimitiveArgumentLayout as PAL;
+            Ok(match prim_layout {
+                PAL::Option(inner_layout) => 1u64 + amplification(inner_layout)?,
+                PAL::Vector(inner_layout) => amplification(inner_layout)?,
+                PAL::Ascii | PAL::UTF8 => 2,
+                PAL::Bool | PAL::U8 | PAL::U16 | PAL::U32 | PAL::U64 => 1,
+                PAL::U128 | PAL::U256 | PAL::Address => 2,
+            })
+        }
+
+        let mut amplification = match primitive_serialization_layout(context, param_ty)? {
+            // No primitive type layout was able to be determined for the type. Assume the worst
+            // and the value is of maximal depth.
+            None => context.protocol_config.max_move_value_depth(),
+            Some(layout) => amplification(&layout)?,
+        };
+
+        // Computed amplification should never be zero
+        debug_assert!(amplification != 0);
+        // We assume here that any value that can be created must be bounded by the max move value
+        // depth so assert that this invariant holds.
+        debug_assert!(
+            context.protocol_config.max_move_value_depth() >= context.protocol_config.max_type_argument_depth() as u64
+        );
+        assert_ne!(context.protocol_config.max_move_value_depth(), 0);
+        if amplification == 0 {
+            amplification = context.protocol_config.max_move_value_depth();
+        }
+        Ok(Some(bound / amplification))
     }
 
     /***************************************************************************************************

@@ -3,18 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    VARIANT_COUNT_MAX,
     account_address::AccountAddress,
-    annotated_visitor::{visit_struct, visit_value, Error as VError, ValueDriver, Visitor},
+    annotated_visitor::{Error as VError, ValueDriver, Visitor, visit_struct, visit_value},
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     runtime_value::{self as R, MOVE_STRUCT_FIELDS, MOVE_STRUCT_TYPE},
-    u256, VARIANT_COUNT_MAX,
+    u256,
 };
 use anyhow::Result as AResult;
 use serde::{
+    Deserialize, Serialize,
     de::Error as DeError,
     ser::{SerializeMap, SerializeSeq, SerializeStruct},
-    Deserialize, Serialize,
 };
 use std::{
     collections::BTreeMap,
@@ -487,7 +488,7 @@ impl<'d> serde::de::Visitor<'d> for DecoratedEnumFieldVisitor<'_> {
                 return Err(A::Error::invalid_type(
                     serde::de::Unexpected::Other(&format!("{val:?}")),
                     &self,
-                ))
+                ));
             }
             None => return Err(A::Error::invalid_length(0, &self)),
         };
@@ -611,7 +612,7 @@ impl fmt::Display for MoveTypeLayout {
 /// Helper type that uses `T`'s `Display` implementation as its own `Debug` implementation, to allow
 /// other `Display` implementations in this module to take advantage of the structured formatting
 /// helpers that Rust uses for its own debug types.
-struct DebugAsDisplay<'a, T>(&'a T);
+pub struct DebugAsDisplay<'a, T>(pub &'a T);
 impl<T: fmt::Display> fmt::Debug for DebugAsDisplay<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {

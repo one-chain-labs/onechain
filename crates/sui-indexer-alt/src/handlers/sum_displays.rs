@@ -7,11 +7,13 @@ use anyhow::{anyhow, Result};
 use diesel::{upsert::excluded, ExpressionMethods};
 use diesel_async::RunQueryDsl;
 use futures::future::try_join_all;
-use sui_field_count::FieldCount;
-use sui_indexer_alt_framework::pipeline::{sequential::Handler, Processor};
+use sui_indexer_alt_framework::{
+    pipeline::{sequential::Handler, Processor},
+    postgres::{Connection, Db},
+    types::{display::DisplayVersionUpdatedEvent, full_checkpoint_content::CheckpointData},
+    FieldCount,
+};
 use sui_indexer_alt_schema::{displays::StoredDisplay, schema::sum_displays};
-use sui_pg_db as db;
-use sui_types::{display::DisplayVersionUpdatedEvent, full_checkpoint_content::CheckpointData};
 
 const MAX_INSERT_CHUNK_ROWS: usize = i16::MAX as usize / StoredDisplay::FIELD_COUNT;
 
@@ -58,6 +60,7 @@ impl Processor for SumDisplays {
 #[async_trait::async_trait]
 impl Handler for SumDisplays {
     type Batch = BTreeMap<Vec<u8>, Self::Value>;
+    type Store = Db;
 
     fn batch(batch: &mut Self::Batch, values: Vec<Self::Value>) {
         for value in values {
@@ -65,7 +68,7 @@ impl Handler for SumDisplays {
         }
     }
 
-    async fn commit(batch: &Self::Batch, conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn commit<'a>(batch: &Self::Batch, conn: &mut Connection<'a>) -> Result<usize> {
         let values: Vec<_> = batch.values().cloned().collect();
         let updates = values.chunks(MAX_INSERT_CHUNK_ROWS).map(|chunk: &[StoredDisplay]| {
             diesel::insert_into(sum_displays::table)

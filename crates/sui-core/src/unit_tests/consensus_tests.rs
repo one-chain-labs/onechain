@@ -39,6 +39,7 @@ use crate::{
     authority::{authority_tests::init_state_with_objects, AuthorityState},
     checkpoints::CheckpointServiceNoop,
     consensus_handler::SequencedConsensusTransaction,
+    execution_scheduler::ExecutionSchedulerAPI,
     mock_consensus::with_block_status,
 };
 
@@ -140,7 +141,7 @@ pub async fn test_user_transaction(
     let mut object_args: Vec<_> = input_objs
         .into_iter()
         .map(|obj| {
-            if obj.is_shared() {
+            if obj.is_consensus() {
                 ObjectArg::SharedObject { id: obj.id(), initial_shared_version: obj.version(), mutable: true }
             } else {
                 ObjectArg::ImmOrOwnedObject(obj.compute_object_reference())
@@ -247,7 +248,7 @@ pub fn make_consensus_adapter_for_test(
             );
 
             if self.execute {
-                self.state.transaction_manager().enqueue(transactions, epoch_store);
+                self.state.execution_scheduler().enqueue(transactions, epoch_store);
             }
 
             assert!(!self.mock_block_status_receivers.lock().is_empty(), "No mock submit responses left");

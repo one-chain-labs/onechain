@@ -12,6 +12,8 @@ use consensus_config::{AuthorityIndex, Committee, NetworkKeyPair, Parameters, Pr
 use consensus_core::{
     network::tonic_network::to_socket_addr,
     transaction::NoopTransactionVerifier,
+    BlockTimestampMs,
+    Clock,
     CommitConsumer,
     CommitConsumerMonitor,
     CommittedSubDag,
@@ -34,6 +36,7 @@ pub(crate) struct Config {
     pub keypairs: Vec<(NetworkKeyPair, ProtocolKeyPair)>,
     pub network_type: ConsensusNetwork,
     pub boot_counter: u64,
+    pub clock_drift: BlockTimestampMs,
     pub protocol_config: ProtocolConfig,
 }
 
@@ -54,7 +57,7 @@ impl AuthorityNode {
 
     /// Start this Node
     pub async fn start(&self) -> Result<()> {
-        info!(index =% self.config.authority_index, "starting in-memory node");
+        info!(index = %self.config.authority_index, "starting in-memory node");
         let config = self.config.clone();
         *self.inner.lock() = Some(AuthorityNodeInner::spawn(config).await);
         Ok(())
@@ -68,7 +71,7 @@ impl AuthorityNode {
             let commit_consumer_monitor = inner.commit_consumer_monitor();
             let _handle = tokio::spawn(async move {
                 while let Some(subdag) = commit_receiver.recv().await {
-                    info!(index =% authority_index, "received committed subdag");
+                    info!(authority =% authority_index, commit_index =% subdag.commit_ref.index, "Received committed subdag");
                     commit_consumer_monitor.set_highest_handled_commit(subdag.commit_ref.index);
                 }
             });
@@ -236,7 +239,16 @@ impl AuthorityNodeInner {
 pub(crate) async fn make_authority(
     config: Config,
 ) -> (ConsensusAuthority, UnboundedReceiver<CommittedSubDag>, Arc<CommitConsumerMonitor>) {
-    let Config { authority_index, db_dir, committee, keypairs, network_type, boot_counter, protocol_config } = config;
+    let Config {
+        authority_index,
+        db_dir,
+        committee,
+        keypairs,
+        network_type,
+        boot_counter,
+        protocol_config,
+        clock_drift,
+    } = config;
 
     let registry = Registry::new();
 
@@ -259,12 +271,14 @@ pub(crate) async fn make_authority(
 
     let authority = ConsensusAuthority::start(
         network_type,
+        0,
         authority_index,
         committee,
         parameters,
         protocol_config,
         protocol_keypair,
         network_keypair,
+        Arc::new(Clock::new_for_test(clock_drift)),
         Arc::new(txn_verifier),
         commit_consumer,
         registry,

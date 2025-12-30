@@ -44,6 +44,7 @@ pub enum Keystore {
 #[enum_dispatch]
 pub trait AccountKeystore: Send + Sync {
     fn add_key(&mut self, alias: Option<String>, keypair: SuiKeyPair) -> Result<(), anyhow::Error>;
+    fn remove_key(&mut self, address: SuiAddress) -> Result<(), anyhow::Error>;
     fn keys(&self) -> Vec<PublicKey>;
     fn get_key(&self, address: &SuiAddress) -> Result<&SuiKeyPair, anyhow::Error>;
 
@@ -196,6 +197,13 @@ impl AccountKeystore for FileBasedKeystore {
         let alias = self.create_alias(alias)?;
         self.aliases.insert(address, Alias { alias, public_key_base64: keypair.public().encode_base64() });
         self.keys.insert(address, keypair);
+        self.save()?;
+        Ok(())
+    }
+
+    fn remove_key(&mut self, address: SuiAddress) -> Result<(), anyhow::Error> {
+        self.aliases.remove(&address);
+        self.keys.remove(&address);
         self.save()?;
         Ok(())
     }
@@ -402,6 +410,12 @@ impl AccountKeystore for InMemKeystore {
         let alias = Alias { alias, public_key_base64 };
         self.aliases.insert(address, alias);
         self.keys.insert(address, keypair);
+        Ok(())
+    }
+
+    fn remove_key(&mut self, address: SuiAddress) -> Result<(), anyhow::Error> {
+        self.aliases.remove(&address);
+        self.keys.remove(&address);
         Ok(())
     }
 

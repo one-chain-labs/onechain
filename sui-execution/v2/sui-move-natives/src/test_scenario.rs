@@ -126,8 +126,8 @@ pub fn end_transaction(
             Owner::Immutable => {
                 inventories.immutable_inventory.entry(ty).or_default().insert(id);
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         }
     }
@@ -477,8 +477,8 @@ fn transaction_effects(
             Owner::ObjectOwner(o) => transferred_to_object.push((pack_id(id), pack_id(o))),
             Owner::Shared { .. } => shared.push(id),
             Owner::Immutable => frozen.push(id),
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         }
     }

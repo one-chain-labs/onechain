@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    object_change::{ObjectIn, ObjectOut},
+    object_change::{AccumulatorWriteV1, ObjectIn, ObjectOut},
     EffectsObjectChange,
     IDOperation,
     ObjectChange,
@@ -29,7 +29,7 @@ use crate::{
     digests::{EffectsAuxDataDigest, TransactionEventsDigest},
     effects::{InputSharedObject, TransactionEffectsAPI},
     execution::SharedInput,
-    execution_status::ExecutionStatus,
+    execution_status::{ExecutionFailureStatus, ExecutionStatus, MoveLocation},
     gas::GasCostSummary,
     object::{Owner, OBJECT_START_VERSION},
 };
@@ -57,6 +57,12 @@ pub struct TransactionEffectsV2 {
     /// The version number of all the written Move objects by this transaction.
     pub(crate) lamport_version: SequenceNumber,
     /// Objects whose state are changed in the object store.
+    /// This field should not be exposed to the public API.
+    /// Otherwise it will make it harder to use effects of different versions.
+    /// Note that for accumulator writes, the ObjectID here will be the dynamic field object ID
+    /// that stores the accumulator value. However this object is not really mutated
+    /// in this transaction. We just have to use an ObjectID that is unique so that
+    /// it does not conflict with any other object IDs in the changed_objects.
     changed_objects: Vec<(ObjectID, EffectsObjectChange)>,
     /// Shared objects that are not mutated in this transaction. Unlike owned objects,
     /// read-only shared objects' version are not committed in the transaction,
@@ -95,6 +101,15 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
             .collect()
     }
 
+    fn move_abort(&self) -> Option<(MoveLocation, u64)> {
+        let ExecutionStatus::Failure { error: ExecutionFailureStatus::MoveAbort(move_location, code), .. } =
+            self.status()
+        else {
+            return None;
+        };
+        Some((move_location.clone(), *code))
+    }
+
     fn lamport_version(&self) -> SequenceNumber {
         self.lamport_version
     }
@@ -116,7 +131,7 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
         self.changed_objects
             .iter()
             .filter_map(|(id, change)| match &change.input_state {
-                ObjectIn::Exist(((version, digest), Owner::Shared { .. })) => {
+                ObjectIn::Exist(((version, digest), owner)) if owner.is_consensus() => {
                     Some(InputSharedObject::Mutate((*id, *version, *digest)))
                 }
                 _ => None,
@@ -125,8 +140,12 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
                 UnchangedSharedKind::ReadOnlyRoot((version, digest)) => {
                     Some(InputSharedObject::ReadOnly((*id, *version, *digest)))
                 }
-                UnchangedSharedKind::MutateDeleted(seqno) => Some(InputSharedObject::MutateDeleted(*id, *seqno)),
-                UnchangedSharedKind::ReadDeleted(seqno) => Some(InputSharedObject::ReadDeleted(*id, *seqno)),
+                UnchangedSharedKind::MutateConsensusStreamEnded(seqno) => {
+                    Some(InputSharedObject::MutateConsensusStreamEnded(*id, *seqno))
+                }
+                UnchangedSharedKind::ReadConsensusStreamEnded(seqno) => {
+                    Some(InputSharedObject::ReadConsensusStreamEnded(*id, *seqno))
+                }
                 UnchangedSharedKind::Cancelled(seqno) => Some(InputSharedObject::Cancelled(*id, *seqno)),
                 // We can not expose the per epoch config object as input shared object,
                 // since it does not require sequencing, and hence shall not be considered
@@ -214,10 +233,55 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
             .collect()
     }
 
+    fn transferred_from_consensus(&self) -> Vec<ObjectRef> {
+        self.changed_objects
+            .iter()
+            .filter_map(|(id, change)| match (&change.input_state, &change.output_state, &change.id_operation) {
+                (
+                    ObjectIn::Exist((_, Owner::ConsensusAddressOwner { .. })),
+                    ObjectOut::ObjectWrite((
+                        object_digest,
+                        Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable,
+                    )),
+                    IDOperation::None,
+                ) => Some((*id, self.lamport_version, *object_digest)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn transferred_to_consensus(&self) -> Vec<ObjectRef> {
+        self.changed_objects
+            .iter()
+            .filter_map(|(id, change)| match (&change.input_state, &change.output_state, &change.id_operation) {
+                (
+                    ObjectIn::Exist((_, Owner::AddressOwner(_) | Owner::ObjectOwner(_))),
+                    ObjectOut::ObjectWrite((object_digest, Owner::ConsensusAddressOwner { .. })),
+                    IDOperation::None,
+                ) => Some((*id, self.lamport_version, *object_digest)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn consensus_owner_changed(&self) -> Vec<ObjectRef> {
+        self.changed_objects
+            .iter()
+            .filter_map(|(id, change)| match (&change.input_state, &change.output_state, &change.id_operation) {
+                (
+                    ObjectIn::Exist((_, Owner::ConsensusAddressOwner { owner: old_owner, .. })),
+                    ObjectOut::ObjectWrite((object_digest, Owner::ConsensusAddressOwner { owner: new_owner, .. })),
+                    IDOperation::None,
+                ) if old_owner != new_owner => Some((*id, self.lamport_version, *object_digest)),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn object_changes(&self) -> Vec<ObjectChange> {
         self.changed_objects
             .iter()
-            .map(|(id, change)| {
+            .filter_map(|(id, change)| {
                 let input_version_digest = match &change.input_state {
                     ObjectIn::NotExist => None,
                     ObjectIn::Exist((vd, _)) => Some(*vd),
@@ -227,9 +291,12 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
                     ObjectOut::NotExist => None,
                     ObjectOut::ObjectWrite((d, _)) => Some((self.lamport_version, *d)),
                     ObjectOut::PackageWrite(vd) => Some(*vd),
+                    ObjectOut::AccumulatorWriteV1(_) => {
+                        return None;
+                    }
                 };
 
-                ObjectChange {
+                Some(ObjectChange {
                     id: *id,
 
                     input_version: input_version_digest.map(|k| k.0),
@@ -239,7 +306,7 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
                     output_digest: output_version_digest.map(|k| k.1),
 
                     id_operation: change.id_operation,
-                }
+                })
             })
             .collect()
     }
@@ -276,6 +343,16 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
         self.unchanged_shared_objects.clone()
     }
 
+    fn accumulator_updates(&self) -> Vec<(ObjectID, AccumulatorWriteV1)> {
+        self.changed_objects
+            .iter()
+            .filter_map(|(id, change)| match &change.output_state {
+                ObjectOut::AccumulatorWriteV1(update) => Some((*id, update.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn status_mut_for_testing(&mut self) -> &mut ExecutionStatus {
         &mut self.status
     }
@@ -304,11 +381,11 @@ impl TransactionEffectsAPI for TransactionEffectsV2 {
             InputSharedObject::ReadOnly(obj_ref) => self
                 .unchanged_shared_objects
                 .push((obj_ref.0, UnchangedSharedKind::ReadOnlyRoot((obj_ref.1, obj_ref.2)))),
-            InputSharedObject::ReadDeleted(obj_id, seqno) => {
-                self.unchanged_shared_objects.push((obj_id, UnchangedSharedKind::ReadDeleted(seqno)))
+            InputSharedObject::ReadConsensusStreamEnded(obj_id, seqno) => {
+                self.unchanged_shared_objects.push((obj_id, UnchangedSharedKind::ReadConsensusStreamEnded(seqno)))
             }
-            InputSharedObject::MutateDeleted(obj_id, seqno) => {
-                self.unchanged_shared_objects.push((obj_id, UnchangedSharedKind::MutateDeleted(seqno)))
+            InputSharedObject::MutateConsensusStreamEnded(obj_id, seqno) => {
+                self.unchanged_shared_objects.push((obj_id, UnchangedSharedKind::MutateConsensusStreamEnded(seqno)))
             }
             InputSharedObject::Cancelled(obj_id, seqno) => {
                 self.unchanged_shared_objects.push((obj_id, UnchangedSharedKind::Cancelled(seqno)))
@@ -357,12 +434,12 @@ impl TransactionEffectsV2 {
                         Some((id, UnchangedSharedKind::ReadOnlyRoot((version, digest))))
                     }
                 }
-                SharedInput::Deleted((id, version, mutable, _)) => {
+                SharedInput::ConsensusStreamEnded((id, version, mutable, _)) => {
                     debug_assert!(!changed_objects.contains_key(&id));
                     if mutable {
-                        Some((id, UnchangedSharedKind::MutateDeleted(version)))
+                        Some((id, UnchangedSharedKind::MutateConsensusStreamEnded(version)))
                     } else {
-                        Some((id, UnchangedSharedKind::ReadDeleted(version)))
+                        Some((id, UnchangedSharedKind::ReadConsensusStreamEnded(version)))
                     }
                 }
                 SharedInput::Cancelled((id, version)) => {
@@ -459,6 +536,9 @@ impl TransactionEffectsV2 {
                     assert_eq!(old_version.value() + 1, new_version.value());
                     assert_ne!(old_digest, new_digest);
                 }
+                (ObjectIn::NotExist, ObjectOut::AccumulatorWriteV1(_), IDOperation::None) => {
+                    // This is an accumulator write.
+                }
                 _ => {
                     panic!("Impossible object change: {:?}, {:?}", id, change);
                 }
@@ -471,10 +551,6 @@ impl TransactionEffectsV2 {
         for (id, _) in &self.unchanged_shared_objects {
             assert!(unique_ids.insert(*id), "Duplicate object id: {:?}\n{:#?}", id, self);
         }
-    }
-
-    pub fn changed_objects(&self) -> &[(ObjectID, EffectsObjectChange)] {
-        &self.changed_objects
     }
 }
 
@@ -501,10 +577,10 @@ pub enum UnchangedSharedKind {
     /// Read-only shared objects from the input. We don't really need ObjectDigest
     /// for protocol correctness, but it will make it easier to verify untrusted read.
     ReadOnlyRoot(VersionDigest),
-    /// Deleted shared objects that appear mutably/owned in the input.
-    MutateDeleted(SequenceNumber),
-    /// Deleted shared objects that appear as read-only in the input.
-    ReadDeleted(SequenceNumber),
+    /// Objects with ended consensus streams that appear mutably/owned in the input.
+    MutateConsensusStreamEnded(SequenceNumber),
+    /// Objects with ended consensus streams objects that appear as read-only in the input.
+    ReadConsensusStreamEnded(SequenceNumber),
     /// Shared objects in cancelled transaction. The sequence number embed cancellation reason.
     Cancelled(SequenceNumber),
     /// Read of a per-epoch config object that should remain the same during an epoch.

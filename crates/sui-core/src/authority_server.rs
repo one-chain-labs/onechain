@@ -6,19 +6,22 @@ use std::{
     io,
     net::{IpAddr, SocketAddr},
     sync::Arc,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use anyhow::Result;
 use async_trait::async_trait;
 use fastcrypto::traits::KeyPair;
+use futures::TryFutureExt;
 use mysten_metrics::spawn_monitored_task;
 use mysten_network::server::SUI_TLS_SERVER_NAME;
 use nonempty::{nonempty, NonEmpty};
 use prometheus::{
+    register_gauge_with_registry,
     register_histogram_with_registry,
     register_int_counter_vec_with_registry,
     register_int_counter_with_registry,
+    Gauge,
     Histogram,
     IntCounter,
     IntCounterVec,
@@ -30,9 +33,10 @@ use sui_network::{
     tonic,
 };
 use sui_types::{
-    effects::TransactionEffectsAPI,
+    effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::*,
     fp_ensure,
+    message_envelope::Message,
     messages_checkpoint::{CheckpointRequest, CheckpointRequestV2, CheckpointResponse, CheckpointResponseV2},
     messages_consensus::{ConsensusTransaction, ConsensusTransactionKind},
     messages_grpc::{
@@ -41,39 +45,53 @@ use sui_types::{
         HandleCertificateResponseV3,
         HandleSoftBundleCertificatesRequestV3,
         HandleSoftBundleCertificatesResponseV3,
-        HandleTransactionRequestV2,
         HandleTransactionResponse,
-        HandleTransactionResponseV2,
         ObjectInfoRequest,
         ObjectInfoResponse,
+        RawSubmitTxRequest,
+        RawSubmitTxResponse,
+        RawWaitForEffectsRequest,
+        RawWaitForEffectsResponse,
         SubmitCertificateResponse,
+        SubmitTxResponse,
         SystemStateRequest,
         TransactionInfoRequest,
         TransactionInfoResponse,
     },
     multiaddr::Multiaddr,
+    object::Object,
     sui_system_state::SuiSystemState,
     traffic_control::{ClientIdSource, PolicyConfig, RemoteFirewallConfig, Weight},
     transaction::*,
 };
 use tap::TapFallible;
+use tokio::time::timeout;
 use tonic::{
     metadata::{Ascii, MetadataValue},
     transport::server::TcpConnectInfo,
 };
-use tracing::{error, error_span, info, Instrument};
+use tracing::{debug, error, error_span, info, Instrument};
 
 use crate::{
-    authority::{authority_per_epoch_store::AuthorityPerEpochStore, AuthorityState},
+    authority::{
+        authority_per_epoch_store::AuthorityPerEpochStore,
+        consensus_tx_status_cache::{ConsensusTxStatus, NotifyReadConsensusTxStatusResult},
+        AuthorityState,
+    },
     checkpoints::CheckpointStore,
     consensus_adapter::{ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics},
     mysticeti_adapter::LazyMysticetiClient,
     traffic_controller::{metrics::TrafficControllerMetrics, parse_ip, policies::TrafficTally, TrafficController},
+    wait_for_effects_request::{ExecutedData, RejectReason, WaitForEffectsRequest, WaitForEffectsResponse},
 };
 
 #[cfg(test)]
 #[path = "unit_tests/server_tests.rs"]
 mod server_tests;
+
+#[cfg(test)]
+#[path = "unit_tests/wait_for_effects_tests.rs"]
+mod wait_for_effects_tests;
 
 pub struct AuthorityServerHandle {
     server_handle: mysten_network::server::Server,
@@ -162,7 +180,7 @@ pub struct ValidatorServiceMetrics {
     pub cert_verification_latency: Histogram,
     pub consensus_latency: Histogram,
     pub handle_transaction_latency: Histogram,
-    pub handle_transaction_v2_latency: Histogram,
+    pub handle_submit_transaction_latency: Histogram,
     pub submit_certificate_consensus_latency: Histogram,
     pub handle_certificate_consensus_latency: Histogram,
     pub handle_certificate_non_consensus_latency: Histogram,
@@ -170,6 +188,7 @@ pub struct ValidatorServiceMetrics {
     pub handle_soft_bundle_certificates_count: Histogram,
     pub handle_soft_bundle_certificates_size_bytes: Histogram,
     pub handle_transaction_consensus_latency: Histogram,
+    pub handle_submit_transaction_consensus_latency: Histogram,
 
     num_rejected_tx_in_epoch_boundary: IntCounter,
     num_rejected_cert_in_epoch_boundary: IntCounter,
@@ -180,6 +199,7 @@ pub struct ValidatorServiceMetrics {
     forwarded_header_invalid: IntCounter,
     forwarded_header_not_included: IntCounter,
     client_id_source_config_mismatch: IntCounter,
+    x_forwarded_for_num_hops: Gauge,
 }
 
 impl ValidatorServiceMetrics {
@@ -219,9 +239,9 @@ impl ValidatorServiceMetrics {
                 registry,
             )
             .unwrap(),
-            handle_transaction_v2_latency: register_histogram_with_registry!(
-                "validator_service_handle_transaction_v2_latency",
-                "Latency of v2 transaction handler",
+            handle_submit_transaction_latency: register_histogram_with_registry!(
+                "validator_service_submit_transaction_latency",
+                "Latency of submit transaction handler",
                 mysten_metrics::SUBSECOND_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
             )
@@ -271,6 +291,13 @@ impl ValidatorServiceMetrics {
             handle_transaction_consensus_latency: register_histogram_with_registry!(
                 "validator_service_handle_transaction_consensus_latency",
                 "Latency of handling a user transaction sent through consensus",
+                mysten_metrics::COARSE_LATENCY_SEC_BUCKETS.to_vec(),
+                registry,
+            )
+            .unwrap(),
+            handle_submit_transaction_consensus_latency: register_histogram_with_registry!(
+                "validator_service_submit_transaction_consensus_latency",
+                "Latency of submitting a user transaction sent through consensus",
                 mysten_metrics::COARSE_LATENCY_SEC_BUCKETS.to_vec(),
                 registry,
             )
@@ -328,6 +355,12 @@ impl ValidatorServiceMetrics {
             client_id_source_config_mismatch: register_int_counter_with_registry!(
                 "validator_service_client_id_source_config_mismatch",
                 "Number of times detected that client id source config doesn't agree with x-forwarded-for header",
+                registry,
+            )
+            .unwrap(),
+            x_forwarded_for_num_hops: register_gauge_with_registry!(
+                "validator_service_x_forwarded_for_num_hops",
+                "Number of hops in x-forwarded-for header",
                 registry,
             )
             .unwrap(),
@@ -398,7 +431,7 @@ impl ValidatorService {
     }
 
     // When making changes to this function, see if the changes should be applied to
-    // `Self::handle_transaction_v2()` and `SuiTxValidator::vote_transaction()` as well.
+    // `Self::handle_submit_transaction()` and `SuiTxValidator::vote_transaction()` as well.
     async fn handle_transaction(
         &self,
         request: tonic::Request<Transaction>,
@@ -459,24 +492,25 @@ impl ValidatorService {
         Ok((tonic::Response::new(info), Weight::zero()))
     }
 
-    async fn handle_transaction_v2(
+    async fn handle_submit_transaction(
         &self,
-        request: tonic::Request<HandleTransactionRequestV2>,
-    ) -> WrappedServiceResponse<HandleTransactionResponseV2> {
+        request: tonic::Request<RawSubmitTxRequest>,
+    ) -> WrappedServiceResponse<RawSubmitTxResponse> {
         let Self { state, consensus_adapter, metrics, traffic_controller: _, client_id_source: _ } = self.clone();
         let epoch_store = state.load_epoch_store_one_call_per_task();
         if !epoch_store.protocol_config().mysticeti_fastpath() {
             return Err(SuiError::UnsupportedFeatureError { error: "Mysticeti fastpath".to_string() }.into());
         }
 
-        let HandleTransactionRequestV2 {
-            transaction,
-            include_events,
-            include_input_objects,
-            include_output_objects,
-            include_auxiliary_data,
-        } = request.into_inner();
-
+        let request = request.into_inner();
+        let transaction =
+            bcs::from_bytes::<Transaction>(&request.transaction).map_err(|e| SuiError::GrpcMessageDeserializeError {
+                type_info: "RawSubmitTxRequest.transaction".to_string(),
+                error: e.to_string(),
+            })?;
+        let include_events = request.include_events;
+        let include_input_objects = request.include_input_objects;
+        let include_output_objects = request.include_output_objects;
         transaction.validity_check(epoch_store.protocol_config(), epoch_store.epoch())?;
 
         // Check system overload
@@ -490,7 +524,7 @@ impl ValidatorService {
             return Err(error.into());
         }
 
-        let _handle_tx_metrics_guard = metrics.handle_transaction_v2_latency.start_timer();
+        let _handle_tx_metrics_guard = metrics.handle_submit_transaction_latency.start_timer();
 
         let transaction = {
             let _metrics_guard = metrics.tx_verification_latency.start_timer();
@@ -501,7 +535,7 @@ impl ValidatorService {
 
         // Enable Trace Propagation across spans/processes using tx_digest
         let tx_digest = transaction.digest();
-        let _span = error_span!("validator_state_handle_tx_v2", ?tx_digest);
+        let _span = error_span!("validator_state_submit_transaction", ?tx_digest);
 
         let tx_output = state.handle_vote_transaction(&epoch_store, transaction.clone()).tap_err(|e| {
             if let SuiError::ValidatorHaltedAtEpochEnd = e {
@@ -516,38 +550,43 @@ impl ValidatorService {
                 include_output_objects.then(|| state.get_transaction_output_objects(&effects)).and_then(Result::ok);
 
             return Ok((
-                tonic::Response::new(HandleTransactionResponseV2 {
+                tonic::Response::new(RawSubmitTxResponse::into_raw(
                     effects,
-                    events: include_events.then_some(events),
+                    include_events,
+                    Some(events),
                     input_objects,
                     output_objects,
-                    auxiliary_data: None, // We don't have any aux data generated presently
-                }),
+                )?),
                 Weight::zero(),
             ));
         }
 
-        let _latency_metric_guard = metrics.handle_transaction_consensus_latency.start_timer();
-        let span = error_span!("handle_transaction_v2", tx_digest = ?transaction.digest());
+        let _latency_metric_guard = metrics.handle_submit_transaction_consensus_latency.start_timer();
+        let span = error_span!("submit_transaction", tx_digest = ?transaction.digest());
         self.handle_submit_to_consensus(
             nonempty![ConsensusTransaction::new_user_transaction_message(&self.state.name, transaction.into())],
             include_events,
             include_input_objects,
             include_output_objects,
-            include_auxiliary_data,
+            false,
             &epoch_store,
             true,
         )
         .instrument(span)
         .await
-        .map(|(resp, spam_weight)| {
-            (
-                tonic::Response::new(
-                    resp.expect("handle_submit_to_consensus should not return none with wait_for_effects=true")
-                        .remove(0),
-                ),
-                spam_weight,
-            )
+        .and_then(|(resp, spam_weight)| {
+            let transaction_response =
+                resp.expect("handle_submit_to_consensus should not return none with wait_for_effects=true").remove(0);
+
+            let submit_transaction_response = RawSubmitTxResponse::into_raw(
+                transaction_response.effects,
+                include_events,
+                transaction_response.events,
+                transaction_response.input_objects,
+                transaction_response.output_objects,
+            )?;
+
+            Ok((tonic::Response::new(submit_transaction_response), spam_weight))
         })
     }
 
@@ -597,8 +636,8 @@ impl ValidatorService {
 
             if let Some(signed_effects) = self.state.get_signed_effects_and_maybe_resign(&tx_digest, epoch_store)? {
                 let events = if include_events {
-                    if let Some(digest) = signed_effects.events_digest() {
-                        Some(self.state.get_transaction_events(digest)?)
+                    if signed_effects.events_digest().is_some() {
+                        Some(self.state.get_transaction_events(signed_effects.transaction_digest())?)
                     } else {
                         None
                     }
@@ -691,7 +730,7 @@ impl ValidatorService {
         _include_auxiliary_data: bool,
         epoch_store: &Arc<AuthorityPerEpochStore>,
         wait_for_effects: bool,
-    ) -> Result<(Option<Vec<HandleTransactionResponseV2>>, Weight), tonic::Status> {
+    ) -> Result<(Option<Vec<SubmitTxResponse>>, Weight), tonic::Status> {
         let consensus_transactions: Vec<_> = consensus_transactions.into();
         {
             // code block within reconfiguration lock
@@ -750,7 +789,7 @@ impl ValidatorService {
                         // Certificates already verified by callers of this function.
                         let certificate = VerifiedCertificate::new_unchecked(*(certificate.clone()));
                         self.state
-                            .execute_certificate(&certificate, epoch_store)
+                            .wait_for_certificate_execution(&certificate, epoch_store)
                             .await?
                     }
                     ConsensusTransactionKind::UserTransaction(tx) => {
@@ -759,8 +798,8 @@ impl ValidatorService {
                     _ => panic!("`handle_submit_to_consensus` received transaction that is not a CertifiedTransaction or UserTransaction"),
                 };
                 let events = if include_events {
-                    if let Some(digest) = effects.events_digest() {
-                        Some(self.state.get_transaction_events(digest)?)
+                    if effects.events_digest().is_some() {
+                        Some(self.state.get_transaction_events(effects.transaction_digest())?)
                     } else {
                         None
                     }
@@ -781,7 +820,7 @@ impl ValidatorService {
                     // TODO(fastpath): Make sure consensus handler does this for a UserTransaction.
                 }
 
-                Ok::<_, SuiError>(HandleTransactionResponseV2 {
+                Ok::<_, SuiError>(SubmitTxResponse {
                     effects,
                     events,
                     input_objects,
@@ -793,6 +832,28 @@ impl ValidatorService {
         .await?;
 
         Ok((Some(responses), Weight::zero()))
+    }
+
+    async fn collect_effects_data(
+        &self,
+        effects: &TransactionEffects,
+        include_events: bool,
+        include_input_objects: bool,
+        include_output_objects: bool,
+    ) -> SuiResult<(Option<TransactionEvents>, Vec<Object>, Vec<Object>)> {
+        let events = if include_events && effects.events_digest().is_some() {
+            Some(self.state.get_transaction_events(effects.transaction_digest())?)
+        } else {
+            None
+        };
+
+        let input_objects =
+            if include_input_objects { self.state.get_transaction_input_objects(effects)? } else { vec![] };
+
+        let output_objects =
+            if include_output_objects { self.state.get_transaction_output_objects(effects)? } else { vec![] };
+
+        Ok((events, input_objects, output_objects))
     }
 }
 
@@ -806,11 +867,11 @@ impl ValidatorService {
         self.handle_transaction(request).await
     }
 
-    async fn transaction_v2_impl(
+    async fn handle_submit_transaction_impl(
         &self,
-        request: tonic::Request<HandleTransactionRequestV2>,
-    ) -> WrappedServiceResponse<HandleTransactionResponseV2> {
-        self.handle_transaction_v2(request).await
+        request: tonic::Request<RawSubmitTxRequest>,
+    ) -> WrappedServiceResponse<RawSubmitTxResponse> {
+        self.handle_submit_transaction(request).await
     }
 
     async fn submit_certificate_impl(
@@ -887,6 +948,129 @@ impl ValidatorService {
                 spam_weight,
             )
         })
+    }
+
+    async fn wait_for_effects_impl(
+        &self,
+        request: tonic::Request<RawWaitForEffectsRequest>,
+    ) -> WrappedServiceResponse<RawWaitForEffectsResponse> {
+        let request: WaitForEffectsRequest = request.into_inner().try_into()?;
+        let epoch_store = self.state.load_epoch_store_one_call_per_task();
+        let response = timeout(
+            // TODO(fastpath): Tune this once we have a good estimate of the typical delay.
+            Duration::from_secs(20),
+            epoch_store
+                .within_alive_epoch(self.wait_for_effects_response(request, &epoch_store))
+                .map_err(|_| SuiError::EpochEnded(epoch_store.epoch())),
+        )
+        .await
+        .map_err(|_| tonic::Status::internal("Timeout waiting for effects"))???
+        .try_into()?;
+        Ok((
+            tonic::Response::new(response),
+            // TODO(fastpath): Implement spam weight
+            Weight::zero(),
+        ))
+    }
+
+    // TODO(fastpath): Add metrics.
+    async fn wait_for_effects_response(
+        &self,
+        request: WaitForEffectsRequest,
+        epoch_store: &Arc<AuthorityPerEpochStore>,
+    ) -> SuiResult<WaitForEffectsResponse> {
+        let Some(consensus_tx_status_cache) = epoch_store.consensus_tx_status_cache.as_ref() else {
+            return Err(SuiError::UnsupportedFeatureError { error: "Mysticeti fastpath".to_string() });
+        };
+        if request.epoch != epoch_store.epoch() {
+            return Err(SuiError::WrongEpoch { expected_epoch: epoch_store.epoch(), actual_epoch: request.epoch });
+        }
+        consensus_tx_status_cache.check_position_too_ahead(&request.transaction_position)?;
+
+        // Because we need to associate effects with a specific transaction position,
+        // we need to first make sure that this specific position is accepted by consensus,
+        // either with fastpath certified or post-commit finalized.
+        let first_status =
+            consensus_tx_status_cache.notify_read_transaction_status(request.transaction_position, None).await;
+        debug!(
+            tx_digest = ?request.transaction_digest,
+            "Observed consensus transaction status: {:?}",
+            first_status
+        );
+        let mut cur_status = match first_status {
+            NotifyReadConsensusTxStatusResult::Status(status) => match status {
+                ConsensusTxStatus::Rejected => {
+                    let response = WaitForEffectsResponse::Rejected {
+                        // TODO(fastpath): Add reject reason.
+                        reason: RejectReason::None,
+                    };
+                    return Ok(response);
+                }
+                ConsensusTxStatus::FastpathCertified | ConsensusTxStatus::Finalized => status,
+            },
+            NotifyReadConsensusTxStatusResult::Expired(round) => {
+                return Ok(WaitForEffectsResponse::Expired(round));
+            }
+        };
+        // Now that we know the transaction position is accepted by consensus,
+        // we can wait for the effects to be executed.
+        // In the meantime, however, if the initial status is fastpath certified,
+        // it is still possible that the transaction is rejected post commit.
+        // So we need to keep checking the status until it is finalized.
+        let effects = loop {
+            let transactions = [request.transaction_digest];
+            tokio::select! {
+                second_status = consensus_tx_status_cache.notify_read_transaction_status(request.transaction_position, Some(cur_status)) => {
+                    debug!(
+                        tx_digest = ?request.transaction_digest,
+                        "Observed consensus transaction status: {:?}",
+                        second_status
+                    );
+                    match second_status {
+                        NotifyReadConsensusTxStatusResult::Status(status) => {
+                            if status == ConsensusTxStatus::Rejected {
+                                return Ok(WaitForEffectsResponse::Rejected { reason: RejectReason::None });
+                            }
+                            assert!(matches!(status, ConsensusTxStatus::Finalized));
+                            // Update the current status so that notify_read_transaction_status will no
+                            // longer be triggered again after the transaction is finalized.
+                            cur_status = status;
+                            continue;
+                        }
+                        NotifyReadConsensusTxStatusResult::Expired(round) => {
+                            return Ok(WaitForEffectsResponse::Expired(round));
+                        }
+                    }
+                },
+                mut effects = self.state
+                    .get_transaction_cache_reader()
+                    .notify_read_executed_effects(&transactions) => {
+                    debug!(
+                        tx_digest = ?request.transaction_digest,
+                        "Observed executed effects",
+                    );
+                    // unwrap is safe because notify_read_executed_effects is expected
+                    // to return the same amount of effects as the provided transactions.
+                    break effects.pop().unwrap();
+                },
+            }
+        };
+        let effects_digest = effects.digest();
+        let details = if request.include_details {
+            let (events, input_objects, output_objects) = self
+                .collect_effects_data(
+                    &effects,
+                    request.include_details,
+                    request.include_details,
+                    request.include_details,
+                )
+                .await?;
+            Some(Box::new(ExecutedData { effects, events, input_objects, output_objects }))
+        } else {
+            None
+        };
+        let response = WaitForEffectsResponse::Executed { effects_digest, details };
+        Ok(response)
     }
 
     async fn soft_bundle_validity_check(
@@ -1073,6 +1257,14 @@ impl ValidatorService {
     }
 
     fn get_client_ip_addr<T>(&self, request: &tonic::Request<T>, source: &ClientIdSource) -> Option<IpAddr> {
+        let forwarded_header = request.metadata().get_all("x-forwarded-for").iter().next();
+
+        if let Some(header) = forwarded_header {
+            let num_hops = header.to_str().map(|h| h.split(',').count().saturating_sub(1)).unwrap_or(0);
+
+            self.metrics.x_forwarded_for_num_hops.set(num_hops as f64);
+        }
+
         match source {
             ClientIdSource::SocketAddr => {
                 let socket_addr: Option<SocketAddr> = request.remote_addr();
@@ -1126,7 +1318,7 @@ impl ValidatorService {
                             }
                             let Some(client_ip) = header_contents.get(contents_len - num_hops) else {
                                 error!(
-                                    "x-forwarded-for header value of {:?} contains {} values, but {} hops were specificed. \
+                                    "x-forwarded-for header value of {:?} contains {} values, but {} hops were specified. \
                                     Expected at least {} values. Skipping traffic controller request handling.",
                                     header_contents,
                                     contents_len,
@@ -1250,6 +1442,23 @@ macro_rules! handle_with_decoration {
 
 #[async_trait]
 impl Validator for ValidatorService {
+    async fn submit_transaction(
+        &self,
+        request: tonic::Request<RawSubmitTxRequest>,
+    ) -> Result<tonic::Response<RawSubmitTxResponse>, tonic::Status> {
+        let validator_service = self.clone();
+
+        // Spawns a task which handles the transaction. The task will unconditionally continue
+        // processing in the event that the client connection is dropped.
+        spawn_monitored_task!(async move {
+            // NB: traffic tally wrapping handled within the task rather than on task exit
+            // to prevent an attacker from subverting traffic control by severing the connection
+            handle_with_decoration!(validator_service, handle_submit_transaction_impl, request)
+        })
+        .await
+        .unwrap()
+    }
+
     async fn transaction(
         &self,
         request: tonic::Request<Transaction>,
@@ -1262,23 +1471,6 @@ impl Validator for ValidatorService {
             // NB: traffic tally wrapping handled within the task rather than on task exit
             // to prevent an attacker from subverting traffic control by severing the connection
             handle_with_decoration!(validator_service, transaction_impl, request)
-        })
-        .await
-        .unwrap()
-    }
-
-    async fn transaction_v2(
-        &self,
-        request: tonic::Request<HandleTransactionRequestV2>,
-    ) -> Result<tonic::Response<HandleTransactionResponseV2>, tonic::Status> {
-        let validator_service = self.clone();
-
-        // Spawns a task which handles the transaction. The task will unconditionally continue
-        // processing in the event that the client connection is dropped.
-        spawn_monitored_task!(async move {
-            // NB: traffic tally wrapping handled within the task rather than on task exit
-            // to prevent an attacker from subverting traffic control by severing the connection
-            handle_with_decoration!(validator_service, transaction_v2_impl, request)
         })
         .await
         .unwrap()
@@ -1313,6 +1505,13 @@ impl Validator for ValidatorService {
         request: tonic::Request<HandleCertificateRequestV3>,
     ) -> Result<tonic::Response<HandleCertificateResponseV3>, tonic::Status> {
         handle_with_decoration!(self, handle_certificate_v3_impl, request)
+    }
+
+    async fn wait_for_effects(
+        &self,
+        request: tonic::Request<RawWaitForEffectsRequest>,
+    ) -> Result<tonic::Response<RawWaitForEffectsResponse>, tonic::Status> {
+        handle_with_decoration!(self, wait_for_effects_impl, request)
     }
 
     async fn handle_soft_bundle_certificates_v3(

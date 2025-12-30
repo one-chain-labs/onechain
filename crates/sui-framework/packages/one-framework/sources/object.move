@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Sui object identifiers
+/// Oct object identifiers
 module one::object;
 
 use std::bcs;

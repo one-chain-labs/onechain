@@ -43,8 +43,8 @@ use sui_storage::{
     },
 };
 use sui_types::{
-    accumulator::Accumulator,
     base_types::{ObjectDigest, ObjectID, ObjectRef, SequenceNumber},
+    global_state_hash::GlobalStateHash,
 };
 use tokio::{
     sync::Mutex,
@@ -67,7 +67,7 @@ use crate::{
     SHA3_BYTES,
 };
 
-pub type SnapshotChecksums = (DigestByBucketAndPartition, Accumulator);
+pub type SnapshotChecksums = (DigestByBucketAndPartition, GlobalStateHash);
 pub type DigestByBucketAndPartition = BTreeMap<u32, BTreeMap<u32, [u8; 32]>>;
 pub type Sha3DigestType = Arc<Mutex<BTreeMap<u32, BTreeMap<u32, [u8; 32]>>>>;
 #[derive(Clone)]
@@ -195,7 +195,7 @@ impl StateSnapshotReaderV1 {
         &mut self,
         perpetual_db: &AuthorityPerpetualTables,
         abort_registration: AbortRegistration,
-        sender: Option<tokio::sync::mpsc::Sender<(Accumulator, u64)>>,
+        sender: Option<tokio::sync::mpsc::Sender<(GlobalStateHash, u64)>>,
     ) -> Result<()> {
         // This computes and stores the sha3 digest of object references in REFERENCE file for each
         // bucket partition. When downloading objects, we will match sha3 digest of object references
@@ -273,7 +273,7 @@ impl StateSnapshotReaderV1 {
 
     fn spawn_accumulation_tasks(
         &self,
-        sender: tokio::sync::mpsc::Sender<(Accumulator, u64)>,
+        sender: tokio::sync::mpsc::Sender<(GlobalStateHash, u64)>,
         num_part_files: usize,
     ) -> JoinHandle<()> {
         // Spawn accumulation progress bar
@@ -333,7 +333,7 @@ impl StateSnapshotReaderV1 {
                         .collect::<Vec<ObjectDigest>>();
                         let sender_clone = sender.clone();
                         tokio::spawn(async move {
-                            let mut partial_acc = Accumulator::default();
+                            let mut partial_acc = GlobalStateHash::default();
                             let num_objects = obj_digests.len();
                             partial_acc.insert_all(obj_digests);
                             sender_clone

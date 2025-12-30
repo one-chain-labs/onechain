@@ -7,7 +7,7 @@ use sui_config::genesis;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     committee::{Committee, EpochId},
-    digests::{ObjectDigest, TransactionDigest, TransactionEventsDigest},
+    digests::{ObjectDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     error::{SuiResult, UserInputError},
     messages_checkpoint::{
@@ -59,9 +59,7 @@ pub trait SimulatorStore:
 
     fn get_transaction_effects(&self, digest: &TransactionDigest) -> Option<TransactionEffects>;
 
-    fn get_transaction_events(&self, digest: &TransactionEventsDigest) -> Option<TransactionEvents>;
-
-    fn get_transaction_events_by_tx_digest(&self, tx_digest: &TransactionDigest) -> Option<TransactionEvents>;
+    fn get_transaction_events(&self, digest: &TransactionDigest) -> Option<TransactionEvents>;
 
     fn get_object(&self, id: &ObjectID) -> Option<Object>;
 

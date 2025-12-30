@@ -1,22 +1,26 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    fmt::{Display, Formatter},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{str::FromStr, sync::Arc};
 
 use ethers::{
     providers::{Http, Provider},
     types::Address as EthAddress,
 };
-use strum_macros::Display;
 use sui_bridge::{
     eth_client::EthClient,
     metered_eth_provider::MeteredEthHttpProvier,
     metrics::BridgeMetrics,
     utils::get_eth_contract_addresses,
+};
+use sui_bridge_schema::models::{
+    BridgeDataSource,
+    GovernanceAction as DBGovernanceAction,
+    GovernanceActionType,
+    SuiErrorTransactions,
+    TokenTransfer as DBTokenTransfer,
+    TokenTransferData as DBTokenTransferData,
+    TokenTransferStatus,
 };
 use sui_data_ingestion_core::DataIngestionMetrics;
 use sui_indexer_builder::{
@@ -32,12 +36,6 @@ use crate::{
     config::IndexerConfig,
     eth_bridge_indexer::{EthDataMapper, EthFinalizedSyncDatasource, EthSubscriptionDatasource},
     metrics::BridgeIndexerMetrics,
-    models::{
-        GovernanceAction as DBGovernanceAction,
-        SuiErrorTransactions,
-        TokenTransfer as DBTokenTransfer,
-        TokenTransferData as DBTokenTransferData,
-    },
     postgres_manager::PgPool,
     storage::PgBridgePersistent,
     sui_bridge_indexer::SuiBridgeDataMapper,
@@ -45,9 +43,7 @@ use crate::{
 
 pub mod config;
 pub mod metrics;
-pub mod models;
 pub mod postgres_manager;
-pub mod schema;
 pub mod storage;
 pub mod sui_transaction_handler;
 pub mod sui_transaction_queries;
@@ -117,9 +113,9 @@ impl TokenTransfer {
             timestamp_ms: self.timestamp_ms as i64,
             txn_hash: self.txn_hash.clone(),
             txn_sender: self.txn_sender.clone(),
-            status: self.status.to_string(),
+            status: self.status,
             gas_usage: self.gas_usage,
-            data_source: self.data_source.to_string(),
+            data_source: self.data_source,
             is_finalized: self.is_finalized,
         }
     }
@@ -157,58 +153,13 @@ impl GovernanceAction {
     fn to_db(&self) -> DBGovernanceAction {
         DBGovernanceAction {
             nonce: self.nonce.map(|nonce| nonce as i64),
-            data_source: self.data_source.to_string(),
+            data_source: self.data_source,
             txn_digest: self.tx_digest.clone(),
             sender_address: self.sender.to_vec(),
             timestamp_ms: self.timestamp_ms as i64,
-            action: self.action.to_string(),
+            action: self.action,
             data: self.data.clone(),
         }
-    }
-}
-
-#[derive(Clone)]
-pub(crate) enum TokenTransferStatus {
-    Deposited,
-    Approved,
-    Claimed,
-}
-
-impl Display for TokenTransferStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            TokenTransferStatus::Deposited => "Deposited",
-            TokenTransferStatus::Approved => "Approved",
-            TokenTransferStatus::Claimed => "Claimed",
-        };
-        write!(f, "{str}")
-    }
-}
-
-#[derive(Clone, Display)]
-pub(crate) enum GovernanceActionType {
-    UpdateCommitteeBlocklist,
-    EmergencyOperation,
-    UpdateBridgeLimit,
-    UpdateTokenPrices,
-    UpgradeEVMContract,
-    AddSuiTokens,
-    AddEVMTokens,
-}
-
-#[derive(Clone)]
-enum BridgeDataSource {
-    Sui,
-    Eth,
-}
-
-impl Display for BridgeDataSource {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            BridgeDataSource::Eth => "ETH",
-            BridgeDataSource::Sui => "SUI",
-        };
-        write!(f, "{str}")
     }
 }
 
@@ -231,7 +182,7 @@ pub async fn create_sui_indexer(
         config.remote_store_url.clone(),
         sui_client,
         config.concurrency as usize,
-        config.checkpoints_path.clone().map(|p| p.into()).unwrap_or(tempfile::tempdir()?.into_path()),
+        config.checkpoints_path.clone().map(|p| p.into()).unwrap_or(tempfile::tempdir()?.keep()),
         config.sui_bridge_genesis_checkpoint,
         ingestion_metrics,
         metrics.clone().boxed(),

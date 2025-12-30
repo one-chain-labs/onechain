@@ -4,17 +4,21 @@
 //! Utility for generating programmable transactions, either by specifying a command or for
 //! migrating legacy transactions
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use indexmap::IndexMap;
 use move_core_types::{ident_str, identifier::Identifier, language_storage::TypeTag};
 use serde::Serialize;
 
 use crate::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
+    base_types::{FullObjectID, FullObjectRef, ObjectID, ObjectRef, SuiAddress},
     move_package::PACKAGE_MODULE_NAME,
     transaction::{Argument, CallArg, Command, ObjectArg, ProgrammableTransaction},
     SUI_FRAMEWORK_PACKAGE_ID,
 };
+
+#[cfg(test)]
+#[path = "unit_tests/programmable_transaction_builder_tests.rs"]
+mod programmable_transaction_builder_tests;
 
 #[derive(PartialEq, Eq, Hash)]
 enum BuilderArg {
@@ -178,6 +182,19 @@ impl ProgrammableTransactionBuilder {
         Ok(())
     }
 
+    // TODO: Merge with `transfer_object` above and update existing callers.
+    pub fn transfer_object_full(&mut self, recipient: SuiAddress, full_object_ref: FullObjectRef) -> anyhow::Result<()> {
+        let rec_arg = self.pure(recipient).unwrap();
+        let obj_arg = self.obj(match full_object_ref.0 {
+            FullObjectID::Fastpath(_) => ObjectArg::ImmOrOwnedObject(full_object_ref.as_object_ref()),
+            FullObjectID::Consensus((id, initial_shared_version)) => {
+                ObjectArg::SharedObject { id, initial_shared_version, mutable: true }
+            }
+        });
+        self.commands.push(Command::TransferObjects(vec![obj_arg?], rec_arg));
+        Ok(())
+    }
+
     pub fn transfer_oct(&mut self, recipient: SuiAddress, amount: Option<u64>) {
         let rec_arg = self.pure(recipient).unwrap();
         let coin_arg = if let Some(amount) = amount {
@@ -197,6 +214,44 @@ impl ProgrammableTransactionBuilder {
     /// Will fail to generate if recipients and amounts do not have the same lengths
     pub fn pay_oct(&mut self, recipients: Vec<SuiAddress>, amounts: Vec<u64>) -> anyhow::Result<()> {
         self.pay_impl(recipients, amounts, Argument::GasCoin)
+    }
+
+    pub fn split_coin(&mut self, recipient: SuiAddress, coin: ObjectRef, amounts: Vec<u64>) {
+        let coin_arg = self.obj(ObjectArg::ImmOrOwnedObject(coin)).unwrap();
+        let amounts_len = amounts.len();
+        let amt_args = amounts.into_iter().map(|a| self.pure(a).unwrap()).collect();
+        let result = self.command(Command::SplitCoins(coin_arg, amt_args));
+        let Argument::Result(result) = result else {
+            panic!("self.command should always give a Argument::Result");
+        };
+
+        let recipient = self.pure(recipient).unwrap();
+        self.command(Command::TransferObjects(
+            (0 .. amounts_len).map(|i| Argument::NestedResult(result, i as u16)).collect(),
+            recipient,
+        ));
+    }
+
+    /// Merge `coins` into the `target` coin.
+    pub fn merge_coins(&mut self, target: ObjectRef, coins: Vec<ObjectRef>) -> anyhow::Result<()> {
+        let target_arg = self.obj(ObjectArg::ImmOrOwnedObject(target))?;
+        let coin_args =
+            coins.into_iter().map(|coin| self.obj(ObjectArg::ImmOrOwnedObject(coin)).unwrap()).collect::<Vec<_>>();
+        self.command(Command::MergeCoins(target_arg, coin_args));
+        Ok(())
+    }
+
+    /// Merge all `coins` into the first coin in the vector.
+    /// Returns an `Argument` for the first coin.
+    pub fn smash_coins(&mut self, coins: Vec<ObjectRef>) -> anyhow::Result<Argument> {
+        let mut coins = coins.into_iter();
+        let Some(target) = coins.next() else {
+            bail!("coins vector is empty");
+        };
+        let target_arg = self.obj(ObjectArg::ImmOrOwnedObject(target))?;
+        let coin_args = coins.map(|coin| self.obj(ObjectArg::ImmOrOwnedObject(coin)).unwrap()).collect::<Vec<_>>();
+        self.command(Command::MergeCoins(target_arg, coin_args));
+        Ok(target_arg)
     }
 
     /// Will fail to generate if recipients and amounts do not have the same lengths.

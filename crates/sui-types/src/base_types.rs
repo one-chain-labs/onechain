@@ -30,11 +30,13 @@ use schemars::JsonSchema;
 use serde::{
     ser::{Error, SerializeSeq},
     Deserialize,
+    Deserializer,
     Serialize,
     Serializer,
 };
-use serde_with::serde_as;
+use serde_with::{serde_as, DeserializeAs, SerializeAs};
 use shared_crypto::intent::HashingIntentScope;
+use sui_protocol_config::ProtocolConfig;
 
 use crate::{
     coin::{Coin, CoinMetadata, TreasuryCap, COIN_MODULE_NAME, COIN_STRUCT_NAME},
@@ -51,7 +53,7 @@ use crate::{
     object::{Object, Owner},
     parse_sui_struct_tag,
     signature::GenericSignature,
-    sui_serde::{to_sui_struct_tag_string, HexAccountAddress, Readable},
+    sui_serde::{to_custom_deser_error, to_sui_struct_tag_string, Readable},
     transaction::{Transaction, VerifiedTransaction},
     zk_login_authenticator::ZkLoginAuthenticator,
     MOVE_STDLIB_ADDRESS,
@@ -153,9 +155,18 @@ pub fn update_object_ref_for_testing(object_ref: ObjectRef) -> ObjectRef {
     (object_ref.0, object_ref.1.next(), ObjectDigest::new([0; 32]))
 }
 
-pub type FullObjectRef = (FullObjectID, SequenceNumber, ObjectDigest);
+pub struct FullObjectRef(pub FullObjectID, pub SequenceNumber, pub ObjectDigest);
 
-/// Represents an distinct stream of object versions for a Shared or ConsensusV2 object,
+impl FullObjectRef {
+    pub fn from_fastpath_ref(object_ref: ObjectRef) -> Self {
+        Self(FullObjectID::Fastpath(object_ref.0), object_ref.1, object_ref.2)
+    }
+
+    pub fn as_object_ref(&self) -> ObjectRef {
+        (self.0.id(), self.1, self.2)
+    }
+}
+/// Represents an distinct stream of object versions for a consensus object,
 /// based on the object ID and start version.
 pub type ConsensusObjectSequenceKey = (ObjectID, SequenceNumber);
 
@@ -837,6 +848,8 @@ pub const RESOLVED_UTF8_STR: (&AccountAddress, &IdentStr, &IdentStr) =
 
 pub const TX_CONTEXT_MODULE_NAME: &IdentStr = ident_str!("tx_context");
 pub const TX_CONTEXT_STRUCT_NAME: &IdentStr = ident_str!("TxContext");
+pub const RESOLVED_TX_CONTEXT: (&AccountAddress, &IdentStr, &IdentStr) =
+    (&SUI_FRAMEWORK_ADDRESS, STD_UTF8_MODULE_NAME, STD_UTF8_STRUCT_NAME);
 
 pub fn move_ascii_str_layout() -> A::MoveStructLayout {
     A::MoveStructLayout {
@@ -919,8 +932,13 @@ pub struct TxContext {
     ids_created: u64,
     // gas price passed to transaction as input
     gas_price: u64,
+    // gas budget passed to transaction as input
+    gas_budget: u64,
     // address of the sponsor if any
     sponsor: Option<AccountAddress>,
+    // whether the `TxContext` is native or not
+    // (TODO: once we version execution we could drop this field)
+    is_native: bool,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -939,7 +957,9 @@ impl TxContext {
         digest: &TransactionDigest,
         epoch_data: &EpochData,
         gas_price: u64,
+        gas_budget: u64,
         sponsor: Option<SuiAddress>,
+        protocol_config: &ProtocolConfig,
     ) -> Self {
         Self::new_from_components(
             sender,
@@ -947,7 +967,9 @@ impl TxContext {
             &epoch_data.epoch_id(),
             epoch_data.epoch_start_timestamp(),
             gas_price,
+            gas_budget,
             sponsor,
+            protocol_config,
         )
     }
 
@@ -957,7 +979,9 @@ impl TxContext {
         epoch_id: &EpochId,
         epoch_timestamp_ms: u64,
         gas_price: u64,
+        gas_budget: u64,
         sponsor: Option<SuiAddress>,
+        protocol_config: &ProtocolConfig,
     ) -> Self {
         Self {
             sender: AccountAddress::new(sender.0),
@@ -966,7 +990,9 @@ impl TxContext {
             epoch_timestamp_ms,
             ids_created: 0,
             gas_price,
+            gas_budget,
             sponsor: sponsor.map(|s| s.into()),
+            is_native: protocol_config.move_native_context(),
         }
     }
 
@@ -999,6 +1025,35 @@ impl TxContext {
         self.epoch
     }
 
+    pub fn sender(&self) -> SuiAddress {
+        self.sender.into()
+    }
+
+    pub fn epoch_timestamp_ms(&self) -> u64 {
+        self.epoch_timestamp_ms
+    }
+
+    /// Return the transaction digest, to include in new objects
+    pub fn digest(&self) -> TransactionDigest {
+        TransactionDigest::new(self.digest.clone().try_into().unwrap())
+    }
+
+    pub fn sponsor(&self) -> Option<SuiAddress> {
+        self.sponsor.map(SuiAddress::from)
+    }
+
+    pub fn gas_price(&self) -> u64 {
+        self.gas_price
+    }
+
+    pub fn gas_budget(&self) -> u64 {
+        self.gas_budget
+    }
+
+    pub fn ids_created(&self) -> u64 {
+        self.ids_created
+    }
+
     /// Derive a globally unique object ID by hashing self.digest | self.ids_created
     pub fn fresh_id(&mut self) -> ObjectID {
         let id = ObjectID::derive_id(self.digest(), self.ids_created);
@@ -1007,17 +1062,23 @@ impl TxContext {
         id
     }
 
-    /// Return the transaction digest, to include in new objects
-    pub fn digest(&self) -> TransactionDigest {
-        TransactionDigest::new(self.digest.clone().try_into().unwrap())
-    }
-
-    pub fn sender(&self) -> SuiAddress {
-        SuiAddress::from(ObjectID(self.sender))
-    }
-
     pub fn to_bcs_legacy_context(&self) -> Vec<u8> {
-        let move_context: MoveLegacyTxContext = self.into();
+        let move_context: MoveLegacyTxContext = if self.is_native {
+            let tx_context = &TxContext {
+                sender: AccountAddress::ZERO,
+                digest: self.digest.clone(),
+                epoch: 0,
+                epoch_timestamp_ms: 0,
+                ids_created: 0,
+                gas_price: 0,
+                gas_budget: 0,
+                sponsor: None,
+                is_native: true,
+            };
+            tx_context.into()
+        } else {
+            self.into()
+        };
         bcs::to_bytes(&move_context).unwrap()
     }
 
@@ -1030,14 +1091,40 @@ impl TxContext {
     /// serialize/deserialize and this is the reason why this method
     /// consumes the other context..
     pub fn update_state(&mut self, other: MoveLegacyTxContext) -> Result<(), ExecutionError> {
-        if self.sender != other.sender || self.digest != other.digest || other.ids_created < self.ids_created {
-            return Err(ExecutionError::new_with_source(
-                ExecutionErrorKind::InvariantViolation,
-                "Immutable fields for TxContext changed",
-            ));
+        if !self.is_native {
+            if self.sender != other.sender || self.digest != other.digest || other.ids_created < self.ids_created {
+                return Err(ExecutionError::new_with_source(
+                    ExecutionErrorKind::InvariantViolation,
+                    "Immutable fields for TxContext changed",
+                ));
+            }
+            self.ids_created = other.ids_created;
         }
-        self.ids_created = other.ids_created;
         Ok(())
+    }
+
+    //
+    // Move test only API
+    //
+    pub fn replace(
+        &mut self,
+        sender: AccountAddress,
+        tx_hash: Vec<u8>,
+        epoch: u64,
+        epoch_timestamp_ms: u64,
+        ids_created: u64,
+        gas_price: u64,
+        gas_budget: u64,
+        sponsor: Option<AccountAddress>,
+    ) {
+        self.sender = sender;
+        self.digest = tx_hash;
+        self.epoch = epoch;
+        self.epoch_timestamp_ms = epoch_timestamp_ms;
+        self.ids_created = ids_created;
+        self.gas_price = gas_price;
+        self.gas_budget = gas_budget;
+        self.sponsor = sponsor;
     }
 }
 
@@ -1379,6 +1466,29 @@ impl From<ObjectID> for AccountAddress {
 impl From<SuiAddress> for AccountAddress {
     fn from(address: SuiAddress) -> Self {
         Self::new(address.0)
+    }
+}
+
+/// Hex serde for AccountAddress
+struct HexAccountAddress;
+
+impl SerializeAs<AccountAddress> for HexAccountAddress {
+    fn serialize_as<S>(value: &AccountAddress, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Hex::serialize_as(value, serializer)
+    }
+}
+
+impl<'de> DeserializeAs<'de, AccountAddress> for HexAccountAddress {
+    fn deserialize_as<D>(deserializer: D) -> Result<AccountAddress, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.starts_with("0x") { AccountAddress::from_hex_literal(&s) } else { AccountAddress::from_hex(&s) }
+            .map_err(to_custom_deser_error::<'de, D, _>)
     }
 }
 

@@ -7,20 +7,20 @@
 use crate::coverage_map::{
     ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap,
 };
-use move_abstract_interpreter::control_flow_graph::{
-    BlockId, ControlFlowGraph, VMControlFlowGraph,
-};
+use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::{
-    file_format::{Bytecode, CodeOffset},
     CompiledModule,
+    file_format::{Bytecode, CodeOffset},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
-use petgraph::{algo::tarjan_scc, Graph};
+use petgraph::{Graph, algo::tarjan_scc};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{self, Write},
 };
+
+type BlockId = CodeOffset;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModuleSummary {
@@ -287,11 +287,13 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
                             }
 
                             for (path_end_scc, path_end_reachability) in reachability.into_iter() {
-                                assert!(path_nums
-                                    .get_mut(&path_end_scc)
-                                    .unwrap()
-                                    .insert(scc_idx, path_end_reachability)
-                                    .is_none());
+                                assert!(
+                                    path_nums
+                                        .get_mut(&path_end_scc)
+                                        .unwrap()
+                                        .insert(scc_idx, path_end_reachability)
+                                        .is_none()
+                                );
                             }
 
                             // move to branch info if there are more than one branches

@@ -9,7 +9,8 @@
 /// - spend - spend the token in the shop
 module examples::loyalty;
 
-use one::{coin::{Self, TreasuryCap}, token::{Self, ActionRequest, Token}};
+use one::coin::{Self, TreasuryCap};
+use one::token::{Self, ActionRequest, Token};
 
 /// Token amount does not match the `GIFT_PRICE`.
 const EIncorrectAmount: u64 = 0;

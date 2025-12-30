@@ -6,9 +6,6 @@ use std::{path::PathBuf, sync::Arc};
 use futures::future;
 use jsonrpsee::{core::client::ClientT, rpc_params};
 use move_core_types::{annotated_value::MoveStructLayout, ident_str};
-use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
-use one_node::SuiNodeHandle;
-use one_tool::restore_from_db_checkpoint;
 use rand::rngs::OsRng;
 use sui_config::node::RunWithRange;
 use sui_json_rpc_types::{
@@ -23,6 +20,7 @@ use sui_json_rpc_types::{
 };
 use sui_keys::keystore::AccountKeystore;
 use sui_macros::*;
+use one_node::SuiNodeHandle;
 use sui_sdk::wallet_context::WalletContext;
 use sui_storage::{key_value_store::TransactionKeyValueStore, key_value_store_metrics::KeyValueStoreMetrics};
 use sui_test_transaction_builder::{
@@ -35,6 +33,7 @@ use sui_test_transaction_builder::{
     publish_nfts_package,
     TestTransactionBuilder,
 };
+use sui_tool::restore_from_db_checkpoint;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
     crypto::{get_key_pair, SuiKeyPair},
@@ -51,14 +50,13 @@ use sui_types::{
         TransactionData,
         TransactionKind,
         TEST_ONLY_GAS_UNIT_FOR_OBJECT_BASICS,
-        TEST_ONLY_GAS_UNIT_FOR_SPLIT_COIN,
         TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
     },
     utils::{to_sender_signed_transaction, to_sender_signed_transaction_with_multi_signers},
 };
 use test_cluster::TestClusterBuilder;
 use tokio::{
-    sync::Mutex,
+    sync::RwLock,
     time::{sleep, Duration},
 };
 use tracing::info;
@@ -440,21 +438,20 @@ async fn do_test_full_node_sync_flood() {
     // Start a new fullnode that is not on the write path
     let fullnode = test_cluster.spawn_new_fullnode().await.sui_node;
 
-    let context = test_cluster.wallet;
+    let test_cluster = Arc::new(RwLock::new(test_cluster));
 
     let mut futures = Vec::new();
 
-    let (package_ref, counter_ref) = publish_basics_package_and_make_counter(&context).await;
-
-    let context = Arc::new(Mutex::new(context));
+    let (package_ref, counter_ref) = publish_basics_package_and_make_counter(&test_cluster.read().await.wallet).await;
 
     // Start up 5 different tasks that all spam txs at the authorities.
     for _i in 0 .. 5 {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let context = context.clone();
+        let test_cluster = test_cluster.clone();
         tokio::task::spawn(async move {
             let (sender, object_to_split, gas_obj) = {
-                let context = &mut context.lock().await;
+                let mut test_cluster = test_cluster.write().await;
+                let context = &mut test_cluster.wallet;
 
                 let sender = context.config.keystore.addresses().first().cloned().unwrap();
 
@@ -468,33 +465,29 @@ async fn do_test_full_node_sync_flood() {
             let mut shared_tx_digest = None;
             let gas_object_id = gas_obj.0;
             for _ in 0 .. 10 {
+                let test_cluster = test_cluster.read().await;
                 let res = {
-                    let context = &mut context.lock().await;
-                    SuiClientCommands::SplitCoin {
-                        amounts: Some(vec![1]),
-                        count: None,
-                        coin_id: object_to_split.0,
-                        opts: OptsWithGas::for_testing(
-                            Some(gas_object_id),
-                            TEST_ONLY_GAS_UNIT_FOR_SPLIT_COIN * context.get_reference_gas_price().await.unwrap(),
-                        ),
-                    }
-                    .execute(context)
-                    .await
-                    .unwrap()
+                    let tx = TestTransactionBuilder::new(sender, gas_obj, test_cluster.get_reference_gas_price().await)
+                        .split_coin(object_to_split, vec![1])
+                        .build();
+
+                    let tx = test_cluster.wallet.sign_transaction(&tx);
+                    test_cluster.execute_transaction(tx).await
                 };
 
-                owned_tx_digest = if let SuiClientCommandResult::TransactionBlock(resp) = res {
-                    Some(resp.digest)
-                } else {
-                    panic!("SplitCoin command did not return SuiClientCommandResult::TransactionBlock");
-                };
+                owned_tx_digest = Some(res.digest);
 
-                let context = &context.lock().await;
                 shared_tx_digest = Some(
-                    increment_counter(context, sender, Some(gas_object_id), package_ref.0, counter_ref.0, counter_ref.1)
-                        .await
-                        .digest,
+                    increment_counter(
+                        &test_cluster.wallet,
+                        sender,
+                        Some(gas_object_id),
+                        package_ref.0,
+                        counter_ref.0,
+                        counter_ref.1,
+                    )
+                    .await
+                    .digest,
                 );
             }
             tx.send((owned_tx_digest.unwrap(), shared_tx_digest.unwrap())).unwrap();

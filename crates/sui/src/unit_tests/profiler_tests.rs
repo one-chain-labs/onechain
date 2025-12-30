@@ -21,7 +21,7 @@
 // defined in all the other crates that the decorated code in the current crate depends on.
 //
 // Note this crate will always have the feature enabled in testing due to the addition of
-// `sui = { path = ".", features = ["tracing"] }` to our dev-dependencies.
+// `One = { path = ".", features = ["tracing"] }` to our dev-dependencies.
 
 #[cfg(feature = "tracing")]
 #[test]
@@ -60,7 +60,7 @@ async fn test_profiler() {
 
     // check that the profile was written
     let mut found = false;
-    for entry in fs::read_dir(output_dir.into_path()).unwrap().flatten() {
+    for entry in fs::read_dir(output_dir.keep()).unwrap().flatten() {
         if entry.file_name().into_string().unwrap().starts_with("profile") {
             found = true;
         }

@@ -55,7 +55,7 @@ pub fn is_one_time_witness(
     debug_assert!(args.len() == 1);
 
     let type_is_one_time_witness_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().type_is_one_time_witness_cost_params.clone();
+        context.extensions_mut().get::<NativesCostTable>()?.type_is_one_time_witness_cost_params.clone();
 
     native_charge_gas_early_exit!(context, type_is_one_time_witness_cost_params.types_is_one_time_witness_cost_base);
 

@@ -1,11 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::language_storage::StructTag;
 use serde::{Deserialize, Serialize};
 
 use super::IDOperation;
 use crate::{
-    base_types::VersionDigest,
+    base_types::{SuiAddress, VersionDigest},
     digests::ObjectDigest,
     object::{Object, Owner},
 };
@@ -55,12 +56,39 @@ impl EffectsObjectChange {
 
 /// If an object exists (at root-level) in the store prior to this transaction,
 /// it should be Exist, otherwise it's NonExist, e.g. wrapped objects should be
-/// NonExist.
+/// NotExist.
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ObjectIn {
     NotExist,
     /// The old version, digest and owner.
     Exist((VersionDigest, Owner)),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum AccumulatorOperation {
+    /// Merge the value into the accumulator.
+    Merge,
+    /// Split the value from the accumulator.
+    Split,
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum AccumulatorValue {
+    // u64 should be sufficient for coin balance.
+    U64(u64),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct AccumulatorWriteV1 {
+    /// The recipient of the accumulator.
+    pub recipient: SuiAddress,
+    /// The type of the accumulator. It is used together with the recipient to
+    /// derive the dynamic field ID of the accumulator.
+    pub accumulator_type: StructTag,
+    /// The operation to be applied to the accumulator.
+    pub operation: AccumulatorOperation,
+    /// The value to be applied to the accumulator.
+    pub value: AccumulatorValue,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -72,4 +100,6 @@ pub enum ObjectOut {
     /// Packages writes need to be tracked separately with version because
     /// we don't use lamport version for package publish and upgrades.
     PackageWrite(VersionDigest),
+    /// This isn't an object write, but a special write to an accumulator.
+    AccumulatorWriteV1(AccumulatorWriteV1),
 }

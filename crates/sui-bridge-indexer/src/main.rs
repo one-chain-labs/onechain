@@ -122,8 +122,16 @@ async fn start_watchdog(
 ) -> Result<()> {
     let watchdog_metrics = WatchdogMetrics::new(registry);
     let eth_provider = Arc::new(new_metered_eth_provider(&config.eth_rpc_url, bridge_metrics.clone()).unwrap());
-    let (_committee_address, _limiter_address, vault_address, _config_address, weth_address, usdt_address, wbtc_address) =
-        get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider).await?;
+    let (
+        _committee_address,
+        _limiter_address,
+        vault_address,
+        _config_address,
+        weth_address,
+        usdt_address,
+        wbtc_address,
+        lbtc_address,
+    ) = get_eth_contract_addresses(eth_bridge_proxy_address, &eth_provider).await?;
 
     let eth_vault_balance = EthereumVaultBalance::new(
         eth_provider.clone(),
@@ -155,18 +163,41 @@ async fn start_watchdog(
     .await
     .unwrap_or_else(|e| panic!("Failed to create wbtc vault balance: {}", e));
 
+    let lbtc_vault_balance = if !lbtc_address.is_zero() {
+        Some(
+            EthereumVaultBalance::new(
+                eth_provider.clone(),
+                vault_address,
+                lbtc_address,
+                VaultAsset::LBTC,
+                watchdog_metrics.lbtc_vault_balance.clone(),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("Failed to create lbtc vault balance: {}", e)),
+        )
+    } else {
+        None
+    };
+
     let eth_bridge_status =
         EthBridgeStatus::new(eth_provider, eth_bridge_proxy_address, watchdog_metrics.eth_bridge_paused.clone());
 
     let sui_bridge_status = SuiBridgeStatus::new(sui_client, watchdog_metrics.sui_bridge_paused.clone());
-    let observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
+    let mut observables: Vec<Box<dyn Observable + Send + Sync>> = vec![
         Box::new(eth_vault_balance),
         Box::new(usdt_vault_balance),
         Box::new(wbtc_vault_balance),
         Box::new(eth_bridge_status),
         Box::new(sui_bridge_status),
     ];
+
+    // Add lbtc_vault_balance if it's available
+    if let Some(balance) = lbtc_vault_balance {
+        observables.push(Box::new(balance));
+    }
+
     BridgeWatchDog::new(observables).run().await;
+
     Ok(())
 }
 

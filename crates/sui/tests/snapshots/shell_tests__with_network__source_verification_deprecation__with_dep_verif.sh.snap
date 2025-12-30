@@ -17,15 +17,15 @@ do
 done
 
 echo "=== publish dependency ===" | tee /dev/stderr
-sui client --client.config $CONFIG publish "dependency" --verify-deps \
+one client --client.config $CONFIG publish "dependency" --verify-deps \
   --json | jq '.effects.status'
 
 echo "=== publish package v0 (should NOT warn) ===" | tee /dev/stderr
-UPGRADE_CAP=$(sui client --client.config $CONFIG publish "example" --verify-deps \
+UPGRADE_CAP=$(one client --client.config $CONFIG publish "example" --verify-deps \
   --json | jq -r '.objectChanges[] | select(.objectType == "0x2::package::UpgradeCap") | .objectId')
 
 echo "=== upgrade package (should NOT warn) ===" | tee /dev/stderr
-sui client --client.config $CONFIG upgrade --upgrade-capability $UPGRADE_CAP example --verify-deps \
+one client --client.config $CONFIG upgrade --upgrade-capability $UPGRADE_CAP example --verify-deps \
   --json | jq '.effects.status'
 
 echo "=== modify dependency ===" | tee /dev/stderr
@@ -33,11 +33,11 @@ cat dependency/sources/dependency.move | sed 's#0#1#g' > dependency.move
 mv dependency.move dependency/sources/dependency.move
 
 echo "=== try to publish with modified dep (should fail) ===" | tee /dev/stderr
-sui client --client.config $CONFIG publish "example" --verify-deps \
+one client --client.config $CONFIG publish "example" --verify-deps \
   | sed 's/at .*::dependency::dependency/at [[package address]]::dependency::dependency/g'
 
 echo "=== try to upgrade with modified dep (should fail) ===" | tee /dev/stderr
-sui client --client.config $CONFIG upgrade --upgrade-capability $UPGRADE_CAP example --verify-deps \
+one client --client.config $CONFIG upgrade --upgrade-capability $UPGRADE_CAP example --verify-deps \
   | sed 's/at .*::dependency::dependency/at [[package address]]::dependency::dependency/g'
 
 ----- results -----
@@ -71,20 +71,35 @@ Fix this by rebuilding your packages with source versions matching on-chain vers
 ----- stderr -----
 === munge Move.toml files ===
 === publish dependency ===
+[note] Dependencies on Bridge, MoveStdlib, Sui, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on Sui. Consider removing these dependencies from Move.toml.
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY MoveStdlib
 BUILDING dependency
 Successfully verified dependencies on-chain against source.
 === publish package v0 (should NOT warn) ===
+[note] Dependencies on Bridge, MoveStdlib, Sui, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on Sui. Consider removing these dependencies from Move.toml.
 INCLUDING DEPENDENCY dependency
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY MoveStdlib
 BUILDING example
 Successfully verified dependencies on-chain against source.
 === upgrade package (should NOT warn) ===
+[note] Dependencies on Bridge, MoveStdlib, Sui, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on Sui. Consider removing these dependencies from Move.toml.
 INCLUDING DEPENDENCY dependency
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY MoveStdlib
 BUILDING example
 Successfully verified dependencies on-chain against source.
 === modify dependency ===
 === try to publish with modified dep (should fail) ===
+[note] Dependencies on Bridge, MoveStdlib, Sui, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on Sui. Consider removing these dependencies from Move.toml.
 INCLUDING DEPENDENCY dependency
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY MoveStdlib
 BUILDING example
 === try to upgrade with modified dep (should fail) ===
+[note] Dependencies on Bridge, MoveStdlib, Sui, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on Sui. Consider removing these dependencies from Move.toml.
 INCLUDING DEPENDENCY dependency
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY MoveStdlib
 BUILDING example

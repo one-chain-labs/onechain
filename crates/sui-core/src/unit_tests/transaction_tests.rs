@@ -12,6 +12,7 @@ use fastcrypto_zkp::bn254::zk_login::{parse_jwks, OIDCProvider, ZkLoginInputs};
 use move_core_types::ident_str;
 use rand::{rngs::StdRng, SeedableRng};
 use shared_crypto::intent::{Intent, IntentMessage};
+use sui_config::transaction_deny_config::{TransactionDenyConfig, TransactionDenyConfigBuilder};
 use sui_macros::sim_test;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use sui_types::{
@@ -29,7 +30,7 @@ use sui_types::{
     },
     error::{SuiError, UserInputError},
     messages_consensus::ConsensusDeterminedVersionAssignments,
-    messages_grpc::HandleSoftBundleCertificatesRequestV3,
+    messages_grpc::{HandleCertificateResponseV2, HandleSoftBundleCertificatesRequestV3},
     multisig::{MultiSig, MultiSigPublicKey},
     signature::GenericSignature,
     sui_system_state::SUI_SYSTEM_MODULE_NAME,
@@ -81,7 +82,6 @@ use crate::{
 #[sim_test]
 async fn test_handle_transfer_transaction_bad_signature() {
     do_transaction_test(
-        1,
         |_| {},
         |mut_tx| {
             let (_unknown_address, unknown_key): (_, AccountKeyPair) = get_key_pair();
@@ -99,7 +99,6 @@ async fn test_handle_transfer_transaction_bad_signature() {
 #[sim_test]
 async fn test_handle_transfer_transaction_no_signature() {
     do_transaction_test(
-        1,
         |_| {},
         |tx| {
             *tx.data_mut_for_testing().tx_signatures_mut_for_testing() = vec![];
@@ -114,7 +113,6 @@ async fn test_handle_transfer_transaction_no_signature() {
 #[sim_test]
 async fn test_handle_transfer_transaction_extra_signature() {
     do_transaction_test(
-        1,
         |_| {},
         |tx| {
             let sigs = tx.data_mut_for_testing().tx_signatures_mut_for_testing();
@@ -130,7 +128,6 @@ async fn test_handle_transfer_transaction_extra_signature() {
 #[sim_test]
 async fn test_empty_gas_data() {
     do_transaction_test_skip_cert_checks(
-        0,
         |tx| {
             tx.gas_data_mut().payment = vec![];
         },
@@ -145,7 +142,6 @@ async fn test_empty_gas_data() {
 #[sim_test]
 async fn test_duplicate_gas_data() {
     do_transaction_test_skip_cert_checks(
-        0,
         |tx| {
             let gas_data = tx.gas_data_mut();
             let new_gas = gas_data.payment[0];
@@ -164,7 +160,6 @@ async fn test_duplicate_gas_data() {
 #[sim_test]
 async fn test_gas_wrong_owner_matches_sender() {
     do_transaction_test(
-        1,
         |tx| {
             let gas_data = tx.gas_data_mut();
             let (new_addr, _): (_, AccountKeyPair) = get_key_pair();
@@ -182,7 +177,6 @@ async fn test_gas_wrong_owner_matches_sender() {
 #[sim_test]
 async fn test_gas_wrong_owner() {
     do_transaction_test(
-        1,
         |tx| {
             let gas_data = tx.gas_data_mut();
             let (new_addr, _): (_, AccountKeyPair) = get_key_pair();
@@ -257,7 +251,6 @@ async fn test_user_sends_end_of_epoch_transaction() {
 
 async fn test_user_sends_system_transaction_impl(transaction_kind: TransactionKind) {
     do_transaction_test_skip_cert_checks(
-        0,
         |tx| {
             *tx.kind_mut() = transaction_kind.clone();
         },
@@ -269,17 +262,45 @@ async fn test_user_sends_system_transaction_impl(transaction_kind: TransactionKi
     .await;
 }
 
+#[tokio::test]
+async fn test_sender_is_not_consensus_v2_owner() {
+    telemetry_subscribers::init_for_testing();
+
+    let (sender1, sender_key1): (_, AccountKeyPair) = get_key_pair();
+    let (sender2, sender_key2): (_, AccountKeyPair) = get_key_pair();
+    let start_version = SequenceNumber::new();
+    let err_check = |err: &SuiError| {
+        assert_matches!(err, SuiError::UserInputError { error: UserInputError::IncorrectUserSignature { .. } });
+    };
+    do_transaction_test_impl(
+        false,
+        &[(sender1, sender_key1), (sender2, sender_key2)],
+        Object::with_id_owner_version_for_testing(
+            ObjectID::random(),
+            start_version.next(),
+            Owner::ConsensusAddressOwner { start_version, owner: sender1 },
+        ),
+        |_| {},
+        |_| {},
+        1,
+        1,
+        err_check,
+    )
+    .await
+}
+
 pub fn init_transfer_transaction(
     pre_sign_mutations: impl Fn(&mut TransactionData),
     sender: SuiAddress,
     secret: &AccountKeyPair,
     recipient: SuiAddress,
-    object_ref: ObjectRef,
+    full_object_ref: FullObjectRef,
     gas_object_ref: ObjectRef,
     gas_budget: u64,
     gas_price: u64,
 ) -> Transaction {
-    let mut data = TransactionData::new_transfer(recipient, object_ref, sender, gas_object_ref, gas_budget, gas_price);
+    let mut data =
+        TransactionData::new_transfer_full(recipient, full_object_ref, sender, gas_object_ref, gas_budget, gas_price);
     pre_sign_mutations(&mut data);
     to_sender_signed_transaction(data, secret)
 }
@@ -288,10 +309,19 @@ pub fn init_move_call_transaction(
     pre_sign_mutations: impl Fn(&mut TransactionData),
     sender: SuiAddress,
     secret: &AccountKeyPair,
+    full_object_ref: FullObjectRef,
     gas_object_ref: ObjectRef,
     gas_budget: u64,
     gas_price: u64,
 ) -> Transaction {
+    let call_arg = CallArg::Object(match full_object_ref.0 {
+        FullObjectID::Fastpath(_) => {
+            ObjectArg::ImmOrOwnedObject((full_object_ref.0.id(), full_object_ref.1, full_object_ref.2))
+        }
+        FullObjectID::Consensus((id, initial_shared_version)) => {
+            ObjectArg::SharedObject { id, initial_shared_version, mutable: true }
+        }
+    });
     let mut data = TransactionData::new_move_call(
         sender,
         SUI_SYSTEM_PACKAGE_ID,
@@ -299,7 +329,7 @@ pub fn init_move_call_transaction(
         ident_str!("request_add_validator").to_owned(),
         vec![],
         gas_object_ref,
-        vec![CallArg::SUI_SYSTEM_MUT],
+        vec![CallArg::SUI_SYSTEM_MUT, call_arg],
         gas_budget,
         gas_price,
     )
@@ -309,63 +339,97 @@ pub fn init_move_call_transaction(
 }
 
 async fn do_transaction_test_skip_cert_checks(
-    expected_sig_errors: u64,
     pre_sign_mutations: impl Fn(&mut TransactionData),
     post_sign_mutations: impl Fn(&mut Transaction),
     err_check: impl Fn(&SuiError),
 ) {
-    do_transaction_test_impl(expected_sig_errors, false, pre_sign_mutations, post_sign_mutations, err_check).await
+    let (sender1, sender_key1): (_, AccountKeyPair) = get_key_pair();
+    let (sender2, sender_key2): (_, AccountKeyPair) = get_key_pair();
+    do_transaction_test_impl(
+        false,
+        &[(sender1, sender_key1), (sender2, sender_key2)],
+        Object::with_id_owner_for_testing(ObjectID::random(), sender1),
+        pre_sign_mutations,
+        post_sign_mutations,
+        0,
+        1,
+        err_check,
+    )
+    .await
 }
 
 async fn do_transaction_test(
-    expected_sig_errors: u64,
     pre_sign_mutations: impl Fn(&mut TransactionData),
     post_sign_mutations: impl Fn(&mut Transaction),
     err_check: impl Fn(&SuiError),
 ) {
-    do_transaction_test_impl(expected_sig_errors, true, pre_sign_mutations, post_sign_mutations, err_check).await
+    let (sender1, sender_key1): (_, AccountKeyPair) = get_key_pair();
+    let (sender2, sender_key2): (_, AccountKeyPair) = get_key_pair();
+    do_transaction_test_impl(
+        true,
+        &[(sender1, sender_key1), (sender2, sender_key2)],
+        Object::with_id_owner_for_testing(ObjectID::random(), sender1),
+        pre_sign_mutations,
+        post_sign_mutations,
+        0,
+        1,
+        err_check,
+    )
+    .await
 }
 
 async fn do_transaction_test_impl(
-    _expected_sig_errors: u64,
     check_forged_cert: bool,
+    senders: &[(SuiAddress, AccountKeyPair)],
+    input_object: Object,
     pre_sign_mutations: impl Fn(&mut TransactionData),
     post_sign_mutations: impl Fn(&mut Transaction),
+    transfer_sender: usize,
+    move_call_sender: usize,
     err_check: impl Fn(&SuiError),
 ) {
     telemetry_subscribers::init_for_testing();
-    let (sender1, sender_key1): (_, AccountKeyPair) = get_key_pair();
-    let (sender2, sender_key2): (_, AccountKeyPair) = get_key_pair();
+
     let recipient = dbg_addr(2);
-    let object_id = ObjectID::random();
-    let gas_object_id1 = ObjectID::random();
-    let gas_object_id2 = ObjectID::random();
-    let authority_state =
-        init_state_with_ids(vec![(sender1, object_id), (sender1, gas_object_id1), (sender2, gas_object_id2)]).await;
+    let input_object_id = input_object.id();
+    let mut gas_object_ids = Vec::new();
+    let init_state_input: Vec<_> = senders
+        .iter()
+        .map(|(sender, _)| {
+            let object_id = ObjectID::random();
+            gas_object_ids.push(object_id);
+            (*sender, object_id)
+        })
+        .collect();
+    let authority_state = init_state_with_ids(init_state_input).await;
+    authority_state.insert_genesis_object(input_object).await;
     let rgp = authority_state.reference_gas_price_for_testing().unwrap();
-    let object = authority_state.get_object(&object_id).await.unwrap();
-    let gas_object1 = authority_state.get_object(&gas_object_id1).await.unwrap();
-    let gas_object2 = authority_state.get_object(&gas_object_id2).await.unwrap();
+    let object = authority_state.get_object(&input_object_id).await.unwrap();
+    let mut gas_objects = Vec::new();
+    for id in gas_object_ids {
+        gas_objects.push(authority_state.get_object(&id).await.unwrap());
+    }
 
     // Execute the test with two transactions, one transfer and one move call.
     // The move call contains access to a shared object.
     // We test both txs and expect the same error.
     let mut transfer_transaction = init_transfer_transaction(
         &pre_sign_mutations,
-        sender1,
-        &sender_key1,
+        senders[transfer_sender].0,
+        &senders[transfer_sender].1,
         recipient,
-        object.compute_object_reference(),
-        gas_object1.compute_object_reference(),
+        object.compute_full_object_reference(),
+        gas_objects[transfer_sender].compute_object_reference(),
         rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
         rgp,
     );
 
     let mut move_call_transaction = init_move_call_transaction(
         &pre_sign_mutations,
-        sender2,
-        &sender_key2,
-        gas_object2.compute_object_reference(),
+        senders[move_call_sender].0,
+        &senders[move_call_sender].1,
+        object.compute_full_object_reference(),
+        gas_objects[move_call_sender].compute_object_reference(),
         rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
         rgp,
     );
@@ -391,7 +455,7 @@ async fn do_transaction_test_impl(
         err_check(&err);
     }
 
-    check_locks(authority_state.clone(), vec![object_id]).await;
+    check_locks(authority_state.clone(), vec![input_object_id]).await;
 
     // now verify that the same transactions are rejected if false certificates are somehow formed and sent
     if check_forged_cert {
@@ -962,6 +1026,159 @@ async fn zklogin_txn_fail_if_missing_jwk() {
 }
 
 #[tokio::test]
+async fn test_aliased_address_success() {
+    telemetry_subscribers::init_for_testing();
+
+    let (tx, original, aliased, input_object, gas_object) = setup_aliased_address_test();
+    let digests = vec![tx.data().digest()];
+
+    let resp = do_test_aliased_address(tx, original, aliased, input_object, gas_object, digests, None)
+        .await
+        .expect("should succeed");
+    assert!(resp.signed_effects.status().is_ok());
+}
+
+#[tokio::test]
+async fn test_aliased_address_success_with_deny_config() {
+    telemetry_subscribers::init_for_testing();
+
+    let (tx, original, aliased, input_object, gas_object) = setup_aliased_address_test();
+    let digests = vec![tx.data().digest()];
+
+    let tx_deny_config = TransactionDenyConfigBuilder::new().add_denied_address(original).build();
+
+    let resp = do_test_aliased_address(tx, original, aliased, input_object, gas_object, digests, Some(tx_deny_config))
+        .await
+        .expect("should succeed");
+    assert!(resp.signed_effects.status().is_ok());
+}
+
+#[tokio::test]
+async fn test_aliased_address_wrong_digest() {
+    telemetry_subscribers::init_for_testing();
+
+    let (tx, original, aliased, input_object, gas_object) = setup_aliased_address_test();
+    let digests = vec![TransactionDigest::random()];
+
+    let err = do_test_aliased_address(tx, original, aliased, input_object, gas_object, digests, None).await.unwrap_err();
+    // Signer is not an allowed alias for the given transaction digest.
+    assert!(matches!(err, SuiError::SignerSignatureAbsent { .. }));
+}
+
+#[tokio::test]
+async fn test_aliased_address_wrong_signer() {
+    telemetry_subscribers::init_for_testing();
+
+    let (tx, original, _aliased, input_object, gas_object) = setup_aliased_address_test();
+    let digests = vec![tx.data().digest()];
+
+    let err =
+        do_test_aliased_address(tx, original, dbg_addr(3), input_object, gas_object, digests, None).await.unwrap_err();
+    // Signer was not one of the allowed aliases.
+    assert!(matches!(err, SuiError::SignerSignatureAbsent { .. }));
+}
+
+#[tokio::test]
+async fn test_aliased_address_wrong_owner() {
+    telemetry_subscribers::init_for_testing();
+
+    let (tx, _original, aliased, input_object, gas_object) = setup_aliased_address_test();
+    let digests = vec![tx.data().digest()];
+
+    let err =
+        do_test_aliased_address(tx, dbg_addr(3), aliased, input_object, gas_object, digests, None).await.unwrap_err();
+    // Signer was an allowed alias, but not of the object owner.
+    assert!(matches!(err, SuiError::SignerSignatureAbsent { .. }));
+}
+
+fn setup_aliased_address_test() -> (Transaction, SuiAddress, SuiAddress, Object, Object) {
+    let recipient = dbg_addr(2);
+
+    let (original, _original_key): (_, AccountKeyPair) = get_key_pair();
+    let gas_object = Object::with_id_owner_for_testing(ObjectID::random(), original);
+    let input_object = Object::with_id_owner_for_testing(ObjectID::random(), original);
+
+    let input_object_ref = input_object.compute_full_object_reference();
+
+    let (aliased, aliased_key): (_, AccountKeyPair) = get_key_pair();
+
+    // need to construct tx before authority, so we have to hardcode rgp
+    let rgp = 1000;
+
+    let data = TransactionData::new_transfer_full(
+        recipient,
+        input_object_ref,
+        original,
+        gas_object.compute_object_reference(),
+        rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
+        rgp,
+    );
+
+    let tx = to_sender_signed_transaction(data, &aliased_key);
+    (tx, original, aliased, input_object, gas_object)
+}
+
+async fn do_test_aliased_address(
+    tx: Transaction,
+    original: SuiAddress,
+    aliased: SuiAddress,
+    input_object: Object,
+    gas_object: Object,
+    digests: Vec<TransactionDigest>,
+    tx_deny_config: Option<TransactionDenyConfig>,
+) -> Result<HandleCertificateResponseV2, SuiError> {
+    let input_object_id = input_object.id();
+    let gas_object_id = gas_object.id();
+
+    let authority_state = {
+        let mut protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
+        protocol_config.push_aliased_addresses_for_testing(
+            original.to_inner(),
+            aliased.to_inner(),
+            digests.into_iter().map(|d| *d.inner()).collect(),
+        );
+
+        let state = TestAuthorityBuilder::new()
+            .with_protocol_config(protocol_config)
+            .with_transaction_deny_config(tx_deny_config.unwrap_or_default())
+            .build()
+            .await;
+        for (address, object_id) in [(original, input_object_id), (original, gas_object_id)] {
+            let obj = Object::with_id_owner_for_testing(object_id, address);
+            state.insert_genesis_object(obj).await;
+        }
+        state
+    };
+
+    let committee = authority_state.load_epoch_store_one_call_per_task().committee().clone();
+
+    authority_state.insert_genesis_object(input_object).await;
+
+    let server = AuthorityServer::new_for_test(authority_state.clone());
+
+    let server_handle = server.spawn_for_test().await.unwrap();
+
+    let client = NetworkAuthorityClient::connect(
+        server_handle.address(),
+        Some(authority_state.config.network_key_pair().public().to_owned()),
+    )
+    .await
+    .unwrap();
+
+    // handle_transaction should succeed, but only because of the aliased address.
+    // if you remove the aliased address list from the protocol config, it will fail.
+    let resp = client.handle_transaction(tx.clone(), Some(make_socket_addr())).await?;
+
+    let TransactionStatus::Signed(sig) = resp.status else {
+        panic!("should be signed");
+    };
+
+    let ct = CertifiedTransaction::new(tx.into_data(), vec![sig], &committee).unwrap();
+
+    client.handle_certificate_v2(ct, Some(make_socket_addr())).await
+}
+
+#[tokio::test]
 async fn zk_multisig_test() {
     telemetry_subscribers::init_for_testing();
 
@@ -1106,7 +1323,7 @@ async fn test_very_large_certificate() {
         sender,
         &sender_key,
         recipient,
-        object.compute_object_reference(),
+        object.compute_full_object_reference(),
         gas_object.compute_object_reference(),
         rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
         rgp,
@@ -1172,7 +1389,7 @@ async fn test_handle_certificate_errors() {
         sender,
         &sender_key,
         recipient,
-        object.compute_object_reference(),
+        object.compute_full_object_reference(),
         gas_object.compute_object_reference(),
         rgp * TEST_ONLY_GAS_UNIT_FOR_TRANSFER,
         rgp,
@@ -1261,6 +1478,7 @@ async fn test_handle_soft_bundle_certificates() {
     let mut protocol_config = ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
     protocol_config.set_enable_soft_bundle_for_testing(true);
     protocol_config.set_max_soft_bundle_size_for_testing(10);
+    protocol_config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
 
     let authority =
         TestAuthorityBuilder::new().with_reference_gas_price(1000).with_protocol_config(protocol_config).build().await;

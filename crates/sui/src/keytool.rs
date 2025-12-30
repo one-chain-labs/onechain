@@ -127,7 +127,7 @@ pub enum KeyToolCommand {
     /// The keypair file is output to the current directory. The content of the file is
     /// a Base64 encoded string of 33-byte `flag || privkey`.
     ///
-    /// Use `sui client new-address` if you want to generate and save the key into sui.keystore.
+    /// Use `one client new-address` if you want to generate and save the key into sui.keystore.
     Generate { key_scheme: SignatureScheme, derivation_path: Option<DerivationPath>, word_length: Option<String> },
 
     /// Add a new key to Sui CLI Keystore using either the input mnemonic phrase or a Bech32 encoded 33-byte
@@ -175,7 +175,7 @@ pub enum KeyToolCommand {
     /// Provides a list of participating signatures (`flag || sig || pk` encoded in Base64),
     /// threshold, a list of all public keys and a list of their weights that define the
     /// MultiSig address. Returns a valid MultiSig signature and its sender address. The
-    /// result can be used as signature field for `sui client execute-signed-tx`. The sum
+    /// result can be used as signature field for `one client execute-signed-tx`. The sum
     /// of weights of all signatures must be >= the threshold.
     ///
     /// The order of `sigs` must be the same as the order of `pks`.
@@ -923,7 +923,7 @@ impl KeyToolCommand {
                 let jwt_randomness = if fixed {
                     "100681567828351849884072155819400689117".to_string()
                 } else {
-                    let random_bytes = rand::thread_rng().r#gen::<[u8; 16]>();
+                    let random_bytes = rand::thread_rng().gen::<[u8; 16]>();
                     let jwt_random_bytes = BigUint::from_bytes_be(&random_bytes);
                     jwt_random_bytes.to_string()
                 };

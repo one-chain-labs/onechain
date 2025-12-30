@@ -46,7 +46,7 @@ pub fn check_zklogin_id_internal(
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
     let check_zklogin_id_cost_params =
-        &context.extensions().get::<NativesCostTable>().check_zklogin_id_cost_params.clone();
+        &context.extensions().get::<NativesCostTable>()?.check_zklogin_id_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(
@@ -140,7 +140,7 @@ pub fn check_zklogin_issuer_internal(
 ) -> PartialVMResult<NativeResult> {
     // Load the cost parameters from the protocol config
     let check_zklogin_issuer_cost_params =
-        &context.extensions().get::<NativesCostTable>().check_zklogin_issuer_cost_params.clone();
+        &context.extensions().get::<NativesCostTable>()?.check_zklogin_issuer_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(

@@ -1,10 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Context;
 use bootstrap::bootstrap;
 use config::{IndexerConfig, PipelineLayer};
 use handlers::{
     coin_balance_buckets::CoinBalanceBuckets,
+    cp_sequence_numbers::CpSequenceNumbers,
     ev_emit_mod::EvEmitMod,
     ev_struct_inst::EvStructInst,
     kv_checkpoints::KvCheckpoints,
@@ -12,12 +14,12 @@ use handlers::{
     kv_epoch_starts::KvEpochStarts,
     kv_feature_flags::KvFeatureFlags,
     kv_objects::KvObjects,
+    kv_packages::KvPackages,
     kv_protocol_configs::KvProtocolConfigs,
     kv_transactions::KvTransactions,
     obj_info::ObjInfo,
     obj_versions::ObjVersions,
     sum_displays::SumDisplays,
-    sum_packages::SumPackages,
     tx_affected_addresses::TxAffectedAddresses,
     tx_affected_objects::TxAffectedObjects,
     tx_balance_changes::TxBalanceChanges,
@@ -27,19 +29,20 @@ use handlers::{
 };
 use prometheus::Registry;
 use sui_indexer_alt_framework::{
-    handlers::cp_sequence_numbers::CpSequenceNumbers,
     ingestion::{ClientArgs, IngestionConfig},
     pipeline::{
         concurrent::{ConcurrentConfig, PrunerConfig},
         sequential::SequentialConfig,
         CommitterConfig,
     },
+    postgres::{Db, DbArgs},
     Indexer,
     IndexerArgs,
 };
+use sui_indexer_alt_metrics::db::DbConnectionStatsCollector;
 use sui_indexer_alt_schema::MIGRATIONS;
-use sui_pg_db::DbArgs;
 use tokio_util::sync::CancellationToken;
+use url::Url;
 
 pub mod args;
 #[cfg(feature = "benchmark")]
@@ -50,6 +53,7 @@ pub(crate) mod consistent_pruning;
 pub(crate) mod handlers;
 
 pub async fn setup_indexer(
+    database_url: Url,
     db_args: DbArgs,
     indexer_args: IndexerArgs,
     client_args: ClientArgs,
@@ -61,12 +65,11 @@ pub async fn setup_indexer(
     with_genesis: bool,
     registry: &Registry,
     cancel: CancellationToken,
-) -> anyhow::Result<Indexer> {
+) -> anyhow::Result<Indexer<Db>> {
     let IndexerConfig { ingestion, consistency, committer, pruner, pipeline, extra: _ } = indexer_config.finish();
 
     let PipelineLayer {
         sum_displays,
-        sum_packages,
         coin_balance_buckets,
         cp_sequence_numbers,
         ev_emit_mod,
@@ -76,6 +79,7 @@ pub async fn setup_indexer(
         kv_epoch_starts,
         kv_feature_flags,
         kv_objects,
+        kv_packages,
         kv_protocol_configs,
         kv_transactions,
         obj_info,
@@ -96,8 +100,15 @@ pub async fn setup_indexer(
 
     let retry_interval = ingestion.retry_interval();
 
-    let mut indexer =
-        Indexer::new(db_args, indexer_args, client_args, ingestion, Some(&MIGRATIONS), registry, cancel.clone()).await?;
+    // Prepare the store for the indexer
+    let store = Db::for_write(database_url, db_args).await.context("Failed to connect to database")?;
+
+    // we want to merge &MIGRATIONS with the migrations from the store
+    store.run_migrations(Some(&MIGRATIONS)).await.context("Failed to run pending migrations")?;
+
+    registry.register(Box::new(DbConnectionStatsCollector::new(Some("indexer_db"), store.clone())))?;
+
+    let mut indexer = Indexer::new(store, indexer_args, client_args, ingestion, registry, cancel.clone()).await?;
 
     // These macros are responsible for registering pipelines with the indexer. It is responsible
     // for:
@@ -167,7 +178,6 @@ pub async fn setup_indexer(
 
     // Summary tables (without write-ahead log)
     add_sequential!(SumDisplays, sum_displays);
-    add_sequential!(SumPackages, sum_packages);
 
     // Unpruned concurrent pipelines
     add_concurrent!(CpSequenceNumbers, cp_sequence_numbers);
@@ -177,6 +187,7 @@ pub async fn setup_indexer(
     add_concurrent!(KvEpochEnds, kv_epoch_ends);
     add_concurrent!(KvEpochStarts, kv_epoch_starts);
     add_concurrent!(KvObjects, kv_objects);
+    add_concurrent!(KvPackages, kv_packages);
     add_concurrent!(KvTransactions, kv_transactions);
     add_concurrent!(ObjVersions, obj_versions);
     add_concurrent!(TxAffectedAddresses, tx_affected_addresses);

@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{body::Body, http};
 pub use balance_changes::*;
@@ -138,7 +138,10 @@ impl JsonRpcServerBuilder {
         let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
         std::mem::forget(server_handle);
 
+        let timeout = std::env::var("JSON_RPC_TIMEOUT").ok().and_then(|value| value.parse::<u64>().ok()).unwrap_or(60);
+
         let rpc_middleware = jsonrpsee::server::middleware::rpc::RpcServiceBuilder::new()
+            .layer_fn(move |s| TimeoutLayer::new(s, Duration::from_secs(timeout)))
             .layer_fn(move |s| MetricsLayer::new(s, metrics.clone()))
             .layer_fn(move |s| TrafficControllerService::new(s, traffic_controller.clone()));
         let service_builder = jsonrpsee::server::ServerBuilder::new()
@@ -238,6 +241,8 @@ where
 }
 
 use jsonrpsee::core::BoxError;
+
+use crate::metrics::TimeoutLayer;
 
 #[derive(Clone)]
 struct JsonRpcService<S>(S);

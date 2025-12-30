@@ -8,7 +8,8 @@ use crate::{
     session::LoadedFunctionInstantiation,
 };
 use move_binary_format::{
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+    IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult, verification_error},
     file_format::{
         AbilitySet, Bytecode, CompiledModule, Constant, ConstantPoolIndex,
         EnumDefInstantiationIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
@@ -18,7 +19,6 @@ use move_binary_format::{
         VariantHandle, VariantHandleIndex, VariantInstantiationHandle,
         VariantInstantiationHandleIndex, VariantJumpTable, VariantTag,
     },
-    IndexKind,
 };
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
@@ -40,7 +40,7 @@ use move_vm_types::{
 };
 use parking_lot::RwLock;
 use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, btree_map::Entry},
     fmt::Debug,
     hash::Hash,
     sync::Arc,
@@ -185,7 +185,12 @@ impl ModuleCache {
         module: &CompiledModule,
     ) -> VMResult<Arc<LoadedModule>> {
         let runtime_id = module.self_id();
-        if let Some(cached) = self.loaded_module_at(data_store.link_context(), &runtime_id) {
+        if let Some(cached) = self.loaded_module_at(
+            data_store
+                .link_context()
+                .map_err(|e| e.finish(Location::Undefined))?,
+            &runtime_id,
+        ) {
             return Ok(cached);
         }
 
@@ -225,7 +230,7 @@ impl ModuleCache {
         storage_id: ModuleId,
         module: &CompiledModule,
     ) -> PartialVMResult<&Arc<LoadedModule>> {
-        let link_context = data_store.link_context();
+        let link_context = data_store.link_context()?;
         let runtime_id = module.self_id();
 
         // Add new structs and collect their field signatures
@@ -355,11 +360,11 @@ impl ModuleCache {
             .zip(self.datatypes.binaries.iter_mut().rev())
         {
             match Arc::get_mut(cached_type) {
-                Some(ref mut x) => match (&mut x.datatype_info, field_info) {
-                    (Datatype::Enum(ref mut enum_type), FieldTypeInfo::Enum(field_info)) => {
+                Some(x) => match (&mut x.datatype_info, field_info) {
+                    (Datatype::Enum(enum_type), FieldTypeInfo::Enum(field_info)) => {
                         enum_type.variants = field_info;
                     }
-                    (Datatype::Struct(ref mut struct_type), FieldTypeInfo::Struct(field_info)) => {
+                    (Datatype::Struct(struct_type), FieldTypeInfo::Struct(field_info)) => {
                         struct_type.fields = field_info;
                     }
                     _ => {
@@ -853,7 +858,9 @@ impl Loader {
         Arc<Function>,
         LoadedFunctionInstantiation,
     )> {
-        let link_context = data_store.link_context();
+        let link_context = data_store
+            .link_context()
+            .map_err(|e| e.finish(Location::Undefined))?;
         let (compiled, loaded) = self.load_module(runtime_id, data_store)?;
         let idx = self
             .module_cache
@@ -1090,7 +1097,9 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, &CompiledModule>,
         data_store: &impl DataStore,
     ) -> VMResult<(Arc<CompiledModule>, Arc<LoadedModule>)> {
-        let link_context = data_store.link_context();
+        let link_context = data_store
+            .link_context()
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         {
             let locked_cache = self.module_cache.read();
@@ -1252,7 +1261,12 @@ impl Loader {
             // check against known modules either in the loader `verified_dependencies`
             // (previously verified module) or in the package being processed (`bundle_verified`)
             let self_id = entry.module.module.self_id();
-            let cache_key = (data_store.link_context(), self_id.clone());
+            let cache_key = (
+                data_store
+                    .link_context()
+                    .map_err(|e| e.finish(Location::Undefined))?,
+                self_id.clone(),
+            );
             if !bundle_verified.contains_key(&self_id)
                 && !self
                     .module_cache

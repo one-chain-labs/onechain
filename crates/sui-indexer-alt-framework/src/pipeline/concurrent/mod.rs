@@ -4,9 +4,6 @@
 use std::{sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use sui_field_count::FieldCount;
-use sui_pg_db::{self as db, Db};
-use sui_types::full_checkpoint_content::CheckpointData;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -19,7 +16,12 @@ use self::{
     reader_watermark::reader_watermark,
 };
 use super::{processor::processor, CommitterConfig, Processor, WatermarkPart, PIPELINE_BUFFER};
-use crate::{metrics::IndexerMetrics, models::watermarks::CommitterWatermark};
+use crate::{
+    metrics::IndexerMetrics,
+    store::{CommitterWatermark, Store},
+    types::full_checkpoint_content::CheckpointData,
+    FieldCount,
+};
 
 mod collector;
 mod commit_watermark;
@@ -53,6 +55,8 @@ const MAX_WATERMARK_UPDATES: usize = 10_000;
 /// back to the ingestion service.
 #[async_trait::async_trait]
 pub trait Handler: Processor<Value: FieldCount> {
+    type Store: Store;
+
     /// If at least this many rows are pending, the committer will commit them eagerly.
     const MIN_EAGER_ROWS: usize = 50;
 
@@ -73,11 +77,19 @@ pub trait Handler: Processor<Value: FieldCount> {
 
     /// Take a chunk of values and commit them to the database, returning the number of rows
     /// affected.
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> anyhow::Result<usize>;
+    async fn commit<'a>(
+        values: &[Self::Value],
+        conn: &mut <Self::Store as Store>::Connection<'a>,
+    ) -> anyhow::Result<usize>;
 
     /// Clean up data between checkpoints `_from` and `_to_exclusive` (exclusive) in the database, returning
     /// the number of rows affected. This function is optional, and defaults to not pruning at all.
-    async fn prune(&self, _from: u64, _to_exclusive: u64, _conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
+    async fn prune<'a>(
+        &self,
+        _from: u64,
+        _to_exclusive: u64,
+        _conn: &mut <Self::Store as Store>::Connection<'a>,
+    ) -> anyhow::Result<usize> {
         Ok(0)
     }
 }
@@ -184,10 +196,10 @@ impl Default for PrunerConfig {
 /// reports an issue.
 pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
     handler: H,
-    initial_commit_watermark: Option<CommitterWatermark<'static>>,
+    initial_commit_watermark: Option<CommitterWatermark>,
     config: ConcurrentConfig,
     skip_watermark: bool,
-    db: Db,
+    store: H::Store,
     checkpoint_rx: mpsc::Receiver<Arc<CheckpointData>>,
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
@@ -216,7 +228,7 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
         skip_watermark,
         committer_rx,
         committer_tx,
-        db.clone(),
+        store.clone(),
         metrics.clone(),
         cancel.clone(),
     );
@@ -226,15 +238,15 @@ pub(crate) fn pipeline<H: Handler + Send + Sync + 'static>(
         committer_config,
         skip_watermark,
         watermark_rx,
-        db.clone(),
+        store.clone(),
         metrics.clone(),
         cancel,
     );
 
     let reader_watermark =
-        reader_watermark::<H>(pruner_config.clone(), db.clone(), metrics.clone(), pruner_cancel.clone());
+        reader_watermark::<H>(pruner_config.clone(), store.clone(), metrics.clone(), pruner_cancel.clone());
 
-    let pruner = pruner(handler, pruner_config, db, metrics, pruner_cancel.clone());
+    let pruner = pruner(handler, pruner_config, store, metrics, pruner_cancel.clone());
 
     tokio::spawn(async move {
         let (_, _, _, _) = futures::join!(processor, collector, committer, commit_watermark);

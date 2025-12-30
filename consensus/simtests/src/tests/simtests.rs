@@ -14,6 +14,7 @@ mod test {
         ProtocolKeyPair,
         Stake,
     };
+    use mysten_metrics::RegistryService;
     use mysten_network::Multiaddr;
     use prometheus::Registry;
     use rand::{rngs::StdRng, SeedableRng as _};
@@ -41,30 +42,38 @@ mod test {
     async fn test_committee_start_simple() {
         telemetry_subscribers::init_for_testing();
         let db_registry = Registry::new();
-        DBMetrics::init(&db_registry);
+        DBMetrics::init(RegistryService::new(db_registry));
 
         const NUM_OF_AUTHORITIES: usize = 10;
         let (committee, keypairs) = local_committee_and_keys(0, [1; NUM_OF_AUTHORITIES].to_vec());
         let mut protocol_config = ProtocolConfig::get_for_max_version_UNSAFE();
-        protocol_config.set_consensus_gc_depth_for_testing(3);
+        // TODO: this is a no-op since gc depth in msim is hardcoded to 5. Overriding should be allowed.
+        // protocol_config.set_consensus_gc_depth_for_testing(3);
 
         let mut authorities = Vec::with_capacity(committee.size());
         let mut transaction_clients = Vec::with_capacity(committee.size());
         let mut boot_counters = [0; NUM_OF_AUTHORITIES];
+        let mut clock_drifts = [0; NUM_OF_AUTHORITIES];
+        clock_drifts[0] = 50;
+        clock_drifts[1] = 100;
+        clock_drifts[2] = 120;
 
-        for (index, _authority_info) in committee.authorities() {
+        for (authority_index, _authority_info) in committee.authorities() {
+            // Introduce a non-trivial clock drift for the first node (it's time will be ahead of the others). This will provide extra reassurance
+            // around the block timestamp checks.
             let config = Config {
-                authority_index: index,
+                authority_index,
                 db_dir: Arc::new(TempDir::new().unwrap()),
                 committee: committee.clone(),
                 keypairs: keypairs.clone(),
                 network_type: sui_protocol_config::ConsensusNetwork::Tonic,
-                boot_counter: boot_counters[index],
+                boot_counter: boot_counters[authority_index],
                 protocol_config: protocol_config.clone(),
+                clock_drift: clock_drifts[authority_index.value() as usize],
             };
             let node = AuthorityNode::new(config);
 
-            if index != AuthorityIndex::new_for_test(NUM_OF_AUTHORITIES as u32 - 1) {
+            if authority_index != AuthorityIndex::new_for_test(NUM_OF_AUTHORITIES as u32 - 1) {
                 node.start().await.unwrap();
                 node.spawn_committed_subdag_consumer().unwrap();
 
@@ -72,7 +81,7 @@ mod test {
                 transaction_clients.push(client);
             }
 
-            boot_counters[index] += 1;
+            boot_counters[authority_index] += 1;
             authorities.push(node);
         }
 
@@ -89,7 +98,8 @@ mod test {
         // wait for authorities
         sleep(Duration::from_secs(60)).await;
 
-        // Now start the fourth authority and let it start
+        // Now start the last authority.
+        tracing::info!(authority =% NUM_OF_AUTHORITIES - 1, "Starting authority and waiting for it to catch up");
         authorities[NUM_OF_AUTHORITIES - 1].start().await.unwrap();
         authorities[NUM_OF_AUTHORITIES - 1].spawn_committed_subdag_consumer().unwrap();
 

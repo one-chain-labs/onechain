@@ -31,13 +31,13 @@ use sui_core::{
     },
     checkpoints::CheckpointStore,
     epoch::committee_store::CommitteeStore,
-    state_accumulator::WrappedObject,
+    global_state_hasher::WrappedObject,
 };
 use sui_protocol_config::Chain;
 use sui_storage::{compute_sha3_checksum, object_store::util::path_to_filesystem, FileCompression, SHA3_BYTES};
 use sui_types::{
-    accumulator::Accumulator,
     base_types::ObjectID,
+    global_state_hash::GlobalStateHash,
     messages_checkpoint::ECMHLiveObjectSetDigest,
     sui_system_state::{
         epoch_start_sui_system_state::EpochStartSystemStateTrait,
@@ -224,7 +224,7 @@ pub fn create_file_metadata(
 
 pub async fn setup_db_state(
     epoch: u64,
-    accumulator: Accumulator,
+    accumulator: GlobalStateHash,
     perpetual_db: Arc<AuthorityPerpetualTables>,
     checkpoint_store: Arc<CheckpointStore>,
     committee_store: Arc<CommitteeStore>,
@@ -281,7 +281,7 @@ pub async fn accumulate_live_object_iter(
     iter: Box<dyn Iterator<Item = LiveObject> + '_>,
     m: MultiProgress,
     num_live_objects: u64,
-) -> Accumulator {
+) -> GlobalStateHash {
     // Monitor progress of live object accumulation
     let accum_progress_bar = m.add(
         ProgressBar::new(num_live_objects)
@@ -309,7 +309,7 @@ pub async fn accumulate_live_object_iter(
     });
 
     // Accumulate live objects
-    let mut acc = Accumulator::default();
+    let mut acc = GlobalStateHash::default();
     for live_object in iter {
         match live_object {
             LiveObject::Normal(object) => {

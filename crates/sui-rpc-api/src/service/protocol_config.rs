@@ -1,21 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use sui_protocol_config::{ProtocolConfig, ProtocolConfigValue, ProtocolVersion};
+use sui_protocol_config::{ProtocolConfig, ProtocolConfigValue};
 
-use crate::{
-    proto::node::v2alpha::{GetProtocolConfigRequest, GetProtocolConfigResponse},
-    Result,
-    RpcService,
-};
+use crate::{proto::rpc::v2beta as proto, Result, RpcService};
 
 impl RpcService {
-    pub fn get_protocol_config(&self, request: GetProtocolConfigRequest) -> Result<GetProtocolConfigResponse> {
-        let version = if let Some(version) = request.version {
-            version
-        } else {
-            self.reader.get_system_state_summary()?.protocol_version
-        };
+    #[tracing::instrument(skip(self))]
+    pub fn get_protocol_config(&self, version: Option<u64>) -> Result<proto::ProtocolConfig> {
+        let version =
+            if let Some(version) = version { version } else { self.reader.get_system_state_summary()?.protocol_version };
 
         let config = ProtocolConfig::get_for_version_if_supported(
             version.into(),
@@ -52,7 +46,7 @@ impl From<ProtocolNotFoundError> for crate::RpcError {
     }
 }
 
-fn config_to_proto(config: ProtocolConfig) -> GetProtocolConfigResponse {
+pub fn config_to_proto(config: ProtocolConfig) -> proto::ProtocolConfig {
     let protocol_version = config.version.as_u64();
     let attributes = config
         .attr_map()
@@ -69,13 +63,7 @@ fn config_to_proto(config: ProtocolConfig) -> GetProtocolConfigResponse {
             })
         })
         .collect();
-    let feature_flags = config.feature_map();
+    let feature_flags = config.feature_map().into_iter().collect();
 
-    GetProtocolConfigResponse {
-        protocol_version: Some(protocol_version),
-        feature_flags,
-        attributes,
-        max_suppported_protocol_version: Some(ProtocolVersion::MAX.as_u64()),
-        min_suppported_protocol_version: Some(ProtocolVersion::MIN.as_u64()),
-    }
+    proto::ProtocolConfig { protocol_version: Some(protocol_version), feature_flags, attributes }
 }

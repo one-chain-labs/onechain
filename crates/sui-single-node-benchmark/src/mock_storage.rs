@@ -11,10 +11,7 @@ use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::language_storage::ModuleId;
 use once_cell::unsync::OnceCell;
 use prometheus::core::{Atomic, AtomicU64};
-use sui_core::authority::{
-    authority_per_epoch_store::AuthorityPerEpochStore,
-    epoch_start_configuration::EpochStartConfigTrait,
-};
+use sui_core::authority::authority_per_epoch_store::AuthorityPerEpochStore;
 use sui_storage::package_object_cache::PackageObjectCache;
 use sui_types::{
     base_types::{EpochId, ObjectID, ObjectRef, SequenceNumber, VersionNumber},
@@ -70,14 +67,7 @@ impl InMemoryObjectStore {
                         .ok_or_else(|| SuiError::GenericAuthorityError {
                             error: "Shared object versions should have been assigned.".to_string(),
                         })?;
-                    let initial_shared_version = if epoch_store.epoch_start_config().use_version_assignment_tables_v3() {
-                        *initial_shared_version
-                    } else {
-                        // (before ConsensusV2 objects, we didn't track initial shared
-                        // version for shared object locks)
-                        SequenceNumber::UNKNOWN
-                    };
-                    let version = shared_version_assignments.get(&(*id, initial_shared_version)).unwrap_or_else(|| {
+                    let version = shared_version_assignments.get(&(*id, *initial_shared_version)).unwrap_or_else(|| {
                         panic!("Shared object version should have been assigned. key: {tx_key:?}, obj id: {id:?}")
                     });
 
@@ -143,8 +133,6 @@ impl ChildObjectResolver for InMemoryObjectStore {
         _receiving_object_id: &ObjectID,
         _receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        _use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         unimplemented!()
     }

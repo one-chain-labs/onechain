@@ -21,6 +21,7 @@ use diesel::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use sui_indexer_alt_reader::tx_digests::TxDigestKey;
 use sui_indexer_alt_schema::schema::{tx_affected_addresses, tx_affected_objects, tx_calls, tx_digests};
 use sui_json_rpc_types::{Page as PageResponse, SuiTransactionBlockResponseOptions};
 use sui_sql_macro::sql;
@@ -34,7 +35,6 @@ use sui_types::{
 use super::error::Error;
 use crate::{
     context::Context,
-    data::tx_digests::TxDigestKey,
     error::{invalid_params, RpcError},
     paginate::{Cursor as _, JsonCursor, Page},
 };
@@ -67,6 +67,8 @@ pub(crate) enum TransactionFilter {
     FromAndToAddress { from: SuiAddress, to: SuiAddress },
     /// Query transactions that have a given address as sender or recipient.
     FromOrToAddress { addr: SuiAddress },
+    /// Query by recipient address. On this RPC, this is an alias for `FromOrToAddress`.
+    ToAddress(SuiAddress),
 }
 
 type Cursor = JsonCursor<u64>;
@@ -103,6 +105,8 @@ pub(super) async fn transactions(
         Some(F::FromAndToAddress { from, to }) => tx_affected_addresses(ctx, &page, Some(*from), *to).await,
 
         Some(F::FromOrToAddress { addr }) => tx_affected_addresses(ctx, &page, None, *addr).await,
+
+        Some(F::ToAddress(addr)) => tx_affected_addresses(ctx, &page, None, *addr).await,
     }
 }
 

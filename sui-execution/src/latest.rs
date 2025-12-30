@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{cell::RefCell, collections::HashSet, path::PathBuf, rc::Rc, sync::Arc};
 
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier_meter::Meter;
@@ -162,16 +162,19 @@ impl executor::Executor for Executor {
         input_objects: CheckedInputObjects,
         pt: ProgrammableTransaction,
     ) -> Result<InnerTemporaryStore, ExecutionError> {
-        let mut tx_context = TxContext::new_from_components(
+        let tx_context = TxContext::new_from_components(
             &SuiAddress::default(),
             transaction_digest,
             &epoch_id,
             epoch_timestamp_ms,
-            // genesis transaction: RGP: 1, sponsor: None
+            // genesis transaction: RGP: 1, budget: 1M, sponsor: None
             1,
+            1_000_000,
             None,
+            protocol_config,
         );
-        execute_genesis_state_update(store, protocol_config, metrics, &self.0, &mut tx_context, input_objects, pt)
+        let tx_context = Rc::new(RefCell::new(tx_context));
+        execute_genesis_state_update(store, protocol_config, metrics, &self.0, tx_context, input_objects, pt)
     }
 
     fn type_layout_resolver<'r, 'vm: 'r, 'store: 'r>(

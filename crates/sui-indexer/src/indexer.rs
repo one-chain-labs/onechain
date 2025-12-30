@@ -1,18 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, env};
+use std::env;
 
 use anyhow::Result;
-use async_trait::async_trait;
 use futures::future::try_join_all;
 use mysten_metrics::spawn_monitored_task;
 use prometheus::Registry;
-use sui_data_ingestion_core::{DataIngestionMetrics, IndexerExecutor, ProgressStore, ReaderOptions, WorkerPool};
-use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_data_ingestion_core::{
+    DataIngestionMetrics,
+    IndexerExecutor,
+    ReaderOptions,
+    ShimIndexerProgressStore,
+    WorkerPool,
+};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{
     build_json_rpc_server,
@@ -37,9 +41,8 @@ impl Indexer {
         store: PgIndexerStore,
         metrics: IndexerMetrics,
         snapshot_config: SnapshotLagConfig,
-        mut retention_config: Option<RetentionConfig>,
+        retention_config: Option<RetentionConfig>,
         cancel: CancellationToken,
-        mvr_mode: bool,
     ) -> Result<(), IndexerError> {
         info!("Sui Indexer Writer (version {:?}) started...", env!("CARGO_PKG_VERSION"));
         info!("Sui Indexer Writer config: {config:?}",);
@@ -63,14 +66,6 @@ impl Indexer {
         )
         .await?;
 
-        if mvr_mode {
-            warn!("Indexer in MVR mode is configured to prune `objects_history` to 2 epochs. The other tables have a 2000 epoch retention.");
-            retention_config = Some(RetentionConfig {
-                epochs_to_keep: 2000, // epochs, roughly 5+ years. We really just care about pruning `objects_history` per the default 2 epochs.
-                overrides: Default::default(),
-            });
-        }
-
         if let Some(retention_config) = retention_config {
             let pruner = Pruner::new(store.clone(), retention_config, metrics.clone())?;
             let cancel_clone = cancel.clone();
@@ -89,14 +84,14 @@ impl Indexer {
         let mut executors = vec![];
 
         let (worker, primary_watermark) =
-            new_handlers(store, metrics, cancel.clone(), config.start_checkpoint, config.end_checkpoint, mvr_mode)
-                .await?;
+            new_handlers(store, metrics, cancel.clone(), config.start_checkpoint, config.end_checkpoint).await?;
         // Ingestion task watermarks are snapshotted once on indexer startup based on the
         // corresponding watermark table before being handed off to the ingestion task.
-        let progress_store = ShimIndexerProgressStore::new(vec![
-            ("primary".to_string(), primary_watermark),
-            ("object_snapshot".to_string(), object_snapshot_watermark),
-        ]);
+        let progress_store = ShimIndexerProgressStore::new(
+            vec![("primary".to_string(), primary_watermark), ("object_snapshot".to_string(), object_snapshot_watermark)]
+                .into_iter()
+                .collect(),
+        );
         let mut executor = IndexerExecutor::new(progress_store.clone(), 2, DataIngestionMetrics::new(&Registry::new()));
 
         let worker_pool = WorkerPool::new(worker, "primary".to_string(), config.checkpoint_download_queue_size);
@@ -132,7 +127,7 @@ impl Indexer {
         info!("Starting data ingestion executor...");
         let futures = executors.into_iter().map(|(executor, exit_receiver)| {
             executor.run(
-                config.sources.data_ingestion_path.clone().unwrap_or(tempfile::tempdir().unwrap().into_path()),
+                config.sources.data_ingestion_path.clone().unwrap_or(tempfile::tempdir().unwrap().keep()),
                 config.sources.remote_store_url.as_ref().map(|url| url.as_str().to_owned()),
                 vec![],
                 extra_reader_options.clone(),
@@ -156,28 +151,6 @@ impl Indexer {
             .expect("Json rpc server should not run into errors upon start.");
         tokio::spawn(async move { handle.stopped().await }).await.expect("Rpc server task failed");
 
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct ShimIndexerProgressStore {
-    watermarks: HashMap<String, CheckpointSequenceNumber>,
-}
-
-impl ShimIndexerProgressStore {
-    fn new(watermarks: Vec<(String, CheckpointSequenceNumber)>) -> Self {
-        Self { watermarks: watermarks.into_iter().collect() }
-    }
-}
-
-#[async_trait]
-impl ProgressStore for ShimIndexerProgressStore {
-    async fn load(&mut self, task_name: String) -> Result<CheckpointSequenceNumber> {
-        Ok(*self.watermarks.get(&task_name).expect("missing watermark"))
-    }
-
-    async fn save(&mut self, _: String, _: CheckpointSequenceNumber) -> Result<()> {
         Ok(())
     }
 }

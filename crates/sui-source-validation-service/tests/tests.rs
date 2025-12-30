@@ -12,8 +12,8 @@ use std::{
 use expect_test::expect;
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
-use one::client_commands::{OptsWithGas, SuiClientCommandResult, SuiClientCommands};
 use reqwest::Client;
+use one::client_commands::{GasDataArgs, PaymentArgs, SuiClientCommandResult, SuiClientCommands, TxProcessingArgs};
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::{BuildConfig, SuiPackageHooks};
 use sui_sdk::{
@@ -171,7 +171,9 @@ async fn run_publish(
         skip_dependency_verification: false,
         verify_deps: true,
         with_unpublished_dependencies: false,
-        opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
+        payment: PaymentArgs { gas: vec![gas_obj_id] },
+        gas_data: GasDataArgs { gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH), ..Default::default() },
+        processing: TxProcessingArgs::default(),
     }
     .execute(context)
     .await?;
@@ -199,8 +201,10 @@ async fn run_upgrade(
         skip_dependency_verification: false,
         verify_deps: true,
         with_unpublished_dependencies: false,
-        opts: OptsWithGas::for_testing(Some(gas_obj_id), rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH),
         verify_compatibility: true,
+        payment: PaymentArgs { gas: vec![gas_obj_id] },
+        gas_data: GasDataArgs { gas_budget: Some(rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH), ..Default::default() },
+        processing: TxProcessingArgs::default(),
     }
     .execute(context)
     .await?;
@@ -250,7 +254,7 @@ async fn test_api_route() -> anyhow::Result<()> {
 
     let address = "0x2";
     let module = "address";
-    let source_path = fixtures.into_path().join("sui/move-stdlib/sources/address.move");
+    let source_path = fixtures.keep().join("sui/move-stdlib/sources/address.move");
 
     let mut source_lookup = SourceLookup::new();
     source_lookup

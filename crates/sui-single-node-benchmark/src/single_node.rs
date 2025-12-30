@@ -16,8 +16,8 @@ use sui_core::{
     authority_server::{ValidatorService, ValidatorServiceMetrics},
     checkpoints::checkpoint_executor::CheckpointExecutor,
     consensus_adapter::{ConnectionMonitorStatusForTests, ConsensusAdapter, ConsensusAdapterMetrics},
+    global_state_hasher::GlobalStateHasher,
     mock_consensus::{ConsensusMode, MockConsensusClient},
-    state_accumulator::StateAccumulator,
 };
 use sui_test_transaction_builder::{PublishData, TestTransactionBuilder};
 use sui_types::{
@@ -147,7 +147,7 @@ impl SingleValidator {
                     // it expects consensus to do so. However we don't have consensus, hence the manual enqueue.
                     self.get_validator().enqueue_certificates_for_execution(vec![cert.clone()], &self.epoch_store);
                 }
-                self.get_validator().execute_certificate(&cert, &self.epoch_store).await.unwrap()
+                self.get_validator().wait_for_certificate_execution(&cert, &self.epoch_store).await.unwrap()
             }
             Component::ValidatorWithoutConsensus | Component::ValidatorWithFakeConsensus => {
                 let response = self.validator_service.execute_certificate_for_testing(cert).await.unwrap().into_inner();
@@ -235,14 +235,14 @@ impl SingleValidator {
             self.epoch_store.clone(),
             validator.get_checkpoint_store().clone(),
             validator.clone(),
-            Arc::new(StateAccumulator::new_for_tests(validator.get_accumulator_store().clone())),
+            Arc::new(GlobalStateHasher::new_for_tests(validator.get_global_state_hash_store().clone())),
         )
     }
 
     pub(crate) fn create_in_memory_store(&self) -> InMemoryObjectStore {
         let objects: HashMap<_, _> = self
             .get_validator()
-            .get_accumulator_store()
+            .get_global_state_hash_store()
             .iter_cached_live_object_set_for_testing(false)
             .map(|o| match o {
                 LiveObject::Normal(object) => (object.id(), object),

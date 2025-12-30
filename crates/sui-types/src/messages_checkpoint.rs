@@ -22,7 +22,6 @@ use tracing::warn;
 
 pub use crate::digests::{CheckpointContentsDigest, CheckpointDigest};
 use crate::{
-    accumulator::Accumulator,
     base_types::{random_object_ref, AuthorityName, ExecutionData, ExecutionDigests, VerifiedExecutionData},
     committee::{Committee, EpochId, ProtocolVersion, StakeUnit},
     crypto::{
@@ -39,9 +38,9 @@ use crate::{
     effects::{TestEffectsBuilder, TransactionEffectsAPI},
     error::{SuiError, SuiResult},
     gas::GasCostSummary,
+    global_state_hash::GlobalStateHash,
     message_envelope::{Envelope, Message, TrustedEnvelope, VerifiedEnvelope},
     signature::GenericSignature,
-    storage::ReadStore,
     sui_serde::{AsProtocolVersion, BigInt, Readable},
     transaction::{Transaction, TransactionData},
 };
@@ -119,7 +118,7 @@ impl From<fastcrypto::hash::Digest<32>> for ECMHLiveObjectSetDigest {
 
 impl Default for ECMHLiveObjectSetDigest {
     fn default() -> Self {
-        Accumulator::default().digest().into()
+        GlobalStateHash::default().digest().into()
     }
 }
 
@@ -515,23 +514,6 @@ impl FullCheckpointContents {
     ) -> Self {
         let transactions: Vec<_> = execution_data.collect();
         Self { transactions, user_signatures: contents.into_v1().user_signatures }
-    }
-
-    pub fn from_checkpoint_contents<S>(store: S, contents: CheckpointContents) -> Option<Self>
-    where
-        S: ReadStore,
-    {
-        let mut transactions = Vec::with_capacity(contents.size());
-        for tx in contents.iter() {
-            if let (Some(t), Some(e)) =
-                (store.get_transaction(&tx.transaction), store.get_transaction_effects(&tx.transaction))
-            {
-                transactions.push(ExecutionData::new((*t).clone().into_inner(), e))
-            } else {
-                return None;
-            }
-        }
-        Some(Self { transactions, user_signatures: contents.into_v1().user_signatures })
     }
 
     pub fn iter(&self) -> Iter<'_, ExecutionData> {

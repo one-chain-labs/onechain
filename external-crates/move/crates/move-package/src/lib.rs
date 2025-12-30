@@ -11,12 +11,12 @@ pub mod package_hooks;
 pub mod resolution;
 pub mod source_package;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::*;
 use lock_file::LockFile;
 use move_compiler::{
-    editions::{Edition, Flavor},
     Flags,
+    editions::{Edition, Flavor},
 };
 use move_core_types::account_address::AccountAddress;
 use move_model_2::source_model;
@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use source_package::{
     layout::SourcePackageLayout,
     manifest_parser::{parse_move_manifest_string, parse_source_manifest},
-    parsed_manifest::DependencyKind,
+    parsed_manifest::{Dependencies, DependencyKind},
 };
 use std::{
     collections::BTreeMap,
@@ -114,6 +114,15 @@ pub struct BuildConfig {
 
     #[clap(flatten)]
     pub lint_flag: LintFlag,
+
+    /// Additional dependencies to be automatically included in every package
+    #[clap(skip)]
+    pub implicit_dependencies: Dependencies,
+
+    /// Forces use of lock file without checking if it needs to be updated
+    /// (regenerates it only if it doesn't exist)
+    #[clap(skip)]
+    pub force_lock_file: bool,
 }
 
 #[derive(
@@ -285,6 +294,8 @@ impl BuildConfig {
             self.skip_fetch_latest_git_deps,
             writer,
             install_dir.clone(),
+            self.implicit_dependencies.clone(),
+            self.force_lock_file,
         );
         let (dependency_graph, modified) = dep_graph_builder.get_graph(
             &DependencyKind::default(),
@@ -362,5 +373,11 @@ impl BuildConfig {
         let _mutx = PackageLock::lock();
         lock.commit(lock_file)?;
         Ok(())
+    }
+
+    /// Indicates if the package was built with configurations that mean it may be published, i.e.,
+    /// it was not built in test mode or similar.
+    pub fn publishable(&self) -> bool {
+        self.compiler_flags().publishable()
     }
 }

@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use move_core_types::ident_str;
-use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+use sui_protocol_config::{Chain, PerObjectCongestionControlMode, ProtocolConfig, ProtocolVersion};
 use sui_types::{
     base_types::{FullObjectID, ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
     committee::EpochId,
@@ -59,7 +59,7 @@ impl TestRunner {
         let (sender, sender_key): (_, AccountKeyPair) = get_key_pair();
 
         let mut protocol_config = ProtocolConfig::get_for_version(ProtocolVersion::max(), Chain::Unknown);
-        protocol_config.set_shared_object_deletion_for_testing(true);
+        protocol_config.set_per_object_congestion_control_mode_for_testing(PerObjectCongestionControlMode::None);
         let authority_state = TestAuthorityBuilder::new().with_protocol_config(protocol_config).build().await;
 
         let mut gas_object_ids = vec![];
@@ -457,9 +457,7 @@ impl TestRunner {
         object_key: FullObjectKey,
         epoch: EpochId,
     ) -> Option<TransactionDigest> {
-        self.authority_state
-            .get_object_cache_reader()
-            .get_deleted_shared_object_previous_tx_digest(object_key, epoch, true)
+        self.authority_state.get_object_cache_reader().get_consensus_stream_end_tx_digest(object_key, epoch)
     }
 }
 

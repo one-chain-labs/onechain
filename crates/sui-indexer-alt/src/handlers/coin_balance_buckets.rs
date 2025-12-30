@@ -6,20 +6,23 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{anyhow, bail, Result};
 use diesel::sql_query;
 use diesel_async::RunQueryDsl;
-use sui_field_count::FieldCount;
-use sui_indexer_alt_framework::pipeline::{concurrent::Handler, Processor};
+use sui_indexer_alt_framework::{
+    pipeline::{concurrent::Handler, Processor},
+    postgres::{Connection, Db},
+    types::{
+        base_types::{ObjectID, SuiAddress},
+        full_checkpoint_content::CheckpointData,
+        object::{Object, Owner},
+        TypeTag,
+    },
+    FieldCount,
+};
 use sui_indexer_alt_schema::{
     objects::{StoredCoinBalanceBucket, StoredCoinOwnerKind},
     schema::coin_balance_buckets,
 };
-use sui_pg_db as db;
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    full_checkpoint_content::CheckpointData,
-    object::{Object, Owner},
-    TypeTag,
-};
 
+use super::checkpoint_input_objects;
 use crate::consistent_pruning::{PruningInfo, PruningLookupTable};
 
 /// This handler is used to track the balance buckets of address-owned coins.
@@ -52,7 +55,7 @@ impl Processor for CoinBalanceBuckets {
 
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
         let cp_sequence_number = checkpoint.checkpoint_summary.sequence_number;
-        let checkpoint_input_objects = checkpoint.checkpoint_input_objects();
+        let checkpoint_input_objects = checkpoint_input_objects(checkpoint)?;
         let latest_live_output_objects: BTreeMap<_, _> =
             checkpoint.latest_live_output_objects().into_iter().map(|o| (o.id(), o)).collect();
         let mut values: BTreeMap<ObjectID, Self::Value> = BTreeMap::new();
@@ -137,9 +140,11 @@ impl Processor for CoinBalanceBuckets {
 
 #[async_trait::async_trait]
 impl Handler for CoinBalanceBuckets {
+    type Store = Db;
+
     const PRUNING_REQUIRES_PROCESSED_VALUES: bool = true;
 
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn commit<'a>(values: &[Self::Value], conn: &mut Connection<'a>) -> Result<usize> {
         let values = values.iter().map(|v| v.try_into()).collect::<Result<Vec<StoredCoinBalanceBucket>>>()?;
         Ok(diesel::insert_into(coin_balance_buckets::table)
             .values(values)
@@ -149,7 +154,7 @@ impl Handler for CoinBalanceBuckets {
     }
 
     // TODO: Add tests for this function.
-    async fn prune(&self, from: u64, to_exclusive: u64, conn: &mut db::Connection<'_>) -> anyhow::Result<usize> {
+    async fn prune<'a>(&self, from: u64, to_exclusive: u64, conn: &mut Connection<'a>) -> anyhow::Result<usize> {
         use sui_indexer_alt_schema::schema::coin_balance_buckets::dsl;
 
         let to_prune = self.pruning_lookup_table.get_prune_info(from, to_exclusive)?;
@@ -233,13 +238,11 @@ impl TryInto<StoredCoinBalanceBucket> for &ProcessedCoinBalanceBucket {
 }
 
 /// Get the owner kind and address of a coin, if it is owned by a single address,
-/// either through fast-path ownership or ConsensusV2 ownership.
+/// either through fast-path ownership or consensus ownership.
 pub(crate) fn get_coin_owner(object: &Object) -> Option<(StoredCoinOwnerKind, SuiAddress)> {
     match object.owner() {
         Owner::AddressOwner(owner_id) => Some((StoredCoinOwnerKind::Fastpath, *owner_id)),
-        Owner::ConsensusV2 { authenticator, .. } => {
-            Some((StoredCoinOwnerKind::Consensus, *authenticator.as_single_owner()))
-        }
+        Owner::ConsensusAddressOwner { owner, .. } => Some((StoredCoinOwnerKind::Consensus, *owner)),
         Owner::Immutable | Owner::ObjectOwner(_) | Owner::Shared { .. } => None,
     }
 }
@@ -262,21 +265,23 @@ mod tests {
     use std::str::FromStr;
 
     use diesel::QueryDsl;
-    use sui_indexer_alt_framework::Indexer;
+    use sui_indexer_alt_framework::{
+        types::{
+            base_types::{dbg_addr, MoveObjectType, ObjectID, SequenceNumber, SuiAddress},
+            digests::TransactionDigest,
+            gas_coin::GAS,
+            object::{MoveObject, Object},
+            test_checkpoint_data_builder::TestCheckpointDataBuilder,
+        },
+        Indexer,
+    };
     use sui_indexer_alt_schema::MIGRATIONS;
     use sui_protocol_config::ProtocolConfig;
-    use sui_types::{
-        base_types::{dbg_addr, MoveObjectType, ObjectID, SequenceNumber, SuiAddress},
-        digests::TransactionDigest,
-        gas_coin::GAS,
-        object::{Authenticator, MoveObject, Object},
-        test_checkpoint_data_builder::TestCheckpointDataBuilder,
-    };
 
     use super::*;
 
     // Get all balance buckets from the database, sorted by object_id and cp_sequence_number.
-    async fn get_all_balance_buckets(conn: &mut db::Connection<'_>) -> Vec<StoredCoinBalanceBucket> {
+    async fn get_all_balance_buckets(conn: &mut Connection<'_>) -> Vec<StoredCoinBalanceBucket> {
         coin_balance_buckets::table
             .order_by((coin_balance_buckets::object_id, coin_balance_buckets::cp_sequence_number))
             .load(conn)
@@ -313,6 +318,7 @@ mod tests {
                     SequenceNumber::new(),
                     bcs::to_bytes(&Object::new_gas_for_testing()).unwrap(),
                     &ProtocolConfig::get_for_max_version_UNSAFE(),
+                    /* system_mutation */ false,
                 )
                 .unwrap(),
                 Owner::AddressOwner(SuiAddress::ZERO),
@@ -341,17 +347,18 @@ mod tests {
         let immutable = Object::immutable_with_id_for_testing(id);
         assert_eq!(get_coin_owner(&immutable), None);
 
-        let consensus_v2 = Object::with_id_owner_version_for_testing(id, SequenceNumber::new(), Owner::ConsensusV2 {
-            authenticator: Box::new(Authenticator::SingleOwner(addr1)),
-            start_version: SequenceNumber::new(),
-        });
+        let consensus_v2 =
+            Object::with_id_owner_version_for_testing(id, SequenceNumber::new(), Owner::ConsensusAddressOwner {
+                start_version: SequenceNumber::new(),
+                owner: addr1,
+            });
         assert_eq!(get_coin_owner(&consensus_v2), Some((StoredCoinOwnerKind::Consensus, addr1)));
     }
 
     #[tokio::test]
     async fn test_process_coin_balance_buckets_new_sui_coin() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
         let handler = CoinBalanceBuckets::default();
         let mut builder = TestCheckpointDataBuilder::new(0);
         builder = builder.start_transaction(0).create_sui_object(0, 0).create_sui_object(1, 100).finish_transaction();
@@ -379,7 +386,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_coin_balance_buckets_new_other_coin() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
         let handler = CoinBalanceBuckets::default();
         let mut builder = TestCheckpointDataBuilder::new(0);
         let coin_type = TypeTag::from_str("0x0::a::b").unwrap();
@@ -404,7 +411,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_coin_balance_buckets_balance_change() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
         let handler = CoinBalanceBuckets::default();
         let mut builder = TestCheckpointDataBuilder::new(0);
         builder = builder.start_transaction(0).create_sui_object(0, 10010).finish_transaction();
@@ -505,7 +512,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_coin_balance_buckets_coin_deleted() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
         let handler = CoinBalanceBuckets::default();
         let mut builder = TestCheckpointDataBuilder::new(0);
         builder = builder.start_transaction(0).create_owned_object(0).finish_transaction();
@@ -541,7 +548,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_coin_balance_buckets_owner_change() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
         let handler = CoinBalanceBuckets::default();
         let mut builder = TestCheckpointDataBuilder::new(0);
         builder = builder.start_transaction(0).create_sui_object(0, 100).finish_transaction();
@@ -580,7 +587,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_coin_balance_buckets_object_owned() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
         let handler = CoinBalanceBuckets::default();
         let mut builder = TestCheckpointDataBuilder::new(0);
         builder = builder.start_transaction(0).create_owned_object(0).finish_transaction();

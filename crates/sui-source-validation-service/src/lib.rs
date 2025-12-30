@@ -35,7 +35,8 @@ use mysten_metrics::RegistryService;
 use prometheus::{register_int_counter_with_registry, IntCounter, Registry};
 use serde::{Deserialize, Serialize};
 use sui_move::manage_package::resolve_lock_file_path;
-use sui_move_build::{BuildConfig, SuiPackageHooks};
+use sui_move_build::{implicit_deps, BuildConfig, SuiPackageHooks};
+use sui_package_management::system_package_versions::latest_system_packages;
 use sui_sdk::{rpc_types::SuiTransactionBlockEffects, types::base_types::ObjectID, SuiClientBuilder};
 use sui_source_validation::{BytecodeSourceVerifier, ValidationMode};
 use tokio::sync::oneshot::Sender;
@@ -165,6 +166,7 @@ pub async fn verify_package(
     let mut config = resolve_lock_file_path(MoveBuildConfig::default(), Some(package_path.as_ref()))?;
     config.lint_flag = LintFlag::LEVEL_NONE;
     config.silence_warnings = true;
+    config.implicit_dependencies = implicit_deps(latest_system_packages());
     let build_config = BuildConfig {
         config,
         run_bytecode_verifier: false, /* no need to run verifier if code is on-chain */

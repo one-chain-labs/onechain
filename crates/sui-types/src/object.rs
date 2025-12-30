@@ -14,6 +14,7 @@ use move_core_types::{
     annotated_value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     language_storage::{StructTag, TypeTag},
 };
+use mysten_common::debug_fatal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, Bytes};
@@ -84,14 +85,23 @@ impl MoveObject {
         version: SequenceNumber,
         contents: Vec<u8>,
         protocol_config: &ProtocolConfig,
+        system_mutation: bool,
     ) -> Result<Self, ExecutionError> {
-        Self::new_from_execution_with_limit(
-            type_,
-            has_public_transfer,
-            version,
-            contents,
-            protocol_config.max_move_object_size(),
-        )
+        let bound = if protocol_config.allow_unbounded_system_objects() && system_mutation {
+            if contents.len() as u64 > protocol_config.max_move_object_size() {
+                debug_fatal!(
+                    "System created object (ID = {:?}) of type {:?} and size {} exceeds normal max size {}",
+                    MoveObject::id_opt(&contents).ok(),
+                    type_,
+                    contents.len(),
+                    protocol_config.max_move_object_size()
+                );
+            }
+            u64::MAX
+        } else {
+            protocol_config.max_move_object_size()
+        };
+        Self::new_from_execution_with_limit(type_, has_public_transfer, version, contents, bound)
     }
 
     /// # Safety
@@ -228,24 +238,26 @@ impl MoveObject {
     }
 
     /// Update the contents of this object but does not increment its version
-    pub fn update_contents(
+    /// This should only be used for safe mode epoch advancement.
+    pub(crate) fn update_contents_advance_epoch_safe_mode(
         &mut self,
         new_contents: Vec<u8>,
         protocol_config: &ProtocolConfig,
     ) -> Result<(), ExecutionError> {
-        self.update_contents_with_limit(new_contents, protocol_config.max_move_object_size())
-    }
-
-    fn update_contents_with_limit(
-        &mut self,
-        new_contents: Vec<u8>,
-        max_move_object_size: u64,
-    ) -> Result<(), ExecutionError> {
-        if new_contents.len() as u64 > max_move_object_size {
-            return Err(ExecutionError::from_kind(ExecutionErrorKind::MoveObjectTooBig {
-                object_size: new_contents.len() as u64,
-                max_object_size: max_move_object_size,
-            }));
+        if new_contents.len() as u64 > protocol_config.max_move_object_size() {
+            if protocol_config.allow_unbounded_system_objects() {
+                debug_fatal!(
+                    "Safe mode object update (ID = {}) of size {} exceeds normal max size {}",
+                    self.id(),
+                    new_contents.len(),
+                    protocol_config.max_move_object_size()
+                )
+            } else {
+                return Err(ExecutionError::from_kind(ExecutionErrorKind::MoveObjectTooBig {
+                    object_size: new_contents.len() as u64,
+                    max_object_size: protocol_config.max_move_object_size(),
+                }));
+            }
         }
 
         #[cfg(debug_assertions)]
@@ -451,36 +463,15 @@ pub enum Owner {
     },
     /// Object is immutable, and hence ownership doesn't matter.
     Immutable,
-    /// Object is sequenced via consensus. Ownership is managed by the configured authenticator.
-    ///
-    /// Note: wondering what happened to `V1`? `Shared` above was the V1 of consensus objects.
-    ConsensusV2 {
+    /// Object is exclusively owned by a single address and sequenced via consensus.
+    ConsensusAddressOwner {
         /// The version at which the object most recently became a consensus object.
         /// This serves the same function as `initial_shared_version`, except it may change
         /// if the object's Owner type changes.
         start_version: SequenceNumber,
-        /// The authentication mode of the object
-        authenticator: Box<Authenticator>,
+        // The owner of the object.
+        owner: SuiAddress,
     },
-}
-
-#[derive(Eq, PartialEq, Debug, Clone, Copy, Deserialize, Serialize, Hash, JsonSchema, Ord, PartialOrd)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-pub enum Authenticator {
-    /// The contained SuiAddress exclusively has all permissions: read, write, delete, transfer
-    SingleOwner(SuiAddress),
-}
-
-impl Authenticator {
-    pub fn as_single_owner(&self) -> &SuiAddress {
-        // NOTE: Existing callers are written assuming that only singly-owned
-        // ConsensusV2 objects exist. If additional Authenticator variants are
-        // added, do not simply panic here. Instead, change the return type of
-        // this function and update callers accordingly.
-        match self {
-            Self::SingleOwner(address) => address,
-        }
-    }
 }
 
 impl Owner {
@@ -489,26 +480,30 @@ impl Owner {
     pub fn get_address_owner_address(&self) -> SuiResult<SuiAddress> {
         match self {
             Self::AddressOwner(address) => Ok(*address),
-            Self::Shared { .. } | Self::Immutable | Self::ObjectOwner(_) | Self::ConsensusV2 { .. } => {
+            Self::Shared { .. } | Self::Immutable | Self::ObjectOwner(_) | Self::ConsensusAddressOwner { .. } => {
                 Err(SuiError::UnexpectedOwnerType)
             }
         }
     }
 
-    // NOTE: this function will return address of both AddressOwner and ObjectOwner,
-    // address of ObjectOwner is converted from object id, even though the type is SuiAddress.
+    // NOTE: this function will return address of AddressOwner, ConsensusAddressOwner, and
+    // ObjectOwner. The address of ObjectOwner is converted from object ID, even though the
+    // type is SuiAddress.
     pub fn get_owner_address(&self) -> SuiResult<SuiAddress> {
         match self {
-            Self::AddressOwner(address) | Self::ObjectOwner(address) => Ok(*address),
-            Self::Shared { .. } | Self::Immutable | Self::ConsensusV2 { .. } => Err(SuiError::UnexpectedOwnerType),
+            Self::AddressOwner(address)
+            | Self::ObjectOwner(address)
+            | Self::ConsensusAddressOwner { owner: address, .. } => Ok(*address),
+            Self::Shared { .. } | Self::Immutable => Err(SuiError::UnexpectedOwnerType),
         }
     }
 
-    // Returns initial_shared_version for Shared objects, and start_version for ConsensusV2 objects.
+    // Returns initial_shared_version for Shared objects, and start_version
+    // for ConsensusAddressOwner objects.
     pub fn start_version(&self) -> Option<SequenceNumber> {
         match self {
             Self::Shared { initial_shared_version } => Some(*initial_shared_version),
-            Self::ConsensusV2 { start_version, .. } => Some(*start_version),
+            Self::ConsensusAddressOwner { start_version, .. } => Some(*start_version),
             Self::Immutable | Self::AddressOwner(_) | Self::ObjectOwner(_) => None,
         }
     }
@@ -530,7 +525,7 @@ impl Owner {
     }
 
     pub fn is_consensus(&self) -> bool {
-        matches!(self, Owner::Shared { .. } | Owner::ConsensusV2 { .. })
+        matches!(self, Owner::Shared { .. } | Owner::ConsensusAddressOwner { .. })
     }
 }
 
@@ -539,7 +534,7 @@ impl PartialEq<ObjectID> for Owner {
         let other_id: SuiAddress = (*other).into();
         match self {
             Self::ObjectOwner(id) => id == &other_id,
-            Self::AddressOwner(_) | Self::Shared { .. } | Self::Immutable | Self::ConsensusV2 { .. } => false,
+            Self::AddressOwner(_) | Self::Shared { .. } | Self::Immutable | Self::ConsensusAddressOwner { .. } => false,
         }
     }
 }
@@ -559,18 +554,8 @@ impl Display for Owner {
             Self::Shared { initial_shared_version } => {
                 write!(f, "Shared( {} )", initial_shared_version.value())
             }
-            Self::ConsensusV2 { start_version, authenticator } => {
-                write!(f, "ConsensusV2( {}, {} )", start_version.value(), authenticator)
-            }
-        }
-    }
-}
-
-impl Display for Authenticator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SingleOwner(address) => {
-                write!(f, "SingleOwner({})", address)
+            Self::ConsensusAddressOwner { start_version, owner } => {
+                write!(f, "ConsensusAddressOwner( {}, {} )", start_version.value(), owner)
             }
         }
     }
@@ -763,7 +748,7 @@ impl ObjectInner {
     }
 
     pub fn compute_full_object_reference(&self) -> FullObjectRef {
-        (self.full_id(), self.version(), self.digest())
+        FullObjectRef(self.full_id(), self.version(), self.digest())
     }
 
     pub fn digest(&self) -> ObjectDigest {
@@ -857,18 +842,7 @@ impl ObjectInner {
         const TRANSACTION_DIGEST_SIZE: usize = 32;
         const STORAGE_REBATE_SIZE: usize = 8;
 
-        let owner_size = match &self.owner {
-            Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Shared { .. } | Owner::Immutable => {
-                DEFAULT_OWNER_SIZE
-            }
-            Owner::ConsensusV2 { authenticator, .. } => {
-                DEFAULT_OWNER_SIZE
-                    + match authenticator.as_ref() {
-                        Authenticator::SingleOwner(_) => 8, // marginal cost to store both SuiAddress and SequenceNumber
-                    }
-            }
-        };
-        let meta_data_size = owner_size + TRANSACTION_DIGEST_SIZE + STORAGE_REBATE_SIZE;
+        let meta_data_size = DEFAULT_OWNER_SIZE + TRANSACTION_DIGEST_SIZE + STORAGE_REBATE_SIZE;
         let data_size = match &self.data {
             Data::Move(m) => m.object_size_for_gas_metering(),
             Data::Package(p) => p.object_size_for_gas_metering(),

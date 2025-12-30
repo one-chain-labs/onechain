@@ -24,9 +24,9 @@ use crate::{
 #[macro_use]
 pub mod error;
 
-pub mod accumulator;
 pub mod authenticator_state;
 pub mod balance;
+pub mod balance_change;
 pub mod base_types;
 pub mod bridge;
 pub mod clock;
@@ -51,6 +51,7 @@ pub mod full_checkpoint_content;
 pub mod gas;
 pub mod gas_coin;
 pub mod gas_model;
+pub mod global_state_hash;
 pub mod governance;
 pub mod id;
 pub mod in_memory_storage;
@@ -70,6 +71,8 @@ pub mod nitro_attestation;
 pub mod object;
 pub mod passkey_authenticator;
 pub mod programmable_transaction_builder;
+pub mod proto_value;
+pub mod ptb_trace;
 pub mod quorum_driver_types;
 pub mod randomness_state;
 pub mod signature;
@@ -130,7 +133,6 @@ built_in_ids! {
 
 pub const SUI_SYSTEM_STATE_OBJECT_SHARED_VERSION: SequenceNumber = OBJECT_START_VERSION;
 pub const SUI_CLOCK_OBJECT_SHARED_VERSION: SequenceNumber = OBJECT_START_VERSION;
-pub const SUI_AUTHENTICATOR_STATE_OBJECT_SHARED_VERSION: SequenceNumber = OBJECT_START_VERSION;
 
 pub fn sui_framework_address_concat_string(suffix: &str) -> String {
     format!("{}{suffix}", SUI_FRAMEWORK_ADDRESS.to_hex_literal())

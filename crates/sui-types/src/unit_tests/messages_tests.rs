@@ -159,7 +159,12 @@ fn test_certificates() {
     sigs.push(v2.auth_sig().clone());
     let c = CertifiedTransaction::new(transaction.clone().into_message(), sigs, &committee).unwrap();
     assert!(c
-        .verify_signatures_authenticated(&committee, &Default::default(), Arc::new(VerifiedDigestCache::new_empty()))
+        .verify_signatures_authenticated(
+            &committee,
+            &Default::default(),
+            Arc::new(VerifiedDigestCache::new_empty()),
+            None,
+        )
         .is_ok());
 
     let sigs = vec![v1.auth_sig().clone(), v3.auth_sig().clone()];
@@ -1138,6 +1143,7 @@ fn test_certificate_digest() {
             &committee,
             &Default::default(),
             Arc::new(VerifiedDigestCache::new_empty()),
+            None,
         )
         .unwrap();
         cert
@@ -1182,19 +1188,19 @@ fn check_approx_effects_components_size() {
     };
 
     assert!(
-        size_of::<GasCostSummary>() < APPROX_SIZE_OF_GAS_COST_SUMMARY,
+        size_of::<GasCostSummary>() <= APPROX_SIZE_OF_GAS_COST_SUMMARY,
         "Update APPROX_SIZE_OF_GAS_COST_SUMMARY constant"
     );
-    assert!(size_of::<EpochId>() < APPROX_SIZE_OF_EPOCH_ID, "Update APPROX_SIZE_OF_EPOCH_ID constant");
+    assert!(size_of::<EpochId>() <= APPROX_SIZE_OF_EPOCH_ID, "Update APPROX_SIZE_OF_EPOCH_ID constant");
     assert!(
-        size_of::<Option<TransactionEventsDigest>>() < APPROX_SIZE_OF_OPT_TX_EVENTS_DIGEST,
+        size_of::<Option<TransactionEventsDigest>>() <= APPROX_SIZE_OF_OPT_TX_EVENTS_DIGEST,
         "Update APPROX_SIZE_OF_OPT_TX_EVENTS_DIGEST constant"
     );
-    assert!(size_of::<ObjectRef>() < APPROX_SIZE_OF_OBJECT_REF, "Update APPROX_SIZE_OF_OBJECT_REF constant");
-    assert!(size_of::<TransactionDigest>() < APPROX_SIZE_OF_TX_DIGEST, "Update APPROX_SIZE_OF_TX_DIGEST constant");
-    assert!(size_of::<Owner>() < APPROX_SIZE_OF_OWNER, "Update APPROX_SIZE_OF_OWNER constant");
+    assert!(size_of::<ObjectRef>() <= APPROX_SIZE_OF_OBJECT_REF, "Update APPROX_SIZE_OF_OBJECT_REF constant");
+    assert!(size_of::<TransactionDigest>() <= APPROX_SIZE_OF_TX_DIGEST, "Update APPROX_SIZE_OF_TX_DIGEST constant");
+    assert!(size_of::<Owner>() <= APPROX_SIZE_OF_OWNER, "Update APPROX_SIZE_OF_OWNER constant");
     assert!(
-        size_of::<ExecutionStatus>() < APPROX_SIZE_OF_EXECUTION_STATUS,
+        size_of::<ExecutionStatus>() <= APPROX_SIZE_OF_EXECUTION_STATUS,
         "Update APPROX_SIZE_OF_EXECUTION_STATUS constant"
     );
 }

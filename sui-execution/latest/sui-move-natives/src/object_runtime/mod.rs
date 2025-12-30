@@ -21,6 +21,7 @@ use move_core_types::{
     runtime_value as R,
     vm_status::StatusCode,
 };
+use move_vm_runtime::native_extensions::NativeExtensionMarker;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
@@ -116,6 +117,8 @@ pub struct ObjectRuntime<'a> {
     pub(crate) protocol_config: &'a ProtocolConfig,
     pub(crate) metrics: Arc<LimitsMetrics>,
 }
+
+impl<'a> NativeExtensionMarker<'a> for ObjectRuntime<'a> {}
 
 pub enum TransferResult {
     New,
@@ -260,8 +263,12 @@ impl<'a> ObjectRuntime<'a> {
             TransferResult::New
         } else if let Some(prev_owner) = self.state.input_objects.get(&id) {
             match (&owner, prev_owner) {
-                // don't use == for dummy values in Shared owner
+                // don't use == for dummy values in Shared or ConsensusAddressOwner
                 (Owner::Shared { .. }, Owner::Shared { .. }) => TransferResult::SameOwner,
+                (
+                    Owner::ConsensusAddressOwner { owner: new_owner, .. },
+                    Owner::ConsensusAddressOwner { owner: old_owner, .. },
+                ) if new_owner == old_owner => TransferResult::SameOwner,
                 (new, old) if new == old => TransferResult::SameOwner,
                 _ => TransferResult::OwnerChanged,
             }
@@ -699,7 +706,7 @@ fn check_circular_ownership(transfers: impl IntoIterator<Item = (ObjectID, Owner
     for (id, recipient) in transfers {
         object_owner_map.remove(&id);
         match recipient {
-            Owner::AddressOwner(_) | Owner::Shared { .. } | Owner::Immutable | Owner::ConsensusV2 { .. } => (),
+            Owner::AddressOwner(_) | Owner::Shared { .. } | Owner::Immutable | Owner::ConsensusAddressOwner { .. } => (),
             Owner::ObjectOwner(new_owner) => {
                 let new_owner: ObjectID = new_owner.into();
                 let mut cur = new_owner;

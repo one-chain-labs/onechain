@@ -24,6 +24,7 @@ mod test {
         util::get_ed25519_keypair_from_keystore,
         workloads::{
             adversarial::AdversarialPayloadCfg,
+            benchmark_move_base_dir,
             expected_failure::ExpectedFailurePayloadCfg,
             workload::ExpectedFailureType,
             workload_configuration::{WorkloadConfig, WorkloadConfiguration, WorkloadWeights},
@@ -47,7 +48,13 @@ mod test {
         register_fail_points,
         sim_test,
     };
-    use sui_protocol_config::{PerObjectCongestionControlMode, ProtocolConfig, ProtocolVersion};
+    use sui_protocol_config::{
+        Chain,
+        ExecutionTimeEstimateParams,
+        PerObjectCongestionControlMode,
+        ProtocolConfig,
+        ProtocolVersion,
+    };
     use sui_simulator::{configs::*, tempfile::TempDir, SimConfig};
     use sui_storage::blob::Blob;
     use sui_surfer::surf_strategy::SurfStrategy;
@@ -91,8 +98,38 @@ mod test {
     #[sim_test(config = "test_config()")]
     async fn test_simulated_load_with_reconfig() {
         sui_protocol_config::ProtocolConfig::poison_get_for_min_version();
-        let test_cluster = build_test_cluster(4, 1000, 1).await;
+        let test_cluster = build_test_cluster(2, 3000, 1).await;
         test_simulated_load(test_cluster, 60).await;
+    }
+
+    #[sim_test(config = "test_config()")]
+    async fn test_mainnet_config() {
+        chain_config_smoke_test(Chain::Mainnet).await;
+    }
+
+    #[sim_test(config = "test_config()")]
+    async fn test_testnet_config() {
+        chain_config_smoke_test(Chain::Testnet).await;
+    }
+
+    async fn chain_config_smoke_test(chain: Chain) {
+        sui_protocol_config::ProtocolConfig::poison_get_for_min_version();
+        let test_cluster = init_test_cluster_builder(2, 3000)
+            .with_authority_overload_config(AuthorityOverloadConfig {
+                // Disable system overload checks for the test - during tests with crashes,
+                // it is possible for overload protection to trigger due to validators
+                // having queued certs which are missing dependencies.
+                check_system_overload_at_execution: false,
+                check_system_overload_at_signing: false,
+                ..Default::default()
+            })
+            .with_submit_delay_step_override_millis(3000)
+            .with_num_unpruned_validators(1)
+            .with_chain_override(chain)
+            .build()
+            .await
+            .into();
+        test_simulated_load(test_cluster, 30).await;
     }
 
     // Ensure that with half the committee enabling v2 and half not,
@@ -111,7 +148,7 @@ mod test {
                 ..Default::default()
             })
             .with_submit_delay_step_override_millis(3000)
-            .with_state_accumulator_v2_enabled_callback(Arc::new(|idx| idx % 2 == 0))
+            .with_global_state_hash_v2_enabled_callback(Arc::new(|idx| idx % 2 == 0))
             .build()
             .await
             .into();
@@ -436,7 +473,14 @@ mod test {
                 PerObjectCongestionControlMode::TotalGasBudget,
                 PerObjectCongestionControlMode::TotalTxCount,
                 PerObjectCongestionControlMode::TotalGasBudgetWithCap,
-                PerObjectCongestionControlMode::ExecutionTimeEstimate,
+                PerObjectCongestionControlMode::ExecutionTimeEstimate(ExecutionTimeEstimateParams {
+                    target_utilization: rng.gen_range(1 ..= 100),
+                    allowed_txn_cost_overage_burst_limit_us: rng.gen_range(0 .. 500_000),
+                    randomness_scalar: rng.gen_range(10 ..= 50),
+                    max_estimate_us: 1_500_000,
+                    stored_observations_num_included_checkpoints: 10,
+                    stored_observations_limit: rng.gen_range(1 ..= 20),
+                }),
             ]
             .choose(&mut rng)
             .unwrap();
@@ -447,13 +491,7 @@ mod test {
             } else {
                 rng.gen_range(1000 .. 10000) // Large deferral round (testing liveness)
             };
-            if mode == PerObjectCongestionControlMode::ExecutionTimeEstimate {
-                // Note: ExecutionTimeEstimate mode does not work properly without overage enabled,
-                // because high default estimates will always initially exceed the per-commit
-                // budget. Overage must at least allow for a single 1.5s (150% util) tx.
-                let min_overage_factor = (150 / checkpoint_budget_factor) + 1;
-                allow_overage_factor = rng.gen_range(min_overage_factor .. min_overage_factor * 2);
-            } else if rng.gen_bool(0.5) {
+            if rng.gen_bool(0.5) {
                 allow_overage_factor = rng.gen_range(1 .. 100);
             }
             cap_factor_denominator = rng.gen_range(1 .. 100);
@@ -512,15 +550,8 @@ mod test {
                         burst_limit_factor * total_gas_limit,
                     );
                 }
-                PerObjectCongestionControlMode::ExecutionTimeEstimate => {
-                    let budget = checkpoint_budget_factor * 1_000; // convert budget factor to % utilization
-                    config.set_max_accumulated_txn_cost_per_object_in_narwhal_commit_for_testing(budget);
-                    config.set_max_accumulated_txn_cost_per_object_in_mysticeti_commit_for_testing(budget);
-                    config.set_max_txn_cost_overage_per_object_in_commit_for_testing(allow_overage_factor * budget);
-                    config.set_allowed_txn_cost_overage_burst_per_object_in_commit_for_testing(
-                        burst_limit_factor * budget,
-                    );
-                }
+                // Ignore, params are in ExecutionTimeEstimateParams
+                PerObjectCongestionControlMode::ExecutionTimeEstimate(_) => {}
             }
             config.set_max_deferral_rounds_for_congestion_control_for_testing(max_deferral_rounds);
             if separate_randomness_budget {
@@ -553,7 +584,7 @@ mod test {
             info!("Simulated load config: {:?}", simulated_load_config);
         }
 
-        test_simulated_load_with_test_config(test_cluster, 180, simulated_load_config, None, None).await;
+        test_simulated_load_with_test_config(test_cluster, 60, simulated_load_config, None, None).await;
     }
 
     // Tests cluster defense against failing transaction floods Traffic Control
@@ -615,8 +646,18 @@ mod test {
     }
 
     #[sim_test(config = "test_config()")]
+    async fn test_simulated_load_mysticeti_fastpath() {
+        unsafe {
+            std::env::set_var("TRANSACTION_DRIVER", "100");
+        }
+
+        let test_cluster = build_test_cluster(4, 30_000, 1).await;
+        test_simulated_load(test_cluster, 120).await;
+    }
+
+    #[sim_test(config = "test_config()")]
     async fn test_data_ingestion_pipeline() {
-        let path = nondeterministic!(TempDir::new().unwrap()).into_path();
+        let path = nondeterministic!(TempDir::new().unwrap()).keep();
         let test_cluster =
             Arc::new(init_test_cluster_builder(4, 5000).with_data_ingestion_dir(path.clone()).build().await);
         test_simulated_load(test_cluster, 30).await;
@@ -921,6 +962,7 @@ mod test {
     struct SimulatedLoadConfig {
         num_transfer_accounts: u64,
         shared_counter_weight: u32,
+        slow_weight: u32,
         transfer_object_weight: u32,
         delegation_weight: u32,
         batch_payment_weight: u32,
@@ -939,6 +981,7 @@ mod test {
         fn default() -> Self {
             Self {
                 shared_counter_weight: 1,
+                slow_weight: 1,
                 transfer_object_weight: 1,
                 num_transfer_accounts: 2,
                 delegation_weight: 1,
@@ -1026,6 +1069,7 @@ mod test {
             adversarial: adversarial_weight,
             expected_failure: config.expected_failure_weight,
             randomized_transaction: config.randomized_transaction_weight,
+            slow: config.slow_weight,
         };
 
         let workload_config = WorkloadConfig {
@@ -1079,7 +1123,7 @@ mod test {
 
         let surfer_task = tokio::spawn(async move {
             // now do a sui-surfer test
-            let mut test_packages_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            let mut test_packages_dir = benchmark_move_base_dir();
             test_packages_dir.extend(["..", "..", "crates", "sui-surfer", "tests"]);
             let test_package_paths: Vec<PathBuf> = std::fs::read_dir(test_packages_dir)
                 .unwrap()

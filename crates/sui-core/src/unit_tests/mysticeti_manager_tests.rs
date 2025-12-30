@@ -18,14 +18,14 @@ use crate::{
     consensus_handler::ConsensusHandlerInitializer,
     consensus_manager::{mysticeti_manager::MysticetiManager, ConsensusManagerMetrics, ConsensusManagerTrait},
     consensus_validator::{SuiTxValidator, SuiTxValidatorMetrics},
+    global_state_hasher::GlobalStateHasher,
     mysticeti_adapter::LazyMysticetiClient,
-    state_accumulator::StateAccumulator,
 };
 
 pub fn checkpoint_service_for_testing(state: Arc<AuthorityState>) -> Arc<CheckpointService> {
     let (output, _result) = mpsc::channel::<(CheckpointContents, CheckpointSummary)>(10);
     let epoch_store = state.epoch_store_for_testing();
-    let accumulator = Arc::new(StateAccumulator::new_for_tests(state.get_accumulator_store().clone()));
+    let accumulator = Arc::new(GlobalStateHasher::new_for_tests(state.get_global_state_hash_store().clone()));
     let (certified_output, _certified_result) = mpsc::channel::<CertifiedCheckpointSummary>(10);
 
     let checkpoint_service = CheckpointService::build(
@@ -40,7 +40,7 @@ pub fn checkpoint_service_for_testing(state: Arc<AuthorityState>) -> Arc<Checkpo
         3,
         100_000,
     );
-    checkpoint_service.spawn().now_or_never().unwrap();
+    checkpoint_service.spawn(None).now_or_never().unwrap();
     checkpoint_service
 }
 
@@ -88,7 +88,6 @@ async fn test_mysticeti_manager() {
                     state.clone(),
                     Arc::new(NoopConsensusOverloadChecker {}),
                     Arc::new(CheckpointServiceNoop {}),
-                    state.transaction_manager().clone(),
                     SuiTxValidatorMetrics::new(&Registry::new()),
                 ),
             )

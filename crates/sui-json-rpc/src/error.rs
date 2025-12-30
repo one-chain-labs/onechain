@@ -168,12 +168,19 @@ impl From<Error> for ErrorObjectOwned {
                             conflicting_txes
                                 .iter()
                                 .sorted_by(|(_, (_, a)), (_, (_, b))| b.cmp(a))
-                                .map(|(digest, (_, stake))| format!(
-                                    "- {} (stake {}.{})",
-                                    digest,
-                                    stake / 100,
-                                    stake % 100,
-                                ))
+                                .map(|(digest, (o, stake))| {
+                                    let objects = o.iter()
+                                        .map(|(_, obj_ref)| format!("    - {}", obj_ref.0))
+                                        .join("\n");
+
+                                    format!(
+                                        "- {} (stake {}.{})\n{}",
+                                        digest,
+                                        stake / 100,
+                                        stake % 100,
+                                        objects,
+                                    )
+                                })
                                 .join("\n"),
                         );
 
@@ -309,8 +316,8 @@ mod tests {
 
     use super::*;
 
-    fn test_object_ref() -> ObjectRef {
-        (ObjectID::ZERO, SequenceNumber::from_u64(0), ObjectDigest::new([0; 32]))
+    fn test_object_ref(id: u8) -> ObjectRef {
+        (ObjectID::from_single_byte(id), SequenceNumber::from_u64(0), ObjectDigest::new([id; 32]))
     }
 
     mod match_quorum_driver_error_tests {
@@ -360,7 +367,7 @@ mod tests {
             let mut conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)> =
                 BTreeMap::new();
             let tx_digest = TransactionDigest::from([1; 32]);
-            let object_ref = test_object_ref();
+            let object_ref = test_object_ref(0);
 
             // 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi has enough stake to escape equivocation
             let stake_unit: StakeUnit = 8000;
@@ -382,7 +389,9 @@ mod tests {
             let expected_message = expect![[r#"
                 Failed to sign transaction by a quorum of validators because one or more of its objects is reserved for another transaction. Other transactions locking these objects:
                 - 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (stake 80.0)
-                - 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR (stake 5.0)"#]];
+                    - 0x0000000000000000000000000000000000000000000000000000000000000000
+                - 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR (stake 5.0)
+                    - 0x0000000000000000000000000000000000000000000000000000000000000000"#]];
             expected_message.assert_eq(error_object.message());
             let expected_data = expect![[
                 r#"{"4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi":[["0x0000000000000000000000000000000000000000000000000000000000000000",0,"11111111111111111111111111111111"]],"8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR":[["0x0000000000000000000000000000000000000000000000000000000000000000",0,"11111111111111111111111111111111"]]}"#
@@ -397,18 +406,21 @@ mod tests {
             let mut conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)> =
                 BTreeMap::new();
             let tx_digest = TransactionDigest::from([1; 32]);
-            let object_ref = test_object_ref();
+            let object_ref_1 = test_object_ref(0);
+            let object_ref_2 = test_object_ref(1);
 
             // 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi has lower stake at 10
             let stake_unit: StakeUnit = 4000;
             let authority_name = AuthorityPublicKeyBytes([0; AuthorityPublicKey::LENGTH]);
-            conflicting_txes.insert(tx_digest, (vec![(authority_name, object_ref)], stake_unit));
+            conflicting_txes
+                .insert(tx_digest, (vec![(authority_name, object_ref_1), (authority_name, object_ref_2)], stake_unit));
 
             // 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR is a higher stake and should be first in the list
             let tx_digest = TransactionDigest::from([2; 32]);
             let stake_unit: StakeUnit = 5000;
             let authority_name = AuthorityPublicKeyBytes([1; AuthorityPublicKey::LENGTH]);
-            conflicting_txes.insert(tx_digest, (vec![(authority_name, object_ref)], stake_unit));
+            conflicting_txes
+                .insert(tx_digest, (vec![(authority_name, object_ref_1), (authority_name, object_ref_2)], stake_unit));
 
             let quorum_driver_error = QuorumDriverError::ObjectsDoubleUsed { conflicting_txes };
 
@@ -418,10 +430,14 @@ mod tests {
             let expected_message = expect![[r#"
                 Failed to sign transaction by a quorum of validators because one or more of its objects is equivocated until the next epoch. Other transactions locking these objects:
                 - 8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR (stake 50.0)
-                - 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (stake 40.0)"#]];
+                    - 0x0000000000000000000000000000000000000000000000000000000000000000
+                    - 0x0000000000000000000000000000000000000000000000000000000000000001
+                - 4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi (stake 40.0)
+                    - 0x0000000000000000000000000000000000000000000000000000000000000000
+                    - 0x0000000000000000000000000000000000000000000000000000000000000001"#]];
             expected_message.assert_eq(error_object.message());
             let expected_data = expect![[
-                r#"{"4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi":[["0x0000000000000000000000000000000000000000000000000000000000000000",0,"11111111111111111111111111111111"]],"8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR":[["0x0000000000000000000000000000000000000000000000000000000000000000",0,"11111111111111111111111111111111"]]}"#
+                r#"{"4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi":[["0x0000000000000000000000000000000000000000000000000000000000000000",0,"11111111111111111111111111111111"],["0x0000000000000000000000000000000000000000000000000000000000000001",0,"4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"]],"8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR":[["0x0000000000000000000000000000000000000000000000000000000000000000",0,"11111111111111111111111111111111"],["0x0000000000000000000000000000000000000000000000000000000000000001",0,"4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"]]}"#
             ]];
             let actual_data = error_object.data().unwrap().to_string();
             expected_data.assert_eq(&actual_data);
@@ -441,7 +457,7 @@ mod tests {
                     (
                         SuiError::UserInputError {
                             error: UserInputError::ObjectVersionUnavailableForConsumption {
-                                provided_obj_ref: test_object_ref(),
+                                provided_obj_ref: test_object_ref(0),
                                 current_version: 10.into(),
                             },
                         },
@@ -465,7 +481,7 @@ mod tests {
                 errors: vec![
                     (
                         SuiError::UserInputError {
-                            error: UserInputError::ObjectNotFound { object_id: test_object_ref().0, version: None },
+                            error: UserInputError::ObjectNotFound { object_id: test_object_ref(0).0, version: None },
                         },
                         0,
                         vec![],

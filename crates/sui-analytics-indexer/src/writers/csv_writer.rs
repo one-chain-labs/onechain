@@ -24,13 +24,21 @@ pub(crate) struct CSVWriter {
     writer: Writer<File>,
     epoch: EpochId,
     checkpoint_range: Range<u64>,
+    row_count: usize,
 }
 
 impl CSVWriter {
     pub(crate) fn new(root_dir_path: &Path, file_type: FileType, start_checkpoint_seq_num: u64) -> Result<Self> {
         let checkpoint_range = start_checkpoint_seq_num .. u64::MAX;
         let writer = Self::make_writer(root_dir_path.to_path_buf(), file_type, 0, checkpoint_range.clone())?;
-        Ok(CSVWriter { root_dir_path: root_dir_path.to_path_buf(), file_type, writer, epoch: 0, checkpoint_range })
+        Ok(CSVWriter {
+            root_dir_path: root_dir_path.to_path_buf(),
+            file_type,
+            writer,
+            epoch: 0,
+            checkpoint_range,
+            row_count: 0,
+        })
     }
 
     fn make_writer(
@@ -59,10 +67,13 @@ impl<S: Serialize + ParquetSchema> AnalyticsWriter<S> for CSVWriter {
         Ok(FileFormat::CSV)
     }
 
-    fn write(&mut self, rows: &[S]) -> Result<()> {
+    fn write(&mut self, rows: Box<dyn Iterator<Item = S> + Send + Sync>) -> Result<()> {
+        let mut count = 0;
         for row in rows {
             self.writer.serialize(row)?;
+            count += 1;
         }
+        self.row_count += count;
         Ok(())
     }
 
@@ -84,6 +95,7 @@ impl<S: Serialize + ParquetSchema> AnalyticsWriter<S> for CSVWriter {
             self.epoch,
             self.checkpoint_range.clone(),
         )?;
+        self.row_count = 0;
         Ok(())
     }
 
@@ -91,5 +103,9 @@ impl<S: Serialize + ParquetSchema> AnalyticsWriter<S> for CSVWriter {
         let file_path = self.file_path(self.epoch, self.checkpoint_range.clone())?;
         let len = fs::metadata(file_path)?.len();
         Ok(Some(len))
+    }
+
+    fn rows(&self) -> Result<usize> {
+        Ok(self.row_count)
     }
 }

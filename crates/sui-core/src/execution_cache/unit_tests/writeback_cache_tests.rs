@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     future::Future,
     path::PathBuf,
     sync::{
@@ -152,7 +152,7 @@ impl Scenario {
         let tx = VerifiedTransaction::new_unchecked(tx);
         let events: TransactionEvents = Default::default();
 
-        let effects = TestEffectsBuilder::new(tx.inner()).with_events_digest(events.digest()).build();
+        let effects = TestEffectsBuilder::new(tx.inner()).build();
 
         TransactionOutputs {
             transaction: Arc::new(tx),
@@ -164,6 +164,7 @@ impl Scenario {
             locks_to_delete: Default::default(),
             new_locks_to_init: Default::default(),
             written: Default::default(),
+            output_keys: Default::default(),
         }
     }
 
@@ -324,7 +325,7 @@ impl Scenario {
         let tx = *outputs.transaction.digest();
         assert!(self.transactions.insert(tx), "transaction is not unique");
 
-        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone(), true);
+        self.cache().write_transaction_outputs(1 /* epoch */, outputs.clone());
 
         self.count_action();
         tx
@@ -332,7 +333,8 @@ impl Scenario {
 
     // commit a transaction to the database
     pub async fn commit(&mut self, tx: TransactionDigest) -> SuiResult {
-        self.cache().commit_transaction_outputs(1, &[tx], true);
+        let batch = self.cache().build_db_batch(1, &[tx]);
+        self.cache().commit_transaction_outputs(1, batch, &[tx]);
         self.count_action();
         Ok(())
     }
@@ -439,11 +441,9 @@ impl Scenario {
             let id = self.id_map.get(short_id).expect("no such object");
             let object = self.objects.get(id).expect("no such object");
             assert_eq!(self.cache().get_object_by_key(id, object.version()).unwrap(), *object);
-            assert!(self.cache().have_received_object_at_version(
-                FullObjectKey::new(object.full_id(), object.version()),
-                1,
-                true
-            ));
+            assert!(self
+                .cache()
+                .have_received_object_at_version(FullObjectKey::new(object.full_id(), object.version()), 1,));
         }
     }
 
@@ -500,7 +500,8 @@ async fn test_committed() {
 
         s.assert_live(&[1, 2]);
         s.assert_dirty(&[1, 2]);
-        s.cache().commit_transaction_outputs(1, &[tx], true);
+        let batch = s.cache().build_db_batch(1, &[tx]);
+        s.cache().commit_transaction_outputs(1, batch, &[tx]);
         s.assert_not_dirty(&[1, 2]);
         s.assert_cached(&[1, 2]);
 
@@ -587,35 +588,35 @@ async fn test_extra_outputs() {
 
         s.cache.get_transaction_block(&tx).unwrap();
         let fx = s.cache.get_executed_effects(&tx).unwrap();
-        let events_digest = fx.events_digest().unwrap();
-        s.cache.get_events(events_digest).unwrap();
+        let _events_digest = fx.events_digest().unwrap();
+        s.cache.get_events(&tx).unwrap();
 
         s.commit(tx).await.unwrap();
 
         s.cache.get_transaction_block(&tx).unwrap();
         s.cache.get_executed_effects(&tx).unwrap();
-        s.cache.get_events(events_digest).unwrap();
+        s.cache.get_events(&tx).unwrap();
 
         // clear cache
         s.reset_cache();
 
         s.cache.get_transaction_block(&tx).unwrap();
         s.cache.get_executed_effects(&tx).unwrap();
-        s.cache.get_events(events_digest).unwrap();
+        s.cache.get_events(&tx).unwrap();
 
         s.with_created(&[3]);
         let tx = s.do_tx().await;
 
         // when Events is empty, it should be treated as None
         let fx = s.cache.get_executed_effects(&tx).unwrap();
-        let events_digest = fx.events_digest().unwrap();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(fx.events_digest().is_none());
+        assert!(s.cache.get_events(&tx).is_none(), "empty events should be none");
 
         s.commit(tx).await.unwrap();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(s.cache.get_events(&tx).is_none(), "empty events should be none");
 
         s.reset_cache();
-        assert!(s.cache.get_events(events_digest).is_none(), "empty events should be none");
+        assert!(s.cache.get_events(&tx).is_none(), "empty events should be none");
     })
     .await;
 }
@@ -696,13 +697,13 @@ async fn test_lt_or_eq_caching() {
         };
 
         // latest object not yet cached
-        assert!(!s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
+        assert!(!s.cache.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version <= 0 does not exist
         assert!(s.cache().find_object_lt_or_eq_version(s.obj_id(1), 0.into()).is_none());
 
         // query above populates cache
-        assert_eq!(s.cache.cached.object_by_id_cache.get(&s.obj_id(1)).unwrap().lock().version().unwrap().value(), 5);
+        assert_eq!(s.cache.object_by_id_cache.get(&s.obj_id(1)).unwrap().lock().version().unwrap().value(), 5);
 
         // all queries get correct answer with a populated cache
         check_version(1, 1);
@@ -739,13 +740,13 @@ async fn test_lt_or_eq_with_cached_tombstone() {
         };
 
         // latest object not yet cached
-        assert!(!s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
+        assert!(!s.cache.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version 2 is deleted
         check_version(2, None);
 
         // checking the version pulled the tombstone into the cache
-        assert!(s.cache.cached.object_by_id_cache.contains_key(&s.obj_id(1)));
+        assert!(s.cache.object_by_id_cache.contains_key(&s.obj_id(1)));
 
         // version 1 is still found, tombstone in cache is ignored
         check_version(1, Some(1));
@@ -1137,7 +1138,7 @@ async fn latest_object_cache_race_test() {
             while start.elapsed() < Duration::from_secs(2) {
                 // If you move the get_ticket_for_read to after we get the latest version,
                 // the test will fail! (this is good, it means the test is doing something)
-                let ticket = cache.cached.object_by_id_cache.get_ticket_for_read(&object_id);
+                let ticket = cache.object_by_id_cache.get_ticket_for_read(&object_id);
 
                 // get the latest version, but then let it become stale
                 let Some(latest_version) =
@@ -1171,7 +1172,7 @@ async fn latest_object_cache_race_test() {
         let start = Instant::now();
         std::thread::spawn(move || {
             while start.elapsed() < Duration::from_secs(2) {
-                cache.cached.object_by_id_cache.invalidate(&object_id);
+                cache.object_by_id_cache.invalidate(&object_id);
                 // sleep for 1 to 10µs
                 std::thread::sleep(Duration::from_micros(rand::thread_rng().gen_range(1 .. 10)));
             }
@@ -1186,7 +1187,7 @@ async fn latest_object_cache_race_test() {
             let mut latest = OBJECT_START_VERSION;
 
             while start.elapsed() < Duration::from_secs(2) {
-                let Some(cur) = cache.cached.object_by_id_cache.get(&object_id).and_then(|e| e.lock().version()) else {
+                let Some(cur) = cache.object_by_id_cache.get(&object_id).and_then(|e| e.lock().version()) else {
                     continue;
                 };
 

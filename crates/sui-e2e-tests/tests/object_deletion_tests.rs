@@ -5,9 +5,9 @@
 mod sim_only_tests {
     use std::{path::PathBuf, time::Duration};
 
-    use one_node::SuiNode;
     use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
     use sui_macros::sim_test;
+    use one_node::SuiNode;
     use sui_test_transaction_builder::publish_package;
     use sui_types::{base_types::ObjectID, digests::TransactionDigest, messages_checkpoint::CheckpointSequenceNumber};
     use test_cluster::{TestCluster, TestClusterBuilder};

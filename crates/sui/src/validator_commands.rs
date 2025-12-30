@@ -60,7 +60,7 @@ use sui_types::{
     sui_system_state::{
         sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
         sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        SUI_SYSTEM_MODULE_NAME,
+        SUI_SYSTEM_MODULE_NAME
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
     SUI_SYSTEM_PACKAGE_ID,
@@ -144,7 +144,7 @@ pub enum SuiValidatorCommand {
         /// Validator's OperationCap ID can be found by using the `display-metadata` subcommand.
         #[clap(name = "operation-cap-id", long)]
         operation_cap_id: Option<ObjectID>,
-        /// The OneChain Address of the validator is being reported or un-reported
+        /// The Sui Address of the validator is being reported or un-reported
         #[clap(name = "reportee-address")]
         reportee_address: SuiAddress,
         /// If true, undo an existing report.
@@ -200,7 +200,7 @@ pub enum SuiValidatorCommand {
         #[clap(name = "gas-budget", long)]
         gas_budget: Option<u64>,
     },
-    /// Update OneChain native bridge committee node url
+    /// Update sui native bridge committee node url
     UpdateBridgeCommitteeNodeUrl {
         /// New node url to be registered in the on chain bridge object.
         #[clap(long)]
@@ -255,7 +255,7 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
     } else {
         let kp = match key {
             Some(key) => {
-                println!("Generated new key file {:?} based on sui.keystore file.", file_name);
+                println!("Generated new key file {:?} based on one.keystore file.", file_name);
                 key
             }
             None => {
@@ -307,7 +307,6 @@ impl SuiValidatorCommand {
                         protocol_key: keypair.public().into(),
                         worker_key: worker_keypair.public().clone(),
                         account_address: SuiAddress::from(&account_keypair.public()),
-                        revenue_receiving_address: SuiAddress::from(&account_keypair.public()),
                         network_key: network_keypair.public().clone(),
                         gas_price,
                         commission_rate: sui_config::node::DEFAULT_COMMISSION_RATE,
@@ -351,7 +350,6 @@ impl SuiValidatorCommand {
                     CallArg::Pure(bcs::to_bytes(validator.p2p_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_primary_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(validator.narwhal_worker_address()).unwrap()),
-                    CallArg::Pure(bcs::to_bytes(&validator.revenue_receiving_address()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
@@ -457,7 +455,7 @@ impl SuiValidatorCommand {
                     bail!("Address {} is not in the committee", address);
                 }
                 println!("Starting bridge committee registration for Sui validator: {address}, with bridge public key: {} and url: {}", ecdsa_keypair.public, bridge_authority_url);
-                let sui_rpc_url = &context.config.get_active_env().unwrap().rpc;
+                let sui_rpc_url = &context.get_active_env().unwrap().rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let bridge_client = SuiBridgeClient::new(sui_rpc_url, bridge_metrics).await?;
                 let bridge = bridge_client.get_mutable_bridge_object_arg_must_succeed().await;
@@ -505,7 +503,7 @@ impl SuiValidatorCommand {
                 // Make sure the address is member of the committee
                 let address =
                     check_address(context.active_address()?, validator_address, print_unsigned_transaction_only)?;
-                let sui_rpc_url = &context.config.get_active_env().unwrap().rpc;
+                let sui_rpc_url = &context.get_active_env().unwrap().rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let bridge_client = SuiBridgeClient::new(sui_rpc_url, bridge_metrics).await?;
                 let committee_members =
@@ -686,7 +684,7 @@ async fn get_validator_summary_from_cap_id(
     Ok((status, summary))
 }
 
-pub async fn construct_unsigned_0x5_txn(
+async fn construct_unsigned_0x5_txn(
     context: &mut WalletContext,
     sender: SuiAddress,
     function: &'static str,
@@ -712,7 +710,7 @@ pub async fn construct_unsigned_0x5_txn(
     )
 }
 
-pub async fn call_0x5(
+async fn call_0x5(
     context: &mut WalletContext,
     function: &'static str,
     call_args: Vec<CallArg>,

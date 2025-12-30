@@ -12,15 +12,16 @@ async-trait = "0.1.68"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 futures = "0.3.28"
 tracing = "0.1.37"
+url.workspace = true
 
 diesel = { workspace = true, features = ["chrono"] }
 diesel-async = { workspace = true, features = ["bb8", "postgres", "async-connection-wrapper"] }
 indicatif.workspace = true
 object_store.workspace = true
 prometheus.workspace = true
-sui-archival.workspace = true
 sui-config.workspace = true
 sui-core.workspace = true
+sui-data-ingestion-core.workspace = true
 sui-field-count.workspace = true
 sui-indexer-alt-schema.workspace = true
 sui-indexer-alt-framework.workspace = true

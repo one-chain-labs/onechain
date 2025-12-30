@@ -11,18 +11,18 @@ dependencies = [
 ]
 
 [[move.package]]
-id = "MoveStdlib"
+name = "MoveStdlib"
 source = { local = "../move-stdlib" }
 
 [[move.package]]
-id = "One"
-source = { local = "../one-framework" }
+name = "Sui"
+source = { local = "../sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
 ]
 
 [move.toolchain-version]
-compiler-version = "1.0.4"
+compiler-version = "1.0.0"
 edition = "2024.beta"
 flavor = "one"

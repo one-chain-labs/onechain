@@ -5,7 +5,8 @@
 module ibe::tests;
 
 use ibe::example;
-use one::{bcs, bls12381};
+use one::bcs;
+use one::bls12381;
 
 #[test_only]
 use std::hash::sha2_256;

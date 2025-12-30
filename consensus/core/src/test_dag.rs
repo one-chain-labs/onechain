@@ -32,7 +32,7 @@ pub(crate) fn build_dag(
             assert_eq!(start.iter().map(|x| x.round).max(), start.iter().map(|x| x.round).min());
             start
         }
-        None => genesis_blocks(context.clone()).iter().map(|x| x.reference()).collect::<Vec<_>>(),
+        None => genesis_blocks(context.as_ref()).iter().map(|x| x.reference()).collect::<Vec<_>>(),
     };
 
     let num_authorities = context.committee.size();

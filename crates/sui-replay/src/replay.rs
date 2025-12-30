@@ -10,11 +10,7 @@ use std::{
 use futures::executor::block_on;
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::module_cache::GetModule;
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
-};
+use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use prometheus::Registry;
 use serde::{Deserialize, Serialize};
 use similar::{ChangeTag, TextDiff};
@@ -36,7 +32,7 @@ use sui_types::{
     inner_temporary_store::InnerTemporaryStore,
     message_envelope::Message,
     metrics::LimitsMetrics,
-    object::{Data, Object, Owner},
+    object::{Object, Owner},
     storage::{
         get_module,
         get_module_by_id,
@@ -96,26 +92,38 @@ pub struct ExecutionSandboxState {
 impl ExecutionSandboxState {
     #[allow(clippy::result_large_err)]
     pub fn check_effects(&self) -> Result<(), ReplayEngineError> {
-        if self.transaction_info.effects != self.local_exec_effects {
+        let SuiTransactionBlockEffects::V1(mut local_effects) = self.local_exec_effects.clone();
+        let SuiTransactionBlockEffects::V1(on_chain_effects) = self.transaction_info.effects.clone();
+
+        // Handle backwards compatibility with the new `abort_error` field in
+        // `SuiTransactionBlockEffects`
+        if on_chain_effects.abort_error.is_none() {
+            local_effects.abort_error = None;
+        }
+        let local_effects = SuiTransactionBlockEffects::V1(local_effects);
+        let on_chain_effects = SuiTransactionBlockEffects::V1(on_chain_effects);
+
+        if on_chain_effects != local_effects {
             error!("Replay tool forked {}", self.transaction_info.tx_digest);
-            let diff = self.diff_effects();
+            let diff = Self::diff_effects(&on_chain_effects, &local_effects);
             println!("{}", diff);
             return Err(ReplayEngineError::EffectsForked {
                 digest: self.transaction_info.tx_digest,
                 diff: format!("\n{}", diff),
-                on_chain: Box::new(self.transaction_info.effects.clone()),
-                local: Box::new(self.local_exec_effects.clone()),
+                on_chain: Box::new(on_chain_effects),
+                local: Box::new(local_effects),
             });
         }
         Ok(())
     }
 
     /// Utility to diff effects in a human readable format
-    pub fn diff_effects(&self) -> String {
-        let eff1 = &self.transaction_info.effects;
-        let eff2 = &self.local_exec_effects;
-        let on_chain_str = format!("{:#?}", eff1);
-        let local_chain_str = format!("{:#?}", eff2);
+    pub fn diff_effects(
+        on_chain_effects: &SuiTransactionBlockEffects,
+        local_effects: &SuiTransactionBlockEffects,
+    ) -> String {
+        let on_chain_str = format!("{:#?}", on_chain_effects);
+        let local_chain_str = format!("{:#?}", local_effects);
         let mut res = vec![];
 
         let diff = TextDiff::from_lines(&on_chain_str, &local_chain_str);
@@ -1505,7 +1513,10 @@ impl LocalExec {
                 }
                 InputObjectKind::SharedMoveObject { id, .. } => {
                     let (digest, version) = deleted_shared_info_map.get(id).unwrap();
-                    Some(ObjectReadResult::new(*kind, ObjectReadResultKind::DeletedSharedObject(*version, *digest)))
+                    Some(ObjectReadResult::new(
+                        *kind,
+                        ObjectReadResultKind::ObjectConsensusStreamEnded(*version, *digest),
+                    ))
                 }
             })
             .collect();
@@ -1632,8 +1643,6 @@ impl ChildObjectResolver for LocalExec {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        _use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         fn inner(
             self_: &LocalExec,
@@ -1683,45 +1692,6 @@ impl ParentSync for LocalExec {
             .lock()
             .expect("Unable to lock events list")
             .push(ExecutionStoreEvent::ParentSyncStoreGetLatestParentEntryRef { object_id, result: res });
-        res
-    }
-}
-
-impl ResourceResolver for LocalExec {
-    type Error = SuiError;
-
-    /// In this case we might need to download a Move object on the fly which was not present in the
-    /// modified at versions list because packages are immutable
-    fn get_resource(&self, address: &AccountAddress, typ: &StructTag) -> SuiResult<Option<Vec<u8>>> {
-        fn inner(self_: &LocalExec, address: &AccountAddress, typ: &StructTag) -> SuiResult<Option<Vec<u8>>> {
-            // If package not present fetch it from the network or some remote location
-            let Some(object) =
-                self_.get_or_download_object(&ObjectID::from(*address), false /* we expect a Move obj*/)?
-            else {
-                return Ok(None);
-            };
-
-            match &object.data {
-                Data::Move(m) => {
-                    assert!(
-                        m.is_type(typ),
-                        "Invariant violation: ill-typed object in storage \
-                        or bad object request from caller"
-                    );
-                    Ok(Some(m.contents().to_vec()))
-                }
-                other => unimplemented!("Bad object lookup: expected Move object, but got {:#?}", other),
-            }
-        }
-
-        let res = inner(self, address, typ);
-        self.exec_store_events.lock().expect("Unable to lock events list").push(
-            ExecutionStoreEvent::ResourceResolverGetResource {
-                address: *address,
-                typ: typ.clone(),
-                result: res.clone(),
-            },
-        );
         res
     }
 }

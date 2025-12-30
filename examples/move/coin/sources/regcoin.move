@@ -4,7 +4,8 @@
 //docs::#regulate
 module examples::regcoin;
 
-use one::{coin::{Self, DenyCapV2}, deny_list::DenyList};
+use one::coin::{Self, DenyCapV2};
+use one::deny_list::DenyList;
 
 public struct REGCOIN has drop {}
 

@@ -65,7 +65,7 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, VersionNumber, SUI_ADDRESS_LENGTH},
     committee::EpochId,
     crypto::{get_authority_key_pair, get_key_pair_from_rng, AccountKeyPair, RandomnessRound},
-    digests::{ConsensusCommitDigest, TransactionDigest, TransactionEventsDigest},
+    digests::{ConsensusCommitDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     event::Event,
     execution_status::ExecutionStatus,
@@ -271,7 +271,7 @@ impl AdapterInitConfig {
             Some(OffChainConfig {
                 snapshot_config,
                 retention_config,
-                data_ingestion_path: data_ingestion_path.unwrap_or(tempdir().unwrap().into_path()),
+                data_ingestion_path: data_ingestion_path.unwrap_or(tempdir().unwrap().keep()),
                 rest_api_url,
             })
         } else {
@@ -435,7 +435,7 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
         extra: Self::ExtraPublishArgs,
     ) -> anyhow::Result<(Option<String>, Vec<MaybeNamedCompiledModule>)> {
         self.next_task();
-        let SuiPublishArgs { sender, upgradeable, dependencies, gas_price } = extra;
+        let SuiPublishArgs { sender, upgradeable, dependencies, gas_price, dry_run } = extra;
         let named_addr_opt = modules.first().unwrap().named_address;
         let first_module_name = modules.first().unwrap().module.self_id().name().to_string();
         let modules_bytes = modules
@@ -462,6 +462,30 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
         // we are assuming that all packages depend on Move Stdlib and Sui Framework, so these
         // don't have to be provided explicitly as parameters
         dependencies.extend([MOVE_STDLIB_PACKAGE_ID, SUI_FRAMEWORK_PACKAGE_ID]);
+
+        if dry_run {
+            let sender_acc = self.get_sender(sender.clone());
+            let sender_address = sender_acc.address;
+
+            let mut builder = ProgrammableTransactionBuilder::new();
+            if upgradeable {
+                let cap = builder.publish_upgradeable(modules_bytes, dependencies);
+                builder.transfer_arg(sender_address, cap);
+            } else {
+                builder.publish_immutable(modules_bytes, dependencies);
+            };
+            let pt = builder.finish();
+            let payments = self.get_payments(sender_acc, vec![]);
+
+            let transaction =
+                TransactionData::new_programmable(sender_acc.address, payments.clone(), pt, gas_budget, gas_price);
+            let summary = self.dry_run(transaction).await?;
+            let output = self.object_summary_output(&summary, /* summarize */ false);
+
+            // do not pass back any modules for storage
+            return Ok((output, vec![]));
+        }
+
         let data = |sender, gas| {
             let mut builder = ProgrammableTransactionBuilder::new();
             if upgradeable {
@@ -471,7 +495,7 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                 builder.publish_immutable(modules_bytes, dependencies);
             };
             let pt = builder.finish();
-            TransactionData::new_programmable(sender, vec![gas], pt, gas_budget, gas_price)
+            TransactionData::new_programmable(sender, gas, pt, gas_budget, gas_price)
         };
         let transaction = self.sign_txn(sender, data);
         let summary = self.execute_txn(transaction).await?;
@@ -587,7 +611,9 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
 
                 let mut output = vec![];
                 if show_headers {
-                    output.push(format!("Headers: {:#?}", resp.http_headers.unwrap()));
+                    let headers_map: BTreeMap<_, _> =
+                        resp.http_headers.into_iter().flatten().filter_map(|(h, v)| Some((h?.to_string(), v))).collect();
+                    output.push(format!("Headers: {headers_map:#?}"));
                 }
                 if show_service_version {
                     output.push(format!("Service version: {}", resp.service_version.unwrap()));
@@ -621,7 +647,9 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                 let mut output = String::new();
 
                 if show_headers {
-                    write!(&mut output, "Headers: {:#?}\n\n", resp.http_headers.unwrap()).unwrap();
+                    let headers_map: BTreeMap<_, _> =
+                        resp.http_headers.into_iter().flatten().filter_map(|(h, v)| Some((h?.to_string(), v))).collect();
+                    write!(&mut output, "Headers: {headers_map:#?}\n\n").unwrap();
                 }
 
                 write!(&mut output, "Response: {}", resp.response_body).unwrap();
@@ -714,7 +742,7 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                     let rec_arg = builder.pure(recipient).unwrap();
                     builder.command(sui_types::transaction::Command::TransferObjects(vec![obj_arg], rec_arg));
                     let pt = builder.finish();
-                    TransactionData::new_programmable(sender, vec![gas], pt, gas_budget, gas_price)
+                    TransactionData::new_programmable(sender, gas, pt, gas_budget, gas_price)
                 });
                 let summary = self.execute_txn(transaction).await?;
                 let output = self.object_summary_output(&summary, /* summarize */ false);
@@ -783,16 +811,21 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                 let summary = if !dev_inspect && !dry_run {
                     let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                     let gas_price = gas_price.unwrap_or(self.gas_price);
-                    let transaction = self.sign_sponsor_txn(sender, sponsor, gas_payment, |sender, sponsor, gas| {
-                        TransactionData::new_programmable_allow_sponsor(
-                            sender,
-                            vec![gas],
-                            ProgrammableTransaction { inputs, commands },
-                            gas_budget,
-                            gas_price,
-                            sponsor,
-                        )
-                    });
+                    let transaction = self.sign_sponsor_txn(
+                        sender,
+                        sponsor,
+                        gas_payment.unwrap_or_default(),
+                        |sender, sponsor, gas| {
+                            TransactionData::new_programmable_allow_sponsor(
+                                sender,
+                                gas,
+                                ProgrammableTransaction { inputs, commands },
+                                gas_budget,
+                                gas_price,
+                                sponsor,
+                            )
+                        },
+                    );
                     self.execute_txn(transaction).await?
                 } else if dry_run {
                     let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
@@ -800,11 +833,11 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                     let sender = self.get_sender(sender);
                     let sponsor = sponsor.map_or(sender, |a| self.get_sender(Some(a)));
 
-                    let payment = self.get_payment(sponsor, gas_payment);
+                    let payments = self.get_payments(sponsor, gas_payment.unwrap_or_default());
 
                     let transaction = TransactionData::new_programmable(
                         sender.address,
-                        vec![payment],
+                        payments,
                         ProgrammableTransaction { inputs, commands },
                         gas_budget,
                         gas_price,
@@ -826,6 +859,7 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                 dependencies,
                 sender,
                 gas_budget,
+                dry_run,
                 syntax,
                 policy,
                 gas_price,
@@ -905,6 +939,7 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                                 dependencies,
                                 sender,
                                 gas_budget,
+                                dry_run,
                                 policy,
                                 gas_price,
                             )
@@ -919,7 +954,10 @@ impl MoveTestAdapter<'_> for SuiTestAdapter {
                     self.compiled_state.named_address_mapping.insert(package, before_upgrade);
                 }
                 let (warnings_opt, output, data, modules) = result?;
-                store_modules(self, syntax, data, modules);
+                // skip storing modules if this is a dry run
+                if !dry_run {
+                    store_modules(self, syntax, data, modules);
+                }
                 Ok(merge_output(warnings_opt, output))
             }
             SuiSubcommand::StagePackage(StagePackageCommand { syntax, dependencies }) => {
@@ -1220,9 +1258,9 @@ impl SuiTestAdapter {
         dependencies: Vec<String>,
         sender: String,
         gas_budget: Option<u64>,
+        dry_run: bool,
         policy: u8,
         gas_price: u64,
-        // dry_run: bool,
     ) -> anyhow::Result<Option<String>> {
         let modules_bytes = modules
             .iter()
@@ -1270,10 +1308,22 @@ impl SuiTestAdapter {
 
         let pt = builder.finish();
 
-        let data = |sender, gas| TransactionData::new_programmable(sender, vec![gas], pt, gas_budget, gas_price);
+        if dry_run {
+            let transaction = TransactionData::new_programmable(
+                self.get_sender(Some(sender)).address,
+                vec![],
+                pt,
+                gas_budget,
+                gas_price,
+            );
+            let summary = self.dry_run(transaction).await?;
+            return Ok(self.object_summary_output(&summary, false));
+        }
 
+        let data = |sender, gas| TransactionData::new_programmable(sender, gas, pt, gas_budget, gas_price);
         let transaction = self.sign_txn(Some(sender), data);
         let summary = self.execute_txn(transaction).await?;
+
         let created_package = summary
             .created
             .iter()
@@ -1303,38 +1353,42 @@ impl SuiTestAdapter {
     fn sign_txn(
         &self,
         sender: Option<String>,
-        txn_data: impl FnOnce(/* sender */ SuiAddress, /* gas */ ObjectRef) -> TransactionData,
+        txn_data: impl FnOnce(/* sender */ SuiAddress, /* gas */ Vec<ObjectRef>) -> TransactionData,
     ) -> Transaction {
-        self.sign_sponsor_txn(sender, None, None, move |sender, _, gas| txn_data(sender, gas))
+        self.sign_sponsor_txn(sender, None, vec![], move |sender, _, gas| txn_data(sender, gas))
     }
 
-    fn get_payment(&self, sponsor: &TestAccount, payment: Option<FakeID>) -> ObjectRef {
-        let payment = if let Some(payment) = payment {
-            self.fake_to_real_object_id(payment).expect("Could not find specified payment object")
+    fn get_payments(&self, sponsor: &TestAccount, payments: Vec<FakeID>) -> Vec<ObjectRef> {
+        let payments = if payments.is_empty() {
+            vec![sponsor.gas]
         } else {
-            sponsor.gas
+            payments
+                .into_iter()
+                .map(|payment| self.fake_to_real_object_id(payment).expect("Could not find specified payment object"))
+                .collect::<Vec<ObjectID>>()
         };
 
-        self.get_object(&payment, None).unwrap().compute_object_reference()
+        payments.into_iter().map(|payment| self.get_object(&payment, None).unwrap().compute_object_reference()).collect()
     }
 
     fn sign_sponsor_txn(
         &self,
         sender: Option<String>,
         sponsor: Option<String>,
-        payment: Option<FakeID>,
+        payment: Vec<FakeID>,
         txn_data: impl FnOnce(
             /* sender */ SuiAddress,
             /* sponsor */ SuiAddress,
-            /* gas */ ObjectRef,
+            /* gas */ Vec<ObjectRef>,
         ) -> TransactionData,
     ) -> Transaction {
         let sender = self.get_sender(sender);
         let sponsor = sponsor.map_or(sender, |a| self.get_sender(Some(a)));
 
-        let payment_ref = self.get_payment(sponsor, payment);
+        let payment_refs = self.get_payments(sponsor, payment);
 
-        let data = txn_data(sender.address, sponsor.address, payment_ref);
+        let data = txn_data(sender.address, sponsor.address, payment_refs);
+
         if sender.address == sponsor.address {
             to_sender_signed_transaction(data, &sender.key_pair)
         } else {
@@ -1380,7 +1434,7 @@ impl SuiTestAdapter {
                 arguments,
             ));
             let pt = builder.finish();
-            TransactionData::new_programmable(sender, vec![gas], pt, gas_budget, gas_price)
+            TransactionData::new_programmable(sender, gas, pt, gas_budget, gas_price)
         };
         Ok(self.sign_txn(sender, data))
     }
@@ -2139,21 +2193,15 @@ impl ReadStore for SuiTestAdapter {
         self.executor.get_transaction_effects(tx_digest)
     }
 
-    fn get_events(&self, event_digest: &TransactionEventsDigest) -> Option<TransactionEvents> {
-        self.executor.get_events(event_digest)
-    }
-
-    fn get_full_checkpoint_contents_by_sequence_number(
-        &self,
-        sequence_number: CheckpointSequenceNumber,
-    ) -> Option<sui_types::messages_checkpoint::FullCheckpointContents> {
-        self.executor.get_full_checkpoint_contents_by_sequence_number(sequence_number)
+    fn get_events(&self, digest: &TransactionDigest) -> Option<TransactionEvents> {
+        self.executor.get_events(digest)
     }
 
     fn get_full_checkpoint_contents(
         &self,
+        sequence_number: Option<CheckpointSequenceNumber>,
         digest: &CheckpointContentsDigest,
     ) -> Option<sui_types::messages_checkpoint::FullCheckpointContents> {
-        self.executor.get_full_checkpoint_contents(digest)
+        self.executor.get_full_checkpoint_contents(sequence_number, digest)
     }
 }

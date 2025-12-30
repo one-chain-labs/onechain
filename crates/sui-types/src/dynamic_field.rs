@@ -35,8 +35,8 @@ use crate::{
 
 pub mod visitor;
 
-const DYNAMIC_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_field");
-const DYNAMIC_FIELD_FIELD_STRUCT_NAME: &IdentStr = ident_str!("Field");
+pub const DYNAMIC_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_field");
+pub const DYNAMIC_FIELD_FIELD_STRUCT_NAME: &IdentStr = ident_str!("Field");
 
 const DYNAMIC_OBJECT_FIELD_MODULE_NAME: &IdentStr = ident_str!("dynamic_object_field");
 const DYNAMIC_OBJECT_FIELD_WRAPPER_STRUCT_NAME: &IdentStr = ident_str!("Wrapper");

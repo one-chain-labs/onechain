@@ -7,7 +7,6 @@ use std::{
     sync::Arc,
 };
 
-use sui_pg_db::Db;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -19,8 +18,8 @@ use tracing::{debug, error, info, warn};
 use super::Handler;
 use crate::{
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
-    models::watermarks::CommitterWatermark,
     pipeline::{logging::WatermarkLogger, CommitterConfig, WatermarkPart, WARN_PENDING_WATERMARKS},
+    store::{CommitterWatermark, Connection, Store},
 };
 
 /// The watermark task is responsible for keeping track of a pipeline's out-of-order commits and
@@ -44,11 +43,11 @@ use crate::{
 /// the watermark cannot be progressed. If `skip_watermark` is set, the task will shutdown
 /// immediately.
 pub(super) fn commit_watermark<H: Handler + 'static>(
-    initial_watermark: Option<CommitterWatermark<'static>>,
+    initial_watermark: Option<CommitterWatermark>,
     config: CommitterConfig,
     skip_watermark: bool,
     mut rx: mpsc::Receiver<Vec<WatermarkPart>>,
-    db: Db,
+    store: H::Store,
     metrics: Arc<IndexerMetrics>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {
@@ -71,7 +70,7 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
             let next = watermark.checkpoint_hi_inclusive + 1;
             (watermark, next)
         } else {
-            (CommitterWatermark::initial(H::NAME.into()), 0)
+            (CommitterWatermark::default(), 0)
         };
 
         // The watermark task will periodically output a log message at a higher log level to
@@ -102,7 +101,7 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
                         );
                     }
 
-                    let Ok(mut conn) = db.connect().await else {
+                    let Ok(mut conn) = store.connect().await else {
                         warn!(pipeline = H::NAME, "Commit watermark task failed to get connection for DB");
                         continue;
                     };
@@ -155,22 +154,22 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
                     metrics
                         .watermark_epoch
                         .with_label_values(&[H::NAME])
-                        .set(watermark.epoch_hi_inclusive);
+                        .set(watermark.epoch_hi_inclusive as i64);
 
                     metrics
                         .watermark_checkpoint
                         .with_label_values(&[H::NAME])
-                        .set(watermark.checkpoint_hi_inclusive);
+                        .set(watermark.checkpoint_hi_inclusive as i64);
 
                     metrics
                         .watermark_transaction
                         .with_label_values(&[H::NAME])
-                        .set(watermark.tx_hi);
+                        .set(watermark.tx_hi as i64);
 
                     metrics
                         .watermark_timestamp_ms
                         .with_label_values(&[H::NAME])
-                        .set(watermark.timestamp_ms_hi_inclusive);
+                        .set(watermark.timestamp_ms_hi_inclusive as i64);
 
                     debug!(
                         pipeline = H::NAME,
@@ -189,7 +188,10 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
 
                         // TODO: If initial_watermark is empty, when we update watermark
                         // for the first time, we should also update the low watermark.
-                        match watermark.update(&mut conn).await {
+                        match conn.set_committer_watermark(
+                            H::NAME,
+                            watermark,
+                        ).await {
                             // If there's an issue updating the watermark, log it but keep going,
                             // it's OK for the watermark to lag from a correctness perspective.
                             Err(e) => {
@@ -208,24 +210,24 @@ pub(super) fn commit_watermark<H: Handler + 'static>(
                                 logger.log::<H>(&watermark, elapsed);
 
                                 checkpoint_lag_reporter.report_lag(
-                                    watermark.checkpoint_hi_inclusive as u64,
-                                    watermark.timestamp_ms_hi_inclusive as u64,
+                                    watermark.checkpoint_hi_inclusive,
+                                    watermark.timestamp_ms_hi_inclusive
                                 );
 
                                 metrics
                                     .watermark_epoch_in_db
                                     .with_label_values(&[H::NAME])
-                                    .set(watermark.epoch_hi_inclusive);
+                                    .set(watermark.epoch_hi_inclusive as i64);
 
                                 metrics
                                     .watermark_transaction_in_db
                                     .with_label_values(&[H::NAME])
-                                    .set(watermark.tx_hi);
+                                    .set(watermark.tx_hi as i64);
 
                                 metrics
                                     .watermark_timestamp_in_db_ms
                                     .with_label_values(&[H::NAME])
-                                    .set(watermark.timestamp_ms_hi_inclusive);
+                                    .set(watermark.timestamp_ms_hi_inclusive as i64);
                             }
                             Ok(false) => {}
                         }

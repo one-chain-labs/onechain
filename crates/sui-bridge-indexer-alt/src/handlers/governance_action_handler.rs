@@ -1,0 +1,146 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use diesel_async::RunQueryDsl;
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::StructTag};
+use sui_bridge::events::{
+    EmergencyOpEvent,
+    MoveBlocklistValidatorEvent,
+    MoveNewTokenEvent,
+    MoveTokenRegistrationEvent,
+    UpdateRouteLimitEvent,
+    UpdateTokenPriceEvent,
+};
+use sui_bridge_schema::{
+    models::{BridgeDataSource, GovernanceAction},
+    schema,
+};
+use sui_indexer_alt_framework::{
+    pipeline::{concurrent::Handler, Processor},
+    postgres::Db,
+    store::Store,
+    types::{full_checkpoint_content::CheckpointData, BRIDGE_ADDRESS},
+};
+use tracing::info;
+
+use crate::{
+    handlers::{is_bridge_txn, BRIDGE, COMMITTEE, LIMITER, TREASURY},
+    struct_tag,
+};
+
+const UPDATE_ROUTE_LIMIT_EVENT: &IdentStr = ident_str!("UpdateRouteLimitEvent");
+const EMERGENCY_OP_EVENT: &IdentStr = ident_str!("EmergencyOpEvent");
+const BLOCKLIST_VALIDATOR_EVENT: &IdentStr = ident_str!("BlocklistValidatorEvent");
+const TOKEN_REGISTRATION_EVENT: &IdentStr = ident_str!("TokenRegistrationEvent");
+const UPDATE_TOKEN_PRICE_EVENT: &IdentStr = ident_str!("UpdateTokenPriceEvent");
+const NEW_TOKEN_EVENT: &IdentStr = ident_str!("NewTokenEvent");
+
+pub struct GovernanceActionHandler {
+    update_limit_event_type: StructTag,
+    emergency_op_event_type: StructTag,
+    blocklist_event_type: StructTag,
+    token_reg_event_type: StructTag,
+    update_price_event_type: StructTag,
+    new_token_event_type: StructTag,
+}
+
+impl Default for GovernanceActionHandler {
+    fn default() -> Self {
+        Self {
+            update_limit_event_type: struct_tag!(BRIDGE_ADDRESS, LIMITER, UPDATE_ROUTE_LIMIT_EVENT),
+            emergency_op_event_type: struct_tag!(BRIDGE_ADDRESS, BRIDGE, EMERGENCY_OP_EVENT),
+            blocklist_event_type: struct_tag!(BRIDGE_ADDRESS, COMMITTEE, BLOCKLIST_VALIDATOR_EVENT),
+            token_reg_event_type: struct_tag!(BRIDGE_ADDRESS, TREASURY, TOKEN_REGISTRATION_EVENT),
+            update_price_event_type: struct_tag!(BRIDGE_ADDRESS, TREASURY, UPDATE_TOKEN_PRICE_EVENT),
+            new_token_event_type: struct_tag!(BRIDGE_ADDRESS, TREASURY, NEW_TOKEN_EVENT),
+        }
+    }
+}
+
+impl Processor for GovernanceActionHandler {
+    type Value = GovernanceAction;
+
+    const NAME: &'static str = "governance_action";
+
+    fn process(&self, checkpoint: &Arc<CheckpointData>) -> anyhow::Result<Vec<Self::Value>> {
+        let timestamp_ms = checkpoint.checkpoint_summary.timestamp_ms as i64;
+
+        let mut results = vec![];
+
+        for tx in &checkpoint.transactions {
+            if !is_bridge_txn(tx) {
+                continue;
+            }
+            let txn_digest = tx.transaction.digest().inner();
+            let sender_address = tx.transaction.sender_address();
+
+            for ev in tx.events.iter().flat_map(|e| &e.data) {
+                use sui_bridge_schema::models::GovernanceActionType::*;
+
+                let (action, data) = match &ev.type_ {
+                    t if t == &self.update_limit_event_type => {
+                        info!(?ev, "Observed Sui Route Limit Update");
+                        // todo: metrics.total_oct_token_deposited.inc();
+                        let event: UpdateRouteLimitEvent = bcs::from_bytes(&ev.contents)?;
+                        (UpdateBridgeLimit, serde_json::to_value(event)?)
+                    }
+                    t if t == &self.emergency_op_event_type => {
+                        info!(?ev, "Observed Sui Emergency Op");
+                        let event: EmergencyOpEvent = bcs::from_bytes(&ev.contents)?;
+                        (EmergencyOperation, serde_json::to_value(event)?)
+                    }
+                    t if t == &self.blocklist_event_type => {
+                        info!(?ev, "Observed Sui Blocklist Validator");
+                        let event: MoveBlocklistValidatorEvent = bcs::from_bytes(&ev.contents)?;
+                        (UpdateCommitteeBlocklist, serde_json::to_value(event)?)
+                    }
+                    t if t == &self.token_reg_event_type => {
+                        info!(?ev, "Observed Sui Token Registration");
+                        let event: MoveTokenRegistrationEvent = bcs::from_bytes(&ev.contents)?;
+                        (AddSuiTokens, serde_json::to_value(event)?)
+                    }
+                    t if t == &self.update_price_event_type => {
+                        info!(?ev, "Observed Sui Token Price Update");
+                        let event: UpdateTokenPriceEvent = bcs::from_bytes(&ev.contents)?;
+                        (UpdateTokenPrices, serde_json::to_value(event)?)
+                    }
+                    t if t == &self.new_token_event_type => {
+                        info!(?ev, "Observed Sui New token event");
+                        let event: MoveNewTokenEvent = bcs::from_bytes(&ev.contents)?;
+                        (AddSuiTokens, serde_json::to_value(event)?)
+                    }
+                    _ => continue,
+                };
+
+                results.push(GovernanceAction {
+                    nonce: None,
+                    data_source: BridgeDataSource::SUI,
+                    txn_digest: txn_digest.to_vec(),
+                    sender_address: sender_address.to_vec(),
+                    timestamp_ms,
+                    action,
+                    data,
+                });
+            }
+        }
+        Ok(results)
+    }
+}
+
+#[async_trait]
+impl Handler for GovernanceActionHandler {
+    type Store = Db;
+
+    async fn commit<'a>(
+        values: &[Self::Value],
+        conn: &mut <Self::Store as Store>::Connection<'a>,
+    ) -> anyhow::Result<usize> {
+        Ok(diesel::insert_into(schema::governance_actions::table)
+            .values(values)
+            .on_conflict_do_nothing()
+            .execute(conn)
+            .await?)
+    }
+}

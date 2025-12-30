@@ -72,6 +72,7 @@ mod checked {
             Value,
         },
         gas_charger::GasCharger,
+        gas_meter::SuiGasMeter,
         programmable_transactions::linkage_view::LinkageView,
         type_resolver::TypeTagResolver,
     };
@@ -198,18 +199,18 @@ mod checked {
             move_vm_profiler::tracing_feature_enabled! {
                 use move_vm_profiler::GasProfiler;
                 use move_vm_types::gas::GasMeter;
+                use crate::gas_meter::SuiGasMeter;
 
                 let tx_digest = tx_context.digest();
-                let remaining_gas: u64 =
-                    move_vm_types::gas::GasMeter::remaining_gas(gas_charger.move_gas_status())
-                        .into();
-                gas_charger
-                    .move_gas_status_mut()
-                    .set_profiler(GasProfiler::init(
-                        &vm.config().profiler_config,
-                        format!("{}", tx_digest),
-                        remaining_gas,
-                    ));
+                let remaining_gas: u64 = move_vm_types::gas::GasMeter::remaining_gas(&SuiGasMeter(
+                    gas_charger.move_gas_status_mut(),
+                ))
+                .into();
+                SuiGasMeter(gas_charger.move_gas_status_mut()).set_profiler(GasProfiler::init(
+                    &vm.config().profiler_config,
+                    format!("{}", tx_digest),
+                    remaining_gas,
+                ));
             }
 
             Ok(Self {
@@ -839,7 +840,7 @@ mod checked {
                 ty_args,
                 args,
                 &mut data_store,
-                gas_status,
+                &mut SuiGasMeter(gas_status),
                 &mut self.native_extensions,
             )
         }
@@ -881,7 +882,7 @@ mod checked {
                 modules,
                 sender,
                 &mut data_store,
-                self.gas_charger.move_gas_status_mut(),
+                &mut SuiGasMeter(self.gas_charger.move_gas_status_mut()),
             )
         }
     }
@@ -1073,8 +1074,8 @@ mod checked {
                 // protected by transaction input checker
                 invariant_violation!("ObjectOwner objects cannot be input")
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         };
         let owner = obj.owner.clone();
@@ -1226,6 +1227,7 @@ mod checked {
             old_obj_ver.unwrap_or_default(),
             contents,
             protocol_config,
+            /* system_mutation */ false,
         )
     }
 

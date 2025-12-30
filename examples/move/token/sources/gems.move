@@ -27,14 +27,13 @@ module examples::sword {
 /// Module that defines the in-game currency: GEMs which can be purchased with
 /// OCT and used to buy swords (in the `sword` module).
 module examples::gem {
-    use std::{option::none, string::{Self, String}};
-    use one::{
-        balance::{Self, Balance},
-        coin::{Self, Coin, TreasuryCap},
-        oct::OCT,
-        token::{Self, Token, ActionRequest},
-        tx_context::sender
-    };
+    use std::option::none;
+    use std::string::{Self, String};
+    use one::balance::{Self, Balance};
+    use one::coin::{Self, Coin, TreasuryCap};
+    use one::oct::OCT;
+    use one::token::{Self, Token, ActionRequest};
+    use one::tx_context::sender;
 
     /// Trying to purchase Gems with an unexpected amount.
     const EUnknownAmount: u64 = 0;

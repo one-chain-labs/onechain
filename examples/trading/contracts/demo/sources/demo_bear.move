@@ -4,7 +4,8 @@
 module demo::demo_bear;
 
 use std::string::{String, utf8};
-use one::{display, package};
+use one::display;
+use one::package;
 
 /// our demo struct.
 public struct DemoBear has key, store {

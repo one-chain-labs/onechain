@@ -46,7 +46,7 @@ pub fn hmac_sha3_256(
 
     // Load the cost parameters from the protocol config
     let hmac_hmac_sha3_256_cost_params =
-        &context.extensions().get::<NativesCostTable>().hmac_hmac_sha3_256_cost_params.clone();
+        &context.extensions().get::<NativesCostTable>()?.hmac_hmac_sha3_256_cost_params.clone();
 
     // Charge the base cost for this operation
     native_charge_gas_early_exit!(context, hmac_hmac_sha3_256_cost_params.hmac_hmac_sha3_256_cost_base);

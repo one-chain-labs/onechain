@@ -6,7 +6,9 @@
 /// the ability to modify those objects.
 module trusted_swap::example;
 
-use one::{balance::{Self, Balance}, coin::{Self, Coin}, oct::OCT};
+use one::balance::{Self, Balance};
+use one::coin::{Self, Coin};
+use one::oct::OCT;
 
 public struct Object has key, store {
     id: UID,

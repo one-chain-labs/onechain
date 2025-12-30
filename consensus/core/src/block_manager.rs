@@ -10,7 +10,7 @@ use std::{
 use itertools::Itertools as _;
 use mysten_metrics::monitored_scope;
 use parking_lot::RwLock;
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 
 use crate::{
     block::{BlockAPI, BlockRef, VerifiedBlock, GENESIS_ROUND},
@@ -89,11 +89,6 @@ impl BlockManager {
     // provided and any children blocks.
     #[tracing::instrument(skip_all)]
     pub(crate) fn try_accept_committed_blocks(&mut self, blocks: Vec<VerifiedBlock>) -> Vec<VerifiedBlock> {
-        // If GC is disabled then should not run any of this logic.
-        if !self.dag_state.read().gc_enabled() {
-            return Vec::new();
-        }
-
         // Just accept the blocks
         let _s = monitored_scope("BlockManager::try_accept_committed_blocks");
         let (accepted_blocks, missing_blocks) = self.try_accept_blocks_internal(blocks, true);
@@ -243,17 +238,33 @@ impl BlockManager {
         missing_blocks
     }
 
-    // TODO: remove once timestamping is refactored to the new approach.
-    // Verifies each block's timestamp based on its ancestors, and persists in store all the valid blocks that should be accepted. Method
-    // returns the accepted and persisted blocks.
     fn verify_block_timestamps_and_accept(
         &mut self,
         unsuspended_blocks: impl IntoIterator<Item = VerifiedBlock>,
     ) -> Vec<VerifiedBlock> {
-        let (gc_enabled, gc_round) = {
-            let dag_state = self.dag_state.read();
-            (dag_state.gc_enabled(), dag_state.gc_round())
+        // If the median based timestamp is enabled, then we skip all the timestamp verification and we go straight and accept the blocks.
+        let blocks_to_accept = if self.context.protocol_config.consensus_median_based_commit_timestamp() {
+            unsuspended_blocks.into_iter().collect::<Vec<_>>()
+        } else {
+            self.verify_block_timestamps(unsuspended_blocks)
         };
+
+        // Insert the accepted blocks into DAG state so future blocks including them as
+        // ancestors do not get suspended.
+        self.dag_state.write().accept_blocks(blocks_to_accept.clone());
+
+        blocks_to_accept
+    }
+
+    // TODO: remove once timestamping is refactored to the new approach.
+    // Verifies each block's timestamp based on its ancestors, and persists in store all the valid blocks that should be accepted. Method
+    // returns the accepted and persisted blocks.
+    fn verify_block_timestamps(
+        &mut self,
+        unsuspended_blocks: impl IntoIterator<Item = VerifiedBlock>,
+    ) -> Vec<VerifiedBlock> {
+        let gc_round = self.dag_state.read().gc_round();
+
         // Try to verify the block and its children for timestamp, with ancestor blocks.
         let mut blocks_to_accept: BTreeMap<BlockRef, VerifiedBlock> = BTreeMap::new();
         let mut blocks_to_reject: BTreeMap<BlockRef, VerifiedBlock> = BTreeMap::new();
@@ -281,9 +292,9 @@ impl BlockManager {
                         continue 'block;
                     }
 
-                    // When gc is enabled it's possible that we indeed won't find any ancestors that are passed gc_round. That's ok. We don't need to panic here.
-                    // We do want to panic if gc_enabled we and have an ancestor that is > gc_round, or gc is disabled.
-                    if gc_enabled && ancestor_ref.round > GENESIS_ROUND && ancestor_ref.round <= gc_round {
+                    // It's possible that we indeed won't find any ancestors that are passed gc_round. That's ok. We don't need to panic here.
+                    // We do want to panic if we have an ancestor that is > gc_round.
+                    if ancestor_ref.round > GENESIS_ROUND && ancestor_ref.round <= gc_round {
                         debug!(
                             "Block {:?} has a missing ancestor: {:?} passed GC round {}",
                             b.reference(),
@@ -298,7 +309,8 @@ impl BlockManager {
                         );
                     }
                 }
-                if let Err(e) = self.block_verifier.check_ancestors(&b, &ancestor_blocks, gc_enabled, gc_round) {
+
+                if let Err(e) = self.block_verifier.check_ancestors(&b, &ancestor_blocks, gc_round) {
                     warn!("Block {:?} failed to verify ancestors: {}", b, e);
                     blocks_to_reject.insert(b.reference(), b);
                 } else {
@@ -338,7 +350,6 @@ impl BlockManager {
         let mut ancestors_to_fetch = BTreeSet::new();
         let dag_state = self.dag_state.read();
         let gc_round = dag_state.gc_round();
-        let gc_enabled = dag_state.gc_enabled();
 
         // If block has been already received and suspended, or already processed and stored, or is a genesis block, then skip it.
         if self.suspended_blocks.contains_key(&block_ref) || dag_state.contains_block(&block_ref) {
@@ -346,24 +357,19 @@ impl BlockManager {
         }
 
         // If the block is <= gc_round, then we simply skip its processing as there is no meaning do any action on it or even store it.
-        if gc_enabled && block.round() <= gc_round {
+        if block.round() <= gc_round {
             let hostname = self.context.committee.authority(block.author()).hostname.as_str();
             self.context.metrics.node_metrics.block_manager_skipped_blocks.with_label_values(&[hostname]).inc();
             return TryAcceptResult::Skipped;
         }
 
-        // Keep only the ancestors that are greater than the GC round to check for their existence. Keep in mind that if GC is disabled
-        // then gc_round will be 0 and all ancestors will be considered.
-        let ancestors = if gc_enabled {
-            block
-                .ancestors()
-                .iter()
-                .filter(|ancestor| ancestor.round == GENESIS_ROUND || ancestor.round > gc_round)
-                .cloned()
-                .collect::<Vec<_>>()
-        } else {
-            block.ancestors().to_vec()
-        };
+        // Keep only the ancestors that are greater than the GC round to check for their existence.
+        let ancestors = block
+            .ancestors()
+            .iter()
+            .filter(|ancestor| ancestor.round == GENESIS_ROUND || ancestor.round > gc_round)
+            .cloned()
+            .collect::<Vec<_>>();
 
         // make sure that we have all the required ancestors in store
         for (found, ancestor) in dag_state.contains_blocks(ancestors.clone()).into_iter().zip(ancestors.iter()) {
@@ -472,17 +478,9 @@ impl BlockManager {
     /// this action.
     pub(crate) fn try_unsuspend_blocks_for_latest_gc_round(&mut self) {
         let _s = monitored_scope("BlockManager::try_unsuspend_blocks_for_latest_gc_round");
-        let (gc_enabled, gc_round) = {
-            let dag_state = self.dag_state.read();
-            (dag_state.gc_enabled(), dag_state.gc_round())
-        };
+        let gc_round = self.dag_state.read().gc_round();
         let mut blocks_unsuspended_below_gc_round = 0;
         let mut blocks_gc_ed = 0;
-
-        if !gc_enabled {
-            trace!("GC is disabled, no blocks will attempt to get unsuspended.");
-            return;
-        }
 
         while let Some((block_ref, _children_refs)) = self.missing_ancestors.first_key_value() {
             // If the first block in the missing ancestors is higher than the gc_round, then we can't unsuspend it yet. So we just put it back
@@ -605,7 +603,7 @@ mod tests {
     use crate::{
         block::{BlockAPI, BlockDigest, BlockRef, SignedBlock, VerifiedBlock},
         block_manager::BlockManager,
-        block_verifier::{BlockVerifier, NoopBlockVerifier},
+        block_verifier::{BlockVerifier, NoopBlockVerifier, SignedBlockVerifier},
         commit::TrustedCommit,
         context::Context,
         dag_state::DagState,
@@ -613,6 +611,7 @@ mod tests {
         storage::mem_store::MemStore,
         test_dag_builder::DagBuilder,
         test_dag_parser::parse_dag,
+        transaction::NoopTransactionVerifier,
         CommitDigest,
         Round,
         TransactionIndex,
@@ -859,18 +858,13 @@ mod tests {
     }
 
     /// The test generate blocks for a well connected DAG and feed them to block manager in random order. In the end all the
-    /// blocks should be uniquely suspended and no missing blocks should exist. The test will run for both gc_enabled/disabled.
-    /// When gc is enabeld we set a high gc_depth value so in practice gc_round will be 0, but we'll be able to test in the common case
-    /// that this work exactly the same way as when gc is disabled.
-    #[rstest]
+    /// blocks should be uniquely suspended and no missing blocks should exist. We set a high gc_depth value so in this test gc_round will be 0.
     #[tokio::test]
-    async fn accept_blocks_unsuspend_children_blocks(#[values(false, true)] gc_enabled: bool) {
+    async fn accept_blocks_unsuspend_children_blocks() {
         // GIVEN
         let (mut context, _key_pairs) = Context::new_for_test(4);
+        context.protocol_config.set_consensus_gc_depth_for_testing(10);
 
-        if gc_enabled {
-            context.protocol_config.set_consensus_gc_depth_for_testing(10);
-        }
         let context = Arc::new(context);
 
         // create a DAG of rounds 1 ~ 3
@@ -912,10 +906,8 @@ mod tests {
         telemetry_subscribers::init_for_testing();
         // GIVEN
         let (mut context, _key_pairs) = Context::new_for_test(4);
+        context.protocol_config.set_consensus_gc_depth_for_testing(gc_depth);
 
-        if gc_depth > 0 {
-            context.protocol_config.set_consensus_gc_depth_for_testing(gc_depth);
-        }
         let context = Arc::new(context);
 
         // create a DAG of rounds 1 ~ gc_depth * 2
@@ -1043,7 +1035,6 @@ mod tests {
             &self,
             block: &VerifiedBlock,
             _ancestors: &[Option<VerifiedBlock>],
-            _gc_enabled: bool,
             _gc_round: Round,
         ) -> ConsensusResult<()> {
             if self.fail.contains(&block.reference()) {
@@ -1059,7 +1050,8 @@ mod tests {
 
     #[tokio::test]
     async fn reject_blocks_failing_verifications() {
-        let (context, _key_pairs) = Context::new_for_test(4);
+        let (mut context, _key_pairs) = Context::new_for_test(4);
+        context.protocol_config.set_consensus_median_based_commit_timestamp_for_testing(false);
         let context = Arc::new(context);
 
         // create a DAG of rounds 1 ~ 5.
@@ -1169,5 +1161,52 @@ mod tests {
             block_manager.missing_blocks(),
             missing_block_refs_from_accept.into_iter().chain(missing_block_refs_from_find.into_iter()).collect()
         );
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn test_verify_block_timestamps_and_accept(#[values(false, true)] median_based_timestamp: bool) {
+        telemetry_subscribers::init_for_testing();
+        let (mut context, _key_pairs) = Context::new_for_test(4);
+        context.protocol_config.set_consensus_median_based_commit_timestamp_for_testing(median_based_timestamp);
+
+        let context = Arc::new(context);
+        let store = Arc::new(MemStore::new());
+        let dag_state = Arc::new(RwLock::new(DagState::new(context.clone(), store.clone())));
+
+        let mut block_manager = BlockManager::new(
+            context.clone(),
+            dag_state.clone(),
+            Arc::new(SignedBlockVerifier::new(context.clone(), Arc::new(NoopTransactionVerifier {}))),
+        );
+
+        // create a DAG where authority 0 timestamp is always higher than the others.
+        let mut dag_builder = DagBuilder::new(context.clone());
+        let authorities = context.committee.authorities().map(|(index, _)| index).collect::<Vec<_>>();
+        dag_builder.layers(1 ..= 1).authorities(authorities.clone()).with_timestamps(vec![1000, 500, 550, 580]).build();
+        dag_builder.layers(2 ..= 2).authorities(authorities.clone()).with_timestamps(vec![2000, 600, 650, 680]).build();
+        dag_builder.layers(3 ..= 3).authorities(authorities).with_timestamps(vec![3000, 700, 750, 780]).build();
+
+        // take all the blocks and try to accept them.
+        let all_blocks = dag_builder.blocks.values().cloned().collect::<Vec<_>>();
+
+        // All blocks should get accepted
+        let (accepted_blocks, missing) = block_manager.try_accept_blocks(all_blocks.clone());
+
+        if median_based_timestamp {
+            // If the median based timestamp is enabled then all the blocks should be accepted
+            assert_eq!(all_blocks, accepted_blocks);
+            assert!(missing.is_empty());
+        } else {
+            // only the blocks of first round will be accepted (and the block of round 2 for authority 0) as the rest will be rejected
+            assert_eq!(accepted_blocks.len(), 5);
+            for block in accepted_blocks {
+                if block.author() == AuthorityIndex::new_for_test(0) {
+                    assert!(block.round() == 1 || block.round() == 2);
+                } else {
+                    assert_eq!(block.round(), 1);
+                }
+            }
+        }
     }
 }

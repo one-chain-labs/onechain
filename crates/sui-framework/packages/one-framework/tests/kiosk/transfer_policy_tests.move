@@ -14,11 +14,11 @@ module one::malicious_policy {
 
 #[test_only]
 module one::transfer_policy_tests {
-    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
+    use one::coin;
     use one::dummy_policy;
     use one::malicious_policy;
     use one::package;
-    use one::coin;
+    use one::transfer_policy::{Self as policy, TransferPolicy, TransferPolicyCap};
 
     public struct OTW has drop {}
     public struct Asset has key, store { id: UID }
@@ -142,7 +142,11 @@ module one::transfer_policy_tests {
         (policy, cap)
     }
 
-    public fun wrapup(policy: TransferPolicy<Asset>, cap: TransferPolicyCap<Asset>, ctx: &mut TxContext): u64 {
+    public fun wrapup(
+        policy: TransferPolicy<Asset>,
+        cap: TransferPolicyCap<Asset>,
+        ctx: &mut TxContext,
+    ): u64 {
         let profits = policy.destroy_and_withdraw(cap, ctx);
         profits.burn_for_testing()
     }

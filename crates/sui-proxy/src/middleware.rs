@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use axum::{
-    async_trait,
     body::{Body, Bytes},
     extract::{Extension, FromRequest},
     http::{Request, StatusCode},
@@ -90,7 +89,6 @@ pub async fn expect_valid_public_key(
 #[derive(Debug)]
 pub struct LenDelimProtobuf(pub Vec<MetricFamily>);
 
-#[async_trait]
 impl<S> FromRequest<S> for LenDelimProtobuf
 where
     S: Send + Sync,

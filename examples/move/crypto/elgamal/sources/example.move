@@ -4,7 +4,9 @@
 /// Example of proving plaintext equivalence of two ElGamal ciphertexts.
 module elgamal::example;
 
-use one::{bls12381::{Self, Scalar, G1}, group_ops::{bytes, equal, Element}, hash::blake2b256};
+use one::bls12381::{Self, Scalar, G1};
+use one::group_ops::{bytes, equal, Element};
+use one::hash::blake2b256;
 
 /// An encryption of group element m under pk is (r*G, r*pk + m) for random r.
 public struct ElGamalEncryption has drop, store {

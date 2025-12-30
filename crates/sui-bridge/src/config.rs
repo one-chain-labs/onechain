@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::anyhow;
 use ethers::{providers::Middleware, types::Address as EthAddress};
-use futures::{future, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use sui_config::Config;
@@ -153,6 +153,7 @@ impl BridgeNodeConfig {
         &self,
         metrics: Arc<BridgeMetrics>,
     ) -> anyhow::Result<(BridgeServerConfig, Option<BridgeClientConfig>)> {
+        info!("Starting config validation");
         if !is_route_valid(
             BridgeChainId::try_from(self.sui.sui_bridge_chain_id)?,
             BridgeChainId::try_from(self.eth.eth_bridge_chain_id)?,
@@ -233,6 +234,7 @@ impl BridgeNodeConfig {
                 .sui_bridge_module_last_processed_event_id_override,
         };
 
+        info!("Config validation complete");
         Ok((bridge_server_config, Some(bridge_client_config)))
     }
 
@@ -240,6 +242,7 @@ impl BridgeNodeConfig {
         &self,
         metrics: Arc<BridgeMetrics>,
     ) -> anyhow::Result<(Arc<EthClient<MeteredEthHttpProvier>>, Vec<EthAddress>)> {
+        info!("Creating Ethereum client provider");
         let bridge_proxy_address = EthAddress::from_str(&self.eth.eth_bridge_proxy_address)?;
         let provider = Arc::new(
             new_metered_eth_provider(&self.eth.eth_rpc_url, metrics.clone())
@@ -255,6 +258,7 @@ impl BridgeNodeConfig {
             _weth_address,
             _usdt_address,
             _wbtc_address,
+            _lbtc_address,
         ) = get_eth_contract_addresses(bridge_proxy_address, &provider).await?;
         let config = EthBridgeConfig::new(config_address, provider.clone());
 
@@ -296,6 +300,7 @@ impl BridgeNodeConfig {
         );
         let contract_addresses =
             vec![bridge_proxy_address, committee_address, config_address, limiter_address, vault_address];
+        info!("Ethereum client setup complete");
         Ok((eth_client, contract_addresses))
     }
 
@@ -340,6 +345,7 @@ impl BridgeNodeConfig {
         let gas_object_id = match self.sui.bridge_client_gas_object {
             Some(id) => id,
             None => {
+                info!("No gas object configured, finding gas object with highest balance");
                 let sui_client = SuiClientBuilder::default().build(&self.sui.sui_rpc_url).await?;
                 let coin =
                     // Minimum balance for gas object is 10 SUI
@@ -358,12 +364,10 @@ impl BridgeNodeConfig {
             ));
         }
         let balance = gas_coin.value();
+        info!("Gas object balance: {}", balance);
         metrics.gas_coin_balance.set(balance as i64);
-        info!(
-            "Starting bridge client with address: {:?}, gas object {:?}, balance: {}",
-            client_sui_address, gas_object_ref.0, balance,
-        );
 
+        info!("Sui client setup complete");
         Ok((bridge_client_key, client_sui_address, gas_object_ref))
     }
 }
@@ -408,29 +412,35 @@ pub async fn pick_highest_balance_coin(
     address: SuiAddress,
     minimal_amount: u64,
 ) -> anyhow::Result<Coin> {
-    let mut highest_balance = 0;
-    let mut highest_balance_coin = None;
-    coin_read_api
-        .get_coins_stream(address, None)
-        .for_each(|coin: Coin| {
-            if coin.balance > highest_balance {
-                highest_balance = coin.balance;
-                highest_balance_coin = Some(coin.clone());
-            }
-            future::ready(())
-        })
-        .await;
-    if highest_balance_coin.is_none() {
-        return Err(anyhow!("No Sui coins found for address {:?}", address));
+    info!("Looking for a suitable gas coin for address {:?}", address);
+
+    // Only look at SUI coins specifically
+    let mut stream = coin_read_api.get_coins_stream(address, Some("0x2::oct::OCT".to_string())).boxed();
+
+    let mut coins_checked = 0;
+
+    while let Some(coin) = stream.next().await {
+        info!("Checking coin: {:?}, balance: {}", coin.coin_object_id, coin.balance);
+        coins_checked += 1;
+
+        // Take the first coin with a sufficient balance
+        if coin.balance >= minimal_amount {
+            info!("Found suitable gas coin with {} mist (object ID: {:?})", coin.balance, coin.coin_object_id);
+            return Ok(coin);
+        }
+
+        // Only check a small number of coins before giving up
+        if coins_checked >= 1000 {
+            break;
+        }
     }
-    if highest_balance < minimal_amount {
-        return Err(anyhow!(
-            "Found no single coin that has >= {} balance Sui for address {:?}",
-            minimal_amount,
-            address,
-        ));
-    }
-    Ok(highest_balance_coin.unwrap())
+
+    Err(anyhow!(
+        "No suitable gas coin with >= {} mist found for address {:?} after checking {} coins",
+        minimal_amount,
+        address,
+        coins_checked
+    ))
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

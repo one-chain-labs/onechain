@@ -21,7 +21,7 @@ use object_store::{path::Path, DynObjectStore};
 use sui_config::object_storage_config::ObjectStoreConfig;
 use sui_core::{
     authority::authority_store_tables::{AuthorityPerpetualTables, LiveObject},
-    state_accumulator::StateAccumulator,
+    global_state_hasher::GlobalStateHasher,
 };
 use sui_protocol_config::{ProtocolConfig, ProtocolVersion};
 use sui_storage::{
@@ -29,9 +29,9 @@ use sui_storage::{
     object_store::util::{copy_file, delete_recursively, path_to_filesystem},
 };
 use sui_types::{
-    accumulator::Accumulator,
     base_types::{ObjectID, ObjectRef},
     digests::ChainIdentifier,
+    global_state_hash::GlobalStateHash,
     messages_checkpoint::ECMHLiveObjectSetDigest,
     sui_system_state::{get_sui_system_state, SuiSystemStateTrait},
 };
@@ -369,9 +369,9 @@ impl StateSnapshotWriterV1 {
     {
         let mut object_writers: HashMap<u32, LiveObjectSetWriterV1> = HashMap::new();
         let local_staging_dir_path = path_to_filesystem(self.local_staging_dir.clone(), &self.epoch_dir(epoch))?;
-        let mut acc = Accumulator::default();
+        let mut acc = GlobalStateHash::default();
         for object in perpetual_db.iter_live_object_set(include_wrapped_tombstone) {
-            StateAccumulator::accumulate_live_object(&mut acc, &object);
+            GlobalStateHasher::accumulate_live_object(&mut acc, &object);
             let bucket_num = bucket_func(&object);
             if let Vacant(entry) = object_writers.entry(bucket_num) {
                 entry.insert(LiveObjectSetWriterV1::new(

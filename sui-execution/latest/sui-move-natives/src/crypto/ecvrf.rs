@@ -53,7 +53,7 @@ pub fn ecvrf_verify(
 
     // Load the cost parameters from the protocol config
     let ecvrf_ecvrf_verify_cost_params =
-        &context.extensions().get::<NativesCostTable>().ecvrf_ecvrf_verify_cost_params.clone();
+        &context.extensions().get::<NativesCostTable>()?.ecvrf_ecvrf_verify_cost_params.clone();
     // Charge the base cost for this oper
     native_charge_gas_early_exit!(context, ecvrf_ecvrf_verify_cost_params.ecvrf_ecvrf_verify_cost_base);
 

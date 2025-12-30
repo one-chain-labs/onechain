@@ -4,7 +4,7 @@
 pub use checked::*;
 #[sui_macros::with_checked_arithmetic]
 mod checked {
-    use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+    use std::{cell::RefCell, collections::BTreeMap, path::PathBuf, rc::Rc, sync::Arc};
 
     use anyhow::Result;
     use move_binary_format::file_format::CompiledModule;
@@ -22,7 +22,12 @@ mod checked {
         native_extensions::NativeContextExtensions,
         native_functions::NativeFunctionTable,
     };
-    use sui_move_natives::{object_runtime, object_runtime::ObjectRuntime, NativesCostTable};
+    use sui_move_natives::{
+        object_runtime,
+        object_runtime::ObjectRuntime,
+        transaction_context::TransactionContext,
+        NativesCostTable,
+    };
     use sui_protocol_config::ProtocolConfig;
     use sui_types::{
         base_types::*,
@@ -75,8 +80,9 @@ mod checked {
         is_metered: bool,
         protocol_config: &'r ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
-        current_epoch_id: EpochId,
+        tx_context: Rc<RefCell<TxContext>>,
     ) -> NativeContextExtensions<'r> {
+        let current_epoch_id: EpochId = tx_context.borrow().epoch();
         let mut extensions = NativeContextExtensions::default();
         extensions.add(ObjectRuntime::new(
             child_resolver,
@@ -87,6 +93,7 @@ mod checked {
             current_epoch_id,
         ));
         extensions.add(NativesCostTable::from_protocol_config(protocol_config));
+        extensions.add(TransactionContext::new(tx_context));
         extensions
     }
 

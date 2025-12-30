@@ -38,7 +38,7 @@ use sui_types::{
 use tokio::time::timeout;
 use tracing::{info, warn};
 
-use crate::{authority::AuthorityState, state_accumulator::StateAccumulator};
+use crate::{authority::AuthorityState, global_state_hasher::GlobalStateHasher};
 
 const WAIT_FOR_TX_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -66,7 +66,7 @@ pub async fn send_and_confirm_transaction(
     //
     // We also check the incremental effects of the transaction on the live object set against StateAccumulator
     // for testing and regression detection
-    let state_acc = StateAccumulator::new_for_tests(authority.get_accumulator_store().clone());
+    let state_acc = GlobalStateHasher::new_for_tests(authority.get_global_state_hash_store().clone());
     let include_wrapped_tombstone =
         !authority.epoch_store_for_testing().protocol_config().simplified_unwrap_then_delete();
     let mut state = state_acc.accumulate_cached_live_object_set_for_testing(include_wrapped_tombstone);
@@ -273,7 +273,12 @@ pub fn make_cert_with_large_committee(
         .collect();
 
     let cert = CertifiedTransaction::new(transaction.clone().into_data(), sigs, committee).unwrap();
-    cert.verify_signatures_authenticated(committee, &Default::default(), Arc::new(VerifiedDigestCache::new_empty()))
-        .unwrap();
+    cert.verify_signatures_authenticated(
+        committee,
+        &Default::default(),
+        Arc::new(VerifiedDigestCache::new_empty()),
+        None,
+    )
+    .unwrap();
     cert
 }

@@ -24,7 +24,7 @@ use sui_types::{
 use super::rpc_module::RpcModule;
 use crate::{
     context::Context,
-    data::objects::load_latest_deserialized,
+    data::load_live_deserialized,
     error::{rpc_bail, RpcError},
 };
 
@@ -72,15 +72,14 @@ async fn rgp_response(ctx: &Context) -> Result<BigInt<u64>, RpcError> {
     let rgp: i64 = conn
         .first(e::kv_epoch_starts.select(e::reference_gas_price).order(e::epoch.desc()))
         .await
-        .context("Failed to fetch the reference gas price")?
-        .context("No reference gas price found")?;
+        .context("Failed to fetch the reference gas price")?;
 
     Ok((rgp as u64).into())
 }
 
 /// Load data and generate response for `getLatestSuiSystemState`.
 async fn latest_sui_system_state_response(ctx: &Context) -> Result<SuiSystemStateSummary, RpcError> {
-    let wrapper: SuiSystemStateWrapper = load_latest_deserialized(ctx, SUI_SYSTEM_STATE_OBJECT_ID)
+    let wrapper: SuiSystemStateWrapper = load_live_deserialized(ctx, SUI_SYSTEM_STATE_OBJECT_ID)
         .await
         .context("Failed to fetch system state wrapper object")?;
 
@@ -92,12 +91,12 @@ async fn latest_sui_system_state_response(ctx: &Context) -> Result<SuiSystemStat
     .context("Failed to derive inner system state field ID")?;
 
     Ok(match wrapper.version {
-        1 => load_latest_deserialized::<Field<u64, SuiSystemStateInnerV1>>(ctx, inner_id)
+        1 => load_live_deserialized::<Field<u64, SuiSystemStateInnerV1>>(ctx, inner_id)
             .await
             .context("Failed to fetch inner system state object")?
             .value
             .into_sui_system_state_summary(),
-        2 => load_latest_deserialized::<Field<u64, SuiSystemStateInnerV2>>(ctx, inner_id)
+        2 => load_live_deserialized::<Field<u64, SuiSystemStateInnerV2>>(ctx, inner_id)
             .await
             .context("Failed to fetch inner system state object")?
             .value

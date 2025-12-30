@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -18,12 +22,14 @@ use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{
-    annotated_value::{MoveStruct, MoveStructLayout, MoveValue},
+    annotated_value::{MoveStructLayout, MoveTypeLayout},
     language_storage::StructTag,
 };
 use mysten_metrics::{add_server_timing, spawn_monitored_task};
+use once_cell::sync::Lazy;
 use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
 use sui_core::authority::AuthorityState;
+use sui_display::v1::Format;
 use sui_json_rpc_api::{
     validate_limit,
     JsonRpcMetrics,
@@ -43,9 +49,6 @@ use sui_json_rpc_types::{
     ProtocolConfigResponse,
     SuiEvent,
     SuiGetPastObjectRequest,
-    SuiMoveStruct,
-    SuiMoveValue,
-    SuiMoveVariant,
     SuiObjectDataOptions,
     SuiObjectResponse,
     SuiPastObjectResponse,
@@ -62,7 +65,6 @@ use sui_storage::key_value_store::TransactionKeyValueStore;
 use sui_types::{
     authenticator_state::{get_authenticator_state, ActiveJwk},
     base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest},
-    collection_types::VecMap,
     crypto::AggregateAuthoritySignature,
     display::DisplayVersionUpdatedEvent,
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
@@ -71,6 +73,7 @@ use sui_types::{
     object::{Object, ObjectRead, PastObjectRead},
     signature::{GenericSignature, VerifyParams},
     signature_verification::VerifiedDigestCache,
+    storage::ObjectKey,
     sui_serde::BigInt,
     transaction::{Transaction, TransactionData, TransactionDataAPI},
 };
@@ -87,7 +90,24 @@ use crate::{
     ObjectProviderCache,
     SuiRpcModule,
 };
+
+/// A field access in a  Display string cannot exceed this level of nesting.
 const MAX_DISPLAY_NESTED_LEVEL: usize = 10;
+
+/// Default budget for Display output size.
+const DEFAULT_MAX_DISPLAY_OUTPUT_SIZE: usize = 1024 * 1024;
+
+/// Overall display output cannot exceed this size.
+static MAX_DISPLAY_OUTPUT_SIZE: Lazy<usize> = Lazy::new(|| {
+    let max_opt = std::env::var("MAX_DISPLAY_OUTPUT_SIZE").ok().and_then(|s| s.parse().ok());
+
+    if let Some(max) = max_opt {
+        info!("Using custom value for 'MAX_DISPLAY_OUTPUT_SIZE': {max}");
+        max
+    } else {
+        DEFAULT_MAX_DISPLAY_OUTPUT_SIZE
+    }
+});
 
 // An implementation of the read portion of the JSON-RPC interface intended for use in
 // Fullnodes.
@@ -337,7 +357,34 @@ impl ReadApi {
             }
         }
 
-        let object_cache = ObjectProviderCache::new((self.state.clone(), self.transaction_kv_store.clone()));
+        let mut object_cache = ObjectProviderCache::new((self.state.clone(), self.transaction_kv_store.clone()));
+
+        // Prefetch the objects if we need to show balance or object changes
+        if opts.show_balance_changes || opts.show_object_changes {
+            let mut keys = vec![];
+            for resp in temp_response.values() {
+                let effects = resp.effects.as_ref().ok_or_else(|| {
+                    SuiRpcInputError::GenericNotFound(
+                        "unable to derive balance/object changes because effect is empty".to_string(),
+                    )
+                })?;
+
+                for change in effects.object_changes() {
+                    if let Some(input_version) = change.input_version {
+                        keys.push(ObjectKey(change.id, input_version));
+                    }
+                    if let Some(output_version) = change.output_version {
+                        keys.push(ObjectKey(change.id, output_version));
+                    }
+                }
+            }
+
+            let objects =
+                self.transaction_kv_store.multi_get_objects(&keys).await?.into_iter().flatten().collect::<Vec<_>>();
+
+            object_cache.insert_objects_into_cache(objects);
+        }
+
         if opts.show_balance_changes {
             trace!("getting balance changes");
 
@@ -612,7 +659,7 @@ impl ReadApiServer for ReadApi {
             let transaction_kv_store = self.transaction_kv_store.clone();
             let transaction = spawn_monitored_task!(async move {
                 let ret = transaction_kv_store.get_tx(digest).await.map_err(|err| {
-                    debug!(tx_digest=?digest, "Failed to get transaction: {:?}", err);
+                    debug!(tx_digest=?digest, "Failed to get transaction: {}", err);
                     Error::from(err)
                 });
                 add_server_timing("tx_kv_lookup");
@@ -999,13 +1046,57 @@ async fn get_display_fields(
     original_object: &Object,
     original_layout: &Option<MoveStructLayout>,
 ) -> Result<DisplayFieldsResponse, ObjectDisplayError> {
-    let Some((object_type, layout)) = get_object_type_and_struct(original_object, original_layout)? else {
+    let Some(layout) = original_layout else {
         return Ok(DisplayFieldsResponse { data: None, error: None });
     };
-    if let Some(display_object) = get_display_object_by_type(kv_store, fullnode_api, &object_type).await? {
-        return get_rendered_fields(display_object.fields, &layout);
+
+    let Some(move_object) = original_object.data.try_as_move() else {
+        return Err(ObjectDisplayError::MoveObject);
+    };
+
+    let Some(display_object) = get_display_object_by_type(kv_store, fullnode_api, &layout.type_).await? else {
+        return Ok(DisplayFieldsResponse { data: None, error: None });
+    };
+
+    let format = match Format::parse(MAX_DISPLAY_NESTED_LEVEL, &display_object.fields) {
+        Ok(format) => format,
+        Err(e) => {
+            return Ok(DisplayFieldsResponse {
+                data: None,
+                error: Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
+            });
+        }
+    };
+
+    let layout = MoveTypeLayout::Struct(Box::new(layout.clone()));
+    let display = match format.display(*MAX_DISPLAY_OUTPUT_SIZE, move_object.contents(), &layout) {
+        Ok(fields) => fields,
+        Err(e) => {
+            return Ok(DisplayFieldsResponse {
+                data: None,
+                error: Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
+            });
+        }
+    };
+
+    let mut fields = BTreeMap::new();
+    let mut errors = vec![];
+
+    for (key, value) in display {
+        match value {
+            Ok(v) => {
+                fields.insert(key, v);
+            }
+            Err(e) => {
+                errors.push(e.to_string());
+            }
+        }
     }
-    Ok(DisplayFieldsResponse { data: None, error: None })
+
+    Ok(DisplayFieldsResponse {
+        data: (!fields.is_empty()).then_some(fields),
+        error: (!errors.is_empty()).then(|| SuiObjectResponseError::DisplayError { error: errors.join("; ") }),
+    })
 }
 
 #[instrument(skip(kv_store, fullnode_api))]
@@ -1033,127 +1124,6 @@ async fn get_display_object_by_type(
         Ok(Some(display))
     } else {
         Ok(None)
-    }
-}
-
-pub fn get_object_type_and_struct(
-    o: &Object,
-    layout: &Option<MoveStructLayout>,
-) -> Result<Option<(StructTag, MoveStruct)>, ObjectDisplayError> {
-    if let Some(object_type) = o.type_() {
-        let move_struct = get_move_struct(o, layout)?;
-        Ok(Some((object_type.clone().into(), move_struct)))
-    } else {
-        Ok(None)
-    }
-}
-
-fn get_move_struct(o: &Object, layout: &Option<MoveStructLayout>) -> Result<MoveStruct, ObjectDisplayError> {
-    let layout = layout.as_ref().ok_or_else(|| ObjectDisplayError::Layout)?;
-    Ok(o.data.try_as_move().ok_or_else(|| ObjectDisplayError::MoveObject)?.to_move_struct(layout)?)
-}
-
-pub fn get_rendered_fields(
-    fields: VecMap<String, String>,
-    move_struct: &MoveStruct,
-) -> Result<DisplayFieldsResponse, ObjectDisplayError> {
-    let sui_move_value: SuiMoveValue = MoveValue::Struct(move_struct.clone()).into();
-    if let SuiMoveValue::Struct(move_struct) = sui_move_value {
-        let fields = fields.contents.iter().map(|entry| match parse_template(&entry.value, &move_struct) {
-            Ok(value) => Ok((entry.key.clone(), value)),
-            Err(e) => Err(e),
-        });
-        let (oks, errs): (Vec<_>, Vec<_>) = fields.partition(Result::is_ok);
-        let success = oks.into_iter().filter_map(Result::ok).collect();
-        let errors: Vec<_> = errs.into_iter().filter_map(Result::err).collect();
-        let error_string = errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join("; ");
-        let error = if !error_string.is_empty() {
-            Some(SuiObjectResponseError::DisplayError { error: anyhow!("{error_string}").to_string() })
-        } else {
-            None
-        };
-
-        return Ok(DisplayFieldsResponse { data: Some(success), error });
-    }
-    Err(ObjectDisplayError::NotMoveStruct)?
-}
-
-fn parse_template(template: &str, move_struct: &SuiMoveStruct) -> Result<String, Error> {
-    let mut output = template.to_string();
-    let mut var_name = String::new();
-    let mut in_braces = false;
-    let mut escaped = false;
-
-    for ch in template.chars() {
-        match ch {
-            '\\' => {
-                escaped = true;
-                continue;
-            }
-            '{' if !escaped => {
-                in_braces = true;
-                var_name.clear();
-            }
-            '}' if !escaped => {
-                in_braces = false;
-                let value = get_value_from_move_struct(move_struct, &var_name)?;
-                output = output.replace(&format!("{{{}}}", var_name), &value.to_string());
-            }
-            _ if !escaped => {
-                if in_braces {
-                    var_name.push(ch);
-                }
-            }
-            _ => {}
-        }
-        escaped = false;
-    }
-
-    Ok(output.replace('\\', ""))
-}
-
-fn get_value_from_move_struct(move_struct: &SuiMoveStruct, var_name: &str) -> Result<String, Error> {
-    let parts: Vec<&str> = var_name.split('.').collect();
-    if parts.is_empty() {
-        Err(anyhow!("Display template value cannot be empty"))?;
-    }
-    if parts.len() > MAX_DISPLAY_NESTED_LEVEL {
-        Err(anyhow!("Display template value nested depth cannot exist {}", MAX_DISPLAY_NESTED_LEVEL))?;
-    }
-    let mut current_value = &SuiMoveValue::Struct(move_struct.clone());
-    // iterate over the parts and try to access the corresponding field
-    for part in parts {
-        match current_value {
-            SuiMoveValue::Struct(move_struct) => {
-                if let SuiMoveStruct::WithTypes { type_: _, fields } | SuiMoveStruct::WithFields(fields) = move_struct {
-                    if let Some(value) = fields.get(part) {
-                        current_value = value;
-                    } else {
-                        Err(anyhow!("Field value {} cannot be found in struct", var_name))?;
-                    }
-                } else {
-                    Err(Error::UnexpectedError(format!("Unexpected move struct type for field {}", var_name)))?;
-                }
-            }
-            SuiMoveValue::Variant(SuiMoveVariant { fields, variant, .. }) => {
-                if let Some(value) = fields.get(part) {
-                    current_value = value;
-                } else {
-                    Err(anyhow!("Field value {var_name} cannot be found in variant {variant}",))?
-                }
-            }
-            _ => return Err(Error::UnexpectedError(format!("Unexpected move value type for field {}", var_name)))?,
-        }
-    }
-
-    match current_value {
-        SuiMoveValue::Option(move_option) => match move_option.as_ref() {
-            Some(move_value) => Ok(move_value.to_string()),
-            None => Ok("".to_string()),
-        },
-        SuiMoveValue::Vector(_) => Err(anyhow!("Vector is not supported as a Display value {}", var_name))?,
-
-        _ => Ok(current_value.to_string()),
     }
 }
 

@@ -11,18 +11,16 @@ use parking_lot::RwLock;
 
 use super::{Store, WriteBatch};
 use crate::{
-    block::{BlockAPI as _, BlockDigest, BlockRef, Round, Slot, VerifiedBlock},
+    block::{BlockAPI as _, BlockDigest, BlockRef, Round, VerifiedBlock},
     commit::{CommitAPI as _, CommitDigest, CommitIndex, CommitInfo, CommitRange, CommitRef, TrustedCommit},
     error::ConsensusResult,
 };
 
 /// In-memory storage for testing.
-#[allow(unused)]
 pub(crate) struct MemStore {
     inner: RwLock<Inner>,
 }
 
-#[allow(unused)]
 struct Inner {
     blocks: BTreeMap<(Round, AuthorityIndex, BlockDigest), VerifiedBlock>,
     digests_by_authorities: BTreeSet<(AuthorityIndex, Round, BlockDigest)>,
@@ -32,7 +30,6 @@ struct Inner {
 }
 
 impl MemStore {
-    #[cfg(test)]
     pub(crate) fn new() -> Self {
         MemStore {
             inner: RwLock::new(Inner {
@@ -101,19 +98,6 @@ impl Store for MemStore {
             }
         }
         Ok(blocks)
-    }
-
-    fn contains_block_at_slot(&self, slot: Slot) -> ConsensusResult<bool> {
-        let inner = self.inner.read();
-        let found = inner
-            .digests_by_authorities
-            .range((
-                Included((slot.authority, slot.round, BlockDigest::MIN)),
-                Included((slot.authority, slot.round, BlockDigest::MAX)),
-            ))
-            .next()
-            .is_some();
-        Ok(found)
     }
 
     fn scan_last_blocks_by_author(

@@ -4,9 +4,9 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use backoff::{backoff::Constant, Error as BE, ExponentialBackoff};
+use sui_rpc_api::{client::AuthInterceptor, Client};
 use sui_storage::blob::Blob;
-use sui_types::full_checkpoint_content::CheckpointData;
-use tokio_util::{bytes::Bytes, sync::CancellationToken};
+use tokio_util::bytes::Bytes;
 use tracing::debug;
 use url::Url;
 
@@ -18,6 +18,7 @@ use crate::{
         Result as IngestionResult,
     },
     metrics::{CheckpointLagMetricReporter, IndexerMetrics},
+    types::full_checkpoint_content::CheckpointData,
 };
 
 /// Wait at most this long between retries for transient errors.
@@ -32,8 +33,6 @@ pub(crate) trait IngestionClientTrait: Send + Sync {
 pub enum FetchError {
     #[error("Checkpoint not found")]
     NotFound,
-    #[error("Failed to fetch checkpoint due to permanent error: {0}")]
-    Permanent(#[from] anyhow::Error),
     #[error("Failed to fetch checkpoint due to {reason}: {error}")]
     Transient {
         reason: &'static str,
@@ -42,7 +41,12 @@ pub enum FetchError {
     },
 }
 
-pub type FetchResult = Result<Bytes, FetchError>;
+pub type FetchResult = Result<FetchData, FetchError>;
+
+pub enum FetchData {
+    Raw(Bytes),
+    CheckpointData(CheckpointData),
+}
 
 #[derive(Clone)]
 pub struct IngestionClient {
@@ -63,6 +67,20 @@ impl IngestionClient {
         Self::new_impl(client, metrics)
     }
 
+    pub(crate) fn new_rpc(
+        url: Url,
+        username: Option<String>,
+        password: Option<String>,
+        metrics: Arc<IndexerMetrics>,
+    ) -> IngestionResult<Self> {
+        let client = if let Some(username) = username {
+            Client::new(url.to_string())?.with_auth(AuthInterceptor::basic(username, password))
+        } else {
+            Client::new(url.to_string())?
+        };
+        Ok(Self::new_impl(Arc::new(client), metrics))
+    }
+
     fn new_impl(client: Arc<dyn IngestionClientTrait>, metrics: Arc<IndexerMetrics>) -> Self {
         let checkpoint_lag_reporter = CheckpointLagMetricReporter::new(
             metrics.ingested_checkpoint_timestamp_lag.clone(),
@@ -77,20 +95,11 @@ impl IngestionClient {
     /// This function behaves like `IngestionClient::fetch`, but will repeatedly retry the fetch if
     /// the checkpoint is not found, on a constant back-off. The time between fetches is controlled
     /// by the `retry_interval` parameter.
-    pub async fn wait_for(
-        &self,
-        checkpoint: u64,
-        retry_interval: Duration,
-        cancel: &CancellationToken,
-    ) -> IngestionResult<Arc<CheckpointData>> {
+    pub async fn wait_for(&self, checkpoint: u64, retry_interval: Duration) -> IngestionResult<Arc<CheckpointData>> {
         let backoff = Constant::new(retry_interval);
         let fetch = || async move {
             use backoff::Error as BE;
-            if cancel.is_cancelled() {
-                return Err(BE::permanent(IngestionError::Cancelled));
-            }
-
-            self.fetch(checkpoint, cancel).await.map_err(|e| match e {
+            self.fetch(checkpoint).await.map_err(|e| match e {
                 IngestionError::NotFound(checkpoint) => {
                     debug!(checkpoint, "Checkpoint not found, retrying...");
                     self.metrics.total_ingested_not_found_retries.inc();
@@ -110,43 +119,36 @@ impl IngestionClient {
     /// implementation that returns a [FetchError::Transient] error variant, or within this
     /// function if we fail to deserialize the result as [CheckpointData].
     ///
-    /// The function will immediately return on:
-    ///
-    /// - Non-transient errors determined by the client implementation, this includes both the
-    ///   [FetchError::NotFound] and [FetchError::Permanent] variants.
-    ///
-    /// - Cancellation of the supplied `cancel` token.
-    pub(crate) async fn fetch(
-        &self,
-        checkpoint: u64,
-        cancel: &CancellationToken,
-    ) -> IngestionResult<Arc<CheckpointData>> {
+    /// The function will immediately return if the checkpoint is not found.
+    pub(crate) async fn fetch(&self, checkpoint: u64) -> IngestionResult<Arc<CheckpointData>> {
         let client = self.client.clone();
         let request = move || {
             let client = client.clone();
             async move {
-                if cancel.is_cancelled() {
-                    return Err(BE::permanent(IngestionError::Cancelled));
-                }
-
-                let bytes = client.fetch(checkpoint).await.map_err(|err| match err {
+                let fetch_data = client.fetch(checkpoint).await.map_err(|err| match err {
                     FetchError::NotFound => BE::permanent(IngestionError::NotFound(checkpoint)),
-                    FetchError::Permanent(error) => BE::permanent(IngestionError::FetchError(checkpoint, error)),
                     FetchError::Transient { reason, error } => {
                         self.metrics.inc_retry(checkpoint, reason, IngestionError::FetchError(checkpoint, error))
                     }
                 })?;
 
-                self.metrics.total_ingested_bytes.inc_by(bytes.len() as u64);
-                let data: CheckpointData = Blob::from_bytes(&bytes).map_err(|e| {
-                    self.metrics.inc_retry(
-                        checkpoint,
-                        "deserialization",
-                        IngestionError::DeserializationError(checkpoint, e),
-                    )
-                })?;
-
-                Ok(data)
+                Ok::<CheckpointData, backoff::Error<IngestionError>>(match fetch_data {
+                    FetchData::Raw(bytes) => {
+                        self.metrics.total_ingested_bytes.inc_by(bytes.len() as u64);
+                        Blob::from_bytes(&bytes).map_err(|e| {
+                            self.metrics.inc_retry(
+                                checkpoint,
+                                "deserialization",
+                                IngestionError::DeserializationError(checkpoint, e),
+                            )
+                        })?
+                    }
+                    FetchData::CheckpointData(data) => {
+                        // We are not recording size metric for Checkpoint data (from RPC client).
+                        // TODO: Record the metric when we have a good way to get the size information
+                        data
+                    }
+                })
             }
         };
 

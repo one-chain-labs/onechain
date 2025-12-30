@@ -21,22 +21,23 @@ use crate::{
     type_input::TypeInput,
 };
 
-/// A type containing all of the information needed to work with a deleted shared object in
-/// execution and when committing the execution effects of the transaction. This holds:
-/// 0. The object ID of the deleted shared object.
-/// 1. The version of the shared object.
-/// 2. Whether the object appeared as mutable (or owned) in the transaction, or as a read-only shared object.
-/// 3. The transaction digest of the previous transaction that used this shared object mutably or
+/// A type containing all of the information needed to work in execution with an object whose
+/// consensus stream is ended, and when committing the execution effects of the transaction.
+/// This holds:
+/// 0. The object ID.
+/// 1. The version.
+/// 2. Whether the object appeared as mutable (or owned) in the transaction, or as read-only.
+/// 3. The transaction digest of the previous transaction that used this object mutably or
 ///    took it by value.
-pub type DeletedSharedObjectInfo = (ObjectID, SequenceNumber, bool, TransactionDigest);
+pub type ConsensusStreamEndedInfo = (ObjectID, SequenceNumber, bool, TransactionDigest);
 
-/// A sequence of information about deleted shared objects in the transaction's inputs.
-pub type DeletedSharedObjects = Vec<DeletedSharedObjectInfo>;
+/// A sequence of information about removed consensus objects in the transaction's inputs.
+pub type ConsensusStreamEndedObjects = Vec<ConsensusStreamEndedInfo>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SharedInput {
     Existing(ObjectRef),
-    Deleted(DeletedSharedObjectInfo),
+    ConsensusStreamEnded(ConsensusStreamEndedInfo),
     Cancelled((ObjectID, SequenceNumber)),
 }
 
@@ -165,6 +166,30 @@ impl ExecutionResultsV2 {
                 }
             }
 
+            // Record start version for ConsensusAddressOwner objects.
+            if let Owner::ConsensusAddressOwner { start_version, owner } = &mut obj.owner {
+                debug_assert!(!self.deleted_object_ids.contains(id));
+
+                if let Some(Owner::ConsensusAddressOwner {
+                    start_version: previous_start_version,
+                    owner: previous_owner,
+                }) = input_objects.get(id).map(|obj| &obj.owner)
+                {
+                    if owner == previous_owner {
+                        // Assign existing start_version in case a ConsensusAddressOwner object was
+                        // transferred to the same owner.
+                        *start_version = *previous_start_version;
+                    } else {
+                        // If owner changes, we need to begin a new stream.
+                        *start_version = lamport_version;
+                    }
+                } else {
+                    // ConsensusAddressOwner object was created, transferred from another Owner
+                    // type, or unwrapped, so we begin a new stream.
+                    *start_version = lamport_version;
+                }
+            }
+
             obj.previous_transaction = prev_tx;
         }
     }
@@ -181,12 +206,13 @@ pub enum ExecutionTimeObservationKey {
         /// The function to be called.
         function: String,
         /// The type arguments to the function.
+        /// NOTE: This field is currently not populated.
         type_arguments: Vec<TypeInput>,
     },
     TransferObjects,
     SplitCoins,
     MergeCoins,
-    Publish,
+    Publish, // special case: should not be used; we only use hard-coded estimate for this
     MakeMoveVec,
     Upgrade,
 }
@@ -226,6 +252,18 @@ impl ExecutionTimeObservationKey {
             Command::Publish(_, _) => ExecutionTimeObservationKey::Publish,
             Command::MakeMoveVec(_, _) => ExecutionTimeObservationKey::MakeMoveVec,
             Command::Upgrade(_, _, _, _) => ExecutionTimeObservationKey::Upgrade,
+        }
+    }
+
+    pub fn default_duration(&self) -> Duration {
+        match self {
+            ExecutionTimeObservationKey::MoveEntryPoint { .. } => Duration::from_millis(1),
+            ExecutionTimeObservationKey::TransferObjects => Duration::from_millis(1),
+            ExecutionTimeObservationKey::SplitCoins => Duration::from_millis(1),
+            ExecutionTimeObservationKey::MergeCoins => Duration::from_millis(1),
+            ExecutionTimeObservationKey::Publish => Duration::from_millis(3),
+            ExecutionTimeObservationKey::MakeMoveVec => Duration::from_millis(1),
+            ExecutionTimeObservationKey::Upgrade => Duration::from_millis(3),
         }
     }
 }

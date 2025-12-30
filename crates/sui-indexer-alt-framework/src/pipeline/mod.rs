@@ -6,7 +6,7 @@ use std::time::Duration;
 pub use processor::Processor;
 use serde::{Deserialize, Serialize};
 
-use crate::models::watermarks::CommitterWatermark;
+use crate::store::CommitterWatermark;
 
 pub mod concurrent;
 mod logging;
@@ -44,14 +44,14 @@ struct IndexedCheckpoint<P: Processor> {
     /// Values to be inserted into the database from this checkpoint
     values: Vec<P::Value>,
     /// The watermark associated with this checkpoint
-    watermark: CommitterWatermark<'static>,
+    watermark: CommitterWatermark,
 }
 
 /// A representation of the proportion of a watermark.
 #[derive(Debug)]
 struct WatermarkPart {
     /// The watermark itself
-    watermark: CommitterWatermark<'static>,
+    watermark: CommitterWatermark,
     /// The number of rows from this watermark that are in this part
     batch_rows: usize,
     /// The total number of rows from this watermark
@@ -83,11 +83,10 @@ impl<P: Processor> IndexedCheckpoint<P> {
     fn new(epoch: u64, cp_sequence_number: u64, tx_hi: u64, timestamp_ms: u64, values: Vec<P::Value>) -> Self {
         Self {
             watermark: CommitterWatermark {
-                pipeline: P::NAME.into(),
-                epoch_hi_inclusive: epoch as i64,
-                checkpoint_hi_inclusive: cp_sequence_number as i64,
-                tx_hi: tx_hi as i64,
-                timestamp_ms_hi_inclusive: timestamp_ms as i64,
+                epoch_hi_inclusive: epoch,
+                checkpoint_hi_inclusive: cp_sequence_number,
+                tx_hi,
+                timestamp_ms_hi_inclusive: timestamp_ms,
             },
             values,
         }
@@ -100,17 +99,17 @@ impl<P: Processor> IndexedCheckpoint<P> {
 
     /// The checkpoint sequence number that this data is from
     fn checkpoint(&self) -> u64 {
-        self.watermark.checkpoint_hi_inclusive as u64
+        self.watermark.checkpoint_hi_inclusive
     }
 }
 
 impl WatermarkPart {
     fn checkpoint(&self) -> u64 {
-        self.watermark.checkpoint_hi_inclusive as u64
+        self.watermark.checkpoint_hi_inclusive
     }
 
     fn timestamp_ms(&self) -> u64 {
-        self.watermark.timestamp_ms_hi_inclusive as u64
+        self.watermark.timestamp_ms_hi_inclusive
     }
 
     /// Check if all the rows from this watermark are represented in this part.
@@ -129,7 +128,7 @@ impl WatermarkPart {
         debug_assert!(self.batch_rows >= rows, "Can't take more rows than are available");
 
         self.batch_rows -= rows;
-        WatermarkPart { watermark: self.watermark.clone(), batch_rows: rows, total_rows: self.total_rows }
+        WatermarkPart { watermark: self.watermark, batch_rows: rows, total_rows: self.total_rows }
     }
 }
 

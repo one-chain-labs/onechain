@@ -6,10 +6,12 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use diesel::{ExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
-use sui_indexer_alt_framework::pipeline::{concurrent::Handler, Processor};
+use sui_indexer_alt_framework::{
+    pipeline::{concurrent::Handler, Processor},
+    postgres::{Connection, Db},
+    types::full_checkpoint_content::CheckpointData,
+};
 use sui_indexer_alt_schema::{schema::kv_transactions, transactions::StoredTransaction};
-use sui_pg_db as db;
-use sui_types::full_checkpoint_content::CheckpointData;
 
 pub(crate) struct KvTransactions;
 
@@ -56,14 +58,16 @@ impl Processor for KvTransactions {
 
 #[async_trait::async_trait]
 impl Handler for KvTransactions {
+    type Store = Db;
+
     const MAX_PENDING_ROWS: usize = 10000;
     const MIN_EAGER_ROWS: usize = 100;
 
-    async fn commit(values: &[Self::Value], conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn commit<'a>(values: &[Self::Value], conn: &mut Connection<'a>) -> Result<usize> {
         Ok(diesel::insert_into(kv_transactions::table).values(values).on_conflict_do_nothing().execute(conn).await?)
     }
 
-    async fn prune(&self, from: u64, to_exclusive: u64, conn: &mut db::Connection<'_>) -> Result<usize> {
+    async fn prune<'a>(&self, from: u64, to_exclusive: u64, conn: &mut Connection<'a>) -> Result<usize> {
         let filter = kv_transactions::table
             .filter(kv_transactions::cp_sequence_number.between(from as i64, to_exclusive as i64 - 1));
 
@@ -74,13 +78,12 @@ impl Handler for KvTransactions {
 #[cfg(test)]
 mod tests {
     use diesel_async::RunQueryDsl;
-    use sui_indexer_alt_framework::Indexer;
+    use sui_indexer_alt_framework::{types::test_checkpoint_data_builder::TestCheckpointDataBuilder, Indexer};
     use sui_indexer_alt_schema::MIGRATIONS;
-    use sui_types::test_checkpoint_data_builder::TestCheckpointDataBuilder;
 
     use super::*;
 
-    async fn get_all_kv_transactions(conn: &mut db::Connection<'_>) -> Result<Vec<StoredTransaction>> {
+    async fn get_all_kv_transactions(conn: &mut Connection<'_>) -> Result<Vec<StoredTransaction>> {
         Ok(kv_transactions::table.load(conn).await?)
     }
 
@@ -89,7 +92,7 @@ mod tests {
     #[tokio::test]
     async fn test_kv_transactions_pruning() {
         let (indexer, _db) = Indexer::new_for_testing(&MIGRATIONS).await;
-        let mut conn = indexer.db().connect().await.unwrap();
+        let mut conn = indexer.store().connect().await.unwrap();
 
         let mut builder = TestCheckpointDataBuilder::new(0);
         builder = builder.start_transaction(0).finish_transaction();

@@ -42,7 +42,7 @@ pub fn read_setting_impl(
     assert_eq!(args.len(), 3);
 
     let ConfigReadSettingImplCostParams { config_read_setting_impl_cost_base, config_read_setting_impl_cost_per_byte } =
-        context.extensions_mut().get::<NativesCostTable>().config_read_setting_impl_cost_params.clone();
+        context.extensions_mut().get::<NativesCostTable>()?.config_read_setting_impl_cost_params.clone();
 
     let config_read_setting_impl_cost_base = config_read_setting_impl_cost_base.ok_or_else(|| {
         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -74,7 +74,7 @@ pub fn read_setting_impl(
     let Some(field_setting_layout) = context.type_to_type_layout(&field_setting_ty)? else {
         return Ok(NativeResult::err(context.gas_used(), E_BCS_SERIALIZATION_FAILURE));
     };
-    let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut();
+    let object_runtime: &mut ObjectRuntime = context.extensions_mut().get_mut()?;
 
     let read_value_opt = consistent_value_before_current_epoch(
         object_runtime,
@@ -167,5 +167,5 @@ fn unpack_option(option: Value, type_param: &Type) -> PartialVMResult<Option<Val
 }
 
 fn option_none(type_param: &Type) -> PartialVMResult<Value> {
-    Ok(Value::struct_(Struct::pack(vec![Vector::empty(type_param)?])))
+    Ok(Value::struct_(Struct::pack(vec![Vector::empty(type_param.try_into()?)?])))
 }
