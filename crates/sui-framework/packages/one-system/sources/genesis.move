@@ -104,6 +104,7 @@ fun create(
 
         let validator = validator::new(
             sui_address,
+            revenue_receiving_address,
             protocol_public_key,
             network_public_key,
             worker_public_key,
