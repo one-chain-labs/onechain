@@ -1,14 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-    num::{NonZeroU32, NonZeroUsize},
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
-
+use crate::certificate_deny_config::CertificateDenyConfig;
+use crate::genesis;
+use crate::object_storage_config::ObjectStoreConfig;
+use crate::p2p::P2pConfig;
+use crate::transaction_deny_config::TransactionDenyConfig;
+use crate::verifier_signing_config::VerifierSigningConfig;
+use crate::Config;
 use anyhow::Result;
 use consensus_config::Parameters as ConsensusParameters;
 use mysten_common::fatal;
@@ -17,36 +15,26 @@ use once_cell::sync::OnceCell;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::collections::{BTreeMap, BTreeSet};
+use std::net::SocketAddr;
+use std::num::{NonZeroU32, NonZeroUsize};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 use sui_keys::keypair_file::{read_authority_keypair_from_file, read_keypair_from_file};
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    committee::EpochId,
-    crypto::{
-        get_key_pair_from_rng,
-        AccountKeyPair,
-        AuthorityKeyPair,
-        AuthorityPublicKeyBytes,
-        KeypairTraits,
-        NetworkKeyPair,
-        SuiKeyPair,
-    },
-    messages_checkpoint::CheckpointSequenceNumber,
-    multiaddr::Multiaddr,
-    supported_protocol_versions::{Chain, SupportedProtocolVersions},
-    traffic_control::{PolicyConfig, RemoteFirewallConfig},
-};
-use tracing::info;
+use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::committee::EpochId;
+use sui_types::crypto::AuthorityPublicKeyBytes;
+use sui_types::crypto::KeypairTraits;
+use sui_types::crypto::NetworkKeyPair;
+use sui_types::crypto::SuiKeyPair;
+use sui_types::messages_checkpoint::CheckpointSequenceNumber;
+use sui_types::supported_protocol_versions::{Chain, SupportedProtocolVersions};
+use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
 
-use crate::{
-    certificate_deny_config::CertificateDenyConfig,
-    genesis,
-    object_storage_config::ObjectStoreConfig,
-    p2p::P2pConfig,
-    transaction_deny_config::TransactionDenyConfig,
-    validator_client_monitor_config::ValidatorClientMonitorConfig,
-    verifier_signing_config::VerifierSigningConfig,
-    Config,
-};
+use sui_types::crypto::{get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair};
+use sui_types::multiaddr::Multiaddr;
+use tracing::info;
 
 // Default max number of concurrent requests served
 pub const DEFAULT_GRPC_CONCURRENCY_LIMIT: usize = 20000000000;
@@ -77,7 +65,7 @@ pub struct NodeConfig {
     pub json_rpc_address: SocketAddr,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub rpc: Option<crate::RpcConfig>,
+    pub rpc: Option<sui_rpc_api::Config>,
 
     #[serde(default = "default_metrics_address")]
     pub metrics_address: SocketAddr,
@@ -184,7 +172,10 @@ pub struct NodeConfig {
     pub run_with_range: Option<RunWithRange>,
 
     // For killswitch use None
-    #[serde(skip_serializing_if = "Option::is_none", default = "default_traffic_controller_policy_config")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default = "default_traffic_controller_policy_config"
+    )]
     pub policy_config: Option<PolicyConfig>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -220,80 +211,6 @@ pub struct NodeConfig {
     /// override this value on production networks will result in an error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chain_override_for_testing: Option<Chain>,
-
-    /// Configuration for validator client monitoring from the client perspective.
-    /// When enabled, tracks client-observed performance metrics for validators.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub validator_client_monitor_config: Option<ValidatorClientMonitorConfig>,
-
-    /// Fork recovery configuration for handling validator equivocation after forks
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fork_recovery: Option<ForkRecoveryConfig>,
-
-    /// Configuration for the transaction driver.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_driver_config: Option<TransactionDriverConfig>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct TransactionDriverConfig {
-    /// The list of validators that are allowed to submit MFP transactions to (via the transaction driver).
-    /// Each entry is a validator display name.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub allowed_submission_validators: Vec<String>,
-
-    /// The list of validators that are blocked from submitting block transactions to (via the transaction driver).
-    /// Each entry is a validator display name.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub blocked_submission_validators: Vec<String>,
-
-    /// Enable early transaction validation before submission to consensus.
-    /// This checks for non-retriable errors (like old object versions) and rejects
-    /// transactions early to provide fast feedback to clients.
-    /// Note: Currently used in TransactionOrchestrator, but may be moved to TransactionDriver in future.
-    #[serde(default = "bool_true")]
-    pub enable_early_validation: bool,
-}
-
-impl Default for TransactionDriverConfig {
-    fn default() -> Self {
-        Self {
-            allowed_submission_validators: vec![],
-            blocked_submission_validators: vec![],
-            enable_early_validation: true,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum ForkCrashBehavior {
-    #[serde(rename = "await-fork-recovery")]
-    #[default]
-    AwaitForkRecovery,
-    /// Return an error instead of blocking forever. This is primarily for testing.
-    #[serde(rename = "return-error")]
-    ReturnError,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct ForkRecoveryConfig {
-    /// Map of transaction digest to effects digest overrides
-    /// Used to repoint transactions to correct effects after a fork
-    #[serde(default)]
-    pub transaction_overrides: BTreeMap<String, String>,
-
-    /// Map of checkpoint sequence number to checkpoint digest overrides
-    /// On node start, if we have a locally computed checkpoint with a
-    /// digest mismatch with this table, we will clear any associated local state.
-    #[serde(default)]
-    pub checkpoint_overrides: BTreeMap<u64, String>,
-
-    /// Behavior when a fork is detected after recovery attempts
-    #[serde(default)]
-    pub fork_crash_behavior: ForkCrashBehavior,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -358,35 +275,12 @@ pub struct ExecutionTimeObserverConfig {
     ///
     /// If unspecified, this will default to `100` observations.
     pub observation_sharing_burst_limit: Option<NonZeroU32>,
-
-    /// Whether to use gas price weighting in execution time estimates.
-    /// When enabled, samples with higher gas prices have more influence on the
-    /// execution time estimates, providing protection against volume-based
-    /// manipulation attacks.
-    ///
-    /// If unspecified, this will default to `false`.
-    pub enable_gas_price_weighting: Option<bool>,
-
-    /// Size of the weighted moving average window for execution time observations.
-    /// This determines how many recent observations are kept in the weighted moving average
-    /// calculation for each execution time observation key.
-    /// Note that this is independent of the window size for the simple moving average.
-    ///
-    /// If unspecified, this will default to `20`.
-    pub weighted_moving_average_window_size: Option<usize>,
-
-    /// Whether to inject synthetic execution time for testing in simtest.
-    /// When enabled, synthetic timings will be generated for execution time observations
-    /// to enable deterministic testing of congestion control features.
-    ///
-    /// If unspecified, this will default to `false`.
-    #[cfg(msim)]
-    pub inject_synthetic_execution_time: Option<bool>,
 }
 
 impl ExecutionTimeObserverConfig {
     pub fn observation_channel_capacity(&self) -> NonZeroUsize {
-        self.observation_channel_capacity.unwrap_or(nonzero!(1_024usize))
+        self.observation_channel_capacity
+            .unwrap_or(nonzero!(1_024usize))
     }
 
     pub fn observation_cache_size(&self) -> NonZeroUsize {
@@ -394,19 +288,23 @@ impl ExecutionTimeObserverConfig {
     }
 
     pub fn object_debt_channel_capacity(&self) -> NonZeroUsize {
-        self.object_debt_channel_capacity.unwrap_or(nonzero!(128usize))
+        self.object_debt_channel_capacity
+            .unwrap_or(nonzero!(128usize))
     }
 
     pub fn object_utilization_cache_size(&self) -> NonZeroUsize {
-        self.object_utilization_cache_size.unwrap_or(nonzero!(50_000usize))
+        self.object_utilization_cache_size
+            .unwrap_or(nonzero!(50_000usize))
     }
 
     pub fn report_object_utilization_metric_with_full_id(&self) -> bool {
-        self.report_object_utilization_metric_with_full_id.unwrap_or(false)
+        self.report_object_utilization_metric_with_full_id
+            .unwrap_or(false)
     }
 
     pub fn observation_sharing_object_utilization_threshold(&self) -> Duration {
-        self.observation_sharing_object_utilization_threshold.unwrap_or(Duration::from_millis(500))
+        self.observation_sharing_object_utilization_threshold
+            .unwrap_or(Duration::from_millis(500))
     }
 
     pub fn observation_sharing_diff_threshold(&self) -> f64 {
@@ -414,32 +312,21 @@ impl ExecutionTimeObserverConfig {
     }
 
     pub fn observation_sharing_min_interval(&self) -> Duration {
-        self.observation_sharing_min_interval.unwrap_or(Duration::from_secs(5))
+        self.observation_sharing_min_interval
+            .unwrap_or(Duration::from_secs(5))
     }
 
     pub fn observation_sharing_rate_limit(&self) -> NonZeroU32 {
-        self.observation_sharing_rate_limit.unwrap_or(nonzero!(10u32))
+        self.observation_sharing_rate_limit
+            .unwrap_or(nonzero!(10u32))
     }
 
     pub fn observation_sharing_burst_limit(&self) -> NonZeroU32 {
-        self.observation_sharing_burst_limit.unwrap_or(nonzero!(100u32))
-    }
-
-    pub fn enable_gas_price_weighting(&self) -> bool {
-        self.enable_gas_price_weighting.unwrap_or(false)
-    }
-
-    pub fn weighted_moving_average_window_size(&self) -> usize {
-        self.weighted_moving_average_window_size.unwrap_or(20)
-    }
-
-    #[cfg(msim)]
-    pub fn inject_synthetic_execution_time(&self) -> bool {
-        self.inject_synthetic_execution_time.unwrap_or(false)
+        self.observation_sharing_burst_limit
+            .unwrap_or(nonzero!(100u32))
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ExecutionCacheConfig {
@@ -451,13 +338,13 @@ pub enum ExecutionCacheConfig {
 
         package_cache_size: Option<u64>, // defaults to 1000
 
-        object_cache_size: Option<u64>,       // defaults to max_cache_size
-        marker_cache_size: Option<u64>,       // defaults to object_cache_size
+        object_cache_size: Option<u64>, // defaults to max_cache_size
+        marker_cache_size: Option<u64>, // defaults to object_cache_size
         object_by_id_cache_size: Option<u64>, // defaults to object_cache_size
 
-        transaction_cache_size: Option<u64>,     // defaults to max_cache_size
+        transaction_cache_size: Option<u64>, // defaults to max_cache_size
         executed_effect_cache_size: Option<u64>, // defaults to transaction_cache_size
-        effect_cache_size: Option<u64>,          // defaults to executed_effect_cache_size
+        effect_cache_size: Option<u64>,      // defaults to executed_effect_cache_size
 
         events_cache_size: Option<u64>, // defaults to transaction_cache_size
 
@@ -469,8 +356,6 @@ pub enum ExecutionCacheConfig {
         /// Number of uncommitted transactions at which to refuse new transaction
         /// submissions. Defaults to backpressure_threshold if unset.
         backpressure_threshold_for_rpc: Option<u64>,
-
-        fastpath_transaction_outputs_cache_size: Option<u64>,
     },
 }
 
@@ -489,129 +374,159 @@ impl Default for ExecutionCacheConfig {
             effect_cache_size: None,
             events_cache_size: None,
             transaction_objects_cache_size: None,
-            fastpath_transaction_outputs_cache_size: None,
         }
     }
 }
 
 impl ExecutionCacheConfig {
     pub fn max_cache_size(&self) -> u64 {
-        std::env::var("SUI_MAX_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { max_cache_size, .. } => max_cache_size.unwrap_or(100000),
-        })
+        std::env::var("SUI_MAX_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache { max_cache_size, .. } => {
+                    max_cache_size.unwrap_or(100000)
+                }
+            })
     }
 
     pub fn package_cache_size(&self) -> u64 {
-        std::env::var("SUI_PACKAGE_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { package_cache_size, .. } => package_cache_size.unwrap_or(1000),
-        })
+        std::env::var("SUI_PACKAGE_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    package_cache_size, ..
+                } => package_cache_size.unwrap_or(1000),
+            })
     }
 
     pub fn object_cache_size(&self) -> u64 {
-        std::env::var("SUI_OBJECT_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { object_cache_size, .. } => {
-                object_cache_size.unwrap_or(self.max_cache_size())
-            }
-        })
+        std::env::var("SUI_OBJECT_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    object_cache_size, ..
+                } => object_cache_size.unwrap_or(self.max_cache_size()),
+            })
     }
 
     pub fn marker_cache_size(&self) -> u64 {
-        std::env::var("SUI_MARKER_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { marker_cache_size, .. } => {
-                marker_cache_size.unwrap_or(self.object_cache_size())
-            }
-        })
+        std::env::var("SUI_MARKER_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    marker_cache_size, ..
+                } => marker_cache_size.unwrap_or(self.object_cache_size()),
+            })
     }
 
     pub fn object_by_id_cache_size(&self) -> u64 {
-        std::env::var("SUI_OBJECT_BY_ID_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { object_by_id_cache_size, .. } => {
-                object_by_id_cache_size.unwrap_or(self.object_cache_size())
-            }
-        })
+        std::env::var("SUI_OBJECT_BY_ID_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    object_by_id_cache_size,
+                    ..
+                } => object_by_id_cache_size.unwrap_or(self.object_cache_size()),
+            })
     }
 
     pub fn transaction_cache_size(&self) -> u64 {
-        std::env::var("SUI_TRANSACTION_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { transaction_cache_size, .. } => {
-                transaction_cache_size.unwrap_or(self.max_cache_size())
-            }
-        })
+        std::env::var("SUI_TRANSACTION_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    transaction_cache_size,
+                    ..
+                } => transaction_cache_size.unwrap_or(self.max_cache_size()),
+            })
     }
 
     pub fn executed_effect_cache_size(&self) -> u64 {
-        std::env::var("SUI_EXECUTED_EFFECT_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { executed_effect_cache_size, .. } => {
-                executed_effect_cache_size.unwrap_or(self.transaction_cache_size())
-            }
-        })
+        std::env::var("SUI_EXECUTED_EFFECT_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    executed_effect_cache_size,
+                    ..
+                } => executed_effect_cache_size.unwrap_or(self.transaction_cache_size()),
+            })
     }
 
     pub fn effect_cache_size(&self) -> u64 {
-        std::env::var("SUI_EFFECT_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { effect_cache_size, .. } => {
-                effect_cache_size.unwrap_or(self.executed_effect_cache_size())
-            }
-        })
+        std::env::var("SUI_EFFECT_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    effect_cache_size, ..
+                } => effect_cache_size.unwrap_or(self.executed_effect_cache_size()),
+            })
     }
 
     pub fn events_cache_size(&self) -> u64 {
-        std::env::var("SUI_EVENTS_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { events_cache_size, .. } => {
-                events_cache_size.unwrap_or(self.transaction_cache_size())
-            }
-        })
+        std::env::var("SUI_EVENTS_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    events_cache_size, ..
+                } => events_cache_size.unwrap_or(self.transaction_cache_size()),
+            })
     }
 
     pub fn transaction_objects_cache_size(&self) -> u64 {
-        std::env::var("SUI_TRANSACTION_OBJECTS_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| {
-            match self {
+        std::env::var("SUI_TRANSACTION_OBJECTS_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
                 ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-                ExecutionCacheConfig::WritebackCache { transaction_objects_cache_size, .. } => {
-                    transaction_objects_cache_size.unwrap_or(1000)
-                }
-            }
-        })
+                ExecutionCacheConfig::WritebackCache {
+                    transaction_objects_cache_size,
+                    ..
+                } => transaction_objects_cache_size.unwrap_or(1000),
+            })
     }
 
     pub fn backpressure_threshold(&self) -> u64 {
-        std::env::var("SUI_BACKPRESSURE_THRESHOLD").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| match self {
-            ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-            ExecutionCacheConfig::WritebackCache { backpressure_threshold, .. } => {
-                backpressure_threshold.unwrap_or(100_000)
-            }
-        })
+        std::env::var("SUI_BACKPRESSURE_THRESHOLD")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
+                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
+                ExecutionCacheConfig::WritebackCache {
+                    backpressure_threshold,
+                    ..
+                } => backpressure_threshold.unwrap_or(100_000),
+            })
     }
 
     pub fn backpressure_threshold_for_rpc(&self) -> u64 {
-        std::env::var("SUI_BACKPRESSURE_THRESHOLD_FOR_RPC").ok().and_then(|s| s.parse().ok()).unwrap_or_else(|| {
-            match self {
+        std::env::var("SUI_BACKPRESSURE_THRESHOLD_FOR_RPC")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| match self {
                 ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-                ExecutionCacheConfig::WritebackCache { backpressure_threshold_for_rpc, .. } => {
-                    backpressure_threshold_for_rpc.unwrap_or(self.backpressure_threshold())
-                }
-            }
-        })
-    }
-
-    pub fn fastpath_transaction_outputs_cache_size(&self) -> u64 {
-        std::env::var("SUI_FASTPATH_TRANSACTION_OUTPUTS_CACHE_SIZE").ok().and_then(|s| s.parse().ok()).unwrap_or_else(
-            || match self {
-                ExecutionCacheConfig::PassthroughCache => fatal!("invalid cache config"),
-                ExecutionCacheConfig::WritebackCache { fastpath_transaction_outputs_cache_size, .. } => {
-                    fastpath_transaction_outputs_cache_size.unwrap_or(10_000)
-                }
-            },
-        )
+                ExecutionCacheConfig::WritebackCache {
+                    backpressure_threshold_for_rpc,
+                    ..
+                } => backpressure_threshold_for_rpc.unwrap_or(self.backpressure_threshold()),
+            })
     }
 }
 
@@ -635,7 +550,10 @@ pub struct TransactionKeyValueStoreReadConfig {
 
 impl Default for TransactionKeyValueStoreReadConfig {
     fn default() -> Self {
-        Self { base_url: default_base_url(), cache_size: default_cache_size() }
+        Self {
+            base_url: default_base_url(),
+            cache_size: default_cache_size(),
+        }
     }
 }
 
@@ -673,9 +591,6 @@ pub fn default_zklogin_oauth_providers() -> BTreeMap<Chain, BTreeSet<String>> {
         "AwsTenant-region:us-east-1-tenant_id:us-east-1_qPsZxYqd8".to_string(), // Ambrus, external partner
         "Arden".to_string(),                                                    // Arden partner
         "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es".to_string(), // Trace, external partner
-        "EveFrontier".to_string(),
-        "TestEveFrontier".to_string(),
-        "AwsTenant-region:ap-southeast-1-tenant_id:ap-southeast-1_2QQPyQXDz".to_string(), // Decot, external partner
         "Huionepay".to_string(),
         "TestHuionepay".to_string(),
         "Telegram".to_string(),
@@ -696,8 +611,6 @@ pub fn default_zklogin_oauth_providers() -> BTreeMap<Chain, BTreeSet<String>> {
         "AwsTenant-region:eu-west-3-tenant_id:eu-west-3_gGVCx53Es".to_string(), // Trace, external partner
         "Arden".to_string(),
         "FanTV".to_string(),
-        "EveFrontier".to_string(),
-        "AwsTenant-region:ap-southeast-1-tenant_id:ap-southeast-1_2QQPyQXDz".to_string(), // Decot, external partner
         "Huionepay".to_string(),
         "TestHuionepay".to_string(),
         "Telegram".to_string(),
@@ -728,7 +641,11 @@ fn default_authority_key_pair() -> AuthorityKeyPairWithPath {
 }
 
 fn default_key_pair() -> KeyPairWithPath {
-    KeyPairWithPath::new(get_key_pair_from_rng::<AccountKeyPair, _>(&mut OsRng).1.into())
+    KeyPairWithPath::new(
+        get_key_pair_from_rng::<AccountKeyPair, _>(&mut OsRng)
+            .1
+            .into(),
+    )
 }
 
 fn default_metrics_address() -> SocketAddr {
@@ -771,14 +688,20 @@ impl NodeConfig {
     pub fn worker_key_pair(&self) -> &NetworkKeyPair {
         match self.worker_key_pair.keypair() {
             SuiKeyPair::Ed25519(kp) => kp,
-            other => panic!("Invalid keypair type: {:?}, only Ed25519 is allowed for worker key", other),
+            other => panic!(
+                "Invalid keypair type: {:?}, only Ed25519 is allowed for worker key",
+                other
+            ),
         }
     }
 
     pub fn network_key_pair(&self) -> &NetworkKeyPair {
         match self.network_key_pair.keypair() {
             SuiKeyPair::Ed25519(kp) => kp,
-            other => panic!("Invalid keypair type: {:?}, only Ed25519 is allowed for network key", other),
+            other => panic!(
+                "Invalid keypair type: {:?}, only Ed25519 is allowed for network key",
+                other
+            ),
         }
     }
 
@@ -819,19 +742,21 @@ impl NodeConfig {
     }
 
     pub fn archive_reader_config(&self) -> Option<ArchiveReaderConfig> {
-        self.state_archive_read_config.first().map(|config| ArchiveReaderConfig {
-            ingestion_url: config.ingestion_url.clone(),
-            remote_store_options: config.remote_store_options.clone(),
-            download_concurrency: NonZeroUsize::new(config.concurrency).unwrap_or(NonZeroUsize::new(5).unwrap()),
-            remote_store_config: ObjectStoreConfig::default(),
-        })
+        self.state_archive_read_config
+            .first()
+            .map(|config| ArchiveReaderConfig {
+                ingestion_url: config.ingestion_url.clone(),
+                download_concurrency: NonZeroUsize::new(config.concurrency)
+                    .unwrap_or(NonZeroUsize::new(5).unwrap()),
+                remote_store_config: ObjectStoreConfig::default(),
+            })
     }
 
     pub fn jsonrpc_server_type(&self) -> ServerType {
         self.jsonrpc_server_type.unwrap_or(ServerType::Http)
     }
 
-    pub fn rpc(&self) -> Option<&crate::RpcConfig> {
+    pub fn rpc(&self) -> Option<&sui_rpc_api::Config> {
         self.rpc.as_ref()
     }
 }
@@ -885,7 +810,8 @@ impl ConsensusConfig {
     }
 
     pub fn submit_delay_step_override(&self) -> Option<Duration> {
-        self.submit_delay_step_override_millis.map(Duration::from_millis)
+        self.submit_delay_step_override_millis
+            .map(Duration::from_millis)
     }
 
     pub fn db_retention_epochs(&self) -> u64 {
@@ -894,7 +820,9 @@ impl ConsensusConfig {
 
     pub fn db_pruner_period(&self) -> Duration {
         // Default to 1 hour
-        self.db_pruner_period_secs.map(Duration::from_secs).unwrap_or(Duration::from_secs(3_600))
+        self.db_pruner_period_secs
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::from_secs(3_600))
     }
 }
 
@@ -992,7 +920,8 @@ impl ExpensiveSafetyCheckConfig {
     }
 
     pub fn enable_state_consistency_check(&self) -> bool {
-        (self.enable_state_consistency_check || cfg!(debug_assertions)) && !self.force_disable_state_consistency_check
+        (self.enable_state_consistency_check || cfg!(debug_assertions))
+            && !self.force_disable_state_consistency_check
     }
 
     pub fn enable_deep_per_tx_sui_conservation_check(&self) -> bool {
@@ -1049,7 +978,10 @@ pub struct AuthorityStorePruningConfig {
     /// enables periodic background compaction for old SST files whose last modified time is
     /// older than `periodic_compaction_threshold_days` days.
     /// That ensures that all sst files eventually go through the compaction process
-    #[serde(default = "default_periodic_compaction_threshold_days", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_periodic_compaction_threshold_days",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub periodic_compaction_threshold_days: Option<usize>,
     /// number of epochs to keep the latest version of transactions and effects for
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1169,7 +1101,6 @@ pub struct ArchiveReaderConfig {
     pub remote_store_config: ObjectStoreConfig,
     pub download_concurrency: NonZeroUsize,
     pub ingestion_url: Option<String>,
-    pub remote_store_options: Vec<(String, String)>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -1180,8 +1111,6 @@ pub struct StateArchiveConfig {
     pub concurrency: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ingestion_url: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default, deserialize_with = "deserialize_remote_store_options")]
-    pub remote_store_options: Vec<(String, String)>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -1190,11 +1119,6 @@ pub struct StateSnapshotConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_store_config: Option<ObjectStoreConfig>,
     pub concurrency: usize,
-    /// Archive snapshots every N epochs. If set to 0, archival is disabled.
-    /// Archived snapshots are copied to `archive/epoch_<N>/` in the same bucket
-    /// and are intended to be kept indefinitely.
-    #[serde(default)]
-    pub archive_interval_epochs: u64,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -1266,7 +1190,7 @@ pub struct AuthorityOverloadConfig {
 }
 
 fn default_max_txn_age_in_queue() -> Duration {
-    Duration::from_millis(1000)
+    Duration::from_millis(500)
 }
 
 fn default_overload_monitor_interval() -> Duration {
@@ -1302,7 +1226,7 @@ fn default_max_transaction_manager_queue_length() -> usize {
 }
 
 fn default_max_transaction_manager_per_object_queue_length() -> usize {
-    2000
+    20
 }
 
 impl Default for AuthorityOverloadConfig {
@@ -1313,12 +1237,14 @@ impl Default for AuthorityOverloadConfig {
             execution_queue_latency_soft_limit: default_execution_queue_latency_soft_limit(),
             execution_queue_latency_hard_limit: default_execution_queue_latency_hard_limit(),
             max_load_shedding_percentage: default_max_load_shedding_percentage(),
-            min_load_shedding_percentage_above_hard_limit: default_min_load_shedding_percentage_above_hard_limit(),
+            min_load_shedding_percentage_above_hard_limit:
+                default_min_load_shedding_percentage_above_hard_limit(),
             safe_transaction_ready_rate: default_safe_transaction_ready_rate(),
             check_system_overload_at_signing: true,
             check_system_overload_at_execution: false,
             max_transaction_manager_queue_length: default_max_transaction_manager_queue_length(),
-            max_transaction_manager_per_object_queue_length: default_max_transaction_manager_per_object_queue_length(),
+            max_transaction_manager_per_object_queue_length:
+                default_max_transaction_manager_per_object_queue_length(),
         }
     }
 }
@@ -1342,26 +1268,35 @@ pub struct Genesis {
 
 impl Genesis {
     pub fn new(genesis: genesis::Genesis) -> Self {
-        Self { location: GenesisLocation::InPlace { genesis }, genesis: Default::default() }
+        Self {
+            location: GenesisLocation::InPlace { genesis },
+            genesis: Default::default(),
+        }
     }
 
     pub fn new_from_file<P: Into<PathBuf>>(path: P) -> Self {
-        Self { location: GenesisLocation::File { genesis_file_location: path.into() }, genesis: Default::default() }
+        Self {
+            location: GenesisLocation::File {
+                genesis_file_location: path.into(),
+            },
+            genesis: Default::default(),
+        }
     }
 
     pub fn genesis(&self) -> Result<&genesis::Genesis> {
         match &self.location {
             GenesisLocation::InPlace { genesis } => Ok(genesis),
-            GenesisLocation::File { genesis_file_location } => {
-                self.genesis.get_or_try_init(|| genesis::Genesis::load(genesis_file_location))
-            }
+            GenesisLocation::File {
+                genesis_file_location,
+            } => self
+                .genesis
+                .get_or_try_init(|| genesis::Genesis::load(genesis_file_location)),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Eq)]
 #[serde(untagged)]
-#[allow(clippy::large_enum_variant)]
 enum GenesisLocation {
     InPlace {
         genesis: genesis::Genesis,
@@ -1402,17 +1337,23 @@ impl KeyPairWithPath {
         let arc_kp = Arc::new(kp);
         // OK to unwrap panic because authority should not start without all keypairs loaded.
         cell.set(arc_kp.clone()).expect("Failed to set keypair");
-        Self { location: KeyPairLocation::InPlace { value: arc_kp }, keypair: cell }
+        Self {
+            location: KeyPairLocation::InPlace { value: arc_kp },
+            keypair: cell,
+        }
     }
 
     pub fn new_from_path(path: PathBuf) -> Self {
         let cell: OnceCell<Arc<SuiKeyPair>> = OnceCell::new();
         // OK to unwrap panic because authority should not start without all keypairs loaded.
-        cell.set(Arc::new(
-            read_keypair_from_file(&path).unwrap_or_else(|e| panic!("Invalid keypair file at path {:?}: {e}", &path)),
-        ))
+        cell.set(Arc::new(read_keypair_from_file(&path).unwrap_or_else(
+            |e| panic!("Invalid keypair file at path {:?}: {e}", &path),
+        )))
         .expect("Failed to set keypair");
-        Self { location: KeyPairLocation::File { path }, keypair: cell }
+        Self {
+            location: KeyPairLocation::File { path },
+            keypair: cell,
+        }
     }
 
     pub fn keypair(&self) -> &SuiKeyPair {
@@ -1422,8 +1363,9 @@ impl KeyPairWithPath {
                 KeyPairLocation::File { path } => {
                     // OK to unwrap panic because authority should not start without all keypairs loaded.
                     Arc::new(
-                        read_keypair_from_file(path)
-                            .unwrap_or_else(|e| panic!("Invalid keypair file at path {:?}: {e}", path)),
+                        read_keypair_from_file(path).unwrap_or_else(|e| {
+                            panic!("Invalid keypair file at path {:?}: {e}", path)
+                        }),
                     )
                 }
             })
@@ -1454,8 +1396,12 @@ impl AuthorityKeyPairWithPath {
         let cell: OnceCell<Arc<AuthorityKeyPair>> = OnceCell::new();
         let arc_kp = Arc::new(kp);
         // OK to unwrap panic because authority should not start without all keypairs loaded.
-        cell.set(arc_kp.clone()).expect("Failed to set authority keypair");
-        Self { location: AuthorityKeyPairLocation::InPlace { value: arc_kp }, keypair: cell }
+        cell.set(arc_kp.clone())
+            .expect("Failed to set authority keypair");
+        Self {
+            location: AuthorityKeyPairLocation::InPlace { value: arc_kp },
+            keypair: cell,
+        }
     }
 
     pub fn new_from_path(path: PathBuf) -> Self {
@@ -1466,7 +1412,10 @@ impl AuthorityKeyPairWithPath {
                 .unwrap_or_else(|_| panic!("Invalid authority keypair file at path {:?}", &path)),
         ))
         .expect("Failed to set authority keypair");
-        Self { location: AuthorityKeyPairLocation::File { path }, keypair: cell }
+        Self {
+            location: AuthorityKeyPairLocation::File { path },
+            keypair: cell,
+        }
     }
 
     pub fn authority_keypair(&self) -> &AuthorityKeyPair {
@@ -1476,8 +1425,9 @@ impl AuthorityKeyPairWithPath {
                 AuthorityKeyPairLocation::File { path } => {
                     // OK to unwrap panic because authority should not start without all keypairs loaded.
                     Arc::new(
-                        read_authority_keypair_from_file(path)
-                            .unwrap_or_else(|_| panic!("Invalid authority keypair file {:?}", &path)),
+                        read_authority_keypair_from_file(path).unwrap_or_else(|_| {
+                            panic!("Invalid authority keypair file {:?}", &path)
+                        }),
                     )
                 }
             })
@@ -1494,50 +1444,6 @@ pub struct StateDebugDumpConfig {
     pub dump_file_directory: Option<PathBuf>,
 }
 
-fn read_credential_from_path_or_literal(value: &str) -> Result<String, std::io::Error> {
-    let path = Path::new(value);
-    if path.exists() && path.is_file() {
-        std::fs::read_to_string(path).map(|content| content.trim().to_string())
-    } else {
-        Ok(value.to_string())
-    }
-}
-
-// Custom deserializer for remote store options that supports file paths or literal values
-fn deserialize_remote_store_options<'de, D>(deserializer: D) -> Result<Vec<(String, String)>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let raw_options: Vec<(String, String)> = Vec::deserialize(deserializer)?;
-    let mut processed_options = Vec::new();
-
-    for (key, value) in raw_options {
-        // GCS service_account keys expect a file path, not the file content
-        // All other keys (AWS credentials, service_account_key) should read file content
-        let is_service_account_path = matches!(
-            key.as_str(),
-            "google_service_account" | "service_account" | "google_service_account_path" | "service_account_path"
-        );
-
-        let processed_value = if is_service_account_path {
-            value
-        } else {
-            match read_credential_from_path_or_literal(&value) {
-                Ok(processed) => processed,
-                Err(e) => {
-                    return Err(D::Error::custom(format!("Failed to read credential for key '{}': {}", key, e)));
-                }
-            }
-        };
-
-        processed_options.push((key, processed_value));
-    }
-
-    Ok(processed_options)
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -1547,7 +1453,7 @@ mod tests {
     use sui_keys::keypair_file::{write_authority_keypair_to_file, write_keypair_to_file};
     use sui_types::crypto::{get_key_pair_from_rng, AuthorityKeyPair, NetworkKeyPair, SuiKeyPair};
 
-    use super::{Genesis, StateArchiveConfig};
+    use super::Genesis;
     use crate::NodeConfig;
 
     #[test]
@@ -1577,128 +1483,39 @@ mod tests {
 
     #[test]
     fn load_key_pairs_to_node_config() {
-        let protocol_key_pair: AuthorityKeyPair = get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
-        let worker_key_pair: NetworkKeyPair = get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
-        let network_key_pair: NetworkKeyPair = get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
+        let protocol_key_pair: AuthorityKeyPair =
+            get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
+        let worker_key_pair: NetworkKeyPair =
+            get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
+        let network_key_pair: NetworkKeyPair =
+            get_key_pair_from_rng(&mut StdRng::from_seed([0; 32])).1;
 
         write_authority_keypair_to_file(&protocol_key_pair, PathBuf::from("protocol.key")).unwrap();
-        write_keypair_to_file(&SuiKeyPair::Ed25519(worker_key_pair.copy()), PathBuf::from("worker.key")).unwrap();
-        write_keypair_to_file(&SuiKeyPair::Ed25519(network_key_pair.copy()), PathBuf::from("network.key")).unwrap();
+        write_keypair_to_file(
+            &SuiKeyPair::Ed25519(worker_key_pair.copy()),
+            PathBuf::from("worker.key"),
+        )
+        .unwrap();
+        write_keypair_to_file(
+            &SuiKeyPair::Ed25519(network_key_pair.copy()),
+            PathBuf::from("network.key"),
+        )
+        .unwrap();
 
         const TEMPLATE: &str = include_str!("../data/fullnode-template-with-path.yaml");
         let template: NodeConfig = serde_yaml::from_str(TEMPLATE).unwrap();
-        assert_eq!(template.protocol_key_pair().public(), protocol_key_pair.public());
-        assert_eq!(template.network_key_pair().public(), network_key_pair.public());
-        assert_eq!(template.worker_key_pair().public(), worker_key_pair.public());
-    }
-
-    #[test]
-    fn test_remote_store_options_file_path_support() {
-        // Create temporary credential files
-        let temp_dir = std::env::temp_dir();
-        let access_key_file = temp_dir.join("test_access_key");
-        let secret_key_file = temp_dir.join("test_secret_key");
-
-        std::fs::write(&access_key_file, "test_access_key_value").unwrap();
-        std::fs::write(&secret_key_file, "test_secret_key_value\n").unwrap();
-
-        let yaml_config = format!(
-            r#"
-object-store-config: null
-concurrency: 5
-ingestion-url: "https://example.com"
-remote-store-options:
-  - ["aws_access_key_id", "{}"]
-  - ["aws_secret_access_key", "{}"]
-  - ["literal_key", "literal_value"]
-"#,
-            access_key_file.to_string_lossy(),
-            secret_key_file.to_string_lossy()
+        assert_eq!(
+            template.protocol_key_pair().public(),
+            protocol_key_pair.public()
         );
-
-        let config: StateArchiveConfig = serde_yaml::from_str(&yaml_config).unwrap();
-
-        // Verify that file paths were resolved and literal values preserved
-        assert_eq!(config.remote_store_options.len(), 3);
-
-        let access_key_option = config.remote_store_options.iter().find(|(key, _)| key == "aws_access_key_id").unwrap();
-        assert_eq!(access_key_option.1, "test_access_key_value");
-
-        let secret_key_option =
-            config.remote_store_options.iter().find(|(key, _)| key == "aws_secret_access_key").unwrap();
-        assert_eq!(secret_key_option.1, "test_secret_key_value");
-
-        let literal_option = config.remote_store_options.iter().find(|(key, _)| key == "literal_key").unwrap();
-        assert_eq!(literal_option.1, "literal_value");
-
-        // Clean up
-        std::fs::remove_file(&access_key_file).ok();
-        std::fs::remove_file(&secret_key_file).ok();
-    }
-
-    #[test]
-    fn test_remote_store_options_literal_values_only() {
-        let yaml_config = r#"
-object-store-config: null
-concurrency: 5
-ingestion-url: "https://example.com"
-remote-store-options:
-  - ["aws_access_key_id", "literal_access_key"]
-  - ["aws_secret_access_key", "literal_secret_key"]
-"#;
-
-        let config: StateArchiveConfig = serde_yaml::from_str(yaml_config).unwrap();
-
-        assert_eq!(config.remote_store_options.len(), 2);
-        assert_eq!(config.remote_store_options[0].1, "literal_access_key");
-        assert_eq!(config.remote_store_options[1].1, "literal_secret_key");
-    }
-
-    #[test]
-    fn test_remote_store_options_gcs_service_account_path_preserved() {
-        let temp_dir = std::env::temp_dir();
-        let service_account_file = temp_dir.join("test_service_account.json");
-        let aws_key_file = temp_dir.join("test_aws_key");
-
-        std::fs::write(&service_account_file, r#"{"type": "service_account"}"#).unwrap();
-        std::fs::write(&aws_key_file, "aws_key_value").unwrap();
-
-        let yaml_config = format!(
-            r#"
-object-store-config: null
-concurrency: 5
-ingestion-url: "gs://my-bucket"
-remote-store-options:
-  - ["service_account", "{}"]
-  - ["google_service_account_path", "{}"]
-  - ["aws_access_key_id", "{}"]
-"#,
-            service_account_file.to_string_lossy(),
-            service_account_file.to_string_lossy(),
-            aws_key_file.to_string_lossy()
+        assert_eq!(
+            template.network_key_pair().public(),
+            network_key_pair.public()
         );
-
-        let config: StateArchiveConfig = serde_yaml::from_str(&yaml_config).unwrap();
-
-        assert_eq!(config.remote_store_options.len(), 3);
-
-        // service_account should preserve the file path, not read the content
-        let service_account_option =
-            config.remote_store_options.iter().find(|(key, _)| key == "service_account").unwrap();
-        assert_eq!(service_account_option.1, service_account_file.to_string_lossy());
-
-        // google_service_account_path should also preserve the file path
-        let gcs_path_option =
-            config.remote_store_options.iter().find(|(key, _)| key == "google_service_account_path").unwrap();
-        assert_eq!(gcs_path_option.1, service_account_file.to_string_lossy());
-
-        // AWS key should read the file content
-        let aws_option = config.remote_store_options.iter().find(|(key, _)| key == "aws_access_key_id").unwrap();
-        assert_eq!(aws_option.1, "aws_key_value");
-
-        // Clean up
-        std::fs::remove_file(&service_account_file).ok();
-        std::fs::remove_file(&aws_key_file).ok();
+        assert_eq!(
+            template.worker_key_pair().public(),
+            worker_key_pair.public()
+        );
     }
 }
 
