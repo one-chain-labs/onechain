@@ -33,7 +33,7 @@ use sui_test_transaction_builder::{
     publish_nfts_package,
     TestTransactionBuilder,
 };
-use sui_tool::restore_from_db_checkpoint;
+use one_tool::restore_from_db_checkpoint;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
     crypto::{get_key_pair, SuiKeyPair},

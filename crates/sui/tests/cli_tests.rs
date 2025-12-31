@@ -2772,7 +2772,7 @@ async fn test_stake_with_none_amount() -> Result<(), anyhow::Error> {
     let coins = client.coin_read_api().get_coins(address, None, None, None).await?.data;
 
     let config_path = test_cluster.swarm.dir().join(SUI_CLIENT_CONFIG);
-    let validator_addr = client.governance_api().get_latest_one_system_state().await?.active_validators[0].sui_address;
+    let validator_addr = client.governance_api().get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
     test_with_sui_binary(&[
         "client",
@@ -2812,7 +2812,7 @@ async fn test_stake_with_u64_amount() -> Result<(), anyhow::Error> {
     let coins = client.coin_read_api().get_coins(address, None, None, None).await?.data;
 
     let config_path = test_cluster.swarm.dir().join(SUI_CLIENT_CONFIG);
-    let validator_addr = client.governance_api().get_latest_one_system_state().await?.active_validators[0].sui_address;
+    let validator_addr = client.governance_api().get_latest_sui_system_state().await?.active_validators[0].sui_address;
 
     test_with_sui_binary(&[
         "client",
@@ -2843,7 +2843,7 @@ async fn test_stake_with_u64_amount() -> Result<(), anyhow::Error> {
 }
 
 async fn test_with_sui_binary(args: &[&str]) -> Result<(), anyhow::Error> {
-    let mut cmd = assert_cmd::Command::cargo_bin("sui").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin("one").unwrap();
     let args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     // test cluster will not response if this call is in the same thread
     let out = thread::spawn(move || cmd.args(args).assert());
@@ -4206,7 +4206,7 @@ async fn test_tree_shaking_package_system_deps() -> Result<(), anyhow::Error> {
 
     // one move build --dump-bytecode-as-base64 should also yield a json with no dependencies
     let package_path = test.package_path("J");
-    let binary_path = env!("CARGO_BIN_EXE_sui");
+    let binary_path = env!("CARGO_BIN_EXE_one");
     let cmd = std::process::Command::new(binary_path)
         .arg("move")
         .arg("build")
