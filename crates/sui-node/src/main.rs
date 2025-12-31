@@ -15,7 +15,7 @@ use sui_types::{
     multiaddr::Multiaddr,
     supported_protocol_versions::SupportedProtocolVersions,
 };
-use tokio::{sync::broadcast, time::sleep};
+use tokio::sync::broadcast;
 use tracing::{error, info};
 
 // Define the `GIT_REVISION` and `VERSION` consts
