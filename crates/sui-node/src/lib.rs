@@ -3,7 +3,6 @@
 
 #[cfg(msim)]
 use std::sync::atomic::Ordering;
-use sui_core::authority::CHAIN_IDENTIFIER;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt,

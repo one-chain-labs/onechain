@@ -37,6 +37,8 @@ use sui_types::{
     multiaddr::{Multiaddr, Protocol},
     transaction::{CallArg, Transaction, TransactionData, TEST_ONLY_GAS_UNIT_FOR_GENERIC},
     SUI_SYSTEM_PACKAGE_ID,
+    sui_system_state::SUI_SYSTEM_MODULE_NAME,
+
 };
 use tracing::info;
 

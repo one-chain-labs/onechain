@@ -49,7 +49,7 @@ use sui_graphql_rpc::{
     config::{ConnectionConfig, ServiceConfig},
     test_infra::cluster::start_graphql_server_with_fn_rpc,
 };
-use one_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
+use sui_indexer::test_utils::{start_indexer_jsonrpc_for_testing, start_indexer_writer_for_testing};
 use sui_json_rpc_types::{SuiObjectDataOptions, SuiRawData};
 use sui_keys::{
     keypair_file::read_key,
