@@ -26,7 +26,6 @@ use crate::{
         NetworkPublicKey,
     },
     error::SuiError,
-    gas::GasCostSummary,
     id::ID,
     multiaddr::Multiaddr,
     storage::ObjectStore,

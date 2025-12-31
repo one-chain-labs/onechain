@@ -16,7 +16,6 @@ use crate::{
     collection_types::{Bag, Table, TableVec, VecMap, VecSet},
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     error::SuiError,
-    gas::GasCostSummary,
     storage::ObjectStore,
     sui_system_state::{
         epoch_start_sui_system_state::EpochStartSystemState,
