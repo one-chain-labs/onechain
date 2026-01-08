@@ -16,7 +16,7 @@ use tracing::{info, warn};
 
 /// The minimum and maximum protocol versions supported by this build.
 const MIN_PROTOCOL_VERSION: u64 = 1;
-const MAX_PROTOCOL_VERSION: u64 = 77;
+const MAX_PROTOCOL_VERSION: u64 = 78;
 
 // Record history of protocol version allocations here:
 //
@@ -3263,6 +3263,10 @@ impl ProtocolConfig {
                         cfg.consensus_gc_depth = Some(60);
                         cfg.feature_flags.consensus_linearize_subdag_v2 = true;
                     }
+                }
+                78 => {        
+                    cfg.consensus_gc_depth = Some(60);
+                    cfg.feature_flags.consensus_linearize_subdag_v2 = true; 
                 }
                 // Use this template when making changes:
                 //
