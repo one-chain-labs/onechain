@@ -3452,6 +3452,10 @@ impl ProtocolConfig {
                     }
                 }
                 78 => {
+                    cfg.consensus_gc_depth = Some(60);
+                    cfg.feature_flags.consensus_linearize_subdag_v2 = true;
+                }
+                79 => {
                     cfg.feature_flags.move_native_context = true;
                     cfg.tx_context_fresh_id_cost_base = Some(52);
                     cfg.tx_context_sender_cost_base = Some(30);
@@ -3479,8 +3483,6 @@ impl ProtocolConfig {
                                 stored_observations_limit: u64::MAX,
                             });
                     }
-                }
-                79 => {
                     if chain != Chain::Mainnet {
                         cfg.feature_flags.consensus_median_based_commit_timestamp = true;
 
@@ -3495,8 +3497,6 @@ impl ProtocolConfig {
                     }
                     cfg.feature_flags.normalize_ptb_arguments = true;
 
-                    cfg.consensus_gc_depth = Some(60);
-                    cfg.feature_flags.consensus_linearize_subdag_v2 = true;
                 }
                 80 => {
                     cfg.max_ptb_value_size = Some(1024 * 1024);
