@@ -4,7 +4,7 @@
 use crate::{
     diag,
     diagnostics::{Diagnostic, DiagnosticReporter},
-    parser::ast::{self as P, ModuleName, Var, MACRO_MODIFIER},
+    parser::ast::{self as P, MACRO_MODIFIER, ModuleName, Var},
     shared::*,
 };
 use move_ir_types::location::*;
@@ -13,8 +13,10 @@ use std::collections::BTreeSet;
 
 // Implicit aliases for the Move Stdlib:
 // use std::vector;
+// use std::internal;
 // use std::option::{Self, Option};
-pub const IMPLICIT_STD_MODULES: &[Symbol] = &[symbol!("option"), symbol!("vector")];
+pub const IMPLICIT_STD_MODULES: &[Symbol] =
+    &[symbol!("option"), symbol!("vector"), symbol!("internal")];
 pub const IMPLICIT_STD_MEMBERS: &[(Symbol, Symbol, ModuleMemberKind)] = &[(
     symbol!("option"),
     symbol!("Option"),
@@ -125,8 +127,7 @@ pub fn check_valid_function_parameter_name(
     is_macro: Option<Loc>,
     v: &Var,
 ) {
-    const SYNTAX_IDENTIFIER_NOTE: &str =
-        "'macro' parameters start with '$' to indicate that their arguments are not evaluated \
+    const SYNTAX_IDENTIFIER_NOTE: &str = "'macro' parameters start with '$' to indicate that their arguments are not evaluated \
         before the macro is expanded, meaning the entire expression is substituted. \
         This is different from regular function parameters that are evaluated before the \
         function is called.";

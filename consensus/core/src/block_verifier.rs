@@ -3,37 +3,39 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
+use bytes::Bytes;
+use consensus_types::block::{BlockRef, TransactionIndex};
+
 use crate::{
-    block::{genesis_blocks, BlockAPI, BlockRef, BlockTimestampMs, SignedBlock, VerifiedBlock, GENESIS_ROUND},
+    block::{genesis_blocks, BlockAPI, SignedBlock, GENESIS_ROUND},
     context::Context,
     error::{ConsensusError, ConsensusResult},
     transaction::TransactionVerifier,
-    Round,
-    TransactionIndex,
+    VerifiedBlock,
 };
 
-pub(crate) trait BlockVerifier: Send + Sync + 'static {
+pub trait BlockVerifier: Send + Sync + 'static {
     /// Verifies a block and its transactions, checking signatures, size limits,
     /// and transaction validity. All honest validators should produce the same verification
     /// outcome for the same block, so any verification error should be due to equivocation.
+    /// Returns the verified block.
     ///
     /// When Mysticeti fastpath is enabled, it also votes on the transactions in verified blocks,
     /// and can return a non-empty list of rejected transaction indices. Different honest
     /// validators may vote differently on transactions.
-    fn verify_and_vote(&self, block: &SignedBlock) -> ConsensusResult<Vec<TransactionIndex>>;
-
-    /// Verifies a block w.r.t. ancestor blocks.
-    /// This is called after a block has complete causal history locally,
-    /// and is ready to be accepted into the DAG.
     ///
-    /// Caller must make sure ancestors corresponse to block.ancestors() 1-to-1, in the same order.
-    fn check_ancestors(
+    /// The method takes both the SignedBlock and its serialized bytes, to avoid re-serializing the block.
+    #[allow(private_interfaces)]
+    fn verify_and_vote(
         &self,
-        block: &VerifiedBlock,
-        ancestors: &[Option<VerifiedBlock>],
-        gc_enabled: bool,
-        gc_round: Round,
-    ) -> ConsensusResult<()>;
+        block: SignedBlock,
+        serialized_block: Bytes,
+    ) -> ConsensusResult<(VerifiedBlock, Vec<TransactionIndex>)>;
+
+    /// Votes on the transactions in a verified block.
+    /// This is used to vote on transactions in a verified block, without having to verify the block again. The method
+    /// will verify the transactions and vote on them.
+    fn vote(&self, block: &VerifiedBlock) -> ConsensusResult<Vec<TransactionIndex>>;
 }
 
 /// `SignedBlockVerifier` checks the validity of a block.
@@ -49,7 +51,7 @@ pub(crate) struct SignedBlockVerifier {
 
 impl SignedBlockVerifier {
     pub(crate) fn new(context: Arc<Context>, transaction_verifier: Arc<dyn TransactionVerifier>) -> Self {
-        let genesis = genesis_blocks(context.clone()).into_iter().map(|b| b.reference()).collect();
+        let genesis = genesis_blocks(&context).into_iter().map(|b| b.reference()).collect();
         Self { context, genesis, transaction_verifier }
     }
 
@@ -149,93 +151,61 @@ impl SignedBlockVerifier {
 
 // All block verification logic are implemented below.
 impl BlockVerifier for SignedBlockVerifier {
-    fn verify_and_vote(&self, block: &SignedBlock) -> ConsensusResult<Vec<TransactionIndex>> {
-        self.verify_block(block)?;
-        if self.context.protocol_config.mysticeti_fastpath() {
-            self.transaction_verifier
-                .verify_and_vote_batch(&block.transactions_data())
-                .map_err(|e| ConsensusError::InvalidTransaction(e.to_string()))
+    fn verify_and_vote(
+        &self,
+        block: SignedBlock,
+        serialized_block: Bytes,
+    ) -> ConsensusResult<(VerifiedBlock, Vec<TransactionIndex>)> {
+        self.verify_block(&block)?;
+
+        // If the block verification passed then we can produce the verified block, but we should only return it if the transaction verification passed as well.
+        let verified_block = VerifiedBlock::new_verified(block, serialized_block);
+
+        let rejected_transactions = if self.context.protocol_config.mysticeti_fastpath() {
+            self.vote(&verified_block)?
         } else {
             self.transaction_verifier
-                .verify_batch(&block.transactions_data())
+                .verify_batch(&verified_block.transactions_data())
                 .map_err(|e| ConsensusError::InvalidTransaction(e.to_string()))?;
-            Ok(vec![])
-        }
+            vec![]
+        };
+        Ok((verified_block, rejected_transactions))
     }
 
-    fn check_ancestors(
-        &self,
-        block: &VerifiedBlock,
-        ancestors: &[Option<VerifiedBlock>],
-        gc_enabled: bool,
-        gc_round: Round,
-    ) -> ConsensusResult<()> {
-        if gc_enabled {
-            // TODO: will be removed with new timestamp calculation is in place as all these will be irrelevant.
-            // When gc is enabled we don't have guarantees that all ancestors will be available. We'll take into account only the passed gc_round ones
-            // for the timestamp check.
-            let mut max_timestamp_ms = BlockTimestampMs::MIN;
-            for ancestor in ancestors.iter().flatten() {
-                if ancestor.round() <= gc_round {
-                    continue;
-                }
-                max_timestamp_ms = max_timestamp_ms.max(ancestor.timestamp_ms());
-                if max_timestamp_ms > block.timestamp_ms() {
-                    return Err(ConsensusError::InvalidBlockTimestamp {
-                        max_timestamp_ms,
-                        block_timestamp_ms: block.timestamp_ms(),
-                    });
-                }
-            }
-        } else {
-            assert_eq!(block.ancestors().len(), ancestors.len());
-            // This checks the invariant that block timestamp >= max ancestor timestamp.
-            let mut max_timestamp_ms = BlockTimestampMs::MIN;
-            for (ancestor_ref, ancestor_block) in block.ancestors().iter().zip(ancestors.iter()) {
-                let ancestor_block = ancestor_block.as_ref().expect("There should never be an empty slot");
-                assert_eq!(ancestor_ref, &ancestor_block.reference());
-                max_timestamp_ms = max_timestamp_ms.max(ancestor_block.timestamp_ms());
-            }
-            if max_timestamp_ms > block.timestamp_ms() {
-                return Err(ConsensusError::InvalidBlockTimestamp {
-                    max_timestamp_ms,
-                    block_timestamp_ms: block.timestamp_ms(),
-                });
-            }
-        }
-        Ok(())
+    fn vote(&self, block: &VerifiedBlock) -> ConsensusResult<Vec<TransactionIndex>> {
+        self.transaction_verifier
+            .verify_and_vote_batch(&block.reference(), &block.transactions_data())
+            .map_err(|e| ConsensusError::InvalidTransaction(e.to_string()))
     }
 }
 
-#[cfg(test)]
-pub(crate) struct NoopBlockVerifier;
+/// Allows all transactions to pass verification, for testing.
+pub struct NoopBlockVerifier;
 
-#[cfg(test)]
 impl BlockVerifier for NoopBlockVerifier {
-    fn verify_and_vote(&self, _block: &SignedBlock) -> ConsensusResult<Vec<TransactionIndex>> {
-        Ok(vec![])
+    #[allow(private_interfaces)]
+    fn verify_and_vote(
+        &self,
+        _block: SignedBlock,
+        _serialized_block: Bytes,
+    ) -> ConsensusResult<(VerifiedBlock, Vec<TransactionIndex>)> {
+        Ok((VerifiedBlock::new_verified(_block, _serialized_block), vec![]))
     }
 
-    fn check_ancestors(
-        &self,
-        _block: &VerifiedBlock,
-        _ancestors: &[Option<VerifiedBlock>],
-        _gc_enabled: bool,
-        _gc_round: Round,
-    ) -> ConsensusResult<()> {
-        Ok(())
+    fn vote(&self, _block: &VerifiedBlock) -> ConsensusResult<Vec<TransactionIndex>> {
+        Ok(vec![])
     }
 }
 
 #[cfg(test)]
 mod test {
     use consensus_config::AuthorityIndex;
-    use rstest::rstest;
+    use consensus_types::block::{BlockDigest, BlockRef, TransactionIndex};
     use sui_protocol_config::ProtocolConfig;
 
     use super::*;
     use crate::{
-        block::{BlockDigest, BlockRef, TestBlock, Transaction, TransactionIndex},
+        block::{TestBlock, Transaction},
         context::Context,
         transaction::{TransactionVerifier, ValidationError},
     };
@@ -255,7 +225,11 @@ mod test {
 
         // Fails verification if any transaction is < 4 bytes.
         // Rejects transactions with length [4, 16) bytes.
-        fn verify_and_vote_batch(&self, batch: &[&[u8]]) -> Result<Vec<TransactionIndex>, ValidationError> {
+        fn verify_and_vote_batch(
+            &self,
+            _block_ref: &BlockRef,
+            batch: &[&[u8]],
+        ) -> Result<Vec<TransactionIndex>, ValidationError> {
             let mut rejected_indices = vec![];
             for (i, txn) in batch.iter().enumerate() {
                 if txn.len() < 4 {
@@ -493,7 +467,11 @@ mod test {
                 .set_transactions(vec![Transaction::new(vec![1; 4]), Transaction::new(vec![1; 2])])
                 .build();
             let signed_block = SignedBlock::new(block, author_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify_and_vote(&signed_block), Err(ConsensusError::InvalidTransaction(_))));
+            let serialized_block = signed_block.serialize().expect("Block serialization failed.");
+            assert!(matches!(
+                verifier.verify_and_vote(signed_block, serialized_block),
+                Err(ConsensusError::InvalidTransaction(_))
+            ));
         }
     }
 
@@ -528,7 +506,11 @@ mod test {
                 ])
                 .build();
             let signed_block = SignedBlock::new(block, author_protocol_keypair).unwrap();
-            assert_eq!(verifier.verify_and_vote(&signed_block).unwrap(), Vec::<TransactionIndex>::new());
+            let serialized_block = signed_block.serialize().expect("Block serialization failed.");
+            let (verified_block, rejected_transactions) =
+                verifier.verify_and_vote(signed_block, serialized_block.clone()).unwrap();
+            assert_eq!(rejected_transactions, Vec::<TransactionIndex>::new());
+            assert_eq!(verified_block.serialized().clone(), serialized_block);
         }
 
         // Block with 2 transactions rejected.
@@ -543,10 +525,10 @@ mod test {
                 ])
                 .build();
             let signed_block = SignedBlock::new(block, author_protocol_keypair).unwrap();
-            assert_eq!(verifier.verify_and_vote(&signed_block).unwrap(), vec![
-                1 as TransactionIndex,
-                3 as TransactionIndex
-            ],);
+            let serialized_block = signed_block.serialize().expect("Block serialization failed.");
+            let (_verified_block, rejected_transactions) =
+                verifier.verify_and_vote(signed_block, serialized_block).unwrap();
+            assert_eq!(rejected_transactions, vec![1 as TransactionIndex, 3 as TransactionIndex],);
         }
 
         // Block with an invalid transaction returns an error.
@@ -561,94 +543,10 @@ mod test {
                 ])
                 .build();
             let signed_block = SignedBlock::new(block, author_protocol_keypair).unwrap();
-            assert!(matches!(verifier.verify_and_vote(&signed_block), Err(ConsensusError::InvalidTransaction(_))));
-        }
-    }
-
-    /// Tests the block's ancestors for timestamp monotonicity. Test will run for both when gc is enabled and disabled, but
-    /// with none of the ancestors being below the gc_round.
-    #[rstest]
-    #[tokio::test]
-    async fn test_check_ancestors(#[values(false, true)] gc_enabled: bool) {
-        let num_authorities = 4;
-        let (context, _keypairs) = Context::new_for_test(num_authorities);
-        let context = Arc::new(context);
-        let verifier = SignedBlockVerifier::new(context.clone(), Arc::new(TxnSizeVerifier {}));
-        let gc_round = 0;
-
-        let mut ancestor_blocks = vec![];
-        for i in 0 .. num_authorities {
-            let test_block = TestBlock::new(10, i as u32).set_timestamp_ms(1000 + 100 * i as BlockTimestampMs).build();
-            ancestor_blocks.push(Some(VerifiedBlock::new_for_test(test_block)));
-        }
-        let ancestor_refs = ancestor_blocks.iter().flatten().map(|block| block.reference()).collect::<Vec<_>>();
-
-        // Block respecting timestamp invariant.
-        {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1500).build();
-            let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round).is_ok());
-        }
-
-        // Block not respecting timestamp invariant.
-        {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1000).build();
-            let verified_block = VerifiedBlock::new_for_test(block);
+            let serialized_block = signed_block.serialize().expect("Block serialization failed.");
             assert!(matches!(
-                verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round),
-                Err(ConsensusError::InvalidBlockTimestamp { max_timestamp_ms: _, block_timestamp_ms: _ })
-            ));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_check_ancestors_passed_gc_round() {
-        let num_authorities = 4;
-        let (context, _keypairs) = Context::new_for_test(num_authorities);
-        let context = Arc::new(context);
-        let verifier = SignedBlockVerifier::new(context.clone(), Arc::new(TxnSizeVerifier {}));
-        let gc_enabled = true;
-        let gc_round = 3;
-
-        let mut ancestor_blocks = vec![];
-
-        // Create one block just on the `gc_round` (so it should be considered garbage collected). This has higher
-        // timestamp that the block we are testing.
-        let test_block = TestBlock::new(gc_round, 0_u32).set_timestamp_ms(1500 as BlockTimestampMs).build();
-        ancestor_blocks.push(Some(VerifiedBlock::new_for_test(test_block)));
-
-        // Rest of the blocks
-        for i in 1 ..= 3 {
-            let test_block =
-                TestBlock::new(gc_round + 1, i as u32).set_timestamp_ms(1000 + 100 * i as BlockTimestampMs).build();
-            ancestor_blocks.push(Some(VerifiedBlock::new_for_test(test_block)));
-        }
-
-        let ancestor_refs = ancestor_blocks.iter().flatten().map(|block| block.reference()).collect::<Vec<_>>();
-
-        // Block respecting timestamp invariant.
-        {
-            let block =
-                TestBlock::new(gc_round + 2, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1600).build();
-            let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round).is_ok());
-        }
-
-        // Block not respecting timestamp invariant for the block that is garbage collected
-        // Validation should pass.
-        {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1400).build();
-            let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round).is_ok());
-        }
-
-        // Block not respecting timestamp invariant for the blocks that are not garbage collected
-        {
-            let block = TestBlock::new(11, 0).set_ancestors(ancestor_refs.clone()).set_timestamp_ms(1100).build();
-            let verified_block = VerifiedBlock::new_for_test(block);
-            assert!(matches!(
-                verifier.check_ancestors(&verified_block, &ancestor_blocks, gc_enabled, gc_round),
-                Err(ConsensusError::InvalidBlockTimestamp { max_timestamp_ms: _, block_timestamp_ms: _ })
+                verifier.verify_and_vote(signed_block, serialized_block),
+                Err(ConsensusError::InvalidTransaction(_))
             ));
         }
     }

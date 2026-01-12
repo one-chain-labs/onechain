@@ -101,7 +101,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ingestion_from_zero() {
-        let ingestion_dir = tempfile::tempdir().unwrap().into_path();
+        let ingestion_dir = tempfile::tempdir().unwrap().keep();
         let config = super::Config {
             ingestion_dir: ingestion_dir.clone(),
             starting_checkpoint: 0,
@@ -114,7 +114,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ingestion_from_non_zero() {
-        let ingestion_dir = tempfile::tempdir().unwrap().into_path();
+        let ingestion_dir = tempfile::tempdir().unwrap().keep();
         let config = super::Config {
             ingestion_dir: ingestion_dir.clone(),
             starting_checkpoint: 10,

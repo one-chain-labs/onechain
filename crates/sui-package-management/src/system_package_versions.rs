@@ -11,6 +11,8 @@ use sui_protocol_config::ProtocolVersion;
 static VERSION_TABLE: LazyLock<BTreeMap<ProtocolVersion, SystemPackagesVersion>> =
     LazyLock::new(|| BTreeMap::from(include!(concat!(env!("OUT_DIR"), "/system_packages_version_table.rs"))));
 
+pub const SYSTEM_GIT_REPO: &str = "https://github.com/one-chain-labs/onechain.git";
+
 #[derive(Debug)]
 pub struct SystemPackagesVersion {
     pub git_revision: String,

@@ -13,9 +13,13 @@ title: Module `one_system::validator_wrapper`
 -  [Function `version`](#one_system_validator_wrapper_version)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/coin_vesting.md#one_coin_vesting">one::coin_vesting</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
@@ -23,14 +27,18 @@ title: Module `one_system::validator_wrapper`
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
 <b>use</b> <a href="../one/url.md#one_url">one::url</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
 <b>use</b> <a href="../one/versioned.md#one_versioned">one::versioned</a>;
 <b>use</b> <a href="../one_system/staking_pool.md#one_system_staking_pool">one_system::staking_pool</a>;
@@ -105,7 +113,7 @@ title: Module `one_system::validator_wrapper`
 
 <pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_create_v1">create_v1</a>(<a href="../one_system/validator.md#one_system_validator">validator</a>: Validator, ctx: &<b>mut</b> TxContext): <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a> {
     <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a> {
-        inner: versioned::create(1, <a href="../one_system/validator.md#one_system_validator">validator</a>, ctx)
+        inner: versioned::create(1, <a href="../one_system/validator.md#one_system_validator">validator</a>, ctx),
     }
 }
 </code></pre>
@@ -132,8 +140,8 @@ If the inner version is old, we upgrade it lazily in-place.
 
 
 <pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_load_validator_maybe_upgrade">load_validator_maybe_upgrade</a>(self: &<b>mut</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a>): &<b>mut</b> Validator {
-    <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_upgrade_to_latest">upgrade_to_latest</a>(self);
-    versioned::load_value_mut(&<b>mut</b> self.inner)
+    self.<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_upgrade_to_latest">upgrade_to_latest</a>();
+    self.inner.load_value_mut()
 }
 </code></pre>
 
@@ -160,7 +168,7 @@ Destroy the wrapper and retrieve the inner validator object.
 <pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_destroy">destroy</a>(self: <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a>): Validator {
     <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_upgrade_to_latest">upgrade_to_latest</a>(&self);
     <b>let</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a> { inner } = self;
-    versioned::destroy(inner)
+    inner.<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_destroy">destroy</a>()
 }
 </code></pre>
 
@@ -184,7 +192,7 @@ Destroy the wrapper and retrieve the inner validator object.
 
 
 <pre><code><b>fun</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_upgrade_to_latest">upgrade_to_latest</a>(self: &<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a>) {
-    <b>let</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a> = <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a>(self);
+    <b>let</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a> = self.<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a>();
     // TODO: When new versions are added, we need to explicitly upgrade here.
     <b>assert</b>!(<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a> == 1, <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_EInvalidVersion">EInvalidVersion</a>);
 }
@@ -210,7 +218,7 @@ Destroy the wrapper and retrieve the inner validator object.
 
 
 <pre><code><b>fun</b> <a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a>(self: &<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_ValidatorWrapper">ValidatorWrapper</a>): u64 {
-    versioned::version(&self.inner)
+    self.inner.<a href="../one_system/validator_wrapper.md#one_system_validator_wrapper_version">version</a>()
 }
 </code></pre>
 

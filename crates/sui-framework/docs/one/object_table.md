@@ -230,7 +230,7 @@ that key <code>k: K</code>.
 
 ## Function `contains`
 
-Returns true iff there is a value associated with the key <code>k: K</code> in table
+Returns true if there is a value associated with the key <code>k: K</code> in table
 <code><a href="../one/table.md#one_table">table</a>: &<a href="../one/object_table.md#one_object_table_ObjectTable">ObjectTable</a>&lt;K, V&gt;</code>
 
 

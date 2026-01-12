@@ -12,7 +12,7 @@ use crate::{
     gas::GasCostSummary,
     message_envelope::Message,
     object::Owner,
-    transaction::{InputObjectKind, SenderSignedData, TransactionDataAPI},
+    transaction::{InputObjectKind, SenderSignedData, SharedObjectMutability, TransactionDataAPI},
 };
 
 pub struct TestEffectsBuilder {
@@ -31,6 +31,8 @@ pub struct TestEffectsBuilder {
     wrapped_objects: Vec<(ObjectID, SequenceNumber)>,
     /// Objects that are unwrapped: (ID, new owner).
     unwrapped_objects: Vec<(ObjectID, Owner)>,
+    /// Immutable objects that are read.
+    frozen_objects: BTreeSet<ObjectID>,
 }
 
 impl TestEffectsBuilder {
@@ -45,6 +47,7 @@ impl TestEffectsBuilder {
             deleted_objects: vec![],
             wrapped_objects: vec![],
             unwrapped_objects: vec![],
+            frozen_objects: BTreeSet::new(),
         }
     }
 
@@ -93,6 +96,11 @@ impl TestEffectsBuilder {
         self
     }
 
+    pub fn with_frozen_objects(mut self, objects: impl IntoIterator<Item = ObjectID>) -> Self {
+        self.frozen_objects.extend(objects);
+        self
+    }
+
     pub fn build(self) -> TransactionEffects {
         let lamport_version = self.get_lamport_version();
         let status = self.status.unwrap_or(ExecutionStatus::Success);
@@ -112,6 +120,7 @@ impl TestEffectsBuilder {
             .unwrap()
             .iter()
             .filter_map(|kind| match kind {
+                InputObjectKind::ImmOrOwnedMoveObject((id, _, _)) if self.frozen_objects.contains(id) => None,
                 InputObjectKind::ImmOrOwnedMoveObject(oref) => Some((oref.0, EffectsObjectChange {
                     input_state: ObjectIn::Exist(((oref.1, oref.2), Owner::AddressOwner(sender))),
                     output_state: ObjectOut::ObjectWrite((
@@ -122,7 +131,12 @@ impl TestEffectsBuilder {
                     id_operation: IDOperation::None,
                 })),
                 InputObjectKind::MovePackage(_) => None,
-                InputObjectKind::SharedMoveObject { id, initial_shared_version, mutable } => {
+                InputObjectKind::SharedMoveObject { id, initial_shared_version, mutability } => {
+                    let mutable = match mutability {
+                        SharedObjectMutability::Mutable => true,
+                        SharedObjectMutability::Immutable => false,
+                        SharedObjectMutability::NonExclusiveWrite => todo!(),
+                    };
                     mutable.then_some((*id, EffectsObjectChange {
                         input_state: ObjectIn::Exist((
                             (*self.shared_input_versions.get(id).unwrap_or(initial_shared_version), ObjectDigest::MIN),

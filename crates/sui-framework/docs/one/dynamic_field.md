@@ -89,16 +89,6 @@ Internal object used for storing the field and value
 ## Constants
 
 
-<a name="one_dynamic_field_EBCSSerializationFailure"></a>
-
-Failed to serialize the field's name
-
-
-<pre><code><b>const</b> <a href="../one/dynamic_field.md#one_dynamic_field_EBCSSerializationFailure">EBCSSerializationFailure</a>: u64 = 3;
-</code></pre>
-
-
-
 <a name="one_dynamic_field_EFieldAlreadyExists"></a>
 
 The object already has a dynamic field with this name (with the value and type specified)
@@ -126,6 +116,16 @@ The object has a field with that name, but the value type does not match
 
 
 <pre><code><b>const</b> <a href="../one/dynamic_field.md#one_dynamic_field_EFieldTypeMismatch">EFieldTypeMismatch</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="one_dynamic_field_EBCSSerializationFailure"></a>
+
+Failed to serialize the field's name
+
+
+<pre><code><b>const</b> <a href="../one/dynamic_field.md#one_dynamic_field_EBCSSerializationFailure">EBCSSerializationFailure</a>: u64 = 3;
 </code></pre>
 
 

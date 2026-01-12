@@ -32,11 +32,19 @@ More entry functions might be added in the future depending on the use cases.
 -  [Function `add_internal`](#one_display_add_internal)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
+<b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/package.md#one_package">one::package</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
@@ -258,12 +266,8 @@ Create a new Display<T> object with a set of fields.
 ): <a href="../one/display.md#one_display_Display">Display</a>&lt;T&gt; {
     <b>let</b> len = <a href="../one/display.md#one_display_fields">fields</a>.length();
     <b>assert</b>!(len == values.length(), <a href="../one/display.md#one_display_EVecLengthMismatch">EVecLengthMismatch</a>);
-    <b>let</b> <b>mut</b> i = 0;
     <b>let</b> <b>mut</b> <a href="../one/display.md#one_display">display</a> = <a href="../one/display.md#one_display_new">new</a>&lt;T&gt;(pub, ctx);
-    <b>while</b> (i &lt; len) {
-        <a href="../one/display.md#one_display">display</a>.<a href="../one/display.md#one_display_add_internal">add_internal</a>(<a href="../one/display.md#one_display_fields">fields</a>[i], values[i]);
-        i = i + 1;
-    };
+    <a href="../one/display.md#one_display_fields">fields</a>.zip_do!(values, |field, value| <a href="../one/display.md#one_display">display</a>.<a href="../one/display.md#one_display_add_internal">add_internal</a>(field, value));
     <a href="../one/display.md#one_display">display</a>
 }
 </code></pre>
@@ -375,11 +379,7 @@ Sets multiple <code><a href="../one/display.md#one_display_fields">fields</a></c
 ) {
     <b>let</b> len = <a href="../one/display.md#one_display_fields">fields</a>.length();
     <b>assert</b>!(len == values.length(), <a href="../one/display.md#one_display_EVecLengthMismatch">EVecLengthMismatch</a>);
-    <b>let</b> <b>mut</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        self.<a href="../one/display.md#one_display_add_internal">add_internal</a>(<a href="../one/display.md#one_display_fields">fields</a>[i], values[i]);
-        i = i + 1;
-    };
+    <a href="../one/display.md#one_display_fields">fields</a>.zip_do!(values, |field, value| self.<a href="../one/display.md#one_display_add_internal">add_internal</a>(field, value));
 }
 </code></pre>
 

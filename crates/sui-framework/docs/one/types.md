@@ -2,7 +2,7 @@
 title: Module `one::types`
 ---
 
-Sui types helpers and utilities
+Oct types helpers and utilities
 
 
 -  [Function `is_one_time_witness`](#one_types_is_one_time_witness)

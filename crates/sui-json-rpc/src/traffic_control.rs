@@ -51,7 +51,7 @@ where
                     response
                 } else {
                     let response = service.call(req).await;
-                    handle_traffic_resp(&traffic_controller, client, &response);
+                    handle_traffic_resp(&traffic_controller, client, &response).await;
                     response
                 }
             } else {
@@ -63,7 +63,7 @@ where
 }
 
 async fn handle_traffic_req(
-    traffic_controller: &TrafficController,
+    traffic_controller: &Arc<TrafficController>,
     client: &Option<IpAddr>,
 ) -> Result<(), MethodResponse> {
     if !traffic_controller.check(client, &None).await {
@@ -75,7 +75,11 @@ async fn handle_traffic_req(
     }
 }
 
-fn handle_traffic_resp(traffic_controller: &TrafficController, client: Option<IpAddr>, response: &MethodResponse) {
+async fn handle_traffic_resp(
+    traffic_controller: &Arc<TrafficController>,
+    client: Option<IpAddr>,
+    response: &MethodResponse,
+) {
     let error = response.as_error_code().map(ErrorCode::from);
     traffic_controller.tally(TrafficTally {
         direct: client,
@@ -117,11 +121,11 @@ pub fn determine_client_ip<T>(client_id_source: ClientIdSource, request: &mut ax
                     let header_contents = header_val.split(',').map(str::trim).collect::<Vec<_>>();
                     if num_hops == 0 {
                         error!(
-                                "x-forwarded-for: 0 specified. x-forwarded-for contents: {:?}. Please assign nonzero value for \
+                            "x-forwarded-for: 0 specified. x-forwarded-for contents: {:?}. Please assign nonzero value for \
                                 number of hops here, or use `socket-addr` client-id-source type if requests are not being proxied \
                                 to this node. Skipping traffic controller request handling.",
-                                header_contents,
-                            );
+                            header_contents,
+                        );
                         return None;
                     }
                     let contents_len = header_contents.len();
@@ -148,7 +152,9 @@ pub fn determine_client_ip<T>(client_id_source: ClientIdSource, request: &mut ax
             } else if let Some(header) = headers.get("X-Forwarded-For") {
                 do_header_parse(header)
             } else {
-                error!("x-forwarded-for header not present for request despite node configuring x-forwarded-for tracking type");
+                error!(
+                    "x-forwarded-for header not present for request despite node configuring x-forwarded-for tracking type"
+                );
                 None
             }
         }

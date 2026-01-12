@@ -67,7 +67,10 @@ impl<'a> ProcessPayload<'a, &'a QueryTransactionBlocks> for RpcCommandProcessor 
                     match (results.first().unwrap().next_cursor, results.get(1).unwrap().next_cursor) {
                         (Some(first_cursor), Some(second_cursor)) => {
                             if first_cursor != second_cursor {
-                                warn!("Cursors are not the same, received {} vs {}. Selecting the first cursor to continue", first_cursor, second_cursor);
+                                warn!(
+                                    "Cursors are not the same, received {} vs {}. Selecting the first cursor to continue",
+                                    first_cursor, second_cursor
+                                );
                             }
                             Some(first_cursor)
                         }

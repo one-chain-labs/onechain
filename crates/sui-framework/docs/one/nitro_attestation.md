@@ -24,8 +24,10 @@ title: Module `one::nitro_attestation`
 <b>use</b> <a href="../one/clock.md#one_clock">one::clock</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -138,16 +140,6 @@ Nitro Attestation Document defined for AWS.
 ## Constants
 
 
-<a name="one_nitro_attestation_EInvalidPCRsError"></a>
-
-Error that the PCRs are invalid.
-
-
-<pre><code><b>const</b> <a href="../one/nitro_attestation.md#one_nitro_attestation_EInvalidPCRsError">EInvalidPCRsError</a>: u64 = 3;
-</code></pre>
-
-
-
 <a name="one_nitro_attestation_ENotSupportedError"></a>
 
 Error that the feature is not available on this network.
@@ -178,6 +170,16 @@ Error that the attestation failed to be verified.
 
 
 
+<a name="one_nitro_attestation_EInvalidPCRsError"></a>
+
+Error that the PCRs are invalid.
+
+
+<pre><code><b>const</b> <a href="../one/nitro_attestation.md#one_nitro_attestation_EInvalidPCRsError">EInvalidPCRsError</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="one_nitro_attestation_load_nitro_attestation"></a>
 
 ## Function `load_nitro_attestation`
@@ -198,10 +200,7 @@ may abort with errors described above.
 <summary>Implementation</summary>
 
 
-<pre><code><b>entry</b> <b>fun</b> <a href="../one/nitro_attestation.md#one_nitro_attestation_load_nitro_attestation">load_nitro_attestation</a>(
-    attestation: vector&lt;u8&gt;,
-    <a href="../one/clock.md#one_clock">clock</a>: &Clock
-): <a href="../one/nitro_attestation.md#one_nitro_attestation_NitroAttestationDocument">NitroAttestationDocument</a> {
+<pre><code><b>entry</b> <b>fun</b> <a href="../one/nitro_attestation.md#one_nitro_attestation_load_nitro_attestation">load_nitro_attestation</a>(attestation: vector&lt;u8&gt;, <a href="../one/clock.md#one_clock">clock</a>: &Clock): <a href="../one/nitro_attestation.md#one_nitro_attestation_NitroAttestationDocument">NitroAttestationDocument</a> {
     <a href="../one/nitro_attestation.md#one_nitro_attestation_load_nitro_attestation_internal">load_nitro_attestation_internal</a>(&attestation, <a href="../one/clock.md#one_clock_timestamp_ms">clock::timestamp_ms</a>(<a href="../one/clock.md#one_clock">clock</a>))
 }
 </code></pre>
@@ -287,7 +286,7 @@ may abort with errors described above.
 ## Function `pcrs`
 
 Returns a list of mapping PCREntry containg the index and the PCR bytes.
-Currently AWS supports PCR0, PCR1, PCR2, PCR3, PCR4, PCR8.
+AWS supports PCR0-31. All-zero PCR values are excluded.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/nitro_attestation.md#one_nitro_attestation_pcrs">pcrs</a>(attestation: &<a href="../one/nitro_attestation.md#one_nitro_attestation_NitroAttestationDocument">one::nitro_attestation::NitroAttestationDocument</a>): &vector&lt;<a href="../one/nitro_attestation.md#one_nitro_attestation_PCREntry">one::nitro_attestation::PCREntry</a>&gt;

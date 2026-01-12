@@ -14,9 +14,9 @@ use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 use strum::{EnumProperty, IntoEnumIterator};
 use strum_macros::{Display, EnumDiscriminants, EnumIter};
-use sui_types::error::SuiError;
+use sui_rpc::proto::sui::rpc::v2::ExecutionError;
+use sui_types::error::{SuiError, SuiErrorKind};
 use thiserror::Error;
-use typed_store::TypedStoreError;
 
 use crate::types::{BlockHash, OperationType, PublicKey, SuiEnv};
 
@@ -48,10 +48,10 @@ pub enum Error {
     PublicKeyDeserializationError(PublicKey),
 
     #[error("Error executing transaction: {0}")]
-    TransactionExecutionError(String),
+    TransactionExecutionError(Box<ExecutionError>),
 
     #[error("{0}")]
-    TransactionDryRunError(String),
+    TransactionDryRunError(Box<ExecutionError>),
 
     #[error(transparent)]
     InternalError(#[from] anyhow::Error),
@@ -62,17 +62,21 @@ pub enum Error {
     #[error(transparent)]
     SuiError(#[from] SuiError),
     #[error(transparent)]
-    SuiRpcError(#[from] sui_sdk::error::Error),
+    SuiRpcError(#[from] tonic::Status),
     #[error(transparent)]
     EncodingError(#[from] eyre::Report),
-    #[error(transparent)]
-    DBError(#[from] TypedStoreError),
     #[error(transparent)]
     JsonExtractorRejection(#[from] JsonRejection),
 
     #[error("Retries exhausted while getting balance. try again.")]
     #[strum(props(retriable = "true"))]
     RetryExhausted(String),
+}
+
+impl From<SuiErrorKind> for Error {
+    fn from(e: SuiErrorKind) -> Self {
+        Error::SuiError(SuiError::from(e))
+    }
 }
 
 impl Serialize for ErrorType {

@@ -176,11 +176,11 @@ impl TrafficSketch {
         let rate = rate as u64;
         if rate_heap.len() < capacity {
             rate_heap.push(Reverse((rate, ip_addr)));
-        } else if let Some(&Reverse((smallest_score, _))) = rate_heap.peek() {
-            if rate > smallest_score {
-                rate_heap.pop();
-                rate_heap.push(Reverse((rate, ip_addr)));
-            }
+        } else if let Some(&Reverse((smallest_score, _))) = rate_heap.peek()
+            && rate > smallest_score
+        {
+            rate_heap.pop();
+            rate_heap.push(Reverse((rate, ip_addr)));
         }
     }
 
@@ -298,10 +298,10 @@ impl TrafficControlPolicy {
 ////////////// *** Policy definitions *** //////////////
 
 pub struct FreqThresholdPolicy {
-    config: PolicyConfig,
+    pub config: PolicyConfig,
+    pub client_threshold: u64,
+    pub proxied_client_threshold: u64,
     sketch: TrafficSketch,
-    client_threshold: u64,
-    proxied_client_threshold: u64,
     /// Unique salt to be added to all keys in the sketch. This
     /// ensures that false positives are not correlated across
     /// all nodes at the same time. For Sui validators for example,
@@ -403,9 +403,9 @@ impl NoOpPolicy {
 
 #[derive(Clone)]
 pub struct TestNConnIPPolicy {
-    config: PolicyConfig,
+    pub threshold: u64,
+    pub config: PolicyConfig,
     frequencies: Arc<RwLock<HashMap<IpAddr, u64>>>,
-    threshold: u64,
 }
 
 impl TestNConnIPPolicy {

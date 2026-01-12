@@ -47,19 +47,19 @@ use crate::{
 pub const SUI_MAINNET_URL: &str = "https://rpc-mainnet.onelabs.cc:443";
 pub const GET_POOLS_PATH: &str = "/get_pools";
 pub const GET_HISTORICAL_VOLUME_BY_BALANCE_MANAGER_ID_WITH_INTERVAL: &str =
-    "/historical_volume_by_balance_manager_id_with_interval/:pool_names/:balance_manager_id";
+    "/historical_volume_by_balance_manager_id_with_interval/{pool_names}/{balance_manager_id}";
 pub const GET_HISTORICAL_VOLUME_BY_BALANCE_MANAGER_ID: &str =
-    "/historical_volume_by_balance_manager_id/:pool_names/:balance_manager_id";
-pub const HISTORICAL_VOLUME_PATH: &str = "/historical_volume/:pool_names";
+    "/historical_volume_by_balance_manager_id/{pool_names}/{balance_manager_id}";
+pub const HISTORICAL_VOLUME_PATH: &str = "/historical_volume/{pool_names}";
 pub const ALL_HISTORICAL_VOLUME_PATH: &str = "/all_historical_volume";
-pub const GET_NET_DEPOSITS: &str = "/get_net_deposits/:asset_ids/:timestamp";
+pub const GET_NET_DEPOSITS: &str = "/get_net_deposits/{asset_ids}/{timestamp}";
 pub const TICKER_PATH: &str = "/ticker";
-pub const TRADES_PATH: &str = "/trades/:pool_name";
-pub const ORDER_UPDATES_PATH: &str = "/order_updates/:pool_name";
+pub const TRADES_PATH: &str = "/trades/{pool_name}";
+pub const ORDER_UPDATES_PATH: &str = "/order_updates/{pool_name}";
 pub const TRADE_COUNT_PATH: &str = "/trade_count";
 pub const ASSETS_PATH: &str = "/assets";
 pub const SUMMARY_PATH: &str = "/summary";
-pub const LEVEL2_PATH: &str = "/orderbook/:pool_name";
+pub const LEVEL2_PATH: &str = "/orderbook/{pool_name}";
 pub const LEVEL2_MODULE: &str = "pool";
 pub const LEVEL2_FUNCTION: &str = "get_level2_ticks_from_mid";
 pub const DEEPBOOK_PACKAGE_ID: &str = "0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809";
@@ -988,12 +988,12 @@ async fn orderbook(
         .map_err(|_| DeepBookError::InternalError("Depth must be a non-negative integer".to_string()))?
         .map(|depth| if depth == 0 { 200 } else { depth });
 
-    if let Some(depth) = depth {
-        if depth == 1 {
-            return Err(DeepBookError::InternalError(
-                "Depth cannot be 1. Use a value greater than 1 or 0 for the entire orderbook".to_string(),
-            ));
-        }
+    if let Some(depth) = depth
+        && depth == 1
+    {
+        return Err(DeepBookError::InternalError(
+            "Depth cannot be 1. Use a value greater than 1 or 0 for the entire orderbook".to_string(),
+        ));
     }
 
     let level = params
@@ -1002,10 +1002,10 @@ async fn orderbook(
         .transpose()
         .map_err(|_| DeepBookError::InternalError("Level must be an integer between 1 and 2".to_string()))?;
 
-    if let Some(level) = level {
-        if !(1 ..= 2).contains(&level) {
-            return Err(DeepBookError::InternalError("Level must be 1 or 2".to_string()));
-        }
+    if let Some(level) = level
+        && !(1 ..= 2).contains(&level)
+    {
+        return Err(DeepBookError::InternalError("Level must be 1 or 2".to_string()));
     }
 
     let ticks_from_mid = match (depth, level) {

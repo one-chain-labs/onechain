@@ -110,7 +110,8 @@ pub(crate) async fn verify_zklogin_signature(
             }
         }
     }
-    let verify_params = VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, true, Some(30));
+    let verify_params =
+        VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, true, Some(30), true);
 
     let bytes = bytes.0;
     match intent_scope {

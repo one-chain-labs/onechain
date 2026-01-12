@@ -5,11 +5,15 @@ use move_binary_format::CompiledModule;
 use move_bytecode_verifier_meter::Meter;
 use move_vm_config::verifier::MeterConfig;
 use sui_protocol_config::ProtocolConfig;
-use sui_types::{error::SuiResult, execution_config_utils::to_binary_config};
+use sui_types::error::SuiResult;
 
 pub trait Verifier {
     /// Create a new bytecode verifier meter.
     fn meter(&self, config: MeterConfig) -> Box<dyn Meter>;
+
+    /// Specifies whether or not deprecate_global_storage_ops_during_deserialization should
+    /// be overridden for the `BinaryConfig`
+    fn override_deprecate_global_storage_ops_during_deserialization(&self) -> Option<bool>;
 
     /// Run the bytecode verifier with a meter limit
     ///
@@ -29,7 +33,8 @@ pub trait Verifier {
         module_bytes: &[Vec<u8>],
         meter: &mut dyn Meter,
     ) -> SuiResult<()> {
-        let binary_config = to_binary_config(protocol_config);
+        let binary_config =
+            protocol_config.binary_config(self.override_deprecate_global_storage_ops_during_deserialization());
         let Ok(modules) = module_bytes
             .iter()
             .map(|b| CompiledModule::deserialize_with_config(b, &binary_config))
@@ -38,6 +43,17 @@ pub trait Verifier {
             // Although we failed, we don't care since it wasn't because of a timeout.
             return Ok(());
         };
+
+        for module in &modules {
+            for identifier in module.identifiers() {
+                if identifier.as_str() == "<SELF>" {
+                    return Err(sui_types::error::UserInputError::InvalidIdentifier {
+                        error: format!("invalid identifier: {}", identifier),
+                    }
+                    .into());
+                }
+            }
+        }
 
         self.meter_compiled_modules(protocol_config, &modules, meter)
     }

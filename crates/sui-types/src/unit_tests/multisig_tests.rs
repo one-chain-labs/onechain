@@ -331,18 +331,15 @@ fn zklogin_in_multisig_works_with_both_addresses() {
     let multisig = MultiSig::insecure_new(vec![zklogin_sig.to_compressed().unwrap()], 1, multisig_pk);
 
     let parsed: ImHashMap<JwkId, JWK> =
-        parse_jwks(DEFAULT_JWK_BYTES, &OIDCProvider::Twitch).unwrap().into_iter().collect();
+        parse_jwks(DEFAULT_JWK_BYTES, &OIDCProvider::Twitch, true).unwrap().into_iter().collect();
 
-    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, true, Some(30));
-    let res = multisig.verify_claims(
-        intent_msg,
-        multisig_address,
-        &aux_verify_data,
-        Arc::new(VerifiedDigestCache::new_empty()),
-    );
+    let aux_verify_data = VerifyParams::new(parsed, vec![], ZkLoginEnv::Test, true, true, true, Some(30), true);
+    let res = multisig
+        .verify_claims(intent_msg, multisig_address, &aux_verify_data, Arc::new(VerifiedDigestCache::new_empty()))
+        .map_err(|e| e.into_inner());
     // since the zklogin inputs is crafted, it is expected that the proof verify failed, but all checks before passes.
     assert!(
-        matches!(res, Err(crate::error::SuiError::InvalidSignature { error }) if error.contains("General cryptographic error: Groth16 proof verify failed"))
+        matches!(res, Err(crate::error::SuiErrorKind::InvalidSignature { error }) if error.contains("General cryptographic error: Groth16 proof verify failed"))
     );
 
     // initialize zklogin pk (pk1_padd) with padded address seed
@@ -368,14 +365,16 @@ fn zklogin_in_multisig_works_with_both_addresses() {
     let multisig_padded =
         MultiSig::insecure_new(vec![zklogin_sig_padded.to_compressed().unwrap()], 1, multisig_pk_padded);
 
-    let res = multisig_padded.verify_claims(
-        intent_msg_padded,
-        multisig_address_padded,
-        &aux_verify_data,
-        Arc::new(VerifiedDigestCache::new_empty()),
-    );
+    let res = multisig_padded
+        .verify_claims(
+            intent_msg_padded,
+            multisig_address_padded,
+            &aux_verify_data,
+            Arc::new(VerifiedDigestCache::new_empty()),
+        )
+        .map_err(|e| e.into_inner());
     assert!(
-        matches!(res, Err(crate::error::SuiError::InvalidSignature { error }) if error.contains("General cryptographic error: Groth16 proof verify failed"))
+        matches!(res, Err(crate::error::SuiErrorKind::InvalidSignature { error }) if error.contains("General cryptographic error: Groth16 proof verify failed"))
     );
 }
 

@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Generate javadoc style documentation for Move packages
+/// Generate Rust style documentation for Move packages
 #[derive(Parser)]
 #[clap(name = "docgen")]
 pub struct Docgen {
@@ -53,7 +53,7 @@ impl Docgen {
 
         let docgen = move_docgen::Docgen::new(&model, &options);
 
-        for (file, content) in docgen.gen(&model)? {
+        for (file, content) in docgen.generate(&model)? {
             let path = PathBuf::from(&file);
             fs::create_dir_all(path.parent().unwrap())?;
             fs::write(path.as_path(), content)?;

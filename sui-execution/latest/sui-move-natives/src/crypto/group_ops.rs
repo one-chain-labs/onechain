@@ -18,30 +18,30 @@ use move_vm_types::{
 };
 use smallvec::smallvec;
 
-use crate::{object_runtime::ObjectRuntime, NativesCostTable};
+use crate::{get_extension, object_runtime::ObjectRuntime, NativesCostTable};
 
 pub const NOT_SUPPORTED_ERROR: u64 = 0;
 pub const INVALID_INPUT_ERROR: u64 = 1;
 pub const INPUT_TOO_LONG_ERROR: u64 = 2;
 
-fn is_supported(context: &NativeContext) -> bool {
-    context.extensions().get::<ObjectRuntime>().protocol_config.enable_group_ops_native_functions()
+fn is_supported(context: &NativeContext) -> PartialVMResult<bool> {
+    Ok(get_extension!(context, ObjectRuntime)?.protocol_config.enable_group_ops_native_functions())
 }
 
-fn is_msm_supported(context: &NativeContext) -> bool {
-    context.extensions().get::<ObjectRuntime>().protocol_config.enable_group_ops_native_function_msm()
+fn is_msm_supported(context: &NativeContext) -> PartialVMResult<bool> {
+    Ok(get_extension!(context, ObjectRuntime)?.protocol_config.enable_group_ops_native_function_msm())
 }
 
-fn is_uncompressed_g1_supported(context: &NativeContext) -> bool {
-    context.extensions().get::<ObjectRuntime>().protocol_config.uncompressed_g1_group_elements()
+fn is_uncompressed_g1_supported(context: &NativeContext) -> PartialVMResult<bool> {
+    Ok(get_extension!(context, ObjectRuntime)?.protocol_config.uncompressed_g1_group_elements())
 }
 
-fn v2_native_charge(context: &NativeContext, cost: InternalGas) -> InternalGas {
-    if context.extensions().get::<ObjectRuntime>().protocol_config.native_charging_v2() {
+fn v2_native_charge(context: &NativeContext, cost: InternalGas) -> PartialVMResult<InternalGas> {
+    Ok(if get_extension!(context, ObjectRuntime)?.protocol_config.native_charging_v2() {
         context.gas_used()
     } else {
         cost
-    }
+    })
 }
 
 fn map_op_result(
@@ -50,9 +50,9 @@ fn map_op_result(
     result: FastCryptoResult<Vec<u8>>,
 ) -> PartialVMResult<NativeResult> {
     match result {
-        Ok(bytes) => Ok(NativeResult::ok(v2_native_charge(context, cost), smallvec![Value::vector_u8(bytes)])),
+        Ok(bytes) => Ok(NativeResult::ok(v2_native_charge(context, cost)?, smallvec![Value::vector_u8(bytes)])),
         // Since all Element<G> are validated on construction, this error should never happen unless the requested type is wrong or inputs are invalid.
-        Err(_) => Ok(NativeResult::err(v2_native_charge(context, cost), INVALID_INPUT_ERROR)),
+        Err(_) => Ok(NativeResult::err(v2_native_charge(context, cost)?, INVALID_INPUT_ERROR)),
     }
 }
 
@@ -200,7 +200,7 @@ pub fn internal_validate(
     debug_assert!(args.len() == 2);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -208,7 +208,7 @@ pub fn internal_validate(
     let bytes = bytes_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -226,7 +226,7 @@ pub fn internal_validate(
         _ => false,
     };
 
-    Ok(NativeResult::ok(v2_native_charge(context, cost), smallvec![Value::bool(result)]))
+    Ok(NativeResult::ok(v2_native_charge(context, cost)?, smallvec![Value::bool(result)]))
 }
 
 /***************************************************************************************************
@@ -243,7 +243,7 @@ pub fn internal_add(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -253,7 +253,7 @@ pub fn internal_add(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -292,7 +292,7 @@ pub fn internal_sub(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -302,7 +302,7 @@ pub fn internal_sub(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -341,7 +341,7 @@ pub fn internal_mul(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -351,7 +351,7 @@ pub fn internal_mul(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -402,7 +402,7 @@ pub fn internal_div(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -412,7 +412,7 @@ pub fn internal_div(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381Scalar) => {
@@ -464,7 +464,7 @@ pub fn internal_hash_to(
     debug_assert!(args.len() == 2);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -476,7 +476,7 @@ pub fn internal_hash_to(
         return Ok(NativeResult::err(cost, INVALID_INPUT_ERROR));
     }
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381G1) => {
@@ -542,8 +542,8 @@ where
 {
     if points.is_empty()
         || scalars.is_empty()
-        || scalars.len() % SCALAR_SIZE != 0
-        || points.len() % POINT_SIZE != 0
+        || !scalars.len().is_multiple_of(SCALAR_SIZE)
+        || !points.len().is_multiple_of(POINT_SIZE)
         || points.len() / POINT_SIZE != scalars.len() / SCALAR_SIZE
     {
         return Ok(NativeResult::err(context.gas_used(), INVALID_INPUT_ERROR));
@@ -598,7 +598,7 @@ pub fn internal_multi_scalar_mul(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_msm_supported(context) {
+    if !is_msm_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -608,7 +608,7 @@ pub fn internal_multi_scalar_mul(
     let scalars = scalars_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let max_len = cost_params.bls12381_msm_max_len.ok_or_else(|| {
         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -641,7 +641,7 @@ pub fn internal_multi_scalar_mul(
                 elements.as_ref(),
             )
         }
-        _ => Ok(NativeResult::err(v2_native_charge(context, cost), INVALID_INPUT_ERROR)),
+        _ => Ok(NativeResult::err(v2_native_charge(context, cost)?, INVALID_INPUT_ERROR)),
     }
 }
 
@@ -659,7 +659,7 @@ pub fn internal_pairing(
     debug_assert!(args.len() == 3);
 
     let cost = context.gas_used();
-    if !is_supported(context) {
+    if !is_supported(context)? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -669,7 +669,7 @@ pub fn internal_pairing(
     let e1 = e1_ref.as_bytes_ref();
     let group_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match Groups::from_u8(group_type) {
         Some(Groups::BLS12381G1) => {
@@ -702,7 +702,7 @@ pub fn internal_convert(
 
     let cost = context.gas_used();
 
-    if !(is_uncompressed_g1_supported(context)) {
+    if !(is_uncompressed_g1_supported(context))? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
@@ -711,7 +711,7 @@ pub fn internal_convert(
     let to_type = pop_arg!(args, u8);
     let from_type = pop_arg!(args, u8);
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     let result = match (Groups::from_u8(from_type), Groups::from_u8(to_type)) {
         (Some(Groups::BLS12381UncompressedG1), Some(Groups::BLS12381G1)) => {
@@ -750,11 +750,11 @@ pub fn internal_sum(
 
     let cost = context.gas_used();
 
-    if !(is_uncompressed_g1_supported(context)) {
+    if !(is_uncompressed_g1_supported(context))? {
         return Ok(NativeResult::err(cost, NOT_SUPPORTED_ERROR));
     }
 
-    let cost_params = &context.extensions().get::<NativesCostTable>().group_ops_cost_params.clone();
+    let cost_params = get_extension!(context, NativesCostTable)?.group_ops_cost_params.clone();
 
     // The input is a reference to a vector of vector<u8>'s
     let inputs = pop_arg!(args, VectorRef);

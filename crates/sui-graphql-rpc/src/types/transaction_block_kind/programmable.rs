@@ -13,6 +13,7 @@ use sui_types::transaction::{
     ObjectArg as NativeObjectArg,
     ProgrammableMoveCall as NativeMoveCallTransaction,
     ProgrammableTransaction as NativeProgrammableTransactionBlock,
+    SharedObjectMutability,
 };
 
 use crate::{
@@ -30,6 +31,13 @@ use crate::{
 
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct ProgrammableTransactionBlock {
+    pub native: NativeProgrammableTransactionBlock,
+    /// The checkpoint sequence number this was viewed at.
+    pub checkpoint_viewed_at: u64,
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub(crate) struct ProgrammableSystemTransactionBlock {
     pub native: NativeProgrammableTransactionBlock,
     /// The checkpoint sequence number this was viewed at.
     pub checkpoint_viewed_at: u64,
@@ -57,7 +65,7 @@ struct OwnedOrImmutable {
 #[derive(SimpleObject, Clone, Eq, PartialEq)]
 struct SharedInput {
     address: SuiAddress,
-    /// The version that this this object was shared at.
+    /// The version at which this object was shared.​
     initial_shared_version: UInt53,
     /// Controls whether the transaction block can reference the shared object as a mutable
     /// reference or by value. This has implications for scheduling: Transactions that just read
@@ -204,6 +212,67 @@ pub(crate) struct TxResult {
     ix: Option<u16>,
 }
 
+mod programmable_transaction_block_impl {
+    use super::*;
+
+    pub(crate) async fn inputs(
+        native: &NativeProgrammableTransactionBlock,
+        checkpoint_viewed_at: u64,
+        ctx: &Context<'_>,
+        first: Option<u64>,
+        after: Option<CInput>,
+        last: Option<u64>,
+        before: Option<CInput>,
+    ) -> Result<Connection<String, TransactionInput>> {
+        let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
+
+        let mut connection = Connection::new(false, false);
+        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(native.inputs.len(), checkpoint_viewed_at)?
+        else {
+            return Ok(connection);
+        };
+
+        connection.has_previous_page = prev;
+        connection.has_next_page = next;
+
+        for c in cs {
+            let input = TransactionInput::from(native.inputs[c.ix].clone(), c.c);
+            connection.edges.push(Edge::new(c.encode_cursor(), input));
+        }
+
+        Ok(connection)
+    }
+
+    /// The transaction commands, executed sequentially.
+    pub(crate) async fn transactions(
+        native: &NativeProgrammableTransactionBlock,
+        checkpoint_viewed_at: u64,
+        ctx: &Context<'_>,
+        first: Option<u64>,
+        after: Option<CTxn>,
+        last: Option<u64>,
+        before: Option<CTxn>,
+    ) -> Result<Connection<String, ProgrammableTransaction>> {
+        let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
+
+        let mut connection = Connection::new(false, false);
+        let Some((prev, next, _, cs)) = page.paginate_consistent_indices(native.commands.len(), checkpoint_viewed_at)?
+        else {
+            return Ok(connection);
+        };
+
+        connection.has_previous_page = prev;
+        connection.has_next_page = next;
+
+        for c in cs {
+            let txn = ProgrammableTransaction::from(native.commands[c.ix].clone(), c.c);
+            connection.edges.push(Edge::new(c.encode_cursor(), txn));
+        }
+
+        Ok(connection)
+    }
+}
+
 /// A user transaction that allows the interleaving of native commands (like transfer, split coins,
 /// merge coins, etc) and move calls, executed atomically.
 #[Object]
@@ -217,24 +286,16 @@ impl ProgrammableTransactionBlock {
         last: Option<u64>,
         before: Option<CInput>,
     ) -> Result<Connection<String, TransactionInput>> {
-        let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-
-        let mut connection = Connection::new(false, false);
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(self.native.inputs.len(), self.checkpoint_viewed_at)?
-        else {
-            return Ok(connection);
-        };
-
-        connection.has_previous_page = prev;
-        connection.has_next_page = next;
-
-        for c in cs {
-            let input = TransactionInput::from(self.native.inputs[c.ix].clone(), c.c);
-            connection.edges.push(Edge::new(c.encode_cursor(), input));
-        }
-
-        Ok(connection)
+        programmable_transaction_block_impl::inputs(
+            &self.native,
+            self.checkpoint_viewed_at,
+            ctx,
+            first,
+            after,
+            last,
+            before,
+        )
+        .await
     }
 
     /// The transaction commands, executed sequentially.
@@ -246,27 +307,65 @@ impl ProgrammableTransactionBlock {
         last: Option<u64>,
         before: Option<CTxn>,
     ) -> Result<Connection<String, ProgrammableTransaction>> {
-        let page = Page::from_params(ctx.data_unchecked(), first, after, last, before)?;
-
-        let mut connection = Connection::new(false, false);
-        let Some((prev, next, _, cs)) =
-            page.paginate_consistent_indices(self.native.commands.len(), self.checkpoint_viewed_at)?
-        else {
-            return Ok(connection);
-        };
-
-        connection.has_previous_page = prev;
-        connection.has_next_page = next;
-
-        for c in cs {
-            let txn = ProgrammableTransaction::from(self.native.commands[c.ix].clone(), c.c);
-            connection.edges.push(Edge::new(c.encode_cursor(), txn));
-        }
-
-        Ok(connection)
+        programmable_transaction_block_impl::transactions(
+            &self.native,
+            self.checkpoint_viewed_at,
+            ctx,
+            first,
+            after,
+            last,
+            before,
+        )
+        .await
     }
 }
 
+/// ProgrammableSystemTransactionBlock is identical to ProgrammableTransactionBlock, but graphql
+/// does not allow multiple variants with the same type.
+#[Object]
+impl ProgrammableSystemTransactionBlock {
+    /// Input objects or primitive values.
+    async fn inputs(
+        &self,
+        ctx: &Context<'_>,
+        first: Option<u64>,
+        after: Option<CInput>,
+        last: Option<u64>,
+        before: Option<CInput>,
+    ) -> Result<Connection<String, TransactionInput>> {
+        programmable_transaction_block_impl::inputs(
+            &self.native,
+            self.checkpoint_viewed_at,
+            ctx,
+            first,
+            after,
+            last,
+            before,
+        )
+        .await
+    }
+
+    /// The transaction commands, executed sequentially.
+    async fn transactions(
+        &self,
+        ctx: &Context<'_>,
+        first: Option<u64>,
+        after: Option<CTxn>,
+        last: Option<u64>,
+        before: Option<CTxn>,
+    ) -> Result<Connection<String, ProgrammableTransaction>> {
+        programmable_transaction_block_impl::transactions(
+            &self.native,
+            self.checkpoint_viewed_at,
+            ctx,
+            first,
+            after,
+            last,
+            before,
+        )
+        .await
+    }
+}
 /// A call to either an entry or a public Move function.
 #[Object]
 impl MoveCallTransaction {
@@ -322,15 +421,25 @@ impl TransactionInput {
                 I::OwnedOrImmutable(OwnedOrImmutable { read: ObjectRead { native: oref, checkpoint_viewed_at } })
             }
 
-            N::Object(O::SharedObject { id, initial_shared_version, mutable }) => I::SharedInput(SharedInput {
+            N::Object(O::SharedObject { id, initial_shared_version, mutability }) => I::SharedInput(SharedInput {
                 address: id.into(),
                 initial_shared_version: initial_shared_version.value().into(),
-                mutable,
+                mutable: match mutability {
+                    SharedObjectMutability::Mutable => true,
+                    SharedObjectMutability::Immutable => false,
+                    SharedObjectMutability::NonExclusiveWrite => {
+                        // TODO: graphql should probably expose the full mutability enum
+                        true
+                    }
+                },
             }),
 
             N::Object(O::Receiving(oref)) => {
                 I::Receiving(Receiving { read: ObjectRead { native: oref, checkpoint_viewed_at } })
             }
+
+            // TODO(address-balances): Add support for balance withdraws.
+            N::FundsWithdrawal(_) => todo!("FundsWithdrawal is not supported for GraphQL"),
         }
     }
 }

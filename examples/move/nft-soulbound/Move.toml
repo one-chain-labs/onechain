@@ -1,0 +1,10 @@
+[package]
+name = "testnet_soulbound_nft"
+version = "0.0.1"
+edition = "2024.beta"
+
+[dependencies]
+One = { local = "../../../crates/sui-framework/packages/one-framework" }
+
+[addresses]
+examples = "0x0"

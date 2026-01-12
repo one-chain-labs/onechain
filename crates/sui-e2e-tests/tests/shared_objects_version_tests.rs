@@ -10,7 +10,7 @@ use sui_types::{
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
     execution_status::{ExecutionFailureStatus, ExecutionStatus},
     object::{Owner, OBJECT_START_VERSION},
-    transaction::{CallArg, ObjectArg},
+    transaction::{CallArg, ObjectArg, SharedObjectMutability},
     SUI_FRAMEWORK_ADDRESS,
 };
 use test_cluster::{TestCluster, TestClusterBuilder};
@@ -120,7 +120,7 @@ impl TestEnvironment {
             .await
             .move_call(self.move_package, "shared_objects_version", function, arguments)
             .build();
-        let transaction = self.test_cluster.wallet.sign_transaction(&transaction);
+        let transaction = self.test_cluster.wallet.sign_transaction(&transaction).await;
         self.test_cluster.execute_transaction_return_raw_effects(transaction).await
     }
 
@@ -171,7 +171,7 @@ impl TestEnvironment {
             .move_call("increment_counter", vec![CallArg::Object(ObjectArg::SharedObject {
                 id: counter,
                 initial_shared_version,
-                mutable: true,
+                mutability: SharedObjectMutability::Mutable,
             })])
             .await?;
 

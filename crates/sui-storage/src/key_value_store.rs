@@ -11,9 +11,10 @@ use sui_types::{
     base_types::{ObjectID, SequenceNumber, VersionNumber},
     digests::{CheckpointDigest, TransactionDigest},
     effects::{TransactionEffects, TransactionEvents},
-    error::{SuiError, SuiResult, UserInputError},
+    error::{SuiErrorKind, SuiResult, UserInputError},
     messages_checkpoint::{CertifiedCheckpointSummary, CheckpointContents, CheckpointSequenceNumber},
     object::Object,
+    storage::ObjectKey,
     transaction::Transaction,
 };
 use tracing::instrument;
@@ -215,7 +216,12 @@ impl TransactionKeyValueStore {
     /// Convenience method for fetching single digest, and returning an error if it's not found.
     /// Prefer using multi_get_tx whenever possible.
     pub async fn get_tx(&self, digest: TransactionDigest) -> SuiResult<Transaction> {
-        self.multi_get_tx(&[digest]).await?.into_iter().next().flatten().ok_or(SuiError::TransactionNotFound { digest })
+        self.multi_get_tx(&[digest])
+            .await?
+            .into_iter()
+            .next()
+            .flatten()
+            .ok_or(SuiErrorKind::TransactionNotFound { digest }.into())
     }
 
     /// Convenience method for fetching single digest, and returning an error if it's not found.
@@ -226,7 +232,7 @@ impl TransactionKeyValueStore {
             .into_iter()
             .next()
             .flatten()
-            .ok_or(SuiError::TransactionNotFound { digest })
+            .ok_or(SuiErrorKind::TransactionNotFound { digest }.into())
     }
 
     /// Convenience method for fetching single checkpoint, and returning an error if it's not found.
@@ -240,7 +246,7 @@ impl TransactionKeyValueStore {
             .into_iter()
             .next()
             .flatten()
-            .ok_or(SuiError::UserInputError { error: UserInputError::VerifiedCheckpointNotFound(checkpoint) })
+            .ok_or(SuiErrorKind::UserInputError { error: UserInputError::VerifiedCheckpointNotFound(checkpoint) }.into())
     }
 
     /// Convenience method for fetching single checkpoint, and returning an error if it's not found.
@@ -251,7 +257,7 @@ impl TransactionKeyValueStore {
             .into_iter()
             .next()
             .flatten()
-            .ok_or(SuiError::UserInputError { error: UserInputError::VerifiedCheckpointNotFound(checkpoint) })
+            .ok_or(SuiErrorKind::UserInputError { error: UserInputError::VerifiedCheckpointNotFound(checkpoint) }.into())
     }
 
     /// Convenience method for fetching single checkpoint, and returning an error if it's not found.
@@ -261,9 +267,10 @@ impl TransactionKeyValueStore {
         digest: CheckpointDigest,
     ) -> SuiResult<CertifiedCheckpointSummary> {
         self.multi_get_checkpoints_summaries_by_digest(&[digest]).await?.into_iter().next().flatten().ok_or(
-            SuiError::UserInputError {
+            SuiErrorKind::UserInputError {
                 error: UserInputError::VerifiedCheckpointDigestNotFound(format!("{:?}", digest)),
-            },
+            }
+            .into(),
         )
     }
 
@@ -276,6 +283,10 @@ impl TransactionKeyValueStore {
 
     pub async fn get_object(&self, object_id: ObjectID, version: VersionNumber) -> SuiResult<Option<Object>> {
         self.inner.get_object(object_id, version).await
+    }
+
+    pub async fn multi_get_objects(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<Option<Object>>> {
+        self.inner.multi_get_objects(object_keys).await
     }
 
     pub async fn multi_get_transaction_checkpoint(
@@ -318,6 +329,8 @@ pub trait TransactionKeyValueStoreTrait {
     ) -> SuiResult<Option<CheckpointSequenceNumber>>;
 
     async fn get_object(&self, object_id: ObjectID, version: SequenceNumber) -> SuiResult<Option<Object>>;
+
+    async fn multi_get_objects(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<Option<Object>>>;
 
     async fn multi_get_transaction_checkpoint(
         &self,
@@ -431,6 +444,23 @@ impl TransactionKeyValueStoreTrait for FallbackTransactionKVStore {
         if res.is_none() {
             res = self.fallback.get_object(object_id, version).await?;
         }
+        Ok(res)
+    }
+
+    #[instrument(level = "trace", skip_all)]
+    async fn multi_get_objects(&self, object_keys: &[ObjectKey]) -> SuiResult<Vec<Option<Object>>> {
+        let mut res = self.primary.multi_get_objects(object_keys).await?;
+
+        let (fallback, indices) = find_fallback(&res, object_keys);
+
+        if fallback.is_empty() {
+            return Ok(res);
+        }
+
+        let secondary_res = self.fallback.multi_get_objects(&fallback).await?;
+
+        merge_res(&mut res, secondary_res, &indices);
+
         Ok(res)
     }
 

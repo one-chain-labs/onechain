@@ -16,8 +16,10 @@ shared object that is created at 0x6 during genesis.
 <pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;

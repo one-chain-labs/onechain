@@ -188,7 +188,9 @@ pub enum ExecutionFailureStatus {
     #[error("The shared object operation is not allowed.")]
     SharedObjectOperationNotAllowed,
 
-    #[error("Certificate cannot be executed due to a dependency on a deleted shared object")]
+    #[error(
+        "Certificate cannot be executed due to a dependency on a deleted shared object or an object that was transferred out of consensus"
+    )]
     InputObjectDeleted,
 
     #[error("Certificate is cancelled due to congestion on shared objects: {congested_objects}")]
@@ -202,6 +204,29 @@ pub enum ExecutionFailureStatus {
 
     #[error("Certificate is cancelled because randomness could not be generated this epoch")]
     ExecutionCancelledDueToRandomnessUnavailable,
+
+    #[error(
+        "Move vector element (passed to MakeMoveVec) with size {value_size} is larger \
+        than the maximum size {max_scaled_size}. Note that this maximum is scaled based on the \
+        type of the vector element."
+    )]
+    MoveVectorElemTooBig { value_size: u64, max_scaled_size: u64 },
+
+    #[error(
+        "Move value (possibly an upgrade ticket or a dev-inspect value) with size {value_size} \
+        is larger than the maximum size  {max_scaled_size}. Note that this maximum is scaled based \
+        on the type of the value."
+    )]
+    MoveRawValueTooBig { value_size: u64, max_scaled_size: u64 },
+
+    #[error("A valid linkage was unable to be determined for the transaction")]
+    InvalidLinkage,
+
+    #[error("Insufficient balance for transaction withdrawal")]
+    InsufficientBalanceForWithdraw,
+
+    #[error("Non-exclusive write input object {id} has been modified")]
+    NonExclusiveWriteInputObjectModified { id: ObjectID },
     // NOTE: if you want to add a new enum,
     // please add it at the end for Rust SDK backward compatibility.
 }
@@ -217,7 +242,7 @@ pub struct MoveLocation {
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct MoveLocationOpt(pub Option<MoveLocation>);
 
-#[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Error)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Serialize, Deserialize, Hash, Error)]
 pub enum CommandArgumentError {
     #[error("The type of the value does not match the expected type")]
     TypeMismatch,
@@ -263,6 +288,42 @@ pub enum CommandArgumentError {
         allowed."
     )]
     SharedObjectOperationNotAllowed,
+    #[error(
+        "Invalid argument arity. Expected a single argument but found a result that expanded to \
+        multiple arguments."
+    )]
+    InvalidArgumentArity,
+    #[error(
+        "Object passed to TransferObject does not have public transfer, i.e. the `store` \
+        ability"
+    )]
+    InvalidTransferObject,
+    #[error(
+        "First argument to MakeMoveVec is not an object. If no type is specified for MakeMoveVec, all arguments must be the same object type."
+    )]
+    InvalidMakeMoveVecNonObjectArgument,
+    #[error("Specified argument location does not have a value and cannot be used")]
+    ArgumentWithoutValue,
+    #[error(
+        "Cannot move a borrowed value. The value's type does resulted in this argument usage \
+        being inferred as a move. This is likely due to the type not having the `copy` ability; \
+        although in rare cases, it could also be this is the last usage of a value without the \
+        `drop` ability."
+    )]
+    CannotMoveBorrowedValue,
+    #[error(
+        "Cannot write to an argument location that is still borrowed, and where that borrow \
+        is an extension of that reference. This is likely due to this argument being used in a \
+        Move call that returns a reference, and that reference is used in a later command."
+    )]
+    CannotWriteToExtendedReference,
+    #[error(
+        "The argument specified cannot be used as a reference argument in the Move call. Either \
+        the argument is a mutable reference and it conflicts with another argument to the call, \
+        or the argument is mutable and another reference extends it and will be used in a later \
+        command."
+    )]
+    InvalidReferenceArgument,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Error)]
@@ -321,7 +382,7 @@ impl ExecutionStatus {
     }
 
     pub fn is_ok(&self) -> bool {
-        matches!(self, ExecutionStatus::Success { .. })
+        matches!(self, ExecutionStatus::Success)
     }
 
     pub fn is_err(&self) -> bool {
@@ -339,7 +400,7 @@ impl ExecutionStatus {
 
     pub fn unwrap_err(self) -> (ExecutionFailureStatus, Option<CommandIndex>) {
         match self {
-            ExecutionStatus::Success { .. } => {
+            ExecutionStatus::Success => {
                 panic!("Unable to unwrap() on {:?}", self);
             }
             ExecutionStatus::Failure { error, command } => (error, command),
@@ -356,6 +417,13 @@ impl ExecutionStatus {
         } else {
             None
         }
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, ExecutionStatus::Failure {
+            error: ExecutionFailureStatus::ExecutionCancelledDueToSharedObjectCongestion { .. },
+            ..
+        })
     }
 }
 

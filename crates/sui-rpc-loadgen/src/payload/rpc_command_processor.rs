@@ -92,15 +92,15 @@ impl RpcCommandProcessor {
 
     async fn process_command_data(&self, command: &CommandData, signer_info: &Option<SignerInfo>) -> Result<()> {
         match command {
-            CommandData::DryRun(ref v) => self.process(v, signer_info).await,
-            CommandData::GetCheckpoints(ref v) => self.process(v, signer_info).await,
-            CommandData::PayOct(ref v) => self.process(v, signer_info).await,
-            CommandData::QueryTransactionBlocks(ref v) => self.process(v, signer_info).await,
-            CommandData::MultiGetTransactionBlocks(ref v) => self.process(v, signer_info).await,
-            CommandData::MultiGetObjects(ref v) => self.process(v, signer_info).await,
-            CommandData::GetObject(ref v) => self.process(v, signer_info).await,
-            CommandData::GetAllBalances(ref v) => self.process(v, signer_info).await,
-            CommandData::GetReferenceGasPrice(ref v) => self.process(v, signer_info).await,
+            CommandData::DryRun(v) => self.process(v, signer_info).await,
+            CommandData::GetCheckpoints(v) => self.process(v, signer_info).await,
+            CommandData::PayOct(v) => self.process(v, signer_info).await,
+            CommandData::QueryTransactionBlocks(v) => self.process(v, signer_info).await,
+            CommandData::MultiGetTransactionBlocks(v) => self.process(v, signer_info).await,
+            CommandData::MultiGetObjects(v) => self.process(v, signer_info).await,
+            CommandData::GetObject(v) => self.process(v, signer_info).await,
+            CommandData::GetAllBalances(v) => self.process(v, signer_info).await,
+            CommandData::GetReferenceGasPrice(v) => self.process(v, signer_info).await,
         }
     }
 
@@ -328,10 +328,10 @@ impl Processor for RpcCommandProcessor {
     }
 
     fn dump_cache_to_file(&self, config: &LoadTestConfig) {
-        if let CommandData::GetCheckpoints(data) = &config.command.data {
-            if data.record {
-                self.dump_cache_to_file();
-            }
+        if let CommandData::GetCheckpoints(data) = &config.command.data
+            && data.record
+        {
+            self.dump_cache_to_file();
         }
     }
 }

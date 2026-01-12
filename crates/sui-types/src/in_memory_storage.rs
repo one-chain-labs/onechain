@@ -11,7 +11,7 @@ use move_core_types::{language_storage::ModuleId, resolver::ModuleResolver};
 use crate::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, VersionNumber},
     committee::EpochId,
-    error::{SuiError, SuiResult},
+    error::{SuiError, SuiErrorKind, SuiResult},
     inner_temporary_store::WrittenObjects,
     object::{Object, Owner},
     storage::{
@@ -53,16 +53,18 @@ impl ChildObjectResolver for InMemoryStorage {
         };
         let parent = *parent;
         if child_object.owner != Owner::ObjectOwner(parent.into()) {
-            return Err(SuiError::InvalidChildObjectAccess {
+            return Err(SuiErrorKind::InvalidChildObjectAccess {
                 object: *child,
                 given_parent: parent,
                 actual_owner: child_object.owner.clone(),
-            });
+            }
+            .into());
         }
         if child_object.version() > child_version_upper_bound {
-            return Err(SuiError::UnsupportedFeatureError {
+            return Err(SuiErrorKind::UnsupportedFeatureError {
                 error: "TODO InMemoryStorage::read_child_object does not yet support bounded reads".to_owned(),
-            });
+            }
+            .into());
         }
         Ok(Some(child_object))
     }
@@ -73,8 +75,6 @@ impl ChildObjectResolver for InMemoryStorage {
         receiving_object_id: &ObjectID,
         receive_object_at_version: SequenceNumber,
         _epoch_id: EpochId,
-        // TODO: Delete this parameter once table migration is complete.
-        _use_object_per_epoch_marker_table_v2: bool,
     ) -> SuiResult<Option<Object>> {
         let recv_object = match self.persistent.get(receiving_object_id).cloned() {
             None => return Ok(None),

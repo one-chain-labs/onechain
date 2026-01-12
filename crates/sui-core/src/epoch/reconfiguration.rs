@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
 
@@ -46,7 +47,10 @@ impl ReconfigState {
     }
 
     pub fn close_all_certs(&mut self) {
-        self.status = ReconfigCertStatus::RejectAllCerts;
+        if !matches!(self.status, ReconfigCertStatus::RejectAllTx) {
+            info!("closing all certs");
+            self.status = ReconfigCertStatus::RejectAllCerts;
+        }
     }
 
     pub fn should_accept_user_certs(&self) -> bool {
@@ -67,6 +71,10 @@ impl ReconfigState {
 
     pub fn should_accept_tx(&self) -> bool {
         !matches!(self.status, ReconfigCertStatus::RejectAllTx)
+    }
+
+    pub fn is_reject_all_tx(&self) -> bool {
+        matches!(self.status, ReconfigCertStatus::RejectAllTx)
     }
 }
 

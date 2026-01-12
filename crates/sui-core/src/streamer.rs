@@ -8,7 +8,10 @@ use mysten_metrics::{metered_channel::Sender, spawn_monitored_task};
 use parking_lot::RwLock;
 use prometheus::Registry;
 use sui_json_rpc_types::Filter;
-use sui_types::{base_types::ObjectID, error::SuiError};
+use sui_types::{
+    base_types::ObjectID,
+    error::{SuiError, SuiErrorKind},
+};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::{debug, warn};
@@ -102,7 +105,7 @@ where
     }
 
     /// Subscribe to the data stream filtered by the filter object.
-    pub fn subscribe(&self, filter: F) -> impl Stream<Item = S> {
+    pub fn subscribe(&self, filter: F) -> impl Stream<Item = S> + use<T, S, F> {
         let (tx, rx) = mpsc::channel::<S>(EVENT_DISPATCH_BUFFER_SIZE);
         self.subscribers.write().insert(ObjectID::random().to_string(), (tx, filter));
         ReceiverStream::new(rx)
@@ -112,7 +115,7 @@ where
         self.streamer_queue.try_send(data).map_err(|e| {
             self.metrics.dropped_submissions.with_label_values(&[self.metrics_label]).inc();
 
-            SuiError::FailedToDispatchSubscription { error: e.to_string() }
+            SuiErrorKind::FailedToDispatchSubscription { error: e.to_string() }.into()
         })
     }
 }

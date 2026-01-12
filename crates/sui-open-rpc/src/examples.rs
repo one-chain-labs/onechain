@@ -86,6 +86,7 @@ use sui_types::{
     balance::Supply,
     base_types::{
         random_object_ref,
+        FullObjectRef,
         MoveObjectType,
         ObjectDigest,
         ObjectID,
@@ -186,10 +187,10 @@ impl RpcExampleProvider {
     }
 
     fn batch_transaction_examples(&mut self) -> Examples {
-        let signer = SuiAddress::from(ObjectID::new(self.rng.gen()));
-        let recipient = SuiAddress::from(ObjectID::new(self.rng.gen()));
-        let gas_id = ObjectID::new(self.rng.gen());
-        let object_id = ObjectID::new(self.rng.gen());
+        let signer = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
+        let recipient = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
+        let gas_id = ObjectID::new(self.rng.r#gen());
+        let object_id = ObjectID::new(self.rng.r#gen());
         let coin_ref = random_object_ref();
         let random_amount: u64 = 10;
 
@@ -222,14 +223,21 @@ impl RpcExampleProvider {
                 )
                 .unwrap();
             builder
-                .transfer_object(recipient, (object_id, SequenceNumber::from_u64(1), ObjectDigest::new(self.rng.gen())))
+                .transfer_object(
+                    recipient,
+                    FullObjectRef::from_fastpath_ref((
+                        object_id,
+                        SequenceNumber::from_u64(1),
+                        ObjectDigest::new(self.rng.r#gen()),
+                    )),
+                )
                 .unwrap();
             builder.finish()
         };
         let gas_price = 10;
         let data = TransactionData::new_programmable(
             signer,
-            vec![(gas_id, SequenceNumber::from_u64(1), ObjectDigest::new(self.rng.gen()))],
+            vec![(gas_id, SequenceNumber::from_u64(1), ObjectDigest::new(self.rng.r#gen()))],
             pt,
             TEST_ONLY_GAS_UNIT_FOR_TRANSFER * gas_price,
             gas_price,
@@ -295,7 +303,10 @@ impl RpcExampleProvider {
             vec![ExamplePairing::new(
                 "Runs the transaction in dev-inspect mode. Which allows for nearly any transaction (or Move call) with any arguments. Detailed results are provided, including both the transaction effects and any return values.",
                 vec![
-                    ("sender_address", json!(SuiAddress::from(ObjectID::new(self.rng.gen())))),
+                    (
+                        "sender_address",
+                        json!(SuiAddress::from(ObjectID::new(self.rng.r#gen()))),
+                    ),
                     ("tx_bytes", json!(tx_bytes.tx_bytes)),
                     ("gas_price", json!(1000)),
                     ("epoch", json!(8888)),
@@ -319,7 +330,7 @@ impl RpcExampleProvider {
     fn get_object_responses(&mut self, object_count: usize) -> Vec<SuiObjectResponse> {
         (0 .. object_count)
             .map(|_| {
-                let object_id = ObjectID::new(self.rng.gen());
+                let object_id = ObjectID::new(self.rng.r#gen());
                 let coin = GasCoin::new(object_id, 100000000);
 
                 SuiObjectResponse::new_with_data(SuiObjectData {
@@ -327,12 +338,12 @@ impl RpcExampleProvider {
                         SuiParsedData::try_from_object(coin.to_object(SequenceNumber::from_u64(1)), GasCoin::layout())
                             .unwrap(),
                     ),
-                    owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.gen())))),
-                    previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+                    owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.r#gen())))),
+                    previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
                     storage_rebate: Some(100),
                     object_id,
                     version: SequenceNumber::from_u64(1),
-                    digest: ObjectDigest::new(self.rng.gen()),
+                    digest: ObjectDigest::new(self.rng.r#gen()),
                     type_: Some(ObjectType::Struct(MoveObjectType::gas_coin())),
                     bcs: None,
                     display: None,
@@ -354,7 +365,7 @@ impl RpcExampleProvider {
     }
 
     fn get_past_object_example(&mut self) -> Examples {
-        let object_id = ObjectID::new(self.rng.gen());
+        let object_id = ObjectID::new(self.rng.r#gen());
 
         let coin = GasCoin::new(object_id, 10000);
 
@@ -362,12 +373,12 @@ impl RpcExampleProvider {
             content: Some(
                 SuiParsedData::try_from_object(coin.to_object(SequenceNumber::from_u64(1)), GasCoin::layout()).unwrap(),
             ),
-            owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.gen())))),
-            previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+            owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.r#gen())))),
+            previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
             storage_rebate: Some(100),
             object_id,
             version: SequenceNumber::from_u64(4),
-            digest: ObjectDigest::new(self.rng.gen()),
+            digest: ObjectDigest::new(self.rng.r#gen()),
             type_: Some(ObjectType::Struct(MoveObjectType::gas_coin())),
             bcs: None,
             display: None,
@@ -388,13 +399,13 @@ impl RpcExampleProvider {
         let result = Checkpoint {
             epoch: 5000,
             sequence_number: 1000,
-            digest: CheckpointDigest::new(self.rng.gen()),
+            digest: CheckpointDigest::new(self.rng.r#gen()),
             network_total_transactions: 792385,
-            previous_digest: Some(CheckpointDigest::new(self.rng.gen())),
+            previous_digest: Some(CheckpointDigest::new(self.rng.r#gen())),
             epoch_rolling_gas_cost_summary: Default::default(),
             timestamp_ms: 1676911928,
             end_of_epoch_data: None,
-            transactions: vec![TransactionDigest::new(self.rng.gen())],
+            transactions: vec![TransactionDigest::new(self.rng.r#gen())],
             checkpoint_commitments: vec![],
             validator_signature: AggregateAuthoritySignature::default(),
         };
@@ -414,13 +425,13 @@ impl RpcExampleProvider {
             .map(|idx| Checkpoint {
                 epoch: 5000,
                 sequence_number: seq + 1 + idx,
-                digest: CheckpointDigest::new(self.rng.gen()),
+                digest: CheckpointDigest::new(self.rng.r#gen()),
                 network_total_transactions: 792385,
-                previous_digest: Some(CheckpointDigest::new(self.rng.gen())),
+                previous_digest: Some(CheckpointDigest::new(self.rng.r#gen())),
                 epoch_rolling_gas_cost_summary: Default::default(),
                 timestamp_ms: 1676911928,
                 end_of_epoch_data: None,
-                transactions: vec![TransactionDigest::new(self.rng.gen())],
+                transactions: vec![TransactionDigest::new(self.rng.r#gen())],
                 checkpoint_commitments: vec![],
                 validator_signature: AggregateAuthoritySignature::default(),
             })
@@ -432,16 +443,10 @@ impl RpcExampleProvider {
             "sui_getCheckpoints",
             vec![ExamplePairing::new(
                 "Gets a paginated list in descending order of all checkpoints starting at the provided cursor. Each page of results has a maximum number of checkpoints set by the provided limit.",
-                vec![(
-                         "cursor", json!(seq.to_string()),
-                     ),
-                     (
-                         "limit", json!(limit),
-                     ),
-                     (
-                         "descending_order",
-                         json!(descending_order),
-                     ),
+                vec![
+                    ("cursor", json!(seq.to_string())),
+                    ("limit", json!(limit)),
+                    ("descending_order", json!(descending_order)),
                 ],
                 json!(result),
             )],
@@ -449,15 +454,15 @@ impl RpcExampleProvider {
     }
 
     fn get_owned_objects(&mut self) -> Examples {
-        let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
+        let owner = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
         let result = (0 .. 4)
             .map(|_| SuiObjectData {
-                object_id: ObjectID::new(self.rng.gen()),
+                object_id: ObjectID::new(self.rng.r#gen()),
                 version: Default::default(),
-                digest: ObjectDigest::new(self.rng.gen()),
+                digest: ObjectDigest::new(self.rng.r#gen()),
                 type_: Some(ObjectType::Struct(MoveObjectType::gas_coin())),
                 owner: Some(Owner::AddressOwner(owner)),
-                previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+                previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
                 storage_rebate: None,
                 display: None,
                 content: None,
@@ -478,7 +483,7 @@ impl RpcExampleProvider {
                         options: Some(SuiObjectDataOptions::new().with_type().with_owner().with_previous_transaction())
                     }),
                 ),
-                ("cursor", json!(ObjectID::new(self.rng.gen()))),
+                ("cursor", json!(ObjectID::new(self.rng.r#gen()))),
                 ("limit", json!(100)),
                 ("at_checkpoint", json!(None::<CheckpointId>)),
             ],
@@ -520,11 +525,11 @@ impl RpcExampleProvider {
                 (
                     "query",
                     json!(SuiTransactionBlockResponseQuery {
-                        filter: Some(TransactionFilter::InputObject(ObjectID::new(self.rng.gen()))),
+                        filter: Some(TransactionFilter::InputObject(ObjectID::new(self.rng.r#gen()))),
                         options: None,
                     }),
                 ),
-                ("cursor", json!(TransactionDigest::new(self.rng.gen()))),
+                ("cursor", json!(TransactionDigest::new(self.rng.r#gen()))),
                 ("limit", json!(100)),
                 ("descending_order", json!(false)),
             ],
@@ -546,11 +551,14 @@ impl RpcExampleProvider {
     }
 
     fn get_transaction_digests(&mut self, range: Range<u64>) -> Vec<TransactionDigest> {
-        range.into_iter().map(|_| TransactionDigest::new(self.rng.gen())).collect()
+        range.into_iter().map(|_| TransactionDigest::new(self.rng.r#gen())).collect()
     }
 
     fn get_event_ids(&mut self, range: Range<u64>) -> Vec<EventID> {
-        range.into_iter().map(|_| EventID { tx_digest: TransactionDigest::new(self.rng.gen()), event_seq: 1 }).collect()
+        range
+            .into_iter()
+            .map(|_| EventID { tx_digest: TransactionDigest::new(self.rng.r#gen()), event_seq: 1 })
+            .collect()
     }
 
     fn get_protocol_config(&mut self) -> Examples {
@@ -559,9 +567,7 @@ impl RpcExampleProvider {
             "sui_getProtocolConfig",
             vec![ExamplePairing::new(
                 "Returns the protocol config for the given protocol version. If none is specified, the node uses the version of the latest epoch it has processed",
-                vec![
-                    ("version", json!(version)),
-                ],
+                vec![("version", json!(version))],
                 json!(Self::get_protocol_config_impl(version)),
             )],
         )
@@ -582,10 +588,12 @@ impl RpcExampleProvider {
         &mut self,
     ) -> (TransactionData, Vec<GenericSignature>, SuiAddress, ObjectID, SuiTransactionBlockResponse) {
         let (signer, kp): (_, AccountKeyPair) = get_key_pair_from_rng(&mut self.rng);
-        let recipient = SuiAddress::from(ObjectID::new(self.rng.gen()));
-        let obj_id = ObjectID::new(self.rng.gen());
-        let gas_ref = (ObjectID::new(self.rng.gen()), SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.gen()));
-        let object_ref = (obj_id, SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.gen()));
+        let recipient = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
+        let obj_id = ObjectID::new(self.rng.r#gen());
+        let gas_ref =
+            (ObjectID::new(self.rng.r#gen()), SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.r#gen()));
+        let object_ref =
+            FullObjectRef::from_fastpath_ref((obj_id, SequenceNumber::from_u64(2), ObjectDigest::new(self.rng.r#gen())));
 
         let data = TransactionData::new_transfer(
             recipient,
@@ -607,9 +615,9 @@ impl RpcExampleProvider {
             sender: signer,
             recipient: Owner::AddressOwner(recipient),
             object_type: parse_sui_struct_tag("0x2::example::Object").unwrap(),
-            object_id: object_ref.0,
+            object_id: object_ref.0.id(),
             version: object_ref.1,
-            digest: ObjectDigest::new(self.rng.gen()),
+            digest: ObjectDigest::new(self.rng.r#gen()),
         };
         struct NoOpsModuleResolver;
         impl ModuleResolver for NoOpsModuleResolver {
@@ -632,26 +640,31 @@ impl RpcExampleProvider {
                     non_refundable_storage_fee: 0,
                 },
                 shared_objects: vec![],
-                transaction_digest: TransactionDigest::new(self.rng.gen()),
+                transaction_digest: TransactionDigest::new(self.rng.r#gen()),
                 created: vec![],
                 mutated: vec![
                     OwnedObjectRef { owner: Owner::AddressOwner(signer), reference: gas_ref.into() },
-                    OwnedObjectRef { owner: Owner::AddressOwner(recipient), reference: object_ref.into() },
+                    OwnedObjectRef {
+                        owner: Owner::AddressOwner(recipient),
+                        reference: object_ref.as_object_ref().into(),
+                    },
                 ],
                 unwrapped: vec![],
                 deleted: vec![],
                 unwrapped_then_deleted: vec![],
                 wrapped: vec![],
                 gas_object: OwnedObjectRef { owner: Owner::ObjectOwner(signer), reference: SuiObjectRef::from(gas_ref) },
-                events_digest: Some(TransactionEventsDigest::new(self.rng.gen())),
+                events_digest: Some(TransactionEventsDigest::new(self.rng.r#gen())),
                 dependencies: vec![],
+                abort_error: None,
+                accumulator_events: vec![],
             })),
             events: None,
             object_changes: Some(vec![object_change]),
             balance_changes: None,
             timestamp_ms: None,
             transaction: Some(SuiTransactionBlock {
-                data: SuiTransactionBlockData::try_from(data1, &&mut NoOpsModuleResolver).unwrap(),
+                data: SuiTransactionBlockData::try_from_with_module_cache(data1, &&mut NoOpsModuleResolver).unwrap(),
                 tx_signatures: signatures.clone(),
             }),
             raw_transaction,
@@ -668,9 +681,9 @@ impl RpcExampleProvider {
         let tx_dig = TransactionDigest::from_str("11a72GCQ5hGNpWGh2QhQkkusTEGS6EDqifJqxr7nSYX").unwrap();
         let event = SuiEvent {
             id: EventID { tx_digest: tx_dig, event_seq: 0 },
-            package_id: ObjectID::new(self.rng.gen()),
+            package_id: ObjectID::new(self.rng.r#gen()),
             transaction_module: Identifier::from_str("test_module").unwrap(),
-            sender: SuiAddress::from(ObjectID::new(self.rng.gen())),
+            sender: SuiAddress::from(ObjectID::new(self.rng.r#gen())),
             type_: parse_sui_struct_tag("0x9::test::TestEvent").unwrap(),
             parsed_json: json!({"test": "example value"}),
             bcs: BcsEvent::new(vec![]),
@@ -708,7 +721,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_get_all_balances(&mut self) -> Examples {
-        let address = SuiAddress::from(ObjectID::new(self.rng.gen()));
+        let address = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
 
         let result = Balance {
             coin_type: "0x2::oct::OCT".to_string(),
@@ -725,17 +738,17 @@ impl RpcExampleProvider {
 
     fn suix_get_all_coins(&mut self) -> Examples {
         let limit = 3;
-        let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
-        let cursor = ObjectID::new(self.rng.gen());
+        let owner = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
+        let cursor = ObjectID::new(self.rng.r#gen());
         let coins = (0 .. 3)
             .map(|_| Coin {
                 coin_type: "0x2::oct::OCT".to_string(),
-                coin_object_id: ObjectID::new(self.rng.gen()),
+                coin_object_id: ObjectID::new(self.rng.r#gen()),
                 version: SequenceNumber::from_u64(103626),
-                digest: ObjectDigest::new(self.rng.gen()),
+                digest: ObjectDigest::new(self.rng.r#gen()),
                 balance: 200000000,
                 //locked_until_epoch: None,
-                previous_transaction: TransactionDigest::new(self.rng.gen()),
+                previous_transaction: TransactionDigest::new(self.rng.r#gen()),
             })
             .collect::<Vec<_>>();
         let page = CoinPage { data: coins, next_cursor: Some("abcd".to_string()), has_next_page: true };
@@ -755,7 +768,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_get_balance(&mut self) -> Examples {
-        let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
+        let owner = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
         let coin_type = "0x168da5bf1f48dafc111b0a488fa454aca95e0b5e::usdc::USDC".to_string();
         let result = Balance {
             coin_type: coin_type.clone(),
@@ -778,7 +791,7 @@ impl RpcExampleProvider {
             symbol: "USDC".to_string(),
             description: "Stable coin.".to_string(),
             icon_url: None,
-            id: Some(ObjectID::new(self.rng.gen())),
+            id: Some(ObjectID::new(self.rng.r#gen())),
         };
 
         Examples::new("suix_getCoinMetadata", vec![ExamplePairing::new(
@@ -799,16 +812,16 @@ impl RpcExampleProvider {
 
     fn suix_get_coins(&mut self) -> Examples {
         let coin_type = "0x2::oct::OCT".to_string();
-        let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
+        let owner = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
         let coins = (0 .. 3)
             .map(|_| Coin {
                 coin_type: coin_type.clone(),
-                coin_object_id: ObjectID::new(self.rng.gen()),
+                coin_object_id: ObjectID::new(self.rng.r#gen()),
                 version: SequenceNumber::from_u64(103626),
-                digest: ObjectDigest::new(self.rng.gen()),
+                digest: ObjectDigest::new(self.rng.r#gen()),
                 balance: 200000000,
                 //locked_until_epoch: None,
-                previous_transaction: TransactionDigest::new(self.rng.gen()),
+                previous_transaction: TransactionDigest::new(self.rng.r#gen()),
             })
             .collect::<Vec<_>>();
 
@@ -821,7 +834,7 @@ impl RpcExampleProvider {
                 vec![
                     ("owner", json!(owner)),
                     ("coin_type", json!(coin_type)),
-                    ("cursor", json!(ObjectID::new(self.rng.gen()))),
+                    ("cursor", json!(ObjectID::new(self.rng.r#gen()))),
                     ("limit", json!(3)),
                 ],
                 json!(page),
@@ -830,7 +843,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_get_total_supply(&mut self) -> Examples {
-        let mut coin = ObjectID::new(self.rng.gen()).to_string();
+        let mut coin = ObjectID::new(self.rng.r#gen()).to_string();
         coin.push_str("::acoin::ACOIN");
 
         let result = Supply { value: 12023692 };
@@ -856,7 +869,7 @@ impl RpcExampleProvider {
         Examples::new("sui_getMoveFunctionArgTypes", vec![ExamplePairing::new(
             "Returns the argument types for the package and function the request provides.",
             vec![
-                ("package", json!(ObjectID::new(self.rng.gen()))),
+                ("package", json!(ObjectID::new(self.rng.r#gen()))),
                 ("module", json!("suifrens".to_string())),
                 ("function", json!("mint".to_string())),
             ],
@@ -878,7 +891,7 @@ impl RpcExampleProvider {
         Examples::new("sui_getNormalizedMoveFunction", vec![ExamplePairing::new(
             "Returns the structured representation of the function the request provides.",
             vec![
-                ("package", json!(ObjectID::new(self.rng.gen()))),
+                ("package", json!(ObjectID::new(self.rng.r#gen()))),
                 ("module_name", json!("moduleName".to_string())),
                 ("function_name", json!("functionName".to_string())),
             ],
@@ -888,7 +901,7 @@ impl RpcExampleProvider {
 
     fn sui_get_normalized_move_module(&mut self) -> Examples {
         let result = SuiMoveNormalizedModule {
-            address: ObjectID::new(self.rng.gen()).to_string(),
+            address: ObjectID::new(self.rng.r#gen()).to_string(),
             exposed_functions: BTreeMap::new(),
             file_format_version: 6,
             friends: vec![],
@@ -899,14 +912,14 @@ impl RpcExampleProvider {
 
         Examples::new("sui_getNormalizedMoveModule", vec![ExamplePairing::new(
             "Gets a structured representation of the Move module for the package in the request.",
-            vec![("package", json!(ObjectID::new(self.rng.gen()))), ("module_name", json!("module".to_string()))],
+            vec![("package", json!(ObjectID::new(self.rng.r#gen()))), ("module_name", json!("module".to_string()))],
             json!(result),
         )])
     }
 
     fn sui_get_normalized_move_modules_by_package(&mut self) -> Examples {
         let result = SuiMoveNormalizedModule {
-            address: ObjectID::new(self.rng.gen()).to_string(),
+            address: ObjectID::new(self.rng.r#gen()).to_string(),
             exposed_functions: BTreeMap::new(),
             file_format_version: 6,
             friends: vec![],
@@ -917,7 +930,7 @@ impl RpcExampleProvider {
 
         Examples::new("sui_getNormalizedMoveModulesByPackage", vec![ExamplePairing::new(
             "Gets structured representations of all the modules for the package in the request.",
-            vec![("package", json!(ObjectID::new(self.rng.gen())))],
+            vec![("package", json!(ObjectID::new(self.rng.r#gen())))],
             json!(result),
         )])
     }
@@ -931,7 +944,7 @@ impl RpcExampleProvider {
         Examples::new("sui_getNormalizedMoveStruct", vec![ExamplePairing::new(
             "Gets a structured representation of the struct in the request.",
             vec![
-                ("package", json!(ObjectID::new(self.rng.gen()))),
+                ("package", json!(ObjectID::new(self.rng.r#gen()))),
                 ("module_name", json!("module".to_string())),
                 ("struct_name", json!("StructName".to_string())),
             ],
@@ -941,9 +954,9 @@ impl RpcExampleProvider {
 
     fn suix_get_validators_apy(&mut self) -> Examples {
         let result = vec![
-            ValidatorApy { address: SuiAddress::from(ObjectID::new(self.rng.gen())), apy: 0.06 },
-            ValidatorApy { address: SuiAddress::from(ObjectID::new(self.rng.gen())), apy: 0.02 },
-            ValidatorApy { address: SuiAddress::from(ObjectID::new(self.rng.gen())), apy: 0.05 },
+            ValidatorApy { address: SuiAddress::from(ObjectID::new(self.rng.r#gen())), apy: 0.06 },
+            ValidatorApy { address: SuiAddress::from(ObjectID::new(self.rng.r#gen())), apy: 0.02 },
+            ValidatorApy { address: SuiAddress::from(ObjectID::new(self.rng.r#gen())), apy: 0.05 },
         ];
 
         Examples::new("suix_getValidatorsApy", vec![ExamplePairing::new(
@@ -954,7 +967,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_get_dynamic_fields(&mut self) -> Examples {
-        let object_id = ObjectID::new(self.rng.gen());
+        let object_id = ObjectID::new(self.rng.r#gen());
         let dynamic_fields = (0 .. 3)
             .map(|_| DynamicFieldInfo {
                 name: DynamicFieldName {
@@ -964,31 +977,33 @@ impl RpcExampleProvider {
                 bcs_name: bcs::to_bytes("0x9::test::TestField").unwrap(),
                 type_: DynamicFieldType::DynamicField,
                 object_type: "test".to_string(),
-                object_id: ObjectID::new(self.rng.gen()),
+                object_id: ObjectID::new(self.rng.r#gen()),
                 version: SequenceNumber::from_u64(1),
-                digest: ObjectDigest::new(self.rng.gen()),
+                digest: ObjectDigest::new(self.rng.r#gen()),
             })
             .map(Into::into)
             .collect::<Vec<_>>();
 
-        let next_cursor = ObjectID::new(self.rng.gen());
+        let next_cursor = ObjectID::new(self.rng.r#gen());
 
         let page = DynamicFieldPage { data: dynamic_fields, next_cursor: Some(next_cursor), has_next_page: true };
 
-        Examples::new("suix_getDynamicFields",
-        vec![ExamplePairing::new(
-            "Gets dynamic fields for the object the request provides in a paginated list of `limit` dynamic field results per page. The default limit is 50.",
-            vec![
-                ("parent_object_id", json!(object_id)),
-                ("cursor", json!(ObjectID::new(self.rng.gen()))),
-                ("limit", json!(3)),
-            ],
-            json!(page),
-        )],)
+        Examples::new(
+            "suix_getDynamicFields",
+            vec![ExamplePairing::new(
+                "Gets dynamic fields for the object the request provides in a paginated list of `limit` dynamic field results per page. The default limit is 50.",
+                vec![
+                    ("parent_object_id", json!(object_id)),
+                    ("cursor", json!(ObjectID::new(self.rng.r#gen()))),
+                    ("limit", json!(3)),
+                ],
+                json!(page),
+            )],
+        )
     }
 
     fn suix_get_dynamic_field_object(&mut self) -> Examples {
-        let parent_object_id = ObjectID::new(self.rng.gen());
+        let parent_object_id = ObjectID::new(self.rng.r#gen());
         let field_name = DynamicFieldName {
             type_: TypeTag::from_str("0x9::test::TestField").unwrap(),
             value: serde_json::Value::String("some_value".to_string()),
@@ -1012,12 +1027,12 @@ impl RpcExampleProvider {
                 )
                 .unwrap(),
             ),
-            owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.gen())))),
-            previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+            owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.r#gen())))),
+            previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
             storage_rebate: Some(100),
             object_id: parent_object_id,
             version: SequenceNumber::from_u64(1),
-            digest: ObjectDigest::new(self.rng.gen()),
+            digest: ObjectDigest::new(self.rng.r#gen()),
             type_: Some(ObjectType::Struct(MoveObjectType::from(parse_sui_struct_tag("0x9::test::TestField").unwrap()))),
             bcs: None,
             display: None,
@@ -1030,7 +1045,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_get_owned_objects(&mut self) -> Examples {
-        let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
+        let owner = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
         let version: u64 = 13488;
         let options = Some(SuiObjectDataOptions::new().with_type().with_owner().with_previous_transaction());
         let filter = Some(SuiObjectDataFilter::MatchAll(vec![
@@ -1039,18 +1054,18 @@ impl RpcExampleProvider {
             SuiObjectDataFilter::Version(version),
         ]));
         let query = json!(SuiObjectResponseQuery { filter, options });
-        let object_id = ObjectID::new(self.rng.gen());
+        let object_id = ObjectID::new(self.rng.r#gen());
 
         let items = (0 .. 3)
             .map(|_| {
                 SuiObjectResponse::new_with_data(SuiObjectData {
                     content: None,
                     owner: Some(Owner::AddressOwner(owner)),
-                    previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+                    previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
                     storage_rebate: Some(100),
-                    object_id: ObjectID::new(self.rng.gen()),
+                    object_id: ObjectID::new(self.rng.r#gen()),
                     version: SequenceNumber::from_u64(version),
-                    digest: ObjectDigest::new(self.rng.gen()),
+                    digest: ObjectDigest::new(self.rng.r#gen()),
                     type_: Some(ObjectType::Struct(MoveObjectType::gas_coin())),
                     bcs: None,
                     display: None,
@@ -1069,7 +1084,7 @@ impl RpcExampleProvider {
                     ("address", json!(owner)),
                     ("query", json!(query)),
                     ("cursor", json!(object_id)),
-                    ("limit", json!(3))
+                    ("limit", json!(3)),
                 ],
                 json!(result),
             )],
@@ -1077,7 +1092,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_query_events(&mut self) -> Examples {
-        let package_id = ObjectID::new(self.rng.gen());
+        let package_id = ObjectID::new(self.rng.r#gen());
         let identifier = Identifier::from_str("test").unwrap();
         let mut event_ids = self.get_event_ids(5 .. 9);
         let has_next_page = event_ids.len() > (9 - 5);
@@ -1091,7 +1106,7 @@ impl RpcExampleProvider {
                 id: event_id,
                 package_id,
                 transaction_module: identifier.clone(),
-                sender: SuiAddress::from(ObjectID::new(self.rng.gen())),
+                sender: SuiAddress::from(ObjectID::new(self.rng.r#gen())),
                 type_: StructTag::from_str("0x3::test::Test<0x3::test::Test>").unwrap(),
                 parsed_json: serde_json::Value::String("some_value".to_string()),
                 bcs: BcsEvent::new(vec![]),
@@ -1106,7 +1121,7 @@ impl RpcExampleProvider {
                 (
                     "query",
                     json!(EventFilter::MoveModule {
-                        package: ObjectID::new(self.rng.gen()),
+                        package: ObjectID::new(self.rng.r#gen()),
                         module: Identifier::from_str("test").unwrap(),
                     }),
                 ),
@@ -1138,14 +1153,14 @@ impl RpcExampleProvider {
 
     fn suix_get_stakes(&mut self) -> Examples {
         let principal = 200000000000;
-        let owner = SuiAddress::from(ObjectID::new(self.rng.gen()));
+        let owner = SuiAddress::from(ObjectID::new(self.rng.r#gen()));
         let result = vec![
             DelegatedStake {
-                validator_address: SuiAddress::from(ObjectID::new(self.rng.gen())),
-                staking_pool: ObjectID::new(self.rng.gen()),
+                validator_address: SuiAddress::from(ObjectID::new(self.rng.r#gen())),
+                staking_pool: ObjectID::new(self.rng.r#gen()),
                 stakes: vec![
                     Stake {
-                        staked_oct_id: ObjectID::new(self.rng.gen()),
+                        staked_oct_id: ObjectID::new(self.rng.r#gen()),
                         stake_request_epoch: 62,
                         stake_active_epoch: 63,
                         principal,
@@ -1153,7 +1168,7 @@ impl RpcExampleProvider {
                         status: StakeStatus::Active { estimated_reward: (principal as f64 * 0.0026) as u64 },
                     },
                     Stake {
-                        staked_oct_id: ObjectID::new(self.rng.gen()),
+                        staked_oct_id: ObjectID::new(self.rng.r#gen()),
                         stake_request_epoch: 142,
                         stake_active_epoch: 143,
                         principal,
@@ -1163,10 +1178,10 @@ impl RpcExampleProvider {
                 ],
             },
             DelegatedStake {
-                validator_address: SuiAddress::from(ObjectID::new(self.rng.gen())),
-                staking_pool: ObjectID::new(self.rng.gen()),
+                validator_address: SuiAddress::from(ObjectID::new(self.rng.r#gen())),
+                staking_pool: ObjectID::new(self.rng.r#gen()),
                 stakes: vec![Stake {
-                    staked_oct_id: ObjectID::new(self.rng.gen()),
+                    staked_oct_id: ObjectID::new(self.rng.r#gen()),
                     stake_request_epoch: 244,
                     stake_active_epoch: 245,
                     principal,
@@ -1185,11 +1200,11 @@ impl RpcExampleProvider {
 
     fn suix_get_stakes_by_ids(&mut self) -> Examples {
         let principal = 200000000000;
-        let stake1 = ObjectID::new(self.rng.gen());
-        let stake2 = ObjectID::new(self.rng.gen());
+        let stake1 = ObjectID::new(self.rng.r#gen());
+        let stake2 = ObjectID::new(self.rng.r#gen());
         let result = DelegatedStake {
-            validator_address: SuiAddress::from(ObjectID::new(self.rng.gen())),
-            staking_pool: ObjectID::new(self.rng.gen()),
+            validator_address: SuiAddress::from(ObjectID::new(self.rng.r#gen())),
+            staking_pool: ObjectID::new(self.rng.r#gen()),
             stakes: vec![
                 Stake {
                     staked_oct_id: stake1,
@@ -1217,7 +1232,7 @@ impl RpcExampleProvider {
     }
 
     fn suix_resolve_name_service_address(&mut self) -> Examples {
-        let result = ObjectID::new(self.rng.gen());
+        let result = ObjectID::new(self.rng.r#gen());
         Examples::new("suix_resolveNameServiceAddress", vec![ExamplePairing::new(
             "Returns the resolved address for the name the request provides.",
             vec![("name", json!("example.sui".to_string()))],
@@ -1226,8 +1241,8 @@ impl RpcExampleProvider {
     }
 
     fn suix_resolve_name_service_names(&mut self) -> Examples {
-        let next_cursor = Some(ObjectID::new(self.rng.gen()));
-        let object_id = ObjectID::new(self.rng.gen());
+        let next_cursor = Some(ObjectID::new(self.rng.r#gen()));
+        let object_id = ObjectID::new(self.rng.r#gen());
         let result = Page { data: vec!["example.sui".to_string()], next_cursor, has_next_page: false };
         Examples::new(
             "suix_resolveNameServiceNames",
@@ -1244,8 +1259,8 @@ impl RpcExampleProvider {
     }
 
     fn sui_try_multi_get_past_objects(&mut self) -> Examples {
-        let object_id = ObjectID::new(self.rng.gen());
-        let object_id2 = ObjectID::new(self.rng.gen());
+        let object_id = ObjectID::new(self.rng.r#gen());
+        let object_id2 = ObjectID::new(self.rng.r#gen());
         let version = SequenceNumber::from_u64(4);
         let version2 = SequenceNumber::from_u64(12);
         let objects = vec![SuiGetPastObjectRequest { object_id, version }, SuiGetPastObjectRequest {
@@ -1260,12 +1275,12 @@ impl RpcExampleProvider {
                     SuiParsedData::try_from_object(coin.to_object(SequenceNumber::from_u64(1)), GasCoin::layout())
                         .unwrap(),
                 ),
-                owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.gen())))),
-                previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+                owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.r#gen())))),
+                previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
                 storage_rebate: Some(100),
                 object_id,
                 version: SequenceNumber::from_u64(4),
-                digest: ObjectDigest::new(self.rng.gen()),
+                digest: ObjectDigest::new(self.rng.r#gen()),
                 type_: Some(ObjectType::Struct(MoveObjectType::gas_coin())),
                 bcs: None,
                 display: None,
@@ -1275,12 +1290,12 @@ impl RpcExampleProvider {
                     SuiParsedData::try_from_object(coin2.to_object(SequenceNumber::from_u64(4)), GasCoin::layout())
                         .unwrap(),
                 ),
-                owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.gen())))),
-                previous_transaction: Some(TransactionDigest::new(self.rng.gen())),
+                owner: Some(Owner::AddressOwner(SuiAddress::from(ObjectID::new(self.rng.r#gen())))),
+                previous_transaction: Some(TransactionDigest::new(self.rng.r#gen())),
                 storage_rebate: Some(100),
                 object_id: object_id2,
                 version: version2,
-                digest: ObjectDigest::new(self.rng.gen()),
+                digest: ObjectDigest::new(self.rng.r#gen()),
                 type_: Some(ObjectType::Struct(MoveObjectType::gas_coin())),
                 bcs: None,
                 display: None,

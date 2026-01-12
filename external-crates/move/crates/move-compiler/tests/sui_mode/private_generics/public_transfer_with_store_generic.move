@@ -34,6 +34,13 @@ module a::m {
     public fun r_gen<T: key + store>(p: &mut UID, s: Receiving<T>): T {
         transfer::public_receive(p, s)
     }
+
+    public fun m<T: store>(s: other::S<T>, p: one::party::Party) {
+        transfer::public_party_transfer(s, p)
+    }
+    public fun m_gen<T: key + store>(s: T, p: one::party::Party) {
+        transfer::public_party_transfer(s, p)
+    }
 }
 
 module a::other {
@@ -62,6 +69,14 @@ module one::transfer {
         abort 0
     }
 
+    public fun party_transfer<T: key>(_: T, _: one::party::Party) {
+        abort 0
+    }
+
+    public fun public_party_transfer<T: key + store>(_: T, _: one::party::Party) {
+        abort 0
+    }
+
     public fun freeze_object<T: key>(_: T) {
         abort 0
     }
@@ -85,4 +100,8 @@ module one::transfer {
     public fun public_receive<T: key + store>(_: &mut UID, _: Receiving<T>): T {
         abort 0
     }
+}
+
+module one::party {
+    struct Party has copy, drop {}
 }

@@ -5,63 +5,55 @@
 module one_system::validator;
 
 use std::bcs;
-use one::balance::Balance;
-use one::oct::OCT;
-use one_system::validator_cap::{Self, ValidatorOperationCap};
-use one_system::staking_pool::{Self, PoolTokenExchangeRate, StakedOct, StakingPool, FungibleStakedOct};
 use std::string::String;
-use one::url::Url;
-use one::url;
+use one::bag::{Self, Bag};
+use one::balance::Balance;
 use one::event;
-use one::bag::Bag;
-use one::bag;
+use one::oct::OCT;
+use one::url::{Self, Url};
+use one_system::staking_pool::{
+    Self,
+    PoolTokenExchangeRate,
+    StakedOct,
+    StakingPool,
+    FungibleStakedOct
+};
+use one_system::validator_cap::{Self, ValidatorOperationCap};
 use one::coin_vesting::{Self, CoinVesting};
+
+
+public use fun one_system::validator_wrapper::create_v1 as Validator.wrap_v1;
 
 /// Invalid proof_of_possession field in ValidatorMetadata
 const EInvalidProofOfPossession: u64 = 0;
-
 /// Invalid pubkey_bytes field in ValidatorMetadata
 const EMetadataInvalidPubkey: u64 = 1;
-
 /// Invalid network_pubkey_bytes field in ValidatorMetadata
 const EMetadataInvalidNetPubkey: u64 = 2;
-
 /// Invalid worker_pubkey_bytes field in ValidatorMetadata
 const EMetadataInvalidWorkerPubkey: u64 = 3;
-
 /// Invalid net_address field in ValidatorMetadata
 const EMetadataInvalidNetAddr: u64 = 4;
-
 /// Invalid p2p_address field in ValidatorMetadata
 const EMetadataInvalidP2pAddr: u64 = 5;
-
 /// Invalid primary_address field in ValidatorMetadata
 const EMetadataInvalidPrimaryAddr: u64 = 6;
-
-/// Invalidworker_address field in ValidatorMetadata
+/// Invalid worker_address field in ValidatorMetadata
 const EMetadataInvalidWorkerAddr: u64 = 7;
-
 /// Commission rate set by the validator is higher than the threshold
 const ECommissionRateTooHigh: u64 = 8;
-
 /// Validator Metadata is too long
 const EValidatorMetadataExceedingLengthLimit: u64 = 9;
-
 /// Intended validator is not a candidate one.
 const ENotValidatorCandidate: u64 = 10;
-
 /// Stake amount is invalid or wrong.
 const EInvalidStakeAmount: u64 = 11;
-
 /// Function called during non-genesis times.
 const ECalledDuringNonGenesis: u64 = 12;
-
 /// New Capability is not created by the validator itself
 const ENewCapNotCreatedByValidatorItself: u64 = 100;
-
 /// Capability code is not valid
 const EInvalidCap: u64 = 101;
-
 /// Validator trying to set gas price higher than threshold.
 const EGasPriceHigherThanThreshold: u64 = 102;
 
@@ -110,7 +102,6 @@ public struct ValidatorMetadata has store {
     primary_address: String,
     /// The address of the narwhal worker
     worker_address: String,
-
     /// "next_epoch" metadata only takes effects in the next epoch.
     /// If none, current value will stay unchanged.
     next_epoch_protocol_pubkey_bytes: Option<vector<u8>>,
@@ -121,7 +112,6 @@ public struct ValidatorMetadata has store {
     next_epoch_p2p_address: Option<String>,
     next_epoch_primary_address: Option<String>,
     next_epoch_worker_address: Option<String>,
-
     /// Any extra fields that's not defined statically.
     extra_fields: Bag,
 }
@@ -173,7 +163,7 @@ public struct UnstakingRequestEvent has copy, drop {
     reward_amount: u64,
 }
 
-/// Event emitted when a staked SUI is converted to a fungible staked SUI.
+/// Event emitted when a staked OCT is converted to a fungible staked OCT.
 public struct ConvertingToFungibleStakedOctEvent has copy, drop {
     pool_id: ID,
     stake_activation_epoch: u64,
@@ -181,7 +171,7 @@ public struct ConvertingToFungibleStakedOctEvent has copy, drop {
     fungible_staked_oct_amount: u64,
 }
 
-/// Event emitted when a fungible staked SUI is redeemed.
+/// Event emitted when a fungible staked OCT is redeemed.
 public struct RedeemingFungibleStakedOctEvent has copy, drop {
     pool_id: ID,
     fungible_staked_oct_amount: u64,
@@ -204,7 +194,7 @@ public(package) fun new_metadata(
     worker_address: String,
     extra_fields: Bag,
 ): ValidatorMetadata {
-    let metadata = ValidatorMetadata {
+    ValidatorMetadata {
         sui_address,
         protocol_pubkey_bytes,
         network_pubkey_bytes,
@@ -227,12 +217,11 @@ public(package) fun new_metadata(
         next_epoch_primary_address: option::none(),
         next_epoch_worker_address: option::none(),
         extra_fields,
-    };
-    metadata
+    }
 }
 
 public(package) fun new(
-    sui_address: address,
+    sui_address: address,    
     revenue_receiving_address: address,
     protocol_pubkey_bytes: vector<u8>,
     network_pubkey_bytes: vector<u8>,
@@ -248,7 +237,7 @@ public(package) fun new(
     worker_address: vector<u8>,
     gas_price: u64,
     commission_rate: u64,
-    ctx: &mut TxContext
+    ctx: &mut TxContext,
 ): Validator {
     assert!(
         net_address.length() <= MAX_VALIDATOR_METADATA_LENGTH
@@ -259,7 +248,7 @@ public(package) fun new(
             && description.length() <= MAX_VALIDATOR_METADATA_LENGTH
             && image_url.length() <= MAX_VALIDATOR_METADATA_LENGTH
             && project_url.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     assert!(commission_rate <= MAX_COMMISSION_RATE, ECommissionRateTooHigh);
     assert!(gas_price < MAX_VALIDATOR_GAS_PRICE, EGasPriceHigherThanThreshold);
@@ -282,23 +271,16 @@ public(package) fun new(
     );
 
     // Checks that the keys & addresses & PoP are valid.
-    validate_metadata(&metadata);
-
-    new_from_metadata(
-        metadata,
-        revenue_receiving_address,
-        true,
-        gas_price,
-        commission_rate,
-        ctx
-    )
+    metadata.validate();
+    metadata.new_from_metadata(revenue_receiving_address, true, gas_price, commission_rate, ctx)
 }
 
-/// Deactivate this validator's staking pool
+/// Mark Validator's `StakingPool` as inactive by setting the `deactivation_epoch`.
 public(package) fun deactivate(self: &mut Validator, deactivation_epoch: u64) {
     self.staking_pool.deactivate_staking_pool(deactivation_epoch)
 }
 
+/// Activate Validator's `StakingPool` by setting the `activation_epoch`.
 public(package) fun activate(self: &mut Validator, activation_epoch: u64) {
     self.staking_pool.activate_staking_pool(activation_epoch);
 }
@@ -369,25 +351,23 @@ public(package) fun request_add_stake_no_check(
     staked_oct
 }
 
+
 public(package) fun convert_to_fungible_staked_oct(
     self: &mut Validator,
     staked_oct: StakedOct,
     ctx: &mut TxContext,
 ): FungibleStakedOct {
     assert!(!staked_oct.lock(), EStakedOctIsLock);
-    let stake_activation_epoch = staked_oct.stake_activation_epoch();
-    let staked_oct_principal_amount = staked_oct.staked_oct_amount();
-
+    let stake_activation_epoch = staked_oct.activation_epoch();
+    let staked_oct_principal_amount = staked_oct.amount();
     let fungible_staked_oct = self.staking_pool.convert_to_fungible_staked_oct(staked_oct, ctx);
 
-    event::emit(
-        ConvertingToFungibleStakedOctEvent {
-            pool_id: self.staking_pool_id(),
-            stake_activation_epoch,
-            staked_oct_principal_amount,
-            fungible_staked_oct_amount: fungible_staked_oct.value(),
-        }
-    );
+    event::emit(ConvertingToFungibleStakedOctEvent {
+        pool_id: self.staking_pool_id(),
+        stake_activation_epoch,
+        staked_oct_principal_amount,
+        fungible_staked_oct_amount: fungible_staked_oct.value(),
+    });
 
     fungible_staked_oct
 }
@@ -398,18 +378,15 @@ public(package) fun redeem_fungible_staked_oct(
     ctx: &TxContext,
 ): Balance<OCT> {
     let fungible_staked_oct_amount = fungible_staked_oct.value();
-
     let sui = self.staking_pool.redeem_fungible_staked_oct(fungible_staked_oct, ctx);
 
     self.next_epoch_stake = self.next_epoch_stake - sui.value();
 
-    event::emit(
-        RedeemingFungibleStakedOctEvent {
-            pool_id: self.staking_pool_id(),
-            fungible_staked_oct_amount,
-            sui_amount: sui.value(),
-        }
-    );
+    event::emit(RedeemingFungibleStakedOctEvent {
+        pool_id: self.staking_pool_id(),
+        fungible_staked_oct_amount,
+        sui_amount: sui.value(),
+    });
 
     sui
 }
@@ -426,12 +403,8 @@ public(package) fun request_add_stake_at_genesis(
     let stake_amount = stake.value();
     assert!(stake_amount > 0, EInvalidStakeAmount);
 
-    let staked_oct = self.staking_pool.request_add_stake(
-        stake,
-        0, // epoch 0 -- genesis
-        lock,
-        ctx
-    );
+    // 0 = genesis epoch
+    let staked_oct = self.staking_pool.request_add_stake(stake, 0, lock, ctx);
 
     transfer::public_transfer(staked_oct, staker_address);
 
@@ -447,24 +420,21 @@ public(package) fun request_withdraw_stake(
     ctx: &mut TxContext,
 ): (Balance<OCT>, Option<CoinVesting<OCT>>) {
     let lock = staked_oct.lock();
-    let principal_amount = staked_oct.staked_oct_amount();
-    let stake_activation_epoch = staked_oct.stake_activation_epoch();
+    let principal_amount = staked_oct.amount();
+    let stake_activation_epoch = staked_oct.activation_epoch();
     let mut withdrawn_stake = self.staking_pool.request_withdraw_stake(staked_oct, ctx);
     let withdraw_amount = withdrawn_stake.value();
     let reward_amount = withdraw_amount - principal_amount;
     self.next_epoch_stake = self.next_epoch_stake - withdraw_amount;
-    event::emit(
-        UnstakingRequestEvent {
-            pool_id: staking_pool_id(self),
-            validator_address: self.metadata.sui_address,
-            staker_address: ctx.sender(),
-            stake_activation_epoch,
-            unstaking_epoch: ctx.epoch(),
-            principal_amount,
-            reward_amount,
-        }
-    );
-
+    event::emit(UnstakingRequestEvent {
+        pool_id: self.staking_pool_id(),
+        validator_address: self.metadata.sui_address,
+        staker_address: ctx.sender(),
+        stake_activation_epoch,
+        unstaking_epoch: ctx.epoch(),
+        principal_amount,
+        reward_amount,
+    });
     if(lock){
         let withdrawn_reward = withdrawn_stake.split(reward_amount);
 
@@ -507,9 +477,9 @@ public(package) fun request_set_gas_price(
 public(package) fun set_candidate_gas_price(
     self: &mut Validator,
     verified_cap: ValidatorOperationCap,
-    new_price: u64
+    new_price: u64,
 ) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     assert!(new_price < MAX_VALIDATOR_GAS_PRICE, EGasPriceHigherThanThreshold);
     let validator_address = *verified_cap.verified_operation_cap_address();
     assert!(validator_address == self.metadata.sui_address, EInvalidCap);
@@ -525,7 +495,7 @@ public(package) fun request_set_commission_rate(self: &mut Validator, new_commis
 
 /// Set new commission rate for the candidate validator.
 public(package) fun set_candidate_commission_rate(self: &mut Validator, new_commission_rate: u64) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     assert!(new_commission_rate <= MAX_COMMISSION_RATE, ECommissionRateTooHigh);
     self.commission_rate = new_commission_rate;
 }
@@ -644,20 +614,19 @@ public fun next_epoch_gas_price(self: &Validator): u64 {
     self.next_epoch_gas_price
 }
 
-// TODO: this and `delegate_amount` and `total_stake` all seem to return the same value?
-// two of the functions can probably be removed.
+#[deprecated(note = b"Use `total_stake` instead")]
 public fun total_stake_amount(self: &Validator): u64 {
     self.staking_pool.sui_balance()
 }
 
-
+#[deprecated(note = b"Use `total_stake` instead")]
 public fun stake_amount(self: &Validator): u64 {
     self.staking_pool.sui_balance()
 }
 
 /// Return the total amount staked with this validator
 public fun total_stake(self: &Validator): u64 {
-    stake_amount(self)
+    self.staking_pool.sui_balance()
 }
 
 public fun only_validator_staking(self: &Validator): bool {
@@ -704,74 +673,66 @@ public fun staking_pool_id(self: &Validator): ID {
 
 // MUSTFIX: We need to check this when updating metadata as well.
 public fun is_duplicate(self: &Validator, other: &Validator): bool {
-        self.metadata.sui_address == other.metadata.sui_address
-        || self.metadata.name == other.metadata.name
-        || self.metadata.net_address == other.metadata.net_address
-        || self.metadata.p2p_address == other.metadata.p2p_address
-        || self.metadata.protocol_pubkey_bytes == other.metadata.protocol_pubkey_bytes
-        || self.metadata.network_pubkey_bytes == other.metadata.network_pubkey_bytes
-        || self.metadata.network_pubkey_bytes == other.metadata.worker_pubkey_bytes
-        || self.metadata.worker_pubkey_bytes == other.metadata.worker_pubkey_bytes
-        || self.metadata.worker_pubkey_bytes == other.metadata.network_pubkey_bytes
+    let self = &self.metadata;
+    let other = &other.metadata;
+
+    self.sui_address == other.sui_address
+        || self.name == other.name
+        || self.net_address == other.net_address
+        || self.p2p_address == other.p2p_address
+        || self.protocol_pubkey_bytes == other.protocol_pubkey_bytes
+        || self.network_pubkey_bytes == other.network_pubkey_bytes
+        || self.network_pubkey_bytes == other.worker_pubkey_bytes
+        || self.worker_pubkey_bytes == other.worker_pubkey_bytes
+        || self.worker_pubkey_bytes == other.network_pubkey_bytes
         // All next epoch parameters.
-        || is_equal_some(&self.metadata.next_epoch_net_address, &other.metadata.next_epoch_net_address)
-        || is_equal_some(&self.metadata.next_epoch_p2p_address, &other.metadata.next_epoch_p2p_address)
-        || is_equal_some(&self.metadata.next_epoch_protocol_pubkey_bytes, &other.metadata.next_epoch_protocol_pubkey_bytes)
-        || is_equal_some(&self.metadata.next_epoch_network_pubkey_bytes, &other.metadata.next_epoch_network_pubkey_bytes)
-        || is_equal_some(&self.metadata.next_epoch_network_pubkey_bytes, &other.metadata.next_epoch_worker_pubkey_bytes)
-        || is_equal_some(&self.metadata.next_epoch_worker_pubkey_bytes, &other.metadata.next_epoch_worker_pubkey_bytes)
-        || is_equal_some(&self.metadata.next_epoch_worker_pubkey_bytes, &other.metadata.next_epoch_network_pubkey_bytes)
+        || both_some_and_equal!(self.next_epoch_net_address, other.next_epoch_net_address)
+        || both_some_and_equal!(self.next_epoch_p2p_address, other.next_epoch_p2p_address)
+        || both_some_and_equal!(self.next_epoch_protocol_pubkey_bytes, other.next_epoch_protocol_pubkey_bytes)
+        || both_some_and_equal!(self.next_epoch_network_pubkey_bytes, other.next_epoch_network_pubkey_bytes)
+        || both_some_and_equal!(self.next_epoch_network_pubkey_bytes, other.next_epoch_worker_pubkey_bytes)
+        || both_some_and_equal!(self.next_epoch_worker_pubkey_bytes, other.next_epoch_worker_pubkey_bytes)
+        || both_some_and_equal!(self.next_epoch_worker_pubkey_bytes, other.next_epoch_network_pubkey_bytes)
         // My next epoch parameters with other current epoch parameters.
-        || is_equal_some_and_value(&self.metadata.next_epoch_net_address, &other.metadata.net_address)
-        || is_equal_some_and_value(&self.metadata.next_epoch_p2p_address, &other.metadata.p2p_address)
-        || is_equal_some_and_value(&self.metadata.next_epoch_protocol_pubkey_bytes, &other.metadata.protocol_pubkey_bytes)
-        || is_equal_some_and_value(&self.metadata.next_epoch_network_pubkey_bytes, &other.metadata.network_pubkey_bytes)
-        || is_equal_some_and_value(&self.metadata.next_epoch_network_pubkey_bytes, &other.metadata.worker_pubkey_bytes)
-        || is_equal_some_and_value(&self.metadata.next_epoch_worker_pubkey_bytes, &other.metadata.worker_pubkey_bytes)
-        || is_equal_some_and_value(&self.metadata.next_epoch_worker_pubkey_bytes, &other.metadata.network_pubkey_bytes)
+        || self.next_epoch_net_address.is_some_and!(|v| v == other.net_address)
+        || self.next_epoch_p2p_address.is_some_and!(|v| v == other.p2p_address)
+        || self.next_epoch_protocol_pubkey_bytes.is_some_and!(|v| v == other.protocol_pubkey_bytes)
+        || self.next_epoch_network_pubkey_bytes.is_some_and!(|v| v == other.network_pubkey_bytes)
+        || self.next_epoch_network_pubkey_bytes.is_some_and!(|v| v == other.worker_pubkey_bytes)
+        || self.next_epoch_worker_pubkey_bytes.is_some_and!(|v| v == other.worker_pubkey_bytes)
+        || self.next_epoch_worker_pubkey_bytes.is_some_and!(|v| v == other.network_pubkey_bytes)
         // Other next epoch parameters with my current epoch parameters.
-        || is_equal_some_and_value(&other.metadata.next_epoch_net_address, &self.metadata.net_address)
-        || is_equal_some_and_value(&other.metadata.next_epoch_p2p_address, &self.metadata.p2p_address)
-        || is_equal_some_and_value(&other.metadata.next_epoch_protocol_pubkey_bytes, &self.metadata.protocol_pubkey_bytes)
-        || is_equal_some_and_value(&other.metadata.next_epoch_network_pubkey_bytes, &self.metadata.network_pubkey_bytes)
-        || is_equal_some_and_value(&other.metadata.next_epoch_network_pubkey_bytes, &self.metadata.worker_pubkey_bytes)
-        || is_equal_some_and_value(&other.metadata.next_epoch_worker_pubkey_bytes, &self.metadata.worker_pubkey_bytes)
-        || is_equal_some_and_value(&other.metadata.next_epoch_worker_pubkey_bytes, &self.metadata.network_pubkey_bytes)
+        || other.next_epoch_net_address.is_some_and!(|v| v == self.net_address)
+        || other.next_epoch_p2p_address.is_some_and!(|v| v == self.p2p_address)
+        || other.next_epoch_protocol_pubkey_bytes.is_some_and!(|v| v == self.protocol_pubkey_bytes)
+        || other.next_epoch_network_pubkey_bytes.is_some_and!(|v| v == self.network_pubkey_bytes)
+        || other.next_epoch_network_pubkey_bytes.is_some_and!(|v| v == self.worker_pubkey_bytes)
+        || other.next_epoch_worker_pubkey_bytes.is_some_and!(|v| v == self.worker_pubkey_bytes)
+        || other.next_epoch_worker_pubkey_bytes.is_some_and!(|v| v == self.network_pubkey_bytes)
 }
 
-fun is_equal_some_and_value<T>(a: &Option<T>, b: &T): bool {
-    if (a.is_none()) {
-        false
-    } else {
-        a.borrow() == b
-    }
-}
-
-fun is_equal_some<T>(a: &Option<T>, b: &Option<T>): bool {
-    if (a.is_none() || b.is_none()) {
-        false
-    } else {
-        a.borrow() == b.borrow()
-    }
+macro fun both_some_and_equal<$T>($a: Option<$T>, $b: Option<$T>): bool {
+    let (a, b) = ($a, $b);
+    a.is_some_and!(|a| b.is_some_and!(|b| a == b))
 }
 
 // ==== Validator Metadata Management Functions ====
 
 /// Create a new `UnverifiedValidatorOperationCap`, transfer to the validator,
 /// and registers it, thus revoking the previous cap's permission.
-public(package) fun new_unverified_validator_operation_cap_and_transfer(self: &mut Validator, ctx: &mut TxContext) {
-    let address = ctx.sender();
-    assert!(address == self.metadata.sui_address, ENewCapNotCreatedByValidatorItself);
-    let new_id = validator_cap::new_unverified_validator_operation_cap_and_transfer(address, ctx);
+public(package) fun new_unverified_validator_operation_cap_and_transfer(
+    self: &mut Validator,
+    ctx: &mut TxContext,
+) {
+    let sender = ctx.sender();
+    assert!(sender == self.metadata.sui_address, ENewCapNotCreatedByValidatorItself);
+    let new_id = validator_cap::new_unverified_validator_operation_cap_and_transfer(sender, ctx);
     self.operation_cap_id = new_id;
 }
 
 /// Update name of the validator.
 public(package) fun update_name(self: &mut Validator, name: vector<u8>) {
-    assert!(
-        name.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
-    );
+    assert!(name.length() <= MAX_VALIDATOR_METADATA_LENGTH, EValidatorMetadataExceedingLengthLimit);
     self.metadata.name = name.to_ascii_string().to_string();
 }
 
@@ -779,7 +740,7 @@ public(package) fun update_name(self: &mut Validator, name: vector<u8>) {
 public(package) fun update_description(self: &mut Validator, description: vector<u8>) {
     assert!(
         description.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     self.metadata.description = description.to_ascii_string().to_string();
 }
@@ -788,7 +749,7 @@ public(package) fun update_description(self: &mut Validator, description: vector
 public(package) fun update_image_url(self: &mut Validator, image_url: vector<u8>) {
     assert!(
         image_url.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     self.metadata.image_url = url::new_unsafe_from_bytes(image_url);
 }
@@ -797,185 +758,219 @@ public(package) fun update_image_url(self: &mut Validator, image_url: vector<u8>
 public(package) fun update_project_url(self: &mut Validator, project_url: vector<u8>) {
     assert!(
         project_url.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     self.metadata.project_url = url::new_unsafe_from_bytes(project_url);
 }
 
 /// Update network address of this validator, taking effects from next epoch
-public(package) fun update_next_epoch_network_address(self: &mut Validator, net_address: vector<u8>) {
+public(package) fun update_next_epoch_network_address(
+    self: &mut Validator,
+    net_address: vector<u8>,
+) {
     assert!(
         net_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let net_address = net_address.to_ascii_string().to_string();
     self.metadata.next_epoch_net_address = option::some(net_address);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update network address of this candidate validator
-public(package) fun update_candidate_network_address(self: &mut Validator, net_address: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+public(package) fun update_candidate_network_address(
+    self: &mut Validator,
+    net_address: vector<u8>,
+) {
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     assert!(
         net_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let net_address = net_address.to_ascii_string().to_string();
     self.metadata.net_address = net_address;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update p2p address of this validator, taking effects from next epoch
 public(package) fun update_next_epoch_p2p_address(self: &mut Validator, p2p_address: vector<u8>) {
     assert!(
         p2p_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let p2p_address = p2p_address.to_ascii_string().to_string();
     self.metadata.next_epoch_p2p_address = option::some(p2p_address);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update p2p address of this candidate validator
 public(package) fun update_candidate_p2p_address(self: &mut Validator, p2p_address: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     assert!(
         p2p_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let p2p_address = p2p_address.to_ascii_string().to_string();
     self.metadata.p2p_address = p2p_address;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update primary address of this validator, taking effects from next epoch
-public(package) fun update_next_epoch_primary_address(self: &mut Validator, primary_address: vector<u8>) {
+public(package) fun update_next_epoch_primary_address(
+    self: &mut Validator,
+    primary_address: vector<u8>,
+) {
     assert!(
         primary_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let primary_address = primary_address.to_ascii_string().to_string();
     self.metadata.next_epoch_primary_address = option::some(primary_address);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update primary address of this candidate validator
-public(package) fun update_candidate_primary_address(self: &mut Validator, primary_address: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+public(package) fun update_candidate_primary_address(
+    self: &mut Validator,
+    primary_address: vector<u8>,
+) {
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     assert!(
         primary_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let primary_address = primary_address.to_ascii_string().to_string();
     self.metadata.primary_address = primary_address;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update worker address of this validator, taking effects from next epoch
-public(package) fun update_next_epoch_worker_address(self: &mut Validator, worker_address: vector<u8>) {
+public(package) fun update_next_epoch_worker_address(
+    self: &mut Validator,
+    worker_address: vector<u8>,
+) {
     assert!(
         worker_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let worker_address = worker_address.to_ascii_string().to_string();
     self.metadata.next_epoch_worker_address = option::some(worker_address);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update worker address of this candidate validator
-public(package) fun update_candidate_worker_address(self: &mut Validator, worker_address: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+public(package) fun update_candidate_worker_address(
+    self: &mut Validator,
+    worker_address: vector<u8>,
+) {
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     assert!(
         worker_address.length() <= MAX_VALIDATOR_METADATA_LENGTH,
-        EValidatorMetadataExceedingLengthLimit
+        EValidatorMetadataExceedingLengthLimit,
     );
     let worker_address = worker_address.to_ascii_string().to_string();
     self.metadata.worker_address = worker_address;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update protocol public key of this validator, taking effects from next epoch
-public(package) fun update_next_epoch_protocol_pubkey(self: &mut Validator, protocol_pubkey: vector<u8>, proof_of_possession: vector<u8>) {
+public(package) fun update_next_epoch_protocol_pubkey(
+    self: &mut Validator,
+    protocol_pubkey: vector<u8>,
+    proof_of_possession: vector<u8>,
+) {
     self.metadata.next_epoch_protocol_pubkey_bytes = option::some(protocol_pubkey);
     self.metadata.next_epoch_proof_of_possession = option::some(proof_of_possession);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update protocol public key of this candidate validator
-public(package) fun update_candidate_protocol_pubkey(self: &mut Validator, protocol_pubkey: vector<u8>, proof_of_possession: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+public(package) fun update_candidate_protocol_pubkey(
+    self: &mut Validator,
+    protocol_pubkey: vector<u8>,
+    proof_of_possession: vector<u8>,
+) {
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     self.metadata.protocol_pubkey_bytes = protocol_pubkey;
     self.metadata.proof_of_possession = proof_of_possession;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update network public key of this validator, taking effects from next epoch
-public(package) fun update_next_epoch_network_pubkey(self: &mut Validator, network_pubkey: vector<u8>) {
+public(package) fun update_next_epoch_network_pubkey(
+    self: &mut Validator,
+    network_pubkey: vector<u8>,
+) {
     self.metadata.next_epoch_network_pubkey_bytes = option::some(network_pubkey);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update network public key of this candidate validator
-public(package) fun update_candidate_network_pubkey(self: &mut Validator, network_pubkey: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+public(package) fun update_candidate_network_pubkey(
+    self: &mut Validator,
+    network_pubkey: vector<u8>,
+) {
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     self.metadata.network_pubkey_bytes = network_pubkey;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update Narwhal worker public key of this validator, taking effects from next epoch
-public(package) fun update_next_epoch_worker_pubkey(self: &mut Validator, worker_pubkey: vector<u8>) {
+public(package) fun update_next_epoch_worker_pubkey(
+    self: &mut Validator,
+    worker_pubkey: vector<u8>,
+) {
     self.metadata.next_epoch_worker_pubkey_bytes = option::some(worker_pubkey);
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Update Narwhal worker public key of this candidate validator
-public(package) fun update_candidate_worker_pubkey(self: &mut Validator, worker_pubkey: vector<u8>) {
-    assert!(is_preactive(self), ENotValidatorCandidate);
+public(package) fun update_candidate_worker_pubkey(
+    self: &mut Validator,
+    worker_pubkey: vector<u8>,
+) {
+    assert!(self.is_preactive(), ENotValidatorCandidate);
     self.metadata.worker_pubkey_bytes = worker_pubkey;
-    validate_metadata(&self.metadata);
+    self.metadata.validate();
 }
 
 /// Effectutate all staged next epoch metadata for this validator.
 /// NOTE: this function SHOULD ONLY be called by validator_set when
 /// advancing an epoch.
 public(package) fun effectuate_staged_metadata(self: &mut Validator) {
-    if (next_epoch_network_address(self).is_some()) {
-        self.metadata.net_address = self.metadata.next_epoch_net_address.extract();
-        self.metadata.next_epoch_net_address = option::none();
-    };
-
-    if (next_epoch_p2p_address(self).is_some()) {
-        self.metadata.p2p_address = self.metadata.next_epoch_p2p_address.extract();
-        self.metadata.next_epoch_p2p_address = option::none();
-    };
-
-    if (next_epoch_primary_address(self).is_some()) {
-        self.metadata.primary_address = self.metadata.next_epoch_primary_address.extract();
-        self.metadata.next_epoch_primary_address = option::none();
-    };
-
-    if (next_epoch_worker_address(self).is_some()) {
-        self.metadata.worker_address = self.metadata.next_epoch_worker_address.extract();
-        self.metadata.next_epoch_worker_address = option::none();
-    };
-
-    if (next_epoch_protocol_pubkey_bytes(self).is_some()) {
-        self.metadata.protocol_pubkey_bytes = self.metadata.next_epoch_protocol_pubkey_bytes.extract();
-        self.metadata.next_epoch_protocol_pubkey_bytes = option::none();
+    do_extract!(&mut self.metadata.next_epoch_net_address, |v| {
+        self.metadata.net_address = v
+    });
+    do_extract!(&mut self.metadata.next_epoch_p2p_address, |v| {
+        self.metadata.p2p_address = v
+    });
+    do_extract!(&mut self.metadata.next_epoch_primary_address, |v| {
+        self.metadata.primary_address = v
+    });
+    do_extract!(&mut self.metadata.next_epoch_worker_address, |v| {
+        self.metadata.worker_address = v
+    });
+    do_extract!(&mut self.metadata.next_epoch_protocol_pubkey_bytes, |v| {
+        self.metadata.protocol_pubkey_bytes = v;
         self.metadata.proof_of_possession = self.metadata.next_epoch_proof_of_possession.extract();
-        self.metadata.next_epoch_proof_of_possession = option::none();
-    };
-
-    if (next_epoch_network_pubkey_bytes(self).is_some()) {
-        self.metadata.network_pubkey_bytes = self.metadata.next_epoch_network_pubkey_bytes.extract();
-        self.metadata.next_epoch_network_pubkey_bytes = option::none();
-    };
-
-    if (next_epoch_worker_pubkey_bytes(self).is_some()) {
-        self.metadata.worker_pubkey_bytes = self.metadata.next_epoch_worker_pubkey_bytes.extract();
-        self.metadata.next_epoch_worker_pubkey_bytes = option::none();
-    };
+    });
+    do_extract!(&mut self.metadata.next_epoch_network_pubkey_bytes, |v| {
+        self.metadata.network_pubkey_bytes = v
+    });
+    do_extract!(&mut self.metadata.next_epoch_worker_pubkey_bytes, |v| {
+        self.metadata.worker_pubkey_bytes = v
+    });
 }
+
+/// Helper macro which extracts the value from `Some` and applies `$f` to it.
+macro fun do_extract<$T>($o: &mut Option<$T>, $f: |$T|) {
+    let o = $o;
+    if (o.is_some()) {
+        $f(o.extract());
+    }
+}
+
+public use fun validate_metadata as ValidatorMetadata.validate;
 
 /// Aborts if validator metadata is valid
 public fun validate_metadata(metadata: &ValidatorMetadata) {
@@ -988,7 +983,6 @@ public(package) fun get_staking_pool_ref(self: &Validator): &StakingPool {
     &self.staking_pool
 }
 
-
 /// Create a new validator from the given `ValidatorMetadata`, called by both `new` and `new_for_testing`.
 fun new_from_metadata(
     metadata: ValidatorMetadata,
@@ -996,13 +990,15 @@ fun new_from_metadata(
     only_validator_staking:bool,
     gas_price: u64,
     commission_rate: u64,
-    ctx: &mut TxContext
+    ctx: &mut TxContext,
 ): Validator {
     let sui_address = metadata.sui_address;
-
     let staking_pool = staking_pool::new(ctx);
+    let operation_cap_id = validator_cap::new_unverified_validator_operation_cap_and_transfer(
+        sui_address,
+        ctx,
+    );
 
-    let operation_cap_id = validator_cap::new_unverified_validator_operation_cap_and_transfer(sui_address, ctx);
     Validator {
         metadata,
         // Initialize the voting power to be 0.
@@ -1042,11 +1038,11 @@ public(package) fun new_for_testing(
     p2p_address: vector<u8>,
     primary_address: vector<u8>,
     worker_address: vector<u8>,
-    mut initial_stake_option: Option<Balance<OCT>>,
+    initial_stake_option: Option<Balance<OCT>>,
     gas_price: u64,
     commission_rate: u64,
     is_active_at_genesis: bool,
-    ctx: &mut TxContext
+    ctx: &mut TxContext,
 ): Validator {
     let mut validator = new_from_metadata(
         new_metadata(
@@ -1069,23 +1065,22 @@ public(package) fun new_for_testing(
         false,
         gas_price,
         commission_rate,
-        ctx
+        ctx,
     );
 
     // Add the validator's starting stake to the staking pool if there exists one.
-    if (initial_stake_option.is_some()) {
+    initial_stake_option.do!(|balance| {
         request_add_stake_at_genesis(
             &mut validator,
-            initial_stake_option.extract(),
+            balance,
             sui_address, // give the stake to the validator
             false,
-            ctx
+            ctx,
         );
-    };
-    initial_stake_option.destroy_none();
+    });
 
     if (is_active_at_genesis) {
-        activate(&mut validator, 0);
+        validator.activate(0);
     };
 
     validator

@@ -39,22 +39,31 @@ list.
 -  [Function `per_type_list`](#one_deny_list_per_type_list)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
+<b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
 <b>use</b> <a href="../std/string.md#std_string">std::string</a>;
+<b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
 </code></pre>
 
@@ -278,22 +287,12 @@ Stores the addresses that are denied for a given core type.
 ## Constants
 
 
-<a name="one_deny_list_COIN_INDEX"></a>
+<a name="one_deny_list_ENotSystemAddress"></a>
 
-The index into the deny list vector for the <code><a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a></code> type.
-
-
-<pre><code><b>const</b> <a href="../one/deny_list.md#one_deny_list_COIN_INDEX">COIN_INDEX</a>: u64 = 0;
-</code></pre>
+Trying to create a deny list object when not called by the system address.
 
 
-
-<a name="one_deny_list_EInvalidAddress"></a>
-
-The specified address cannot be added to the deny list.
-
-
-<pre><code><b>const</b> <a href="../one/deny_list.md#one_deny_list_EInvalidAddress">EInvalidAddress</a>: u64 = 1;
+<pre><code><b>const</b> <a href="../one/deny_list.md#one_deny_list_ENotSystemAddress">ENotSystemAddress</a>: u64 = 0;
 </code></pre>
 
 
@@ -308,12 +307,22 @@ The specified address to be removed is not already in the deny list.
 
 
 
-<a name="one_deny_list_ENotSystemAddress"></a>
+<a name="one_deny_list_EInvalidAddress"></a>
 
-Trying to create a deny list object when not called by the system address.
+The specified address cannot be added to the deny list.
 
 
-<pre><code><b>const</b> <a href="../one/deny_list.md#one_deny_list_ENotSystemAddress">ENotSystemAddress</a>: u64 = 0;
+<pre><code><b>const</b> <a href="../one/deny_list.md#one_deny_list_EInvalidAddress">EInvalidAddress</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="one_deny_list_COIN_INDEX"></a>
+
+The index into the deny list vector for the <code><a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a></code> type.
+
+
+<pre><code><b>const</b> <a href="../one/deny_list.md#one_deny_list_COIN_INDEX">COIN_INDEX</a>: u64 = 0;
 </code></pre>
 
 
@@ -626,8 +635,10 @@ meaningless to add them to the deny list.
     ctx: &<b>mut</b> TxContext,
 ) {
     <b>let</b> bag_entry: &<b>mut</b> <a href="../one/deny_list.md#one_deny_list_PerTypeList">PerTypeList</a> = &<b>mut</b> <a href="../one/deny_list.md#one_deny_list">deny_list</a>.lists[per_type_index];
-    <b>let</b> elements = <b>if</b> (!bag_entry.denied_addresses.contains(per_type_key)) vector[]
-    <b>else</b> bag_entry.denied_addresses.remove(per_type_key).into_keys();
+    <b>let</b> elements = <b>if</b> (!bag_entry.denied_addresses.contains(per_type_key)) vector[] <b>else</b> bag_entry
+        .denied_addresses
+        .remove(per_type_key)
+        .into_keys();
     elements.do_ref!(|addr| {
         <b>let</b> addr = *addr;
         <b>let</b> denied_count = &<b>mut</b> bag_entry.denied_count[addr];

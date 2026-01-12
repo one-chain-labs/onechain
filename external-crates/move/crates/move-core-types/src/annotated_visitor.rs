@@ -4,11 +4,11 @@
 use std::io::{Cursor, Read};
 
 use crate::{
+    VARIANT_TAG_MAX_VALUE,
     account_address::AccountAddress,
     annotated_value::{MoveEnumLayout, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     identifier::IdentStr,
     u256::U256,
-    VARIANT_COUNT_MAX,
 };
 
 /// Visitors can be used for building values out of a serialized Move struct or value.
@@ -348,7 +348,7 @@ pub struct VariantDriver<'c, 'b, 'l> {
     off: u64,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Copy, Clone)]
 pub enum Error {
     #[error("unexpected end of input")]
     UnexpectedEof,
@@ -456,6 +456,13 @@ impl<'c, 'b, 'l> VecDriver<'c, 'b, 'l> {
         self.inner.remaining_bytes()
     }
 
+    /// Type layout for the value being visited. May produce an error if a layout was not supplied
+    /// when the driver was created (which should only happen if the driver was created for
+    /// visiting a struct specifically).
+    pub fn layout(&self) -> Result<&'l MoveTypeLayout, Error> {
+        self.inner.layout()
+    }
+
     /// Type layout for the vector's inner type.
     pub fn element_layout(&self) -> &'l MoveTypeLayout {
         self.layout
@@ -530,6 +537,13 @@ impl<'c, 'b, 'l> StructDriver<'c, 'b, 'l> {
     /// The bytes that haven't been consumed by the visitor yet.
     pub fn remaining_bytes(&self) -> &'b [u8] {
         self.inner.remaining_bytes()
+    }
+
+    /// Type layout for the value being visited. May produce an error if a layout was not supplied
+    /// when the driver was created (which should only happen if the driver was created for
+    /// visiting a struct specifically).
+    pub fn layout(&self) -> Result<&'l MoveTypeLayout, Error> {
+        self.inner.layout()
     }
 
     /// The layout of the struct being visited.
@@ -612,6 +626,13 @@ impl<'c, 'b, 'l> VariantDriver<'c, 'b, 'l> {
     /// The bytes that haven't been consumed by the visitor yet.
     pub fn remaining_bytes(&self) -> &'b [u8] {
         self.inner.remaining_bytes()
+    }
+
+    /// Type layout for the value being visited. May produce an error if a layout was not supplied
+    /// when the driver was created (which should only happen if the driver was created for
+    /// visiting a struct specifically).
+    pub fn layout(&self) -> Result<&'l MoveTypeLayout, Error> {
+        self.inner.layout()
     }
 
     /// The layout of the enum being visited.
@@ -775,7 +796,7 @@ fn visit_variant<'c, 'b, 'l, V: Visitor<'b, 'l> + ?Sized>(
     // When we add true ULEB encoding for enum variants switch to this:
     // let tag = inner.read_leb128()?;
     let [tag] = inner.read_exact()?;
-    if tag >= VARIANT_COUNT_MAX as u8 {
+    if tag > VARIANT_TAG_MAX_VALUE as u8 {
         return Err(Error::UnexpectedVariantTag(tag as usize).into());
     }
     let variant_layout = layout
@@ -788,7 +809,7 @@ fn visit_variant<'c, 'b, 'l, V: Visitor<'b, 'l> + ?Sized>(
         inner,
         layout,
         variant_layout.1,
-        &variant_layout.0 .0,
+        &variant_layout.0.0,
         tag as u16,
     );
     let res = visitor.visit_variant(&mut driver)?;

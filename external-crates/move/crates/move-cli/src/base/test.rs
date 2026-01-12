@@ -5,16 +5,16 @@ use super::reroot_path;
 use crate::NativeFunctionRecord;
 use anyhow::Result;
 use clap::*;
-use move_binary_format::CompiledModule;
+use move_binary_format::{CompiledModule, binary_config::BinaryConfig};
 use move_command_line_common::files::MOVE_COVERAGE_MAP_EXTENSION;
 use move_compiler::{
+    PASS_CFGIR,
     diagnostics::{self, Diagnostics},
     shared::{NumberFormat, NumericalAddress},
-    unit_test::{plan_builder::construct_test_plan, TestPlan},
-    PASS_CFGIR,
+    unit_test::{TestPlan, plan_builder::construct_test_plan},
 };
-use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
-use move_package::{compilation::build_plan::BuildPlan, BuildConfig};
+use move_coverage::coverage_map::{CoverageMap, output_map_to_file};
+use move_package::{BuildConfig, compilation::build_plan::BuildPlan};
 use move_unit_test::UnitTestingConfig;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::{io::Write, path::Path, process::ExitStatus};
@@ -50,7 +50,7 @@ pub struct Test {
         long = "threads"
     )]
     pub num_threads: usize,
-    /// Report test statistics at the end of testing. CSV report generated if 'csv' passed
+    /// Report test statistics at the end of testing. CSV report generated if 'csv' passed.
     #[clap(name = "report-statistics", short = 's', long = "statistics")]
     pub report_statistics: Option<Option<String>>,
 
@@ -69,9 +69,9 @@ pub struct Test {
     #[clap(name = "rand-num-iters", long = "rand-num-iters")]
     pub rand_num_iters: Option<u64>,
 
-    // Enable tracing for tests
-    #[clap(long = "trace-execution", value_name = "PATH")]
-    pub trace_execution: Option<Option<String>>,
+    /// Enable tracing for tests.
+    #[clap(long = "trace")]
+    pub trace: bool,
 }
 
 impl Test {
@@ -85,7 +85,7 @@ impl Test {
         let rerooted_path = reroot_path(path)?;
         let compute_coverage = self.compute_coverage;
         // save disassembly if trace execution is enabled
-        let save_disassembly = self.trace_execution.is_some();
+        let save_disassembly = self.trace;
         let result = run_move_unit_tests(
             &rerooted_path,
             config,
@@ -115,7 +115,7 @@ impl Test {
             compute_coverage: _,
             seed,
             rand_num_iters,
-            trace_execution,
+            trace,
         } = self;
         UnitTestingConfig {
             gas_limit,
@@ -126,7 +126,7 @@ impl Test {
             verbose: verbose_mode,
             seed,
             rand_num_iters,
-            trace_execution,
+            trace,
             ..UnitTestingConfig::default_with_bound(None)
         }
     }
@@ -171,6 +171,8 @@ pub fn run_move_unit_tests<W: Write + Send>(
         })
         .collect();
 
+    let binary_config = BinaryConfig::new_unpublishable();
+
     // Collect all the bytecode modules that are dependencies of the package. We need to do this
     // because they're not returned by the compilation result, but we need to add them in the
     // VM storage.
@@ -184,7 +186,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
             continue;
         }
         for bytes in pkg.get_bytecodes_bytes()? {
-            let module = CompiledModule::deserialize_with_defaults(&bytes)?;
+            let module = CompiledModule::deserialize_with_config(&bytes, &binary_config)?;
             bytecode_deps_modules.push(module);
         }
     }
@@ -240,7 +242,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // If we need to compute test coverage set the VM tracking environment variable since we will
     // need this trace to construct the coverage information.
     if compute_coverage {
-        std::env::set_var("MOVE_VM_TRACE", &trace_path);
+        unsafe { std::env::set_var("MOVE_VM_TRACE", &trace_path) };
     }
 
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup

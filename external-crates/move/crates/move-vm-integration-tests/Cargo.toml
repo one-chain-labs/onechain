@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -35,7 +35,6 @@ default = []
 tracing = [
     "move-vm-config/tracing",
     "move-vm-runtime/tracing",
-    "move-vm-profiler/tracing",
     "move-vm-test-utils/tracing",
 ]
 

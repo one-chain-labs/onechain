@@ -12,7 +12,7 @@ use proptest_derive::Arbitrary;
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
     base_types::{ObjectRef, SuiAddress},
-    error::{SuiError, UserInputError},
+    error::{SuiError, SuiErrorKind, UserInputError},
     execution_status::{ExecutionFailureStatus, ExecutionStatus},
     object::Object,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
@@ -327,7 +327,11 @@ impl RunInfo {
         let gas_price_greater_than_budget = p2p.gas_price > p2p.gas;
         let gas_units_too_low = p2p.gas_price > 0 && p2p.gas / p2p.gas_price < INSUFFICIENT_GAS_UNITS_THRESHOLD
             || gas_price_greater_than_budget;
-        let too_many_gas_coins = p2p.gas_coins >= PROTOCOL_CONFIG.max_gas_payment_objects();
+        let too_many_gas_coins = if PROTOCOL_CONFIG.correct_gas_payment_limit_check() {
+            p2p.gas_coins > PROTOCOL_CONFIG.max_gas_payment_objects()
+        } else {
+            p2p.gas_coins >= PROTOCOL_CONFIG.max_gas_payment_objects()
+        };
         Self {
             enough_max_gas,
             enough_computation_gas,
@@ -370,7 +374,7 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
         // *sender.current_balances.last().unwrap();
         let rgp = exec.get_reference_gas_price();
         let run_info = RunInfo::new(gas_balance, rgp, self);
-        let status = match run_info {
+        let status: Result<ExecutionStatus, SuiError> = match run_info {
             RunInfo {
                 enough_max_gas: true,
                 enough_computation_gas: true,
@@ -387,40 +391,46 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
                 self.fix_balance_and_gas_coins(payer, true);
                 Ok(ExecutionStatus::Success)
             }
-            RunInfo { too_many_gas_coins: true, .. } => Err(SuiError::UserInputError {
+            RunInfo { too_many_gas_coins: true, .. } => Err(SuiErrorKind::UserInputError {
                 error: UserInputError::SizeLimitExceeded {
                     limit: "maximum number of gas payment objects".to_string(),
                     value: "256".to_string(),
                 },
-            }),
-            RunInfo { gas_price_too_low: true, .. } => Err(SuiError::UserInputError {
-                error: UserInputError::GasPriceUnderRGP {
-                    gas_price: self.gas_price,
-                    reference_gas_price: exec.get_reference_gas_price(),
-                },
-            }),
-            RunInfo { gas_price_too_high: true, .. } => Err(SuiError::UserInputError {
+            }
+            .into()),
+            RunInfo { gas_price_too_high: true, .. } => Err(SuiErrorKind::UserInputError {
                 error: UserInputError::GasPriceTooHigh { max_gas_price: PROTOCOL_CONFIG.max_gas_price() },
-            }),
-            RunInfo { gas_budget_too_high: true, .. } => Err(SuiError::UserInputError {
+            }
+            .into()),
+            RunInfo { gas_budget_too_high: true, .. } => Err(SuiErrorKind::UserInputError {
                 error: UserInputError::GasBudgetTooHigh {
                     gas_budget: self.gas,
                     max_budget: PROTOCOL_CONFIG.max_tx_gas(),
                 },
-            }),
-            RunInfo { gas_budget_too_low: true, .. } => Err(SuiError::UserInputError {
+            }
+            .into()),
+            RunInfo { gas_budget_too_low: true, .. } => Err(SuiErrorKind::UserInputError {
                 error: UserInputError::GasBudgetTooLow {
                     gas_budget: self.gas,
                     min_budget: PROTOCOL_CONFIG.base_tx_cost_fixed() * self.gas_price,
                 },
-            }),
-            RunInfo { enough_max_gas: false, .. } => Err(SuiError::UserInputError {
+            }
+            .into()),
+            RunInfo { gas_price_too_low: true, .. } => Err(SuiErrorKind::UserInputError {
+                error: UserInputError::GasPriceUnderRGP {
+                    gas_price: self.gas_price,
+                    reference_gas_price: exec.get_reference_gas_price(),
+                },
+            }
+            .into()),
+            RunInfo { enough_max_gas: false, .. } => Err(SuiErrorKind::UserInputError {
                 error: UserInputError::GasBalanceTooLow {
                     gas_balance: gas_balance as u128,
                     needed_gas_amount: self.gas as u128,
                 },
-            }),
-            RunInfo { wrong_gas_owner: true, .. } => Err(SuiError::UserInputError {
+            }
+            .into()),
+            RunInfo { wrong_gas_owner: true, .. } => Err(SuiErrorKind::UserInputError {
                 error: UserInputError::IncorrectUserSignature {
                     error: format!(
                         "Object {} is owned by account address {}, but given owner/signer address is {}",
@@ -429,7 +439,8 @@ impl AUTransactionGen for P2PTransferGenRandomGasRandomPriceRandomSponsorship {
                         payer.initial_data.account.address,
                     ),
                 },
-            }),
+            }
+            .into()),
             RunInfo { enough_max_gas: true, enough_to_succeed: false, gas_units_too_low: false, .. } => {
                 self.fix_balance_and_gas_coins(payer, false);
                 Ok(ExecutionStatus::Failure { error: ExecutionFailureStatus::InsufficientCoinBalance, command: Some(0) })

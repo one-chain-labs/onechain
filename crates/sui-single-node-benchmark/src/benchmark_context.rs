@@ -9,15 +9,18 @@ use std::{
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use sui_config::node::RunWithRange;
+use sui_core::{
+    authority::shared_object_version_manager::{AssignedTxAndVersions, AssignedVersions},
+    mock_checkpoint_builder::ValidatorKeypairProvider,
+};
 use sui_test_transaction_builder::PublishData;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress},
     effects::{TransactionEffects, TransactionEffectsAPI},
     messages_grpc::HandleTransactionResponse,
-    mock_checkpoint_builder::ValidatorKeypairProvider,
     transaction::{CertifiedTransaction, SignedTransaction, Transaction, VerifiedTransaction},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     command::Component,
@@ -92,12 +95,12 @@ impl BenchmarkContext {
             .await;
         let results = self.execute_raw_transactions(root_object_create_transactions).await;
         let mut new_gas_objects = HashMap::new();
+        let cache_commit = self.validator().get_validator().get_cache_commit().clone();
         for effects in results {
-            self.validator().get_validator().get_cache_commit().commit_transaction_outputs(
-                effects.executed_epoch(),
-                &[*effects.transaction_digest()],
-                true,
-            );
+            let batch = cache_commit.build_db_batch(effects.executed_epoch(), &[*effects.transaction_digest()]);
+
+            cache_commit.commit_transaction_outputs(effects.executed_epoch(), batch, &[*effects.transaction_digest()]);
+
             let (owner, root_object) = effects
                 .created()
                 .into_iter()
@@ -123,6 +126,15 @@ impl BenchmarkContext {
         if num_shared_objects == 0 {
             return shared_objects;
         }
+
+        if matches!(self.benchmark_component, Component::ValidatorWithoutConsensus) {
+            warn!(
+                "Ignoring num_shared_objects {} parameter for Component::ValidatorWithoutConsensus",
+                num_shared_objects
+            );
+            return shared_objects;
+        }
+
         assert!(num_shared_objects <= self.user_accounts.len());
 
         info!("Preparing shared objects");
@@ -135,7 +147,6 @@ impl BenchmarkContext {
             .collect();
         let results = self.execute_raw_transactions(shared_object_create_transactions).await;
         let mut new_gas_objects = HashMap::new();
-        let epoch_id = self.validator.get_epoch_store().epoch();
         let cache_commit = self.validator.get_validator().get_cache_commit();
         for effects in results {
             let shared_object = effects
@@ -152,7 +163,8 @@ impl BenchmarkContext {
             // live objects to construct the in memory object store, hence requiring these objects committed to DB.
             // For checkpoint executor, in order to commit a checkpoint it is required previous versions
             // of objects are already committed.
-            cache_commit.commit_transaction_outputs(epoch_id, &[*effects.transaction_digest()], true);
+            let batch = cache_commit.build_db_batch(effects.executed_epoch(), &[*effects.transaction_digest()]);
+            cache_commit.commit_transaction_outputs(effects.executed_epoch(), batch, &[*effects.transaction_digest()]);
         }
         self.refresh_gas_objects(new_gas_objects);
         info!("Finished preparing shared objects");
@@ -209,8 +221,10 @@ impl BenchmarkContext {
     pub(crate) async fn benchmark_transaction_execution(
         &self,
         transactions: Vec<CertifiedTransaction>,
+        assigned_versions: AssignedTxAndVersions,
         print_sample_tx: bool,
     ) {
+        let assigned_versions = assigned_versions.into_map();
         if print_sample_tx {
             // We must use remove(0) in case there are shared objects and the transactions
             // must be executed in order.
@@ -221,11 +235,14 @@ impl BenchmarkContext {
         let start_time = std::time::Instant::now();
         info!("Started executing {} transactions. You can now attach a profiler", transactions.len());
 
-        let has_shared_object = transactions.iter().any(|tx| tx.contains_shared_object());
-        if has_shared_object {
+        let is_consensus_tx = transactions.iter().any(|tx| tx.is_consensus_tx());
+        if is_consensus_tx {
             // With shared objects, we must execute each transaction in order.
             for transaction in transactions {
-                self.validator.execute_certificate(transaction, self.benchmark_component).await;
+                let key = transaction.key();
+                self.validator
+                    .execute_certificate(transaction, assigned_versions.get(&key).unwrap(), self.benchmark_component)
+                    .await;
             }
         } else {
             let tasks: FuturesUnordered<_> = transactions
@@ -233,7 +250,9 @@ impl BenchmarkContext {
                 .map(|tx| {
                     let validator = self.validator();
                     let component = self.benchmark_component;
-                    tokio::spawn(async move { validator.execute_certificate(tx, component).await })
+                    tokio::spawn(async move {
+                        validator.execute_certificate(tx, &AssignedVersions::new(vec![], None), component).await
+                    })
                 })
                 .collect();
             let results: Vec<_> = tasks.collect().await;
@@ -249,6 +268,7 @@ impl BenchmarkContext {
     pub(crate) async fn benchmark_transaction_execution_in_memory(
         &self,
         transactions: Vec<CertifiedTransaction>,
+        assigned_versions: AssignedTxAndVersions,
         print_sample_tx: bool,
     ) {
         if print_sample_tx {
@@ -260,7 +280,7 @@ impl BenchmarkContext {
         let start_time = std::time::Instant::now();
         info!("Started executing {} transactions. You can now attach a profiler", transactions.len());
 
-        self.execute_transactions_in_memory(in_memory_store.clone(), transactions).await;
+        self.execute_transactions_in_memory(in_memory_store.clone(), transactions, assigned_versions).await;
 
         let elapsed = start_time.elapsed().as_millis() as f64 / 1000f64;
         info!(
@@ -297,6 +317,7 @@ impl BenchmarkContext {
     pub(crate) async fn benchmark_checkpoint_executor(
         &self,
         transactions: Vec<CertifiedTransaction>,
+        assigned_versions: AssignedTxAndVersions,
         checkpoint_size: usize,
     ) {
         self.execute_sample_transaction(transactions[0].clone()).await;
@@ -305,7 +326,7 @@ impl BenchmarkContext {
         let tx_count = transactions.len();
         let in_memory_store = self.validator.create_in_memory_store();
         let effects: BTreeMap<_, _> = self
-            .execute_transactions_in_memory(in_memory_store.clone(), transactions.clone())
+            .execute_transactions_in_memory(in_memory_store.clone(), transactions.clone(), assigned_versions)
             .await
             .into_iter()
             .map(|e| (*e.transaction_digest(), e))
@@ -347,13 +368,18 @@ impl BenchmarkContext {
         &self,
         store: InMemoryObjectStore,
         transactions: Vec<CertifiedTransaction>,
+        assigned_versions: AssignedTxAndVersions,
     ) -> Vec<TransactionEffects> {
-        let has_shared_object = transactions.iter().any(|tx| tx.contains_shared_object());
-        if has_shared_object {
+        let is_consensus_tx = transactions.iter().any(|tx| tx.is_consensus_tx());
+        let assigned_versions = assigned_versions.into_map();
+        if is_consensus_tx {
             // With shared objects, we must execute each transaction in order.
             let mut effects = Vec::new();
             for transaction in transactions {
-                effects.push(self.validator.execute_transaction_in_memory(store.clone(), transaction).await);
+                let assigned_versions = assigned_versions.get(&transaction.key()).unwrap();
+                effects.push(
+                    self.validator.execute_transaction_in_memory(store.clone(), transaction, assigned_versions).await,
+                );
             }
             effects
         } else {
@@ -362,7 +388,9 @@ impl BenchmarkContext {
                 .map(|tx| {
                     let store = store.clone();
                     let validator = self.validator();
-                    tokio::spawn(async move { validator.execute_transaction_in_memory(store, tx).await })
+                    tokio::spawn(async move {
+                        validator.execute_transaction_in_memory(store, tx, &AssignedVersions::new(vec![], None)).await
+                    })
                 })
                 .collect();
             let results: Vec<_> = tasks.collect().await;

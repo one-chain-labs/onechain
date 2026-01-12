@@ -24,6 +24,10 @@ module a::m {
     public fun t5(s: &Receiving<other::S>) {
         transfer::receiving_object_id(s);
     }
+
+    public fun t6(s: other::S, p: one::party::Party) {
+        transfer::party_transfer(s, p);
+    }
 }
 
 module a::other {
@@ -54,6 +58,14 @@ module one::transfer {
         abort 0
     }
 
+    public fun party_transfer<T: key>(_: T, _: one::party::Party) {
+        abort 0
+    }
+
+    public fun public_party_transfer<T: key + store>(_: T, _: one::party::Party) {
+        abort 0
+    }
+
     public fun freeze_object<T: key>(_: T) {
         abort 0
     }
@@ -81,4 +93,8 @@ module one::transfer {
     public fun receiving_object_id<T: key>(_: &Receiving<T>): ID {
         abort 0
     }
+}
+
+module one::party {
+    struct Party has copy, drop {}
 }

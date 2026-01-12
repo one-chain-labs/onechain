@@ -11,23 +11,31 @@ title: Module `one_system::storage_fund`
 -  [Function `total_balance`](#one_system_storage_fund_total_balance)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
 <b>use</b> <a href="../one/url.md#one_url">one::url</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
 <b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
@@ -140,7 +148,9 @@ Called by <code>sui_system</code> at epoch change times to process the inflows a
     // into `<a href="../one_system/storage_fund.md#one_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>`.
     self.<a href="../one_system/storage_fund.md#one_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>.join(storage_charges);
     // Split out the non-refundable portion of the storage rebate and put it into the non-refundable balance.
-    <b>let</b> non_refundable_storage_fee = self.<a href="../one_system/storage_fund.md#one_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>.split(non_refundable_storage_fee_amount);
+    <b>let</b> non_refundable_storage_fee = self
+        .<a href="../one_system/storage_fund.md#one_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>
+        .split(non_refundable_storage_fee_amount);
     self.non_refundable_balance.join(non_refundable_storage_fee);
     // `storage_rebates` include the already refunded rebates of deleted objects and old rebates of modified objects and
     // should be taken out of the `<a href="../one_system/storage_fund.md#one_system_storage_fund_total_object_storage_rebates">total_object_storage_rebates</a>`.

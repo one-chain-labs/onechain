@@ -11,15 +11,6 @@ use smallvec::smallvec;
 
 use crate::{legacy_test_cost, types::is_otw_struct};
 
-pub fn destroy(
-    _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    args.pop_back();
-    Ok(NativeResult::ok(legacy_test_cost(), smallvec![]))
-}
-
 pub fn create_one_time_witness(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,

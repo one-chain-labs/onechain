@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use rand::seq::IteratorRandom;
@@ -13,7 +13,7 @@ use sui_types::{
     gas_coin::MIST_PER_OCT,
     transaction::Transaction,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::{
     drivers::Interval,
@@ -165,7 +165,15 @@ impl Workload<dyn Payload> for DelegationWorkload {
         proxy: Arc<dyn ValidatorProxy + Sync + Send>,
         system_state_observer: Arc<SystemStateObserver>,
     ) -> Vec<Box<dyn Payload>> {
-        let validators = proxy.get_validators().await.expect("failed to fetch validators");
+        let validators = loop {
+            match proxy.get_validators().await {
+                Ok(validators) => break validators,
+                Err(e) => {
+                    warn!("failed to fetch validators: {:?}", e);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+            }
+        };
 
         self.payload_gas
             .iter()
@@ -182,5 +190,9 @@ impl Workload<dyn Payload> for DelegationWorkload {
             })
             .map(|b| Box::<dyn Payload>::from(b))
             .collect()
+    }
+
+    fn name(&self) -> &str {
+        "Delegation"
     }
 }

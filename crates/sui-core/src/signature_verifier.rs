@@ -19,7 +19,7 @@ use sui_types::{
     committee::Committee,
     crypto::{AuthoritySignInfoTrait, VerificationObligation},
     digests::{CertificateDigest, SenderSignedDataDigest, ZKLoginInputsDigest},
-    error::{SuiError, SuiResult},
+    error::{SuiErrorKind, SuiResult},
     message_envelope::Message,
     messages_checkpoint::SignedCheckpointSummary,
     signature::VerifyParams,
@@ -118,6 +118,8 @@ struct ZkLoginParams {
     pub accept_passkey_in_multisig: bool,
     /// Value that sets the upper bound for max_epoch in zkLogin signature.
     pub zklogin_max_epoch_upper_bound_delta: Option<u64>,
+    /// Flag to determine whether additional multisig checks are performed.
+    pub additional_multisig_checks: bool,
 }
 
 impl SignatureVerifier {
@@ -131,6 +133,7 @@ impl SignatureVerifier {
         accept_zklogin_in_multisig: bool,
         accept_passkey_in_multisig: bool,
         zklogin_max_epoch_upper_bound_delta: Option<u64>,
+        additional_multisig_checks: bool,
     ) -> Self {
         Self {
             committee,
@@ -159,6 +162,7 @@ impl SignatureVerifier {
                 accept_zklogin_in_multisig,
                 accept_passkey_in_multisig,
                 zklogin_max_epoch_upper_bound_delta,
+                additional_multisig_checks,
             },
         }
     }
@@ -172,6 +176,7 @@ impl SignatureVerifier {
         accept_zklogin_in_multisig: bool,
         accept_passkey_in_multisig: bool,
         zklogin_max_epoch_upper_bound_delta: Option<u64>,
+        additional_multisig_checks: bool,
     ) -> Self {
         Self::new_with_batch_size(
             committee,
@@ -183,6 +188,7 @@ impl SignatureVerifier {
             accept_zklogin_in_multisig,
             accept_passkey_in_multisig,
             zklogin_max_epoch_upper_bound_delta,
+            additional_multisig_checks,
         )
     }
 
@@ -230,10 +236,11 @@ impl SignatureVerifier {
         // this is the only innocent error we are likely to encounter - filter it before we poison
         // a whole batch.
         if cert.auth_sig().epoch != self.committee.epoch() {
-            return Err(SuiError::WrongEpoch {
+            return Err(SuiErrorKind::WrongEpoch {
                 expected_epoch: self.committee.epoch(),
                 actual_epoch: cert.auth_sig().epoch,
-            });
+            }
+            .into());
         }
 
         self.verify_cert_inner(cert).await
@@ -367,6 +374,7 @@ impl SignatureVerifier {
                     self.zk_login_params.accept_zklogin_in_multisig,
                     self.zk_login_params.accept_passkey_in_multisig,
                     self.zk_login_params.zklogin_max_epoch_upper_bound_delta,
+                    self.zk_login_params.additional_multisig_checks,
                 );
                 verify_sender_signed_data_message_signatures(
                     signed_tx,

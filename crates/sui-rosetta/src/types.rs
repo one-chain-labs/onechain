@@ -8,19 +8,16 @@ use axum::{
     Json,
 };
 use fastcrypto::encoding::Hex;
+pub use internal_operation::InternalOperation;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use strum_macros::{EnumIter, EnumString};
-use sui_sdk::rpc_types::{SuiExecutionStatus, SuiTransactionBlockKind};
+use sui_rpc::proto::sui::rpc::v2::{transaction_kind::Kind, ExecutionStatus, TransactionKind};
+use sui_sdk_types::Address;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest},
     crypto::{PublicKey as SuiPublicKey, SignatureScheme},
-    governance::{ADD_STAKE_FUN_NAME, WITHDRAW_STAKE_FUN_NAME},
     messages_checkpoint::CheckpointDigest,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    sui_system_state::SUI_SYSTEM_MODULE_NAME,
-    transaction::{Argument, CallArg, Command, ObjectArg, TransactionData},
-    SUI_SYSTEM_PACKAGE_ID,
 };
 
 use crate::{
@@ -29,9 +26,7 @@ use crate::{
     SUI,
 };
 
-#[cfg(test)]
-#[path = "unit_tests/types_tests.rs"]
-mod types_tests;
+pub mod internal_operation;
 
 pub type BlockHeight = u64;
 
@@ -183,8 +178,8 @@ pub struct AmountMetadata {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct SubBalance {
-    pub stake_id: ObjectID,
-    pub validator: SuiAddress,
+    pub stake_id: Address,
+    pub validator: Address,
     #[serde(with = "str_format")]
     pub value: i128,
 }
@@ -242,15 +237,6 @@ impl IntoResponse for AccountCoinsResponse {
 pub struct Coin {
     pub coin_identifier: CoinIdentifier,
     pub amount: Amount,
-}
-
-impl From<sui_sdk::rpc_types::Coin> for Coin {
-    fn from(coin: sui_sdk::rpc_types::Coin) -> Self {
-        Self {
-            coin_identifier: CoinIdentifier { identifier: CoinID { id: coin.coin_object_id, version: coin.version } },
-            amount: Amount { value: coin.balance as i128, currency: SUI.clone(), metadata: None },
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -430,21 +416,24 @@ pub enum OperationType {
     AuthenticatorStateUpdate,
     RandomnessStateUpdate,
     EndOfEpochTransaction,
+    ProgrammableSystemTransaction,
+    Unknown,
 }
 
-impl From<&SuiTransactionBlockKind> for OperationType {
-    fn from(tx: &SuiTransactionBlockKind) -> Self {
-        match tx {
-            SuiTransactionBlockKind::ChangeEpoch(_) => OperationType::EpochChange,
-            SuiTransactionBlockKind::Genesis(_) => OperationType::Genesis,
-            SuiTransactionBlockKind::ConsensusCommitPrologue(_)
-            | SuiTransactionBlockKind::ConsensusCommitPrologueV2(_)
-            | SuiTransactionBlockKind::ConsensusCommitPrologueV3(_)
-            | SuiTransactionBlockKind::ConsensusCommitPrologueV4(_) => OperationType::ConsensusCommitPrologue,
-            SuiTransactionBlockKind::ProgrammableTransaction(_) => OperationType::ProgrammableTransaction,
-            SuiTransactionBlockKind::AuthenticatorStateUpdate(_) => OperationType::AuthenticatorStateUpdate,
-            SuiTransactionBlockKind::RandomnessStateUpdate(_) => OperationType::RandomnessStateUpdate,
-            SuiTransactionBlockKind::EndOfEpochTransaction(_) => OperationType::EndOfEpochTransaction,
+impl From<&TransactionKind> for OperationType {
+    fn from(tx: &TransactionKind) -> Self {
+        match tx.kind.and_then(|k| Kind::try_from(k).ok()) {
+            Some(Kind::ProgrammableTransaction) => OperationType::ProgrammableTransaction,
+            Some(Kind::ChangeEpoch) => OperationType::EpochChange,
+            Some(Kind::Genesis) => OperationType::Genesis,
+            Some(Kind::ConsensusCommitPrologueV1)
+            | Some(Kind::ConsensusCommitPrologueV2)
+            | Some(Kind::ConsensusCommitPrologueV3)
+            | Some(Kind::ConsensusCommitPrologueV4) => OperationType::ConsensusCommitPrologue,
+            Some(Kind::AuthenticatorStateUpdate) => OperationType::AuthenticatorStateUpdate,
+            Some(Kind::RandomnessStateUpdate) => OperationType::RandomnessStateUpdate,
+            Some(Kind::EndOfEpoch) => OperationType::EndOfEpochTransaction,
+            Some(Kind::Unknown) | Some(_) | None => OperationType::Unknown,
         }
     }
 }
@@ -574,7 +563,7 @@ pub struct ConstructionPreprocessResponse {
     pub required_public_keys: Vec<AccountIdentifier>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MetadataOptions {
     pub internal_operation: InternalOperation,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -608,11 +597,25 @@ pub struct ConstructionMetadataResponse {
     pub suggested_fee: Vec<Amount>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConstructionMetadata {
     pub sender: SuiAddress,
-    pub coins: Vec<ObjectRef>,
+    /// `Coin<OCT>` objects to be used as gas
+    pub gas_coins: Vec<ObjectRef>,
+    /// DEPRECATED: Kept for backwards compatibility during rolling deployments.
+    /// For PayOct/Stake: extra gas coins to merge into gas
+    /// For PayCoin/WithdrawStake: empty
+    /// New code should use `objects` field instead.
+    #[serde(default)]
+    pub extra_gas_coins: Vec<ObjectRef>,
+    /// For PayOct/Stake: extra gas coins to merge into gas
+    /// For PayCoin: payment coins of the specified type
+    /// For WithdrawStake: stake objects to withdraw
     pub objects: Vec<ObjectRef>,
+    /// Party-owned (ConsensusAddress) version of objects
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub party_objects: Vec<(ObjectID, SequenceNumber)>,
+    /// Always refers to SUI balance used
     #[serde(with = "str_format")]
     pub total_coin_value: i128,
     pub gas_price: u64,
@@ -736,11 +739,12 @@ pub enum OperationStatus {
     Failure,
 }
 
-impl From<SuiExecutionStatus> for OperationStatus {
-    fn from(es: SuiExecutionStatus) -> Self {
-        match es {
-            SuiExecutionStatus::Success => OperationStatus::Success,
-            SuiExecutionStatus::Failure { .. } => OperationStatus::Failure,
+impl From<&ExecutionStatus> for OperationStatus {
+    fn from(es: &ExecutionStatus) -> Self {
+        if es.success() {
+            OperationStatus::Success
+        } else {
+            OperationStatus::Failure
         }
     }
 }
@@ -861,121 +865,116 @@ pub struct PrefundedAccount {
     pub currency: Currency,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum InternalOperation {
-    PayOct {
-        sender: SuiAddress,
-        recipients: Vec<SuiAddress>,
-        amounts: Vec<u64>,
-    },
-    PayCoin {
-        sender: SuiAddress,
-        recipients: Vec<SuiAddress>,
-        amounts: Vec<u64>,
-        currency: Currency,
-    },
-    Stake {
-        sender: SuiAddress,
-        validator: SuiAddress,
-        amount: Option<u64>,
-    },
-    WithdrawStake {
-        sender: SuiAddress,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        stake_ids: Vec<ObjectID>,
-    },
-}
+#[cfg(test)]
+mod tests {
+    use quick_js::Context;
+    use serde_json::json;
 
-impl InternalOperation {
-    pub fn sender(&self) -> SuiAddress {
-        match self {
-            InternalOperation::PayOct { sender, .. }
-            | InternalOperation::PayCoin { sender, .. }
-            | InternalOperation::Stake { sender, .. }
-            | InternalOperation::WithdrawStake { sender, .. } => *sender,
-        }
-    }
+    use super::*;
 
-    /// Combine with ConstructionMetadata to form the TransactionData
-    pub fn try_into_data(self, metadata: ConstructionMetadata) -> Result<TransactionData, Error> {
-        let pt = match self {
-            Self::PayOct { recipients, amounts, .. } => {
-                let mut builder = ProgrammableTransactionBuilder::new();
-                builder.pay_oct(recipients, amounts)?;
-                builder.finish()
-            }
-            Self::PayCoin { recipients, amounts, .. } => {
-                let mut builder = ProgrammableTransactionBuilder::new();
-                builder.pay(metadata.objects.clone(), recipients, amounts)?;
-                let currency_str = serde_json::to_string(&metadata.currency.unwrap()).unwrap();
-                // This is a workaround in order to have the currency info available during the process
-                // of constructing back the Operations object from the transaction data. A process that
-                // takes place upon the request to the construction's /parse endpoint. The pure value is
-                // not actually being used in any on-chain transaction execution and its sole purpose
-                // is to act as a bearer of the currency info between the various steps of the flow.
-                // See also the value is being later accessed within the operations.rs file's
-                // parse_programmable_transaction function.
-                builder.pure(currency_str)?;
-                builder.finish()
-            }
-            InternalOperation::Stake { validator, amount, .. } => {
-                let mut builder = ProgrammableTransactionBuilder::new();
-
-                // [WORKAROUND] - this is a hack to work out if the staking ops is for a selected amount or None amount (whole wallet).
-                // if amount is none, validator input will be created after the system object input
-                let (validator, system_state, amount) = if let Some(amount) = amount {
-                    let amount = builder.pure(amount)?;
-                    let validator = builder.input(CallArg::Pure(bcs::to_bytes(&validator)?))?;
-                    let state = builder.input(CallArg::SUI_SYSTEM_MUT)?;
-                    (validator, state, amount)
-                } else {
-                    let amount = builder.pure(metadata.total_coin_value as u64 - metadata.budget)?;
-                    let state = builder.input(CallArg::SUI_SYSTEM_MUT)?;
-                    let validator = builder.input(CallArg::Pure(bcs::to_bytes(&validator)?))?;
-                    (validator, state, amount)
-                };
-                let coin = builder.command(Command::SplitCoins(Argument::GasCoin, vec![amount]));
-
-                let arguments = vec![system_state, coin, validator];
-
-                builder.command(Command::move_call(
-                    SUI_SYSTEM_PACKAGE_ID,
-                    SUI_SYSTEM_MODULE_NAME.to_owned(),
-                    ADD_STAKE_FUN_NAME.to_owned(),
-                    vec![],
-                    arguments,
-                ));
-                builder.finish()
-            }
-            InternalOperation::WithdrawStake { stake_ids, .. } => {
-                let mut builder = ProgrammableTransactionBuilder::new();
-
-                for stake_id in metadata.objects {
-                    // [WORKAROUND] - this is a hack to work out if the withdraw stake ops is for selected stake_ids or None (all stakes) using the index of the call args.
-                    // if stake_ids is not empty, id input will be created after the system object input
-                    let (system_state, id) = if !stake_ids.is_empty() {
-                        let system_state = builder.input(CallArg::SUI_SYSTEM_MUT)?;
-                        let id = builder.obj(ObjectArg::ImmOrOwnedObject(stake_id))?;
-                        (system_state, id)
-                    } else {
-                        let id = builder.obj(ObjectArg::ImmOrOwnedObject(stake_id))?;
-                        let system_state = builder.input(CallArg::SUI_SYSTEM_MUT)?;
-                        (system_state, id)
-                    };
-
-                    let arguments = vec![system_state, id];
-                    builder.command(Command::move_call(
-                        SUI_SYSTEM_PACKAGE_ID,
-                        SUI_SYSTEM_MODULE_NAME.to_owned(),
-                        WITHDRAW_STAKE_FUN_NAME.to_owned(),
-                        vec![],
-                        arguments,
-                    ));
-                }
-                builder.finish()
-            }
+    #[tokio::test]
+    async fn test_currency_defaults() {
+        let expected = Currency {
+            symbol: "SUI".to_string(),
+            decimals: 9,
+            metadata: CurrencyMetadata {
+                coin_type: "0x0000000000000000000000000000000000000000000000000000000000000002::oct::OCT".to_string(),
+            },
         };
 
-        Ok(TransactionData::new_programmable(metadata.sender, metadata.coins, pt, metadata.budget, metadata.gas_price))
+        let currency: Currency = serde_json::from_value(json!(
+            {
+                "symbol": "SUI",
+                "decimals": 9,
+            }
+        ))
+        .unwrap();
+        assert_eq!(expected, currency);
+
+        let amount: Amount = serde_json::from_value(json!(
+            {
+                "value": "1000000000",
+            }
+        ))
+        .unwrap();
+        assert_eq!(expected, amount.currency);
+
+        let account_balance_request: AccountBalanceRequest = serde_json::from_value(json!(
+            {
+                "network_identifier": {
+                    "blockchain": "sui",
+                    "network": "mainnet"
+                },
+                "account_identifier": {
+                    "address": "0xadc3a0bb21840f732435f8b649e99df6b29cd27854dfa4b020e3bee07ea09b96"
+                }
+            }
+        ))
+        .unwrap();
+        assert_eq!(expected, account_balance_request.currencies.0.clone().pop().unwrap());
+
+        let account_balance_request: AccountBalanceRequest = serde_json::from_value(json!(
+            {
+                "network_identifier": {
+                    "blockchain": "sui",
+                    "network": "mainnet"
+                },
+                "account_identifier": {
+                    "address": "0xadc3a0bb21840f732435f8b649e99df6b29cd27854dfa4b020e3bee07ea09b96"
+                },
+                "currencies": []
+            }
+        ))
+        .unwrap();
+        assert_eq!(expected, account_balance_request.currencies.0.clone().pop().unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_metadata_total_coin_value_js_conversion_for_large_balance() {
+        #[derive(Serialize, Deserialize, Debug)]
+        pub struct TestConstructionMetadata {
+            pub sender: SuiAddress,
+            pub coins: Vec<ObjectRef>,
+            pub objects: Vec<ObjectRef>,
+            pub total_coin_value: u64,
+            pub gas_price: u64,
+            pub budget: u64,
+            pub currency: Option<Currency>,
+        }
+
+        let test_metadata = TestConstructionMetadata {
+            sender: Default::default(),
+            coins: vec![],
+            objects: vec![],
+            total_coin_value: 65_000_004_233_578_496,
+            gas_price: 0,
+            budget: 0,
+            currency: None,
+        };
+        let test_metadata_json = serde_json::to_string(&test_metadata).unwrap();
+
+        let prod_metadata = ConstructionMetadata {
+            sender: Default::default(),
+            gas_coins: vec![],
+            extra_gas_coins: vec![],
+            objects: vec![],
+            party_objects: vec![],
+            total_coin_value: 65_000_004_233_578_496,
+            gas_price: 0,
+            budget: 0,
+            currency: None,
+        };
+        let prod_metadata_json = serde_json::to_string(&prod_metadata).unwrap();
+
+        let context = Context::new().unwrap();
+
+        let test_total_coin_value = format!("JSON.parse({:?}).total_coin_value.toString()", test_metadata_json);
+        let js_test_total_coin_value = context.eval_as::<String>(&test_total_coin_value).unwrap();
+
+        let prod_total_coin_value = format!("JSON.parse({:?}).total_coin_value.toString()", prod_metadata_json);
+        let js_prod_total_coin_value = context.eval_as::<String>(&prod_total_coin_value).unwrap();
+
+        assert_eq!("65000004233578500", js_test_total_coin_value);
+        assert_eq!("65000004233578496", js_prod_total_coin_value);
     }
 }

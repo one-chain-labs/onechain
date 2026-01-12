@@ -16,9 +16,7 @@ use diesel_async::{
     AsyncPgConnection,
     RunQueryDsl,
 };
-use sui_types::digests::TransactionDigest;
-
-use crate::{
+use sui_bridge_schema::{
     models::SuiProgressStore,
     schema,
     schema::{
@@ -28,8 +26,10 @@ use crate::{
         token_transfer,
         token_transfer_data,
     },
-    ProcessedTxnData,
 };
+use sui_types::digests::TransactionDigest;
+
+use crate::ProcessedTxnData;
 
 pub(crate) type PgPool = diesel_async::pooled_connection::bb8::Pool<diesel_async::AsyncPgConnection>;
 
@@ -141,7 +141,7 @@ pub async fn update_sui_progress_store(pool: &PgPool, tx_digest: TransactionDige
 
 pub async fn read_sui_progress_store(pool: &PgPool) -> anyhow::Result<Option<TransactionDigest>> {
     let mut conn = pool.get().await?;
-    let val: Option<SuiProgressStore> = crate::schema::sui_progress_store::dsl::sui_progress_store
+    let val: Option<SuiProgressStore> = schema::sui_progress_store::dsl::sui_progress_store
         .select(SuiProgressStore::as_select())
         .first(&mut conn)
         .await

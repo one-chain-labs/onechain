@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+use serde::{de::Deserializer, Deserialize, Serialize};
 use serde_with::serde_as;
 
 // These values set to loosely attempt to limit
@@ -53,12 +53,12 @@ const TRAFFIC_SINK_TIMEOUT_SEC: u64 = 300;
 ///
 /// 1. Set `x-forwarded-for: 0` for the `client-id-source` in the config.
 /// 2. Run the node and query any endpoint (AuthorityServer for validator, or json rpc for rpc node)
-///     from a known IP address.
+///    from a known IP address.
 /// 3. Search for lines containing `x-forwarded-for` in the logs. The log lines should contain
 ///    the contents of the `x-forwarded-for` header, if present, or a corresponding error if not.
 /// 4. The value for number of hops is derived from any such log line that contains your known IP
-///     address, and is defined as 1 + the number of IP addresses in the `x-forwarded-for` that occur
-///     **after** the known client IP address. Example:
+///    address, and is defined as 1 + the number of IP addresses in the `x-forwarded-for` that occur
+///    **after** the known client IP address. Example:
 ///
 /// ```ignore
 ///     [<known client IP>] <--- number of hops is 1
@@ -70,6 +70,13 @@ pub enum ClientIdSource {
     #[default]
     SocketAddr,
     XForwardedFor(usize),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TrafficControlReconfigParams {
+    pub error_threshold: Option<u64>,
+    pub spam_threshold: Option<u64>,
+    pub dry_run: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -101,6 +108,14 @@ impl Weight {
         let sample = rand::distributions::Uniform::new(0.0, 1.0).sample(&mut rng);
         sample <= self.value()
     }
+}
+
+fn validate_sample_rate<'de, D>(deserializer: D) -> Result<Weight, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = f32::deserialize(deserializer)?;
+    Weight::new(value).map_err(|_| serde::de::Error::custom("spam-sample-rate must be between 0.0 and 1.0"))
 }
 
 impl PartialEq for Weight {
@@ -214,6 +229,7 @@ pub enum PolicyType {
     /// Blocks connection_ip after reaching a tally frequency (tallies per second)
     /// of `threshold`, as calculated over an average window of `window_size_secs`
     /// with granularity of `update_interval_secs`
+    #[serde(rename = "freq-threshold", alias = "FreqThreshold")]
     FreqThreshold(FreqThresholdConfig),
 
     /* Below this point are test policies, and thus should not be used in production */
@@ -243,7 +259,7 @@ pub struct PolicyConfig {
     pub error_policy_type: PolicyType,
     #[serde(default = "default_channel_capacity")]
     pub channel_capacity: usize,
-    #[serde(default = "default_spam_sample_rate")]
+    #[serde(default = "default_spam_sample_rate", deserialize_with = "validate_sample_rate")]
     /// Note that this sample policy is applied on top of the
     /// endpoint-specific sample policy (not configurable) which
     /// weighs endpoints by the relative effort required to serve
@@ -271,6 +287,30 @@ impl Default for PolicyConfig {
             spam_sample_rate: default_spam_sample_rate(),
             dry_run: default_dry_run(),
             allow_list: None,
+        }
+    }
+}
+
+impl PolicyConfig {
+    pub fn default_dos_protection_policy() -> PolicyConfig {
+        PolicyConfig {
+            client_id_source: ClientIdSource::SocketAddr,
+            spam_policy_type: PolicyType::FreqThreshold(FreqThresholdConfig {
+                client_threshold: 1000,
+                window_size_secs: 5,
+                update_interval_secs: 1,
+                ..FreqThresholdConfig::default()
+            }),
+            error_policy_type: PolicyType::FreqThreshold(FreqThresholdConfig {
+                client_threshold: 50,
+                window_size_secs: 5,
+                update_interval_secs: 1,
+                ..FreqThresholdConfig::default()
+            }),
+            channel_capacity: 6000,
+            spam_sample_rate: Weight::new(1.0).unwrap(),
+            dry_run: true,
+            ..PolicyConfig::default()
         }
     }
 }

@@ -16,9 +16,11 @@ This is the root document for the Move stdlib module documentation. The Move std
 -  [`ascii`](../std/ascii.md#std_ascii)
 -  [`bcs`](../std/bcs.md#std_bcs)
 -  [`bit_vector`](../std/bit_vector.md#std_bit_vector)
+-  [`bool`](../std/bool.md#std_bool)
 -  [`debug`](../std/debug.md#std_debug)
 -  [`fixed_point32`](../std/fixed_point32.md#std_fixed_point32)
 -  [`hash`](../std/hash.md#std_hash)
+-  [`internal`](../std/internal.md#std_internal)
 -  [`macros`](../std/macros.md#std_macros)
 -  [`option`](../std/option.md#std_option)
 -  [`string`](../std/string.md#std_string)
@@ -29,6 +31,8 @@ This is the root document for the Move stdlib module documentation. The Move std
 -  [`u32`](../std/u32.md#std_u32)
 -  [`u64`](../std/u64.md#std_u64)
 -  [`u8`](../std/u8.md#std_u8)
+-  [`uq32_32`](../std/uq32_32.md#std_uq32_32)
+-  [`uq64_64`](../std/uq64_64.md#std_uq64_64)
 -  [`vector`](../std/vector.md#std_vector)
 
 

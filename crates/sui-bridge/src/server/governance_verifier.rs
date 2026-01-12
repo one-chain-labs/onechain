@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 use crate::{
     error::{BridgeError, BridgeResult},
-    server::handler::ActionVerifier,
     types::{BridgeAction, BridgeActionDigest},
 };
 
@@ -26,15 +25,8 @@ impl GovernanceVerifier {
         }
         Ok(Self { approved_goverance_actions })
     }
-}
 
-#[async_trait::async_trait]
-impl ActionVerifier<BridgeAction> for GovernanceVerifier {
-    fn name(&self) -> &'static str {
-        "GovernanceVerifier"
-    }
-
-    async fn verify(&self, key: BridgeAction) -> BridgeResult<BridgeAction> {
+    pub async fn verify(&self, key: BridgeAction) -> BridgeResult<BridgeAction> {
         // TODO: an optimization would be to check the current nonce on chain and err for older ones
         if !key.is_governace_action() {
             return Err(BridgeError::ActionIsNotGovernanceAction(key));
@@ -43,7 +35,8 @@ impl ActionVerifier<BridgeAction> for GovernanceVerifier {
             assert_eq!(&key, approved_action, "Mismatched action found in approved_actions");
             return Ok(key);
         }
-        return Err(BridgeError::GovernanceActionIsNotApproved);
+
+        Err(BridgeError::GovernanceActionIsNotApproved)
     }
 }
 

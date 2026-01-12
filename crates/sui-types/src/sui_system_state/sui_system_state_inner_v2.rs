@@ -16,6 +16,7 @@ use crate::{
     collection_types::{Bag, Table, TableVec, VecMap, VecSet},
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     error::SuiError,
+    gas::GasCostSummary,
     storage::ObjectStore,
     sui_system_state::{
         epoch_start_sui_system_state::EpochStartSystemState,
@@ -24,7 +25,7 @@ use crate::{
     },
 };
 
-/// Rust version of the Move sui::sui_system::SystemParametersV2 type
+/// Rust version of the Move one::one_system::SystemParametersV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SystemParametersV2 {
     /// The duration of an epoch, in milliseconds.
@@ -59,7 +60,7 @@ pub struct SystemParametersV2 {
     pub extra_fields: Bag,
 }
 
-/// Rust version of the Move sui_system::sui_system::SuiSystemStateInnerV2 type
+/// Rust version of the Move one_system::one_system::SuiSystemStateInnerV2 type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SuiSystemStateInnerV2 {
     pub epoch: u64,
@@ -109,6 +110,15 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
 
     fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary {
+            computation_cost: self.safe_mode_computation_rewards.value(),
+            storage_cost: self.safe_mode_storage_rewards.value(),
+            storage_rebate: self.safe_mode_storage_rebates,
+            non_refundable_storage_fee: self.safe_mode_non_refundable_storage_fee,
+        }
     }
 
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
@@ -208,6 +218,7 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV2 {
                     trusted_validators: VecSet { contents: trusted_validators },
                     only_trusted_validator,
                     extra_fields: _,
+                    ..
                 },
             storage_fund,
             parameters:

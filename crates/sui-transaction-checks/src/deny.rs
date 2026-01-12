@@ -2,20 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use fastcrypto_zkp::bn254::zk_login::OIDCProvider;
-use sui_config::transaction_deny_config::TransactionDenyConfig;
+use sui_config::{
+    dynamic_transaction_signing_checks::DynamicCheckRunnerError,
+    transaction_deny_config::TransactionDenyConfig,
+};
 use sui_types::{
     base_types::ObjectRef,
-    error::{SuiError, SuiResult, UserInputError},
+    error::{SuiError, SuiErrorKind, SuiResult, UserInputError},
     signature::GenericSignature,
     storage::BackingPackageStore,
     transaction::{Command, InputObjectKind, TransactionData, TransactionDataAPI},
 };
+use tracing::{error, warn};
 macro_rules! deny_if_true {
     ($cond:expr, $msg:expr) => {
         if ($cond) {
-            return Err(SuiError::UserInputError {
+            return Err(SuiError(Box::new(SuiErrorKind::UserInputError {
                 error: UserInputError::TransactionDenied { error: $msg.to_string() },
-            });
+            })));
         }
     };
 }
@@ -40,7 +44,45 @@ pub fn check_transaction_for_signing(
 
     check_receiving_objects(filter_config, receiving_objects)?;
 
+    // NB: Only performed at signing time.
+    dynamic_transaction_checks(filter_config, tx_data, tx_signatures, input_object_kinds, receiving_objects)?;
+
     Ok(())
+}
+
+fn dynamic_transaction_checks(
+    filter_config: &TransactionDenyConfig,
+    tx_data: &TransactionData,
+    tx_signatures: &[GenericSignature],
+    input_object_kinds: &[InputObjectKind],
+    receiving_objects: &[ObjectRef],
+) -> SuiResult {
+    let Some(dynamic_check) = filter_config.dynamic_transaction_checks() else {
+        return Ok(());
+    };
+    match dynamic_check.run_predicate(tx_data, tx_signatures, input_object_kinds, receiving_objects) {
+        // Predicate passed
+        Ok(()) => Ok(()),
+        // Predicate failed
+        Err(DynamicCheckRunnerError::CheckFailure) => {
+            warn!("Dynamic transaction predicate rejected transaction: {:?}", tx_data.digest());
+            Err(SuiErrorKind::UserInputError {
+                error: UserInputError::TransactionDenied { error: "Dynamic transaction predicate failed".to_string() },
+            }
+            .into())
+        }
+        // Non-predicate failure, so be conservative and deny the transaction.
+        Err(e) => {
+            error!(
+                "Dynamic transaction predicate failed with error: {:?} on transaction: {}. \
+                 Rejecting transaction.",
+                e,
+                tx_data.digest()
+            );
+            Err(SuiErrorKind::UserInputError { error: UserInputError::TransactionDenied { error: e.to_string() } }
+                .into())
+        }
+    }
 }
 
 fn check_receiving_objects(filter_config: &TransactionDenyConfig, receiving_objects: &[ObjectRef]) -> SuiResult {
@@ -70,7 +112,7 @@ fn check_disabled_features(
             deny_if_true!(
                 filter_config.zklogin_disabled_providers().contains(
                     &OIDCProvider::from_iss(z.get_iss())
-                        .map_err(|_| SuiError::UnexpectedMessage(z.get_iss().to_string()))?
+                        .map_err(|_| SuiErrorKind::UnexpectedMessage(z.get_iss().to_string()))?
                         .to_string()
                 ),
                 "zkLogin OAuth provider is temporarily disabled"
@@ -153,7 +195,7 @@ fn check_package_dependencies(
                 dependencies.push(*package_id);
             }
             Command::MoveCall(call) => {
-                let package = package_store.get_package_object(&call.package)?.ok_or(SuiError::UserInputError {
+                let package = package_store.get_package_object(&call.package)?.ok_or(SuiErrorKind::UserInputError {
                     error: UserInputError::ObjectNotFound { object_id: call.package, version: None },
                 })?;
                 // linkage_table maps from the original package ID to the upgraded ID for each

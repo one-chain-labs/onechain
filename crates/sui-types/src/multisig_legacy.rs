@@ -23,7 +23,7 @@ use crate::{
     base_types::{EpochId, SuiAddress},
     crypto::{CompressedSignature, PublicKey, SignatureScheme},
     digests::ZKLoginInputsDigest,
-    error::SuiError,
+    error::{SuiError, SuiErrorKind},
     multisig::{MultiSig, MultiSigPublicKey},
     signature::{AuthenticatorTrait, GenericSignature, VerifyParams},
     signature_verification::VerifiedDigestCache,
@@ -95,7 +95,7 @@ impl AuthenticatorTrait for MultiSigLegacy {
         let multisig: MultiSig = self
             .clone()
             .try_into()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid legacy multisig".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature { error: "Invalid legacy multisig".to_string() })?;
         multisig.verify_user_authenticator_epoch(epoch_id, max_epoch_upper_bound_delta)
     }
 
@@ -112,7 +112,7 @@ impl AuthenticatorTrait for MultiSigLegacy {
         let multisig: MultiSig = self
             .clone()
             .try_into()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid legacy multisig".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature { error: "Invalid legacy multisig".to_string() })?;
         multisig.verify_claims(value, author, aux_verify_data, zklogin_inputs_cache)
     }
 }
@@ -157,10 +157,10 @@ impl MultiSigLegacy {
     pub fn combine(full_sigs: Vec<GenericSignature>, multisig_pk: MultiSigPublicKeyLegacy) -> Result<Self, SuiError> {
         multisig_pk
             .validate()
-            .map_err(|_| SuiError::InvalidSignature { error: "Invalid multisig public key".to_string() })?;
+            .map_err(|_| SuiErrorKind::InvalidSignature { error: "Invalid multisig public key".to_string() })?;
 
         if full_sigs.len() > multisig_pk.pk_map.len() || full_sigs.is_empty() {
-            return Err(SuiError::InvalidSignature { error: "Invalid number of signatures".to_string() });
+            return Err(SuiErrorKind::InvalidSignature { error: "Invalid number of signatures".to_string() }.into());
         }
         let mut bitmap = RoaringBitmap::new();
         let mut sigs = Vec::with_capacity(full_sigs.len());
@@ -169,10 +169,10 @@ impl MultiSigLegacy {
             let inserted = bitmap.insert(
                 multisig_pk
                     .get_index(&pk)
-                    .ok_or(SuiError::IncorrectSigner { error: format!("pk does not exist: {:?}", pk) })?,
+                    .ok_or(SuiErrorKind::IncorrectSigner { error: format!("pk does not exist: {:?}", pk) })?,
             );
             if !inserted {
-                return Err(SuiError::InvalidSignature { error: "Duplicate signature".to_string() });
+                return Err(SuiErrorKind::InvalidSignature { error: "Duplicate signature".to_string() }.into());
             }
             sigs.push(s.to_compressed()?);
         }
@@ -264,10 +264,13 @@ impl MultiSigPublicKeyLegacy {
             || threshold == 0
             || pks.len() != weights.len()
             || pks.len() > MAX_SIGNER_IN_MULTISIG
-            || weights.iter().any(|w| *w == 0)
+            || weights.contains(&0)
             || weights.iter().map(|w| *w as ThresholdUnit).sum::<ThresholdUnit>() < threshold
         {
-            return Err(SuiError::InvalidSignature { error: "Invalid multisig public key construction".to_string() });
+            return Err(SuiErrorKind::InvalidSignature {
+                error: "Invalid multisig public key construction".to_string(),
+            }
+            .into());
         }
         Ok(MultiSigPublicKeyLegacy { pk_map: pks.into_iter().zip(weights).collect(), threshold })
     }

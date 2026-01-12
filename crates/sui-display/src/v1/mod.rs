@@ -8,12 +8,13 @@ use move_core_types::{
     annotated_extractor::Extractor,
     annotated_value::{MoveTypeLayout, MoveValue},
 };
-use parser::{Parser, Strand};
 use sui_json_rpc_types::SuiMoveValue;
 use sui_types::{
     collection_types::{Entry, VecMap},
     object::bounded_visitor::BoundedVisitor,
 };
+
+use self::parser::{Parser, Strand};
 
 pub(crate) mod lexer;
 pub(crate) mod parser;

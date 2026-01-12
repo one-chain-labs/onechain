@@ -15,8 +15,7 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
     effects::{TransactionEffects, TransactionEffectsAPI},
-    error::{SuiError, UserInputError},
-    execution_config_utils::to_binary_config,
+    error::{SuiErrorKind, UserInputError},
     execution_status::{CommandArgumentError, ExecutionFailureStatus, ExecutionStatus, PackageUpgradeError},
     move_package::UpgradePolicy,
     object::{Object, Owner},
@@ -293,8 +292,9 @@ async fn test_upgrade_package_happy_path() {
     let package =
         runner.authority_state.get_object_cache_reader().get_package_object(&runner.package.0).unwrap().unwrap();
     let config = ProtocolConfig::get_for_max_version_UNSAFE();
-    let binary_config = to_binary_config(&config);
-    let normalized_modules = package.move_package().normalize(&binary_config).unwrap();
+    let binary_config = config.binary_config(None);
+    let pool = &mut move_binary_format::normalized::RcPool::new();
+    let normalized_modules = package.move_package().normalize(pool, &binary_config, /* include code */ true).unwrap();
     assert!(normalized_modules.contains_key("new_module"));
     assert!(normalized_modules["new_module"].functions.contains_key(ident_str!("this_is_a_new_module")));
     assert!(normalized_modules["new_module"]
@@ -637,14 +637,25 @@ async fn test_upgrade_ticket_doesnt_match() {
             builder,
             (SUI_FRAMEWORK_PACKAGE_ID)::package::authorize_upgrade(Argument::Input(0), upgrade_arg, digest_arg)
         };
-        builder.upgrade(MOVE_STDLIB_PACKAGE_ID, upgrade_ticket, vec![], modules);
+        let upgrade_receipt = builder.upgrade(MOVE_STDLIB_PACKAGE_ID, upgrade_ticket, vec![], modules);
+        builder.programmable_move_call(
+            SUI_FRAMEWORK_PACKAGE_ID,
+            ident_str!("package").to_owned(),
+            ident_str!("commit_upgrade").to_owned(),
+            vec![],
+            vec![Argument::Input(0), upgrade_receipt],
+        );
         builder.finish()
     };
     let effects = runner.run(pt).await;
 
-    assert!(matches!(effects.into_status().unwrap_err().0, ExecutionFailureStatus::PackageUpgradeError {
-        upgrade_error: PackageUpgradeError::PackageIDDoesNotMatch { package_id: _, ticket_id: _ }
-    }));
+    let err = effects.into_status().unwrap_err().0;
+    assert!(
+        matches!(err, ExecutionFailureStatus::PackageUpgradeError {
+            upgrade_error: PackageUpgradeError::PackageIDDoesNotMatch { package_id: _, ticket_id: _ }
+        }),
+        "Expected PackageUpgradeError with PackageIDDoesNotMatch, got: {err:#?}",
+    );
 }
 
 #[tokio::test]
@@ -994,8 +1005,8 @@ async fn test_upgraded_types_in_one_txn() {
     let e1_type = StructTag::from_str(&format!("{package_v2}::base::BModEvent")).unwrap();
     let e2_type = StructTag::from_str(&format!("{package_v3}::base::CModEvent")).unwrap();
 
-    let event_digest = effects.events_digest().unwrap();
-    let mut events = runner.authority_state.get_transaction_events(event_digest).unwrap().data;
+    let _event_digest = effects.events_digest().unwrap();
+    let mut events = runner.authority_state.get_transaction_events(effects.transaction_digest()).unwrap().data;
     events.sort_by(|a, b| a.type_.name.as_str().cmp(b.type_.name.as_str()));
     assert!(events.len() == 2);
     assert_eq!(events[0].type_, e1_type);
@@ -1261,7 +1272,7 @@ async fn test_upgrade_more_than_max_packages_error() {
     build_multi_upgrade_txns(&mut builder, package_upgrades);
     build_multi_publish_txns(&mut builder, sender, packages);
     let err = run_multi_txns(&authority, sender, &sender_key, &gas_object_id, builder).await.unwrap_err();
-    assert_eq!(err, SuiError::UserInputError {
+    assert_eq!(err, SuiErrorKind::UserInputError {
         error: UserInputError::MaxPublishCountExceeded {
             max_publish_commands: max_pub_cmd,
             publish_count: max_pub_cmd + 2,

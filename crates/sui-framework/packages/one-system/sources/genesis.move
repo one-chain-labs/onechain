@@ -4,50 +4,42 @@
 module one_system::genesis;
 
 use one::balance::{Self, Balance};
-use one::oct::{Self, OCT};
+use one::oct::OCT;
+use one_system::stake_subsidy;
 use one_system::one_system;
+use one_system::sui_system_state_inner;
 use one_system::validator::{Self, Validator};
 use one_system::validator_set;
-use one_system::sui_system_state_inner;
-use one_system::stake_subsidy;
 
-public struct GenesisValidatorMetadata has drop, copy {
+public struct GenesisValidatorMetadata has copy, drop {
     name: vector<u8>,
     description: vector<u8>,
     image_url: vector<u8>,
     project_url: vector<u8>,
-
     sui_address: address,
     revenue_receiving_address:address,
-
-
     gas_price: u64,
     commission_rate: u64,
-
     protocol_public_key: vector<u8>,
     proof_of_possession: vector<u8>,
-
     network_public_key: vector<u8>,
     worker_public_key: vector<u8>,
-
     network_address: vector<u8>,
     p2p_address: vector<u8>,
     primary_address: vector<u8>,
     worker_address: vector<u8>,
 }
 
-public struct GenesisChainParameters has drop, copy {
+public struct GenesisChainParameters has copy, drop {
     protocol_version: u64,
     chain_start_timestamp_ms: u64,
     epoch_duration_ms: u64,
-
-    // Stake Subsidy parameters
+    /// Stake Subsidy parameters
     stake_subsidy_start_epoch: u64,
     stake_subsidy_initial_distribution_amount: u64,
     stake_subsidy_period_length: u64,
     stake_subsidy_decrease_rate: u16,
-
-    // Validator committee parameters
+    /// Validator committee parameters
     max_validator_count: u64,
     min_validator_joining_stake: u64,
     validator_low_stake_threshold: u64,
@@ -63,7 +55,6 @@ public struct TokenDistributionSchedule {
 public struct TokenAllocation {
     recipient_address: address,
     amount_mist: u64,
-
     /// Indicates if this allocation should be staked at genesis and with which validator
     staked_with_validator: Option<address>,
 }
@@ -89,19 +80,9 @@ fun create(
     // Ensure this is only called at genesis
     assert!(ctx.epoch() == 0, ENotCalledAtGenesis);
 
-    let TokenDistributionSchedule {
-        stake_subsidy_fund_mist,
-        allocations,
-    } = token_distribution_schedule;
-
-    let subsidy_fund = sui_supply.split(stake_subsidy_fund_mist);
-    let storage_fund = balance::zero();
-
     // Create all the `Validator` structs
     let mut validators = vector[];
-    let count = genesis_validators.length();
-    let mut i = 0;
-    while (i < count) {
+    genesis_validators.do!(|genesis_validator| {
         let GenesisValidatorMetadata {
             name,
             description,
@@ -119,7 +100,7 @@ fun create(
             p2p_address,
             primary_address,
             worker_address,
-        } = genesis_validators[i];
+        } = genesis_validator;
 
         let validator = validator::new(
             sui_address,
@@ -138,7 +119,7 @@ fun create(
             worker_address,
             gas_price,
             commission_rate,
-            ctx
+            ctx,
         );
 
         // Ensure that each validator is unique
@@ -148,32 +129,31 @@ fun create(
         );
 
         validators.push_back(validator);
+    });
 
-        i = i + 1;
-    };
+    let TokenDistributionSchedule {
+        stake_subsidy_fund_mist,
+        allocations,
+    } = token_distribution_schedule;
+
+    let subsidy_fund = sui_supply.split(stake_subsidy_fund_mist);
+    let storage_fund = balance::zero();
 
     // Allocate tokens and staking operations
-    allocate_tokens(
-        sui_supply,
-        allocations,
-        &mut validators,
-        ctx
-    );
+    allocate_tokens(sui_supply, allocations, &mut validators, ctx);
 
     // Activate all validators
-    activate_validators(&mut validators);
+    validators.do_mut!(|validator| validator.activate(0));
 
     let system_parameters = sui_system_state_inner::create_system_parameters(
         genesis_chain_parameters.epoch_duration_ms,
         genesis_chain_parameters.stake_subsidy_start_epoch,
-
         // Validator committee parameters
         genesis_chain_parameters.max_validator_count,
         genesis_chain_parameters.min_validator_joining_stake,
         genesis_chain_parameters.validator_low_stake_threshold,
         genesis_chain_parameters.validator_very_low_stake_threshold,
         genesis_chain_parameters.validator_low_stake_grace_period,
-
         ctx,
     );
 
@@ -199,52 +179,30 @@ fun create(
 
 fun allocate_tokens(
     mut sui_supply: Balance<OCT>,
-    mut allocations: vector<TokenAllocation>,
+    allocations: vector<TokenAllocation>,
     validators: &mut vector<Validator>,
     ctx: &mut TxContext,
 ) {
+    allocations.destroy!(
+        |TokenAllocation { recipient_address, amount_mist, staked_with_validator }| {
+            let allocation_balance = sui_supply.split(amount_mist);
+            if (staked_with_validator.is_some()) {
+                let validator_address = staked_with_validator.destroy_some();
+                let validator = validator_set::get_validator_mut(validators, validator_address);
 
-    while (!allocations.is_empty()) {
-        let TokenAllocation {
-            recipient_address,
-            amount_mist,
-            staked_with_validator,
-        } = allocations.pop_back();
+                validator.request_add_stake_at_genesis(
+                    allocation_balance,
+                    recipient_address,
+                    true,
+                    ctx,
+                );
+            } else {
+                transfer::public_transfer(allocation_balance.into_coin(ctx), recipient_address);
+            };
+        },
+    );
 
-        let allocation_balance = sui_supply.split(amount_mist);
-
-        if (staked_with_validator.is_some()) {
-            let validator_address = staked_with_validator.destroy_some();
-            let validator = validator_set::get_validator_mut(validators, validator_address);
-            validator.request_add_stake_at_genesis(
-                allocation_balance,
-                recipient_address,
-                true,
-                ctx
-            );
-        } else {
-            oct::transfer(
-                allocation_balance.into_coin(ctx),
-                recipient_address,
-            );
-        };
-    };
-    allocations.destroy_empty();
-
-    // Provided allocations must fully allocate the sui_supply and there
     // should be none left at this point.
+    // Provided allocations must fully allocate the sui_supply and there
     sui_supply.destroy_zero();
-}
-
-fun activate_validators(validators: &mut vector<Validator>) {
-    // Activate all genesis validators
-    let count = validators.length();
-    let mut i = 0;
-    while (i < count) {
-        let validator = &mut validators[i];
-        validator.activate(0);
-
-        i = i + 1;
-    };
-
 }

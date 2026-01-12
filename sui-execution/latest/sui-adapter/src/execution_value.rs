@@ -1,27 +1,29 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeSet;
+
 use move_binary_format::file_format::AbilitySet;
-use move_core_types::{identifier::IdentStr, resolver::ResourceResolver};
+use move_core_types::u256::U256;
 use move_vm_types::loaded_data::runtime_types::Type;
 use serde::Deserialize;
 use sui_types::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     coin::Coin,
-    error::{ExecutionError, ExecutionErrorKind, SuiError},
+    error::{ExecutionError, ExecutionErrorKind},
     execution_status::CommandArgumentError,
+    funds_accumulator::Withdrawal,
     object::Owner,
     storage::{BackingPackageStore, ChildObjectResolver, StorageView},
     transfer::Receiving,
 };
 
-pub trait SuiResolver: ResourceResolver<Error = SuiError> + BackingPackageStore {
+pub trait SuiResolver: BackingPackageStore {
     fn as_backing_package_store(&self) -> &dyn BackingPackageStore;
 }
 
 impl<T> SuiResolver for T
 where
-    T: ResourceResolver<Error = SuiError>,
     T: BackingPackageStore,
 {
     fn as_backing_package_store(&self) -> &dyn BackingPackageStore {
@@ -50,9 +52,16 @@ where
 }
 
 #[derive(Clone, Debug)]
+pub enum Mutability {
+    Mutable,
+    Immutable,
+    NonExclusiveWrite,
+}
+
+#[derive(Clone, Debug)]
 pub enum InputObjectMetadata {
     Receiving { id: ObjectID, version: SequenceNumber },
-    InputObject { id: ObjectID, is_mutable_input: bool, owner: Owner, version: SequenceNumber },
+    InputObject { id: ObjectID, mutability: Mutability, owner: Owner, version: SequenceNumber },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,8 +72,8 @@ pub enum UsageKind {
 }
 
 #[derive(Clone, Copy)]
-pub enum CommandKind<'a> {
-    MoveCall { package: ObjectID, module: &'a IdentStr, function: &'a IdentStr },
+pub enum CommandKind {
+    MoveCall,
     MakeMoveVec,
     TransferObjects,
     SplitCoins,
@@ -87,6 +96,7 @@ pub struct ResultValue {
     /// a "move" of the value.
     pub last_usage_kind: Option<UsageKind>,
     pub value: Option<Value>,
+    pub shared_object_ids: BTreeSet<ObjectID>,
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +115,13 @@ pub struct ObjectValue {
     // entry Move functions
     pub used_in_non_entry_move_call: bool,
     pub contents: ObjectContents,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SizeBound {
+    Object(u64),
+    VectorElem(u64),
+    Raw(u64),
 }
 
 #[derive(Debug, Clone)]
@@ -137,7 +154,11 @@ impl InputObjectMetadata {
 
 impl InputValue {
     pub fn new_object(object_metadata: InputObjectMetadata, value: ObjectValue) -> Self {
-        InputValue { object_metadata: Some(object_metadata), inner: ResultValue::new(Value::Object(value)) }
+        let mut inner = ResultValue::new(Value::Object(value));
+        if let InputObjectMetadata::InputObject { id, owner: Owner::Shared { .. }, .. } = &object_metadata {
+            inner.shared_object_ids.insert(*id);
+        }
+        InputValue { object_metadata: Some(object_metadata), inner }
     }
 
     pub fn new_raw(ty: RawValueType, value: Vec<u8>) -> Self {
@@ -150,11 +171,19 @@ impl InputValue {
             inner: ResultValue::new(Value::Receiving(id, version, None)),
         }
     }
+
+    pub fn withdrawal(withdrawal_ty: RawValueType, owner: SuiAddress, limit: U256) -> Self {
+        let value = Value::Raw(withdrawal_ty, bcs::to_bytes(&Withdrawal::new(owner, limit)).unwrap());
+        InputValue {
+            object_metadata: None,
+            inner: ResultValue { last_usage_kind: None, value: Some(value), shared_object_ids: BTreeSet::new() },
+        }
+    }
 }
 
 impl ResultValue {
     pub fn new(value: Value) -> Self {
-        Self { last_usage_kind: None, value: Some(value) }
+        Self { last_usage_kind: None, value: Some(value), shared_object_ids: BTreeSet::new() }
     }
 }
 
@@ -168,12 +197,17 @@ impl Value {
         }
     }
 
-    pub fn write_bcs_bytes(&self, buf: &mut Vec<u8>) {
+    pub fn write_bcs_bytes(&self, buf: &mut Vec<u8>, bound: Option<SizeBound>) -> Result<(), ExecutionError> {
         match self {
-            Value::Object(obj_value) => obj_value.write_bcs_bytes(buf),
+            Value::Object(obj_value) => obj_value.write_bcs_bytes(buf, bound)?,
             Value::Raw(_, bytes) => buf.extend(bytes),
             Value::Receiving(id, version, _) => buf.extend(Receiving::new(*id, *version).to_bcs_bytes()),
         }
+        if let Some(bound) = bound {
+            ensure_serialized_size(buf.len() as u64, bound)?;
+        }
+
+        Ok(())
     }
 
     pub fn was_used_in_non_entry_move_call(&self) -> bool {
@@ -209,12 +243,38 @@ impl ObjectValue {
         Ok(())
     }
 
-    pub fn write_bcs_bytes(&self, buf: &mut Vec<u8>) {
+    pub fn write_bcs_bytes(&self, buf: &mut Vec<u8>, bound: Option<SizeBound>) -> Result<(), ExecutionError> {
         match &self.contents {
             ObjectContents::Raw(bytes) => buf.extend(bytes),
             ObjectContents::Coin(coin) => buf.extend(coin.to_bcs_bytes()),
         }
+        if let Some(bound) = bound {
+            ensure_serialized_size(buf.len() as u64, bound)?;
+        }
+        Ok(())
     }
+}
+
+pub fn ensure_serialized_size(size: u64, bound: SizeBound) -> Result<(), ExecutionError> {
+    let bound_size = match bound {
+        SizeBound::Object(bound_size) | SizeBound::VectorElem(bound_size) | SizeBound::Raw(bound_size) => bound_size,
+    };
+    if size > bound_size {
+        let e = match bound {
+            SizeBound::Object(_) => {
+                ExecutionErrorKind::MoveObjectTooBig { object_size: size, max_object_size: bound_size }
+            }
+            SizeBound::VectorElem(_) => {
+                ExecutionErrorKind::MoveVectorElemTooBig { value_size: size, max_scaled_size: bound_size }
+            }
+            SizeBound::Raw(_) => {
+                ExecutionErrorKind::MoveRawValueTooBig { value_size: size, max_scaled_size: bound_size }
+            }
+        };
+        let msg = "Serialized bytes of value too large".to_owned();
+        return Err(ExecutionError::new_with_source(e, msg));
+    }
+    Ok(())
 }
 
 pub trait TryFromValue: Sized {

@@ -6,15 +6,29 @@ title: Module `one::tx_context`
 
 -  [Struct `TxContext`](#one_tx_context_TxContext)
 -  [Function `sender`](#one_tx_context_sender)
+-  [Function `native_sender`](#one_tx_context_native_sender)
 -  [Function `digest`](#one_tx_context_digest)
 -  [Function `epoch`](#one_tx_context_epoch)
+-  [Function `native_epoch`](#one_tx_context_native_epoch)
 -  [Function `epoch_timestamp_ms`](#one_tx_context_epoch_timestamp_ms)
+-  [Function `native_epoch_timestamp_ms`](#one_tx_context_native_epoch_timestamp_ms)
+-  [Function `sponsor`](#one_tx_context_sponsor)
 -  [Function `fresh_object_address`](#one_tx_context_fresh_object_address)
--  [Function `ids_created`](#one_tx_context_ids_created)
+-  [Function `fresh_id`](#one_tx_context_fresh_id)
+-  [Function `reference_gas_price`](#one_tx_context_reference_gas_price)
+-  [Function `native_rgp`](#one_tx_context_native_rgp)
+-  [Function `gas_price`](#one_tx_context_gas_price)
+-  [Function `native_gas_price`](#one_tx_context_native_gas_price)
+-  [Function `native_ids_created`](#one_tx_context_native_ids_created)
+-  [Function `native_gas_budget`](#one_tx_context_native_gas_budget)
+-  [Function `option_sponsor`](#one_tx_context_option_sponsor)
+-  [Function `native_sponsor`](#one_tx_context_native_sponsor)
 -  [Function `derive_id`](#one_tx_context_derive_id)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../std/option.md#std_option">std::option</a>;
+<b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
+</code></pre>
 
 
 
@@ -62,7 +76,7 @@ the VM and passed in to the entrypoint of the transaction as <code>&<b>mut</b> <
  Timestamp that the epoch started at
 </dd>
 <dt>
-<code><a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>: u64</code>
+<code>ids_created: u64</code>
 </dt>
 <dd>
  Counter recording the number of fresh id's created while executing
@@ -81,7 +95,7 @@ Return the address of the user that signed the current
 transaction
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_sender">sender</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_sender">sender</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <b>address</b>
 </code></pre>
 
 
@@ -90,9 +104,31 @@ transaction
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_sender">sender</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): <b>address</b> {
-    self.<a href="../one/tx_context.md#one_tx_context_sender">sender</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_sender">sender</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): <b>address</b> {
+    <a href="../one/tx_context.md#one_tx_context_native_sender">native_sender</a>()
 }
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_sender"></a>
+
+## Function `native_sender`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_sender">native_sender</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_sender">native_sender</a>(): <b>address</b>;
 </code></pre>
 
 
@@ -132,7 +168,7 @@ Please do not use as a source of randomness.
 Return the current epoch
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch">epoch</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch">epoch</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
 </code></pre>
 
 
@@ -141,9 +177,31 @@ Return the current epoch
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch">epoch</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
-    self.<a href="../one/tx_context.md#one_tx_context_epoch">epoch</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch">epoch</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
+    <a href="../one/tx_context.md#one_tx_context_native_epoch">native_epoch</a>()
 }
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_epoch"></a>
+
+## Function `native_epoch`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_epoch">native_epoch</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_epoch">native_epoch</a>(): u64;
 </code></pre>
 
 
@@ -157,7 +215,7 @@ Return the current epoch
 Return the epoch start time as a unix timestamp in milliseconds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
 </code></pre>
 
 
@@ -166,8 +224,55 @@ Return the epoch start time as a unix timestamp in milliseconds.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
-    self.<a href="../one/tx_context.md#one_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_epoch_timestamp_ms">epoch_timestamp_ms</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
+    <a href="../one/tx_context.md#one_tx_context_native_epoch_timestamp_ms">native_epoch_timestamp_ms</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_epoch_timestamp_ms"></a>
+
+## Function `native_epoch_timestamp_ms`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_epoch_timestamp_ms">native_epoch_timestamp_ms</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_epoch_timestamp_ms">native_epoch_timestamp_ms</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_sponsor"></a>
+
+## Function `sponsor`
+
+Return the adress of the transaction sponsor or <code>None</code> if there was no sponsor.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_sponsor">sponsor</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_sponsor">sponsor</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): Option&lt;<b>address</b>&gt; {
+    <a href="../one/tx_context.md#one_tx_context_option_sponsor">option_sponsor</a>()
 }
 </code></pre>
 
@@ -184,7 +289,7 @@ occur as the address for a user.
 In other words, the generated address is a globally unique object ID.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_fresh_object_address">fresh_object_address</a>(ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_fresh_object_address">fresh_object_address</a>(_ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <b>address</b>
 </code></pre>
 
 
@@ -193,11 +298,8 @@ In other words, the generated address is a globally unique object ID.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_fresh_object_address">fresh_object_address</a>(ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): <b>address</b> {
-    <b>let</b> <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a> = ctx.<a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>;
-    <b>let</b> id = <a href="../one/tx_context.md#one_tx_context_derive_id">derive_id</a>(*&ctx.tx_hash, <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>);
-    ctx.<a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a> = <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a> + 1;
-    id
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_fresh_object_address">fresh_object_address</a>(_ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): <b>address</b> {
+    <a href="../one/tx_context.md#one_tx_context_fresh_id">fresh_id</a>()
 }
 </code></pre>
 
@@ -205,15 +307,13 @@ In other words, the generated address is a globally unique object ID.
 
 </details>
 
-<a name="one_tx_context_ids_created"></a>
+<a name="one_tx_context_fresh_id"></a>
 
-## Function `ids_created`
-
-Return the number of id's created by the current transaction.
-Hidden for now, but may expose later
+## Function `fresh_id`
 
 
-<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_fresh_id">fresh_id</a>(): <b>address</b>
 </code></pre>
 
 
@@ -222,9 +322,194 @@ Hidden for now, but may expose later
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>(self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
-    self.<a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_fresh_id">fresh_id</a>(): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_reference_gas_price"></a>
+
+## Function `reference_gas_price`
+
+Return the reference gas price in effect for the epoch the transaction
+is being executed in.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_reference_gas_price">reference_gas_price</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_reference_gas_price">reference_gas_price</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
+    <a href="../one/tx_context.md#one_tx_context_native_rgp">native_rgp</a>()
 }
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_rgp"></a>
+
+## Function `native_rgp`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_rgp">native_rgp</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_rgp">native_rgp</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_gas_price"></a>
+
+## Function `gas_price`
+
+Return the gas price submitted for the current transaction.
+That is the value the user submitted with the transaction data.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_gas_price">gas_price</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_gas_price">gas_price</a>(_self: &<a href="../one/tx_context.md#one_tx_context_TxContext">TxContext</a>): u64 {
+    <a href="../one/tx_context.md#one_tx_context_native_gas_price">native_gas_price</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_gas_price"></a>
+
+## Function `native_gas_price`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_gas_price">native_gas_price</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_gas_price">native_gas_price</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_ids_created"></a>
+
+## Function `native_ids_created`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_ids_created">native_ids_created</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_ids_created">native_ids_created</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_gas_budget"></a>
+
+## Function `native_gas_budget`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_gas_budget">native_gas_budget</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_gas_budget">native_gas_budget</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_option_sponsor"></a>
+
+## Function `option_sponsor`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_option_sponsor">option_sponsor</a>(): <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_option_sponsor">option_sponsor</a>(): Option&lt;<b>address</b>&gt; {
+    <b>let</b> <a href="../one/tx_context.md#one_tx_context_sponsor">sponsor</a> = <a href="../one/tx_context.md#one_tx_context_native_sponsor">native_sponsor</a>();
+    <b>if</b> (<a href="../one/tx_context.md#one_tx_context_sponsor">sponsor</a>.length() == 0) option::none() <b>else</b> option::some(<a href="../one/tx_context.md#one_tx_context_sponsor">sponsor</a>[0])
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_tx_context_native_sponsor"></a>
+
+## Function `native_sponsor`
+
+
+
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_sponsor">native_sponsor</a>(): vector&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_native_sponsor">native_sponsor</a>(): vector&lt;<b>address</b>&gt;;
 </code></pre>
 
 
@@ -238,7 +523,7 @@ Hidden for now, but may expose later
 Native function for deriving an ID via hash(tx_hash || ids_created)
 
 
-<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_derive_id">derive_id</a>(tx_hash: vector&lt;u8&gt;, <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>: u64): <b>address</b>
+<pre><code><b>fun</b> <a href="../one/tx_context.md#one_tx_context_derive_id">derive_id</a>(tx_hash: vector&lt;u8&gt;, ids_created: u64): <b>address</b>
 </code></pre>
 
 
@@ -247,7 +532,7 @@ Native function for deriving an ID via hash(tx_hash || ids_created)
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_derive_id">derive_id</a>(tx_hash: vector&lt;u8&gt;, <a href="../one/tx_context.md#one_tx_context_ids_created">ids_created</a>: u64): <b>address</b>;
+<pre><code><b>native</b> <b>fun</b> <a href="../one/tx_context.md#one_tx_context_derive_id">derive_id</a>(tx_hash: vector&lt;u8&gt;, ids_created: u64): <b>address</b>;
 </code></pre>
 
 

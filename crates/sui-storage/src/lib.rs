@@ -8,7 +8,7 @@ use std::{
     io,
     io::{BufReader, Read, Write},
     ops::Range,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -160,7 +160,7 @@ pub fn verify_checkpoint_with_committee(
     committee: Arc<Committee>,
     current: &VerifiedCheckpoint,
     checkpoint: CertifiedCheckpointSummary,
-) -> Result<VerifiedCheckpoint, CertifiedCheckpointSummary> {
+) -> Result<VerifiedCheckpoint, Box<CertifiedCheckpointSummary>> {
     assert_eq!(*checkpoint.sequence_number(), current.sequence_number().checked_add(1).unwrap());
 
     if Some(*current.digest()) != checkpoint.previous_digest {
@@ -172,7 +172,7 @@ pub fn verify_checkpoint_with_committee(
             checkpoint_previous_digest =? checkpoint.previous_digest,
             "checkpoint not on same chain"
         );
-        return Err(checkpoint);
+        return Err(Box::new(checkpoint));
     }
 
     let current_epoch = current.epoch();
@@ -184,7 +184,7 @@ pub fn verify_checkpoint_with_committee(
             current_epoch = current_epoch,
             "cannot verify checkpoint with too high of an epoch",
         );
-        return Err(checkpoint);
+        return Err(Box::new(checkpoint));
     }
 
     if checkpoint.epoch() == current_epoch.checked_add(1).unwrap() && current.next_epoch_committee().is_none() {
@@ -196,7 +196,7 @@ pub fn verify_checkpoint_with_committee(
             "next checkpoint claims to be from the next epoch but the latest verified \
             checkpoint does not indicate that it is the last checkpoint of an epoch"
         );
-        return Err(checkpoint);
+        return Err(Box::new(checkpoint));
     }
 
     checkpoint.verify_authority_signatures(&committee).map_err(|e| {
@@ -210,7 +210,7 @@ pub fn verify_checkpoint<S>(
     current: &VerifiedCheckpoint,
     store: S,
     checkpoint: CertifiedCheckpointSummary,
-) -> Result<VerifiedCheckpoint, CertifiedCheckpointSummary>
+) -> Result<VerifiedCheckpoint, Box<CertifiedCheckpointSummary>>
 where
     S: WriteStore,
 {
@@ -265,64 +265,4 @@ pub async fn verify_checkpoint_range<S>(
     let final_checkpoint =
         store.get_checkpoint_by_sequence_number(last).expect("Expected end of checkpoint range to exist in store");
     store.update_highest_verified_checkpoint(&final_checkpoint).expect("Failed to update highest verified checkpoint");
-}
-
-fn hard_link(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
-    fs::create_dir_all(&dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            hard_link(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        } else {
-            fs::hard_link(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        }
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use tempfile::TempDir;
-    use typed_store::{
-        reopen,
-        rocks::{open_cf, DBMap, MetricConf, ReadWriteOptions},
-        Map,
-    };
-
-    use crate::hard_link;
-
-    #[tokio::test]
-    pub async fn test_db_hard_link() -> anyhow::Result<()> {
-        let input = TempDir::new()?;
-        let input_path = input.path();
-
-        let output = TempDir::new()?;
-        let output_path = output.path();
-
-        const FIRST_CF: &str = "First_CF";
-        const SECOND_CF: &str = "Second_CF";
-
-        let db_a = open_cf(input_path, None, MetricConf::new("test_db_hard_link_1"), &[FIRST_CF, SECOND_CF]).unwrap();
-
-        let (db_map_1, db_map_2) = reopen!(&db_a, FIRST_CF;<i32, String>, SECOND_CF;<i32, String>);
-
-        let keys_vals_cf1 = (1 .. 100).map(|i| (i, i.to_string()));
-        let keys_vals_cf2 = (1 .. 100).map(|i| (i, i.to_string()));
-
-        assert!(db_map_1.multi_insert(keys_vals_cf1).is_ok());
-        assert!(db_map_2.multi_insert(keys_vals_cf2).is_ok());
-
-        // set up db hard link
-        hard_link(input_path, output_path)?;
-        let db_b = open_cf(output_path, None, MetricConf::new("test_db_hard_link_2"), &[FIRST_CF, SECOND_CF]).unwrap();
-
-        let (db_map_1, db_map_2) = reopen!(&db_b, FIRST_CF;<i32, String>, SECOND_CF;<i32, String>);
-        for i in 1 .. 100 {
-            assert!(db_map_1.contains_key(&i).expect("Failed to call contains key"));
-            assert!(db_map_2.contains_key(&i).expect("Failed to call contains key"));
-        }
-
-        Ok(())
-    }
 }

@@ -3,8 +3,8 @@
 
 use crate::unit_tests::production_config;
 use move_binary_format::file_format::{
-    empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
-    IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility,
+    Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility, empty_module,
 };
 use move_bytecode_verifier_meter::dummy::DummyMeter;
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -50,12 +50,10 @@ fn test_vec_pack() {
 
     m.function_defs[0].code.as_mut().unwrap().code =
         std::iter::once(&[Bytecode::VecPack(sig, 0)][..])
-            .chain(
-                std::iter::repeat(
-                    &[Bytecode::VecUnpack(sig, 1024), Bytecode::VecPack(sig, 1024)][..],
-                )
-                .take(COUNT),
-            )
+            .chain(std::iter::repeat_n(
+                &[Bytecode::VecUnpack(sig, 1024), Bytecode::VecPack(sig, 1024)][..],
+                COUNT,
+            ))
             .chain(std::iter::once(&[Bytecode::Pop, Bytecode::Ret][..]))
             .flatten()
             .cloned()

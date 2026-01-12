@@ -138,7 +138,7 @@ Create a new <code><a href="../one/borrow.md#one_borrow_Referent">Referent</a></
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/borrow.md#one_borrow_new">new</a>&lt;T: key + store&gt;(value: T, ctx: &<b>mut</b> TxContext): <a href="../one/borrow.md#one_borrow_Referent">Referent</a>&lt;T&gt; {
     <a href="../one/borrow.md#one_borrow_Referent">Referent</a> {
-        id: <a href="../one/tx_context.md#one_tx_context_fresh_object_address">tx_context::fresh_object_address</a>(ctx),
+        id: ctx.fresh_object_address(),
         value: option::some(value),
     }
 }
@@ -152,7 +152,7 @@ Create a new <code><a href="../one/borrow.md#one_borrow_Referent">Referent</a></
 
 ## Function `borrow`
 
-Borrow the <code>T</code> from the <code><a href="../one/borrow.md#one_borrow_Referent">Referent</a></code> receiving the <code>T</code> and a <code><a href="../one/borrow.md#one_borrow_Borrow">Borrow</a></code>
+Borrow the <code>T</code> from the <code><a href="../one/borrow.md#one_borrow_Referent">Referent</a></code>, receiving the <code>T</code> and a <code><a href="../one/borrow.md#one_borrow_Borrow">Borrow</a></code>
 hot potato.
 
 

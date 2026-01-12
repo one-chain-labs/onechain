@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{body::Body, http};
 pub use balance_changes::*;
@@ -11,9 +11,9 @@ use metrics::{Metrics, MetricsLayer};
 pub use object_changes::*;
 use prometheus::Registry;
 pub use sui_config::node::ServerType;
-use sui_core::traffic_controller::{metrics::TrafficControllerMetrics, TrafficController};
+use sui_core::traffic_controller::TrafficController;
 use sui_open_rpc::{Module, Project};
-use sui_types::traffic_control::{PolicyConfig, RemoteFirewallConfig};
+use sui_types::traffic_control::PolicyConfig;
 use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
 use tower::ServiceBuilder;
@@ -47,8 +47,8 @@ pub struct JsonRpcServerBuilder {
     module: RpcModule<()>,
     rpc_doc: Project,
     registry: Registry,
+    traffic_controller: Option<Arc<TrafficController>>,
     policy_config: Option<PolicyConfig>,
-    firewall_config: Option<RemoteFirewallConfig>,
 }
 
 pub fn sui_rpc_doc(version: &str) -> Project {
@@ -68,15 +68,15 @@ impl JsonRpcServerBuilder {
     pub fn new(
         version: &str,
         prometheus_registry: &Registry,
+        traffic_controller: Option<Arc<TrafficController>>,
         policy_config: Option<PolicyConfig>,
-        firewall_config: Option<RemoteFirewallConfig>,
     ) -> Self {
         Self {
             module: RpcModule::new(()),
             rpc_doc: sui_rpc_doc(version),
             registry: prometheus_registry.clone(),
+            traffic_controller,
             policy_config,
-            firewall_config,
         }
     }
 
@@ -119,10 +119,6 @@ impl JsonRpcServerBuilder {
         let methods_names = module.method_names().collect::<Vec<_>>();
 
         let metrics = Arc::new(Metrics::new(&self.registry, &methods_names));
-        let traffic_controller_metrics = TrafficControllerMetrics::new(&self.registry);
-        let traffic_controller = self.policy_config.clone().map(|policy| {
-            Arc::new(TrafficController::init(policy, traffic_controller_metrics, self.firewall_config.clone()))
-        });
         let client_id_source = self.policy_config.clone().map(|policy| policy.client_id_source);
 
         let metrics_clone = metrics.clone();
@@ -138,9 +134,16 @@ impl JsonRpcServerBuilder {
         let (stop_handle, server_handle) = jsonrpsee::server::stop_channel();
         std::mem::forget(server_handle);
 
+        let timeout = std::env::var("JSON_RPC_TIMEOUT").ok().and_then(|value| value.parse::<u64>().ok()).unwrap_or(60);
+
+        let traffic_controller = self.traffic_controller.clone();
         let rpc_middleware = jsonrpsee::server::middleware::rpc::RpcServiceBuilder::new()
+            .layer_fn(move |s| TimeoutLayer::new(s, Duration::from_secs(timeout)))
             .layer_fn(move |s| MetricsLayer::new(s, metrics.clone()))
-            .layer_fn(move |s| TrafficControllerService::new(s, traffic_controller.clone()));
+            .layer_fn({
+                let traffic_controller = traffic_controller.clone();
+                move |s| TrafficControllerService::new(s, traffic_controller.clone())
+            });
         let service_builder = jsonrpsee::server::ServerBuilder::new()
             // Since we're not using jsonrpsee's server to actually handle connections this value
             // is instead limiting the number of concurrent requests and has no impact on the
@@ -238,6 +241,8 @@ where
 }
 
 use jsonrpsee::core::BoxError;
+
+use crate::metrics::TimeoutLayer;
 
 #[derive(Clone)]
 struct JsonRpcService<S>(S);

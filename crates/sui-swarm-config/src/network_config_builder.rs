@@ -9,16 +9,18 @@ use std::{
 };
 
 use rand::rngs::OsRng;
+#[cfg(msim)]
+use sui_config::node::ExecutionTimeObserverConfig;
 use sui_config::{
-    genesis::{TokenAllocation, TokenDistributionScheduleBuilder},
+    genesis::{TokenAllocation, TokenDistributionSchedule, TokenDistributionScheduleBuilder},
     node::AuthorityOverloadConfig,
     ExecutionCacheConfig,
 };
-use sui_macros::nondeterministic;
+use sui_protocol_config::Chain;
 use sui_types::{
     base_types::{AuthorityName, SuiAddress},
     committee::{Committee, ProtocolVersion},
-    crypto::{get_key_pair_from_rng, AccountKeyPair, KeypairTraits, PublicKey},
+    crypto::{get_key_pair_from_rng, AccountKeyPair, AuthorityKeyPair, KeypairTraits, PublicKey},
     object::Object,
     supported_protocol_versions::SupportedProtocolVersions,
     traffic_control::{PolicyConfig, RemoteFirewallConfig},
@@ -36,13 +38,27 @@ use crate::{
     node_config_builder::ValidatorConfigBuilder,
 };
 
+pub struct KeyPairWrapper {
+    pub account_key_pair: AccountKeyPair,
+    pub protocol_key_pair: Option<AuthorityKeyPair>,
+}
+
+impl Clone for KeyPairWrapper {
+    fn clone(&self) -> Self {
+        Self {
+            account_key_pair: self.account_key_pair.copy(),
+            protocol_key_pair: self.protocol_key_pair.as_ref().map(|k| k.copy()),
+        }
+    }
+}
+
 pub enum CommitteeConfig {
     Size(NonZeroUsize),
     Validators(Vec<ValidatorGenesisConfig>),
     AccountKeys(Vec<AccountKeyPair>),
     /// Indicates that a committee should be deterministically generated, using the provided rng
     /// as a source of randomness as well as generating deterministic network port information.
-    Deterministic((NonZeroUsize, Option<Vec<AccountKeyPair>>)),
+    Deterministic((NonZeroUsize, Option<Vec<KeyPairWrapper>>)),
 }
 
 pub type SupportedProtocolVersionsCallback = Arc<
@@ -66,18 +82,19 @@ pub enum ProtocolVersionsConfig {
     PerValidator(SupportedProtocolVersionsCallback),
 }
 
-pub type StateAccumulatorV2EnabledCallback = Arc<dyn Fn(usize) -> bool + Send + Sync + 'static>;
+pub type GlobalStateHashV2EnabledCallback = Arc<dyn Fn(usize) -> bool + Send + Sync + 'static>;
 
 #[derive(Clone)]
-pub enum StateAccumulatorV2EnabledConfig {
+pub enum GlobalStateHashV2EnabledConfig {
     Global(bool),
-    PerValidator(StateAccumulatorV2EnabledCallback),
+    PerValidator(GlobalStateHashV2EnabledCallback),
 }
 
 pub struct ConfigBuilder<R = OsRng> {
     rng: Option<R>,
     config_directory: PathBuf,
     supported_protocol_versions_config: Option<ProtocolVersionsConfig>,
+    chain_override: Option<Chain>,
     committee: CommitteeConfig,
     genesis_config: Option<GenesisConfig>,
     reference_gas_price: Option<u64>,
@@ -91,7 +108,10 @@ pub struct ConfigBuilder<R = OsRng> {
     firewall_config: Option<RemoteFirewallConfig>,
     max_submit_position: Option<usize>,
     submit_delay_step_override_millis: Option<u64>,
-    state_accumulator_v2_enabled_config: Option<StateAccumulatorV2EnabledConfig>,
+    global_state_hash_v2_enabled_config: Option<GlobalStateHashV2EnabledConfig>,
+    custom_distribution_schedule: Option<TokenDistributionSchedule>,
+    #[cfg(msim)]
+    execution_time_observer_config: Option<ExecutionTimeObserverConfig>,
 }
 
 impl ConfigBuilder {
@@ -100,6 +120,7 @@ impl ConfigBuilder {
             rng: Some(OsRng),
             config_directory: config_directory.as_ref().into(),
             supported_protocol_versions_config: None,
+            chain_override: None,
             // FIXME: A network with only 1 validator does not have liveness.
             // We need to change this. There are some tests that depend on it though.
             committee: CommitteeConfig::Size(NonZeroUsize::new(1).unwrap()),
@@ -115,12 +136,15 @@ impl ConfigBuilder {
             firewall_config: None,
             max_submit_position: None,
             submit_delay_step_override_millis: None,
-            state_accumulator_v2_enabled_config: None,
+            global_state_hash_v2_enabled_config: None,
+            custom_distribution_schedule: None,
+            #[cfg(msim)]
+            execution_time_observer_config: None,
         }
     }
 
     pub fn new_with_temp_dir() -> Self {
-        Self::new(nondeterministic!(tempfile::tempdir().unwrap()).into_path())
+        Self::new(mysten_common::tempdir().unwrap().keep())
     }
 }
 
@@ -140,7 +164,7 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
-    pub fn deterministic_committee_validators(mut self, keys: Vec<AccountKeyPair>) -> Self {
+    pub fn deterministic_committee_validators(mut self, keys: Vec<KeyPairWrapper>) -> Self {
         self.committee = CommitteeConfig::Deterministic((
             NonZeroUsize::new(keys.len()).expect("Validator keys should be non empty"),
             Some(keys),
@@ -161,6 +185,12 @@ impl<R> ConfigBuilder<R> {
     pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
         assert!(self.genesis_config.is_none(), "Genesis config already set");
         self.genesis_config = Some(genesis_config);
+        self
+    }
+
+    pub fn with_chain_override(mut self, chain: Chain) -> Self {
+        assert!(self.chain_override.is_none(), "Chain override already set");
+        self.chain_override = Some(chain);
         self
     }
 
@@ -224,18 +254,24 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled(mut self, enabled: bool) -> Self {
-        self.state_accumulator_v2_enabled_config = Some(StateAccumulatorV2EnabledConfig::Global(enabled));
+    pub fn with_global_state_hash_v2_enabled(mut self, enabled: bool) -> Self {
+        self.global_state_hash_v2_enabled_config = Some(GlobalStateHashV2EnabledConfig::Global(enabled));
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_callback(mut self, func: StateAccumulatorV2EnabledCallback) -> Self {
-        self.state_accumulator_v2_enabled_config = Some(StateAccumulatorV2EnabledConfig::PerValidator(func));
+    pub fn with_global_state_hash_v2_enabled_callback(mut self, func: GlobalStateHashV2EnabledCallback) -> Self {
+        self.global_state_hash_v2_enabled_config = Some(GlobalStateHashV2EnabledConfig::PerValidator(func));
         self
     }
 
-    pub fn with_state_accumulator_v2_enabled_config(mut self, c: StateAccumulatorV2EnabledConfig) -> Self {
-        self.state_accumulator_v2_enabled_config = Some(c);
+    pub fn with_global_state_hash_v2_enabled_config(mut self, c: GlobalStateHashV2EnabledConfig) -> Self {
+        self.global_state_hash_v2_enabled_config = Some(c);
+        self
+    }
+
+    #[cfg(msim)]
+    pub fn with_execution_time_observer_config(mut self, c: ExecutionTimeObserverConfig) -> Self {
+        self.execution_time_observer_config = Some(c);
         self
     }
 
@@ -269,6 +305,11 @@ impl<R> ConfigBuilder<R> {
         self
     }
 
+    pub fn with_custom_distribution_schedule(mut self, schedule: TokenDistributionSchedule) -> Self {
+        self.custom_distribution_schedule = Some(schedule);
+        self
+    }
+
     pub fn rng<N: rand::RngCore + rand::CryptoRng>(self, rng: N) -> ConfigBuilder<N> {
         ConfigBuilder {
             rng: Some(rng),
@@ -276,6 +317,7 @@ impl<R> ConfigBuilder<R> {
             supported_protocol_versions_config: self.supported_protocol_versions_config,
             committee: self.committee,
             genesis_config: self.genesis_config,
+            chain_override: self.chain_override,
             reference_gas_price: self.reference_gas_price,
             additional_objects: self.additional_objects,
             num_unpruned_validators: self.num_unpruned_validators,
@@ -287,7 +329,10 @@ impl<R> ConfigBuilder<R> {
             firewall_config: self.firewall_config,
             max_submit_position: self.max_submit_position,
             submit_delay_step_override_millis: self.submit_delay_step_override_millis,
-            state_accumulator_v2_enabled_config: self.state_accumulator_v2_enabled_config,
+            global_state_hash_v2_enabled_config: self.global_state_hash_v2_enabled_config,
+            custom_distribution_schedule: self.custom_distribution_schedule,
+            #[cfg(msim)]
+            execution_time_observer_config: self.execution_time_observer_config,
         }
     }
 
@@ -342,17 +387,27 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     })
                     .collect::<Vec<_>>()
             }
-            CommitteeConfig::Deterministic((size, keys)) => {
+            CommitteeConfig::Deterministic((size, key_pair_wrappers)) => {
                 // If no keys are provided, generate them.
-                let keys = keys.unwrap_or((0 .. size.get()).map(|_| get_key_pair_from_rng(&mut rng).1).collect());
+                let keys = key_pair_wrappers.unwrap_or_else(|| {
+                    (0 .. size.get())
+                        .map(|_| KeyPairWrapper {
+                            account_key_pair: get_key_pair_from_rng(&mut rng).1,
+                            protocol_key_pair: None,
+                        })
+                        .collect()
+                });
 
                 let mut configs = vec![];
                 for (i, key) in keys.into_iter().enumerate() {
                     let port_offset = 8000 + i * 10;
                     let mut builder = ValidatorGenesisConfigBuilder::new()
                         .with_ip("127.0.0.1".to_owned())
-                        .with_account_key_pair(key)
+                        .with_account_key_pair(key.account_key_pair)
                         .with_deterministic_ports(port_offset as u16);
+                    if let Some(protocol_key_pair) = key.protocol_key_pair {
+                        builder = builder.with_protocol_key_pair(protocol_key_pair);
+                    }
                     if let Some(rgp) = self.reference_gas_price {
                         builder = builder.with_gas_price(rgp);
                     }
@@ -366,7 +421,9 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
 
         let (account_keys, allocations) = genesis_config.generate_accounts(&mut rng).unwrap();
 
-        let token_distribution_schedule = {
+        let token_distribution_schedule = if let Some(schedule) = self.custom_distribution_schedule {
+            schedule
+        } else {
             let mut builder = TokenDistributionScheduleBuilder::new();
             for allocation in allocations {
                 builder.add_allocation(allocation);
@@ -421,6 +478,10 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     .with_policy_config(self.policy_config.clone())
                     .with_firewall_config(self.firewall_config.clone());
 
+                if let Some(chain) = self.chain_override {
+                    builder = builder.with_chain_override(chain);
+                }
+
                 if let Some(max_submit_position) = self.max_submit_position {
                     builder = builder.with_max_submit_position(max_submit_position);
                 }
@@ -445,6 +506,11 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     builder = builder.with_data_ingestion_dir(path.clone());
                 }
 
+                #[cfg(msim)]
+                if let Some(execution_time_observer_config) = &self.execution_time_observer_config {
+                    builder = builder.with_execution_time_observer_config(execution_time_observer_config.clone());
+                }
+
                 if let Some(spvc) = &self.supported_protocol_versions_config {
                     let supported_versions = match spvc {
                         ProtocolVersionsConfig::Default => SupportedProtocolVersions::SYSTEM_DEFAULT,
@@ -455,17 +521,17 @@ impl<R: rand::RngCore + rand::CryptoRng> ConfigBuilder<R> {
                     };
                     builder = builder.with_supported_protocol_versions(supported_versions);
                 }
-                if let Some(acc_v2_config) = &self.state_accumulator_v2_enabled_config {
-                    let state_accumulator_v2_enabled: bool = match acc_v2_config {
-                        StateAccumulatorV2EnabledConfig::Global(enabled) => *enabled,
-                        StateAccumulatorV2EnabledConfig::PerValidator(func) => func(idx),
+                if let Some(acc_v2_config) = &self.global_state_hash_v2_enabled_config {
+                    let global_state_hash_v2_enabled: bool = match acc_v2_config {
+                        GlobalStateHashV2EnabledConfig::Global(enabled) => *enabled,
+                        GlobalStateHashV2EnabledConfig::PerValidator(func) => func(idx),
                     };
-                    builder = builder.with_state_accumulator_v2_enabled(state_accumulator_v2_enabled);
+                    builder = builder.with_global_state_hash_v2_enabled(global_state_hash_v2_enabled);
                 }
-                if let Some(num_unpruned_validators) = self.num_unpruned_validators {
-                    if idx < num_unpruned_validators {
-                        builder = builder.with_unpruned_checkpoints();
-                    }
+                if let Some(num_unpruned_validators) = self.num_unpruned_validators
+                    && idx < num_unpruned_validators
+                {
+                    builder = builder.with_unpruned_checkpoints();
                 }
                 builder.build(validator, genesis.clone())
             })
@@ -516,12 +582,13 @@ mod tests {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, sync::Arc};
+    use std::sync::Arc;
 
     use sui_config::genesis::Genesis;
     use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
     use sui_types::{
         epoch_data::EpochData,
+        execution_params::ExecutionOrEarlyError,
         gas::SuiGasStatus,
         in_memory_storage::InMemoryStorage,
         metrics::LimitsMetrics,
@@ -556,13 +623,12 @@ mod test {
 
         let silent = true;
         let executor =
-            sui_execution::executor(&protocol_config, silent, None).expect("Creating an executor should not fail here");
+            sui_execution::executor(&protocol_config, silent).expect("Creating an executor should not fail here");
 
         // Use a throwaway metrics registry for genesis transaction execution.
         let registry = prometheus::Registry::new();
         let metrics = Arc::new(LimitsMetrics::new(&registry));
         let expensive_checks = false;
-        let certificate_deny_set = HashSet::new();
         let epoch = EpochData::new_test();
         let transaction_data = &genesis_transaction.data().intent_message().value;
         let (kind, signer, mut gas_data) = transaction_data.execution_parts();
@@ -574,7 +640,7 @@ mod test {
             &protocol_config,
             metrics,
             expensive_checks,
-            &certificate_deny_set,
+            ExecutionOrEarlyError::Ok(()),
             &epoch.epoch_id(),
             epoch.epoch_start_timestamp(),
             input_objects,

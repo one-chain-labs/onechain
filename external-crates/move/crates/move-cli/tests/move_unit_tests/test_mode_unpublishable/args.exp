@@ -1,0 +1,136 @@
+Command `disassemble --Xdebug --package Test --name a --test`:
+// Move bytecode v6
+module 2.a {
+use 0000000000000000000000000000000000000000000000000000000000000001::unit_test;
+
+f(): u64 {
+B0:
+	0: LdU64(42)
+	1: Ret
+}
+
+entry public unit_test_poison() {
+B0:
+	0: Call unit_test::poison()
+	1: Ret
+}
+
+}
+
+
+CompiledModule {
+    version: 6,
+    publishable: false,
+    self_module_handle_idx: ModuleHandleIndex(0),
+    module_handles: [
+        ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        },
+        ModuleHandle {
+            address: AddressIdentifierIndex(1),
+            name: IdentifierIndex(3),
+        },
+    ],
+    datatype_handles: [],
+    function_handles: [
+        FunctionHandle {
+            module: ModuleHandleIndex(0),
+            name: IdentifierIndex(1),
+            parameters: SignatureIndex(0),
+            return_: SignatureIndex(1),
+            type_parameters: [],
+        },
+        FunctionHandle {
+            module: ModuleHandleIndex(0),
+            name: IdentifierIndex(4),
+            parameters: SignatureIndex(0),
+            return_: SignatureIndex(0),
+            type_parameters: [],
+        },
+        FunctionHandle {
+            module: ModuleHandleIndex(1),
+            name: IdentifierIndex(2),
+            parameters: SignatureIndex(0),
+            return_: SignatureIndex(0),
+            type_parameters: [],
+        },
+    ],
+    field_handles: [],
+    friend_decls: [],
+    struct_def_instantiations: [],
+    function_instantiations: [],
+    field_instantiations: [],
+    signatures: [
+        Signature(
+            [],
+        ),
+        Signature(
+            [
+                U64,
+            ],
+        ),
+    ],
+    identifiers: [
+        Identifier(
+            "a",
+        ),
+        Identifier(
+            "f",
+        ),
+        Identifier(
+            "poison",
+        ),
+        Identifier(
+            "unit_test",
+        ),
+        Identifier(
+            "unit_test_poison",
+        ),
+    ],
+    address_identifiers: [
+        0000000000000000000000000000000000000000000000000000000000000002,
+        0000000000000000000000000000000000000000000000000000000000000001,
+    ],
+    constant_pool: [],
+    metadata: [],
+    struct_defs: [],
+    function_defs: [
+        FunctionDefinition {
+            function: FunctionHandleIndex(0),
+            visibility: Private,
+            is_entry: false,
+            acquires_global_resources: [],
+            code: Some(
+                CodeUnit {
+                    locals: SignatureIndex(0),
+                    code: [
+                        LdU64(42),
+                        Ret,
+                    ],
+                    jump_tables: [],
+                },
+            ),
+        },
+        FunctionDefinition {
+            function: FunctionHandleIndex(1),
+            visibility: Public,
+            is_entry: true,
+            acquires_global_resources: [],
+            code: Some(
+                CodeUnit {
+                    locals: SignatureIndex(0),
+                    code: [
+                        Call(2),
+                        Ret,
+                    ],
+                    jump_tables: [],
+                },
+            ),
+        },
+    ],
+    enum_defs: [],
+    enum_def_instantiations: [],
+    variant_handles: [],
+    variant_instantiation_handles: [],
+}

@@ -23,7 +23,7 @@ pub use sui_protocol_config::ProtocolVersion;
 use super::base_types::*;
 use crate::{
     crypto::{random_committee_key_pairs_of_size, AuthorityKeyPair, AuthorityPublicKey, NetworkPublicKey},
-    error::{SuiError, SuiResult},
+    error::{SuiErrorKind, SuiResult},
     multiaddr::Multiaddr,
 };
 
@@ -135,11 +135,12 @@ impl Committee {
         debug_assert_eq!(self.expanded_keys.len(), self.voting_rights.len());
         match self.expanded_keys.get(authority) {
             Some(v) => Ok(v),
-            None => Err(SuiError::InvalidCommittee(format!(
+            None => Err(SuiErrorKind::InvalidCommittee(format!(
                 "Authority #{} not found, committee size {}",
                 authority,
                 self.expanded_keys.len()
-            ))),
+            ))
+            .into()),
         }
     }
 
@@ -149,11 +150,11 @@ impl Committee {
         Self::choose_multiple_weighted(&self.voting_rights[..], 1, &mut ThreadRng::default()).next().unwrap()
     }
 
-    fn choose_multiple_weighted<'a>(
+    fn choose_multiple_weighted<'a, T: Rng>(
         slice: &'a [(AuthorityName, StakeUnit)],
         count: usize,
-        rng: &mut impl Rng,
-    ) -> impl Iterator<Item = &'a AuthorityName> {
+        rng: &mut T,
+    ) -> impl Iterator<Item = &'a AuthorityName> + use<'a, T> {
         // unwrap is safe because we validate the committee composition in `new` above.
         // See https://docs.rs/rand/latest/rand/distributions/weighted/enum.WeightedError.html
         // for possible errors.

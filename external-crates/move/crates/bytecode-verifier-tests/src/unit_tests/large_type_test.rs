@@ -3,9 +3,8 @@
 
 use crate::unit_tests::production_config;
 use move_binary_format::file_format::{
-    empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
-    IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
-    Visibility::Public,
+    Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, Visibility::Public, empty_module,
 };
 use move_bytecode_verifier_meter::bound::BoundMeter;
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -28,9 +27,11 @@ fn test_large_types() {
     let mut m = empty_module();
 
     m.signatures.push(Signature(
-        std::iter::repeat(SignatureToken::Reference(Box::new(get_nested_vec_type(64))))
-            .take(NUM_LOCALS as usize)
-            .collect(),
+        std::iter::repeat_n(
+            SignatureToken::Reference(Box::new(get_nested_vec_type(64))),
+            NUM_LOCALS as usize,
+        )
+        .collect(),
     ));
 
     m.function_handles.push(FunctionHandle {

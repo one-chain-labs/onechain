@@ -170,8 +170,12 @@ async fn test_quorum_driver_update_validators_and_max_retry_times() {
         let ticket = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx)).await.unwrap();
         // We have a timeout here to make the test fail fast if fails
         match tokio::time::timeout(Duration::from_secs(20), ticket).await {
-            Ok(Err(QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts { total_attempts })) => assert_eq!(total_attempts, 4),
-            _ => panic!("The transaction should err on SafeClient epoch check mismatch, be retried 3 times and raise QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts error"),
+            Ok(Err(QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts {
+                total_attempts,
+            })) => assert_eq!(total_attempts, 4),
+            _ => panic!(
+                "The transaction should err on SafeClient epoch check mismatch, be retried 3 times and raise QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts error"
+            ),
         };
     });
 
@@ -281,13 +285,17 @@ async fn test_quorum_driver_object_locked() -> Result<(), anyhow::Error> {
 
     let tx3 = make_tx(&gas, sender, &keypair, rgp);
 
-    let res = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx3)).await.unwrap().await;
+    let res = quorum_driver.submit_transaction(ExecuteTransactionRequestV3::new_v2(tx3)).await?.await;
 
     if let Err(QuorumDriverError::ObjectsDoubleUsed { conflicting_txes }) = res {
-        assert_eq!(conflicting_txes.len(), 2);
         let tx_stake = conflicting_txes.get(tx.digest()).unwrap().1;
-        assert!(tx_stake == 2500 || tx_stake == 5000);
-        assert_eq!(conflicting_txes.get(tx2.digest()).unwrap().1, 2500);
+        if tx_stake == 5000 {
+            assert_eq!(conflicting_txes.len(), 1);
+        } else {
+            assert_eq!(conflicting_txes.len(), 2);
+            assert_eq!(tx_stake, 2500);
+            assert_eq!(conflicting_txes.get(tx2.digest()).unwrap().1, 2500);
+        }
     } else {
         panic!("expect Err(QuorumDriverError::ObjectsDoubleUsed) but got {:?}", res)
     }

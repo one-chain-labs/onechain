@@ -21,7 +21,6 @@ use sui_types::{
     bridge::{BridgeChainId, MoveTypeBridgeMessageKey, MoveTypeCommitteeMember, MoveTypeCommitteeMemberRegistration},
     collection_types::VecMap,
     crypto::ToFromBytes,
-    digests::TransactionDigest,
     parse_sui_type_tag,
     TypeTag,
     BRIDGE_PACKAGE_ID,
@@ -30,7 +29,7 @@ use sui_types::{
 use crate::{
     crypto::BridgeAuthorityPublicKey,
     error::{BridgeError, BridgeResult},
-    types::{BridgeAction, SuiToEthBridgeAction},
+    types::{BridgeAction, SuiToEthTokenTransfer},
 };
 
 // `TokendDepositedEvent` emitted in bridge.move
@@ -374,17 +373,27 @@ macro_rules! declare_events {
 }
 
 impl SuiBridgeEvent {
-    pub fn try_into_bridge_action(
-        self,
-        sui_tx_digest: TransactionDigest,
-        sui_tx_event_index: u16,
-    ) -> Option<BridgeAction> {
+    pub fn try_into_bridge_action(self) -> Option<BridgeAction> {
         match self {
             SuiBridgeEvent::SuiToEthTokenBridgeV1(event) => {
-                Some(BridgeAction::SuiToEthBridgeAction(SuiToEthBridgeAction {
-                    sui_tx_digest,
-                    sui_tx_event_index,
-                    sui_bridge_event: event.clone(),
+                let EmittedSuiToEthTokenBridgeV1 {
+                    nonce,
+                    sui_chain_id,
+                    eth_chain_id,
+                    sui_address,
+                    eth_address,
+                    token_id,
+                    amount_sui_adjusted,
+                } = event;
+
+                Some(BridgeAction::SuiToEthTokenTransfer(SuiToEthTokenTransfer {
+                    nonce,
+                    sui_chain_id,
+                    eth_chain_id,
+                    sui_address,
+                    eth_address,
+                    token_id,
+                    amount_adjusted: amount_sui_adjusted,
                 }))
             }
             SuiBridgeEvent::TokenTransferApproved(_event) => None,

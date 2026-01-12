@@ -72,6 +72,7 @@ mod checked {
             Value,
         },
         gas_charger::GasCharger,
+        gas_meter::SuiGasMeter,
         programmable_transactions::linkage_view::LinkageView,
         type_resolver::TypeTagResolver,
     };
@@ -193,25 +194,6 @@ mod checked {
                 tx_context.epoch(),
             );
 
-            // Set the profiler if in CLI
-            #[skip_checked_arithmetic]
-            move_vm_profiler::tracing_feature_enabled! {
-                use move_vm_profiler::GasProfiler;
-                use move_vm_types::gas::GasMeter;
-
-                let tx_digest = tx_context.digest();
-                let remaining_gas: u64 =
-                    move_vm_types::gas::GasMeter::remaining_gas(gas_charger.move_gas_status())
-                        .into();
-                gas_charger
-                    .move_gas_status_mut()
-                    .set_profiler(GasProfiler::init(
-                        &vm.config().profiler_config,
-                        format!("{}", tx_digest),
-                        remaining_gas,
-                    ));
-            }
-
             Ok(Self {
                 protocol_config,
                 metrics,
@@ -231,7 +213,7 @@ mod checked {
             })
         }
 
-        pub fn object_runtime(&mut self) -> &ObjectRuntime {
+        pub fn object_runtime(&mut self) -> &ObjectRuntime<'_> {
             self.native_extensions.get()
         }
 
@@ -471,12 +453,7 @@ mod checked {
             modules: &[CompiledModule],
             dependencies: impl IntoIterator<Item = &'p MovePackage>,
         ) -> Result<MovePackage, ExecutionError> {
-            MovePackage::new_initial(
-                modules,
-                self.protocol_config.max_move_package_size(),
-                self.protocol_config.move_binary_format_version(),
-                dependencies,
-            )
+            MovePackage::new_initial(modules, self.protocol_config, dependencies)
         }
 
         /// Create a package upgrade from `previous_package` with `new_modules` and `dependencies`
@@ -737,6 +714,11 @@ mod checked {
                 created_object_ids: created_object_ids.into_iter().collect(),
                 deleted_object_ids: deleted_object_ids.into_iter().collect(),
                 user_events,
+                // no accumulator events for v2
+                accumulator_events: vec![],
+                // no settlement input/output for v2
+                settlement_input_sui: 0,
+                settlement_output_sui: 0,
             }))
         }
 
@@ -839,7 +821,7 @@ mod checked {
                 ty_args,
                 args,
                 &mut data_store,
-                gas_status,
+                &mut SuiGasMeter(gas_status),
                 &mut self.native_extensions,
             )
         }
@@ -881,7 +863,7 @@ mod checked {
                 modules,
                 sender,
                 &mut data_store,
-                self.gas_charger.move_gas_status_mut(),
+                &mut SuiGasMeter(self.gas_charger.move_gas_status_mut()),
             )
         }
     }
@@ -1073,8 +1055,8 @@ mod checked {
                 // protected by transaction input checker
                 invariant_violation!("ObjectOwner objects cannot be input")
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         };
         let owner = obj.owner.clone();
@@ -1117,6 +1099,9 @@ mod checked {
             CallArg::Object(obj_arg) => {
                 load_object_arg(protocol_config, vm, state_view, linkage_view, new_packages, input_object_map, obj_arg)?
             }
+            CallArg::FundsWithdrawal(_) => {
+                unreachable!("Impossible to hit BalanceWithdraw in v2")
+            }
         })
     }
 
@@ -1141,14 +1126,14 @@ mod checked {
                 /* imm override */ false,
                 id,
             ),
-            ObjectArg::SharedObject { id, mutable, .. } => load_object(
+            ObjectArg::SharedObject { id, mutability, .. } => load_object(
                 protocol_config,
                 vm,
                 state_view,
                 linkage_view,
                 new_packages,
                 input_object_map,
-                /* imm override */ !mutable,
+                /* imm override */ !mutability.is_exclusive(),
                 id,
             ),
             ObjectArg::Receiving((id, version, _)) => Ok(InputValue::new_receiving_object(id, version)),
@@ -1226,6 +1211,7 @@ mod checked {
             old_obj_ver.unwrap_or_default(),
             contents,
             protocol_config,
+            /* system_mutation */ false,
         )
     }
 

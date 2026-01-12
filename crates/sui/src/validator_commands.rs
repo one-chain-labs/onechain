@@ -60,7 +60,7 @@ use sui_types::{
     sui_system_state::{
         sui_system_state_inner_v1::{UnverifiedValidatorOperationCapV1, ValidatorV1},
         sui_system_state_summary::{SuiSystemStateSummary, SuiValidatorSummary},
-        SUI_SYSTEM_MODULE_NAME,
+        SUI_SYSTEM_MODULE_NAME
     },
     transaction::{CallArg, ObjectArg, Transaction, TransactionData},
     SUI_SYSTEM_PACKAGE_ID,
@@ -75,6 +75,19 @@ use crate::fire_drill::get_gas_obj_ref;
 mod validator_tests;
 
 const DEFAULT_GAS_BUDGET: u64 = 200_000_000; // 0.2 SUI
+
+/// Arguments related to transaction processing
+#[derive(Args, Debug, Default)]
+pub struct TxProcessingArgs {
+    /// Instead of executing the transaction, serialize the bcs bytes of the unsigned transaction data
+    /// (TransactionData) using base64 encoding, and print out the string <TX_BYTES>. The string can
+    /// be used to execute transaction with `one client execute-signed-tx --tx-bytes <TX_BYTES>`.
+    #[arg(long)]
+    pub serialize_unsigned_transaction: bool,
+    /// Gas budget for this transaction
+    #[clap(name = "gas-budget", long)]
+    pub gas_budget: Option<u64>,
+}
 
 #[derive(Parser)]
 #[clap(rename_all = "kebab-case")]
@@ -92,20 +105,18 @@ pub enum SuiValidatorCommand {
     BecomeCandidate {
         #[clap(name = "validator-info-path")]
         file: PathBuf,
-        #[clap(name = "gas-budget", long)]
-        gas_budget: Option<u64>,
+        #[clap(flatten)]
+        tx_args: TxProcessingArgs,
     },
     #[clap(name = "join-committee")]
     JoinCommittee {
-        /// Gas budget for this transaction.
-        #[clap(name = "gas-budget", long)]
-        gas_budget: Option<u64>,
+        #[clap(flatten)]
+        tx_args: TxProcessingArgs,
     },
     #[clap(name = "leave-committee")]
     LeaveCommittee {
-        /// Gas budget for this transaction.
-        #[clap(name = "gas-budget", long)]
-        gas_budget: Option<u64>,
+        #[clap(flatten)]
+        tx_args: TxProcessingArgs,
     },
     #[clap(name = "display-metadata")]
     DisplayMetadata {
@@ -118,9 +129,8 @@ pub enum SuiValidatorCommand {
     UpdateMetadata {
         #[clap(subcommand)]
         metadata: MetadataUpdate,
-        /// Gas budget for this transaction.
-        #[clap(name = "gas-budget", long)]
-        gas_budget: Option<u64>,
+        #[clap(flatten)]
+        tx_args: TxProcessingArgs,
     },
     /// Update gas price that is used to calculate Reference Gas Price
     #[clap(name = "update-gas-price")]
@@ -132,10 +142,10 @@ pub enum SuiValidatorCommand {
         operation_cap_id: Option<ObjectID>,
         #[clap(name = "gas-price")]
         gas_price: u64,
-        /// Gas budget for this transaction.
-        #[clap(name = "gas-budget", long)]
-        gas_budget: Option<u64>,
+        #[clap(flatten)]
+        tx_args: TxProcessingArgs,
     },
+    /// Report or un-report a validator.
     /// Report or un-report a validator.
     #[clap(name = "report-validator")]
     ReportValidator {
@@ -144,15 +154,14 @@ pub enum SuiValidatorCommand {
         /// Validator's OperationCap ID can be found by using the `display-metadata` subcommand.
         #[clap(name = "operation-cap-id", long)]
         operation_cap_id: Option<ObjectID>,
-        /// The OneChain Address of the validator is being reported or un-reported
+        /// The Sui Address of the validator is being reported or un-reported
         #[clap(name = "reportee-address")]
         reportee_address: SuiAddress,
         /// If true, undo an existing report.
         #[clap(name = "undo-report", long)]
         undo_report: Option<bool>,
-        /// Gas budget for this transaction.
-        #[clap(name = "gas-budget", long)]
-        gas_budget: Option<u64>,
+        #[clap(flatten)]
+        tx_args: TxProcessingArgs,
     },
     /// Serialize the payload that is used to generate Proof of Possession.
     /// This is useful to take the payload offline for an Authority protocol keypair to sign.
@@ -200,7 +209,7 @@ pub enum SuiValidatorCommand {
         #[clap(name = "gas-budget", long)]
         gas_budget: Option<u64>,
     },
-    /// Update OneChain native bridge committee node url
+    /// Update sui native bridge committee node url
     UpdateBridgeCommitteeNodeUrl {
         /// New node url to be registered in the on chain bridge object.
         #[clap(long)]
@@ -223,12 +232,30 @@ pub enum SuiValidatorCommand {
 pub enum SuiValidatorCommandResponse {
     MakeValidatorInfo,
     DisplayMetadata,
-    BecomeCandidate(SuiTransactionBlockResponse),
-    JoinCommittee(SuiTransactionBlockResponse),
-    LeaveCommittee(SuiTransactionBlockResponse),
-    UpdateMetadata(SuiTransactionBlockResponse),
-    UpdateGasPrice(SuiTransactionBlockResponse),
-    ReportValidator(SuiTransactionBlockResponse),
+    BecomeCandidate {
+        response: Option<SuiTransactionBlockResponse>,
+        serialized_unsigned_transaction: Option<String>,
+    },
+    JoinCommittee {
+        response: Option<SuiTransactionBlockResponse>,
+        serialized_unsigned_transaction: Option<String>,
+    },
+    LeaveCommittee {
+        response: Option<SuiTransactionBlockResponse>,
+        serialized_unsigned_transaction: Option<String>,
+    },
+    UpdateMetadata {
+        response: Option<SuiTransactionBlockResponse>,
+        serialized_unsigned_transaction: Option<String>,
+    },
+    UpdateGasPrice {
+        response: Option<SuiTransactionBlockResponse>,
+        serialized_unsigned_transaction: Option<String>,
+    },
+    ReportValidator {
+        response: Option<SuiTransactionBlockResponse>,
+        serialized_unsigned_transaction: Option<String>,
+    },
     SerializedPayload(String),
     DisplayGasPriceUpdateRawTxn {
         data: TransactionData,
@@ -255,7 +282,7 @@ fn make_key_files(file_name: PathBuf, is_protocol_key: bool, key: Option<SuiKeyP
     } else {
         let kp = match key {
             Some(key) => {
-                println!("Generated new key file {:?} based on sui.keystore file.", file_name);
+                println!("Generated new key file {:?} based on one.keystore file.", file_name);
                 key
             }
             None => {
@@ -273,7 +300,7 @@ impl SuiValidatorCommand {
     pub async fn execute(self, context: &mut WalletContext) -> Result<SuiValidatorCommandResponse, anyhow::Error> {
         let sui_address = context.active_address()?;
 
-        let ret = Ok(match self {
+        Ok(match self {
             SuiValidatorCommand::MakeValidatorInfo {
                 name,
                 description,
@@ -284,7 +311,7 @@ impl SuiValidatorCommand {
             } => {
                 let dir = std::env::current_dir()?;
                 let protocol_key_file_name = dir.join("protocol.key");
-                let account_key = match context.config.keystore.get_key(&sui_address)? {
+                let account_key = match context.config.keystore.export(&sui_address)? {
                     SuiKeyPair::Ed25519(account_key) => SuiKeyPair::Ed25519(account_key.copy()),
                     _ => panic!("Other account key types supported yet, please use Ed25519 keys for now."),
                 };
@@ -328,8 +355,8 @@ impl SuiValidatorCommand {
                 println!("Generated validator info file: {:?}.", validator_info_file_name);
                 SuiValidatorCommandResponse::MakeValidatorInfo
             }
-            SuiValidatorCommand::BecomeCandidate { file, gas_budget } => {
-                let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
+            SuiValidatorCommand::BecomeCandidate { file, tx_args } => {
+                let gas_budget = tx_args.gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let validator_info_bytes = fs::read(file)?;
                 // Note: we should probably rename the struct or evolve it accordingly.
                 let validator_info: GenesisValidatorInfo = serde_yaml::from_slice(&validator_info_bytes)?;
@@ -355,22 +382,43 @@ impl SuiValidatorCommand {
                     CallArg::Pure(bcs::to_bytes(&validator.gas_price()).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&validator.commission_rate()).unwrap()),
                 ];
-                let response = call_0x5(context, "request_add_validator_candidate", args, gas_budget).await?;
-                SuiValidatorCommandResponse::BecomeCandidate(response)
+                let (response, serialized_unsigned_transaction) = call_0x5(
+                    context,
+                    "request_add_validator_candidate",
+                    args,
+                    gas_budget,
+                    tx_args.serialize_unsigned_transaction,
+                )
+                .await?;
+                SuiValidatorCommandResponse::BecomeCandidate { response, serialized_unsigned_transaction }
             }
 
-            SuiValidatorCommand::JoinCommittee { gas_budget } => {
-                let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let response = call_0x5(context, "request_add_validator", vec![], gas_budget).await?;
-                SuiValidatorCommandResponse::JoinCommittee(response)
+            SuiValidatorCommand::JoinCommittee { tx_args } => {
+                let gas_budget = tx_args.gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
+                let (response, serialized_unsigned_transaction) = call_0x5(
+                    context,
+                    "request_add_validator",
+                    vec![],
+                    gas_budget,
+                    tx_args.serialize_unsigned_transaction,
+                )
+                .await?;
+                SuiValidatorCommandResponse::JoinCommittee { response, serialized_unsigned_transaction }
             }
 
-            SuiValidatorCommand::LeaveCommittee { gas_budget } => {
+            SuiValidatorCommand::LeaveCommittee { tx_args } => {
                 // Only an active validator can leave committee.
                 let _status = check_status(context, HashSet::from([ValidatorStatus::Active])).await?;
-                let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let response = call_0x5(context, "request_remove_validator", vec![], gas_budget).await?;
-                SuiValidatorCommandResponse::LeaveCommittee(response)
+                let gas_budget = tx_args.gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
+                let (response, serialized_unsigned_transaction) = call_0x5(
+                    context,
+                    "request_remove_validator",
+                    vec![],
+                    gas_budget,
+                    tx_args.serialize_unsigned_transaction,
+                )
+                .await?;
+                SuiValidatorCommandResponse::LeaveCommittee { response, serialized_unsigned_transaction }
             }
 
             SuiValidatorCommand::DisplayMetadata { validator_address, json } => {
@@ -381,24 +429,39 @@ impl SuiValidatorCommand {
                 SuiValidatorCommandResponse::DisplayMetadata
             }
 
-            SuiValidatorCommand::UpdateMetadata { metadata, gas_budget } => {
-                let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let resp = update_metadata(context, metadata, gas_budget).await?;
-                SuiValidatorCommandResponse::UpdateMetadata(resp)
+            SuiValidatorCommand::UpdateMetadata { metadata, tx_args } => {
+                let gas_budget = tx_args.gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
+                let (response, serialized_unsigned_transaction) =
+                    update_metadata(context, metadata, gas_budget, tx_args.serialize_unsigned_transaction).await?;
+                SuiValidatorCommandResponse::UpdateMetadata { response, serialized_unsigned_transaction }
             }
 
-            SuiValidatorCommand::UpdateGasPrice { operation_cap_id, gas_price, gas_budget } => {
-                let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
-                let resp = update_gas_price(context, operation_cap_id, gas_price, gas_budget).await?;
-                SuiValidatorCommandResponse::UpdateGasPrice(resp)
+            SuiValidatorCommand::UpdateGasPrice { operation_cap_id, gas_price, tx_args } => {
+                let gas_budget = tx_args.gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
+                let (response, serialized_unsigned_transaction) = update_gas_price(
+                    context,
+                    operation_cap_id,
+                    gas_price,
+                    gas_budget,
+                    tx_args.serialize_unsigned_transaction,
+                )
+                .await?;
+                SuiValidatorCommandResponse::UpdateGasPrice { response, serialized_unsigned_transaction }
             }
 
-            SuiValidatorCommand::ReportValidator { operation_cap_id, reportee_address, undo_report, gas_budget } => {
-                let gas_budget = gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
+            SuiValidatorCommand::ReportValidator { operation_cap_id, reportee_address, undo_report, tx_args } => {
+                let gas_budget = tx_args.gas_budget.unwrap_or(DEFAULT_GAS_BUDGET);
                 let undo_report = undo_report.unwrap_or(false);
-                let resp =
-                    report_validator(context, reportee_address, operation_cap_id, undo_report, gas_budget).await?;
-                SuiValidatorCommandResponse::ReportValidator(resp)
+                let (response, serialized_unsigned_transaction) = report_validator(
+                    context,
+                    reportee_address,
+                    operation_cap_id,
+                    undo_report,
+                    gas_budget,
+                    tx_args.serialize_unsigned_transaction,
+                )
+                .await?;
+                SuiValidatorCommandResponse::ReportValidator { response, serialized_unsigned_transaction }
             }
 
             SuiValidatorCommand::SerializePayloadForPoP { account_address, protocol_public_key } => {
@@ -456,8 +519,11 @@ impl SuiValidatorCommand {
                 if !active_validators.into_iter().any(|s| s.sui_address == address) {
                     bail!("Address {} is not in the committee", address);
                 }
-                println!("Starting bridge committee registration for Sui validator: {address}, with bridge public key: {} and url: {}", ecdsa_keypair.public, bridge_authority_url);
-                let sui_rpc_url = &context.config.get_active_env().unwrap().rpc;
+                println!(
+                    "Starting bridge committee registration for Sui validator: {address}, with bridge public key: {} and url: {}",
+                    ecdsa_keypair.public, bridge_authority_url
+                );
+                let sui_rpc_url = &context.get_active_env().unwrap().rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let bridge_client = SuiBridgeClient::new(sui_rpc_url, bridge_metrics).await?;
                 let bridge = bridge_client.get_mutable_bridge_object_arg_must_succeed().await;
@@ -483,7 +549,7 @@ impl SuiValidatorCommand {
                         serialized_unsigned_transaction: Some(serialized_data),
                     }
                 } else {
-                    let tx = context.sign_transaction(&tx_data);
+                    let tx = context.sign_transaction(&tx_data).await;
                     let response = context.execute_transaction_must_succeed(tx).await;
                     println!("Committee registration successful. Transaction digest: {}", response.digest);
                     SuiValidatorCommandResponse::RegisterBridgeCommittee {
@@ -505,7 +571,7 @@ impl SuiValidatorCommand {
                 // Make sure the address is member of the committee
                 let address =
                     check_address(context.active_address()?, validator_address, print_unsigned_transaction_only)?;
-                let sui_rpc_url = &context.config.get_active_env().unwrap().rpc;
+                let sui_rpc_url = &context.get_active_env().unwrap().rpc;
                 let bridge_metrics = Arc::new(BridgeMetrics::new_for_testing());
                 let bridge_client = SuiBridgeClient::new(sui_rpc_url, bridge_metrics).await?;
                 let committee_members =
@@ -540,7 +606,7 @@ impl SuiValidatorCommand {
                         serialized_unsigned_transaction: Some(serialized_data),
                     }
                 } else {
-                    let tx = context.sign_transaction(&tx_data);
+                    let tx = context.sign_transaction(&tx_data).await;
                     let response = context.execute_transaction_must_succeed(tx).await;
                     println!("Update Bridge validator node URL successful. Transaction digest: {}", response.digest);
                     SuiValidatorCommandResponse::UpdateBridgeCommitteeURL {
@@ -549,8 +615,7 @@ impl SuiValidatorCommand {
                     }
                 }
             }
-        });
-        ret
+        })
     }
 }
 
@@ -560,10 +625,10 @@ fn check_address(
     print_unsigned_transaction_only: bool,
 ) -> Result<SuiAddress, anyhow::Error> {
     if !print_unsigned_transaction_only {
-        if let Some(validator_address) = validator_address {
-            if validator_address != active_address {
-                bail!("`--validator-address` must be the same as the current active address: {}", active_address);
-            }
+        if let Some(validator_address) = validator_address
+            && validator_address != active_address
+        {
+            bail!("`--validator-address` must be the same as the current active address: {}", active_address);
         }
         Ok(active_address)
     } else {
@@ -622,7 +687,8 @@ async fn update_gas_price(
     operation_cap_id: Option<ObjectID>,
     gas_price: u64,
     gas_budget: u64,
-) -> Result<SuiTransactionBlockResponse> {
+    serialize_unsigned_transaction: bool,
+) -> Result<(Option<SuiTransactionBlockResponse>, Option<String>)> {
     let (_status, _summary, cap_obj_ref) = get_cap_object_ref(context, operation_cap_id).await?;
 
     // TODO: Only active/pending validators can set gas price.
@@ -631,7 +697,7 @@ async fn update_gas_price(
         CallArg::Object(ObjectArg::ImmOrOwnedObject(cap_obj_ref)),
         CallArg::Pure(bcs::to_bytes(&gas_price).unwrap()),
     ];
-    call_0x5(context, "request_set_gas_price", args, gas_budget).await
+    call_0x5(context, "request_set_gas_price", args, gas_budget, serialize_unsigned_transaction).await
 }
 
 async fn report_validator(
@@ -640,7 +706,8 @@ async fn report_validator(
     operation_cap_id: Option<ObjectID>,
     undo_report: bool,
     gas_budget: u64,
-) -> Result<SuiTransactionBlockResponse> {
+    serialize_unsigned_transaction: bool,
+) -> Result<(Option<SuiTransactionBlockResponse>, Option<String>)> {
     let (status, summary, cap_obj_ref) = get_cap_object_ref(context, operation_cap_id).await?;
 
     let validator_address = summary.sui_address;
@@ -657,7 +724,7 @@ async fn report_validator(
         CallArg::Pure(bcs::to_bytes(&reportee_address).unwrap()),
     ];
     let function_name = if undo_report { "undo_report_validator" } else { "report_validator" };
-    call_0x5(context, function_name, args, gas_budget).await
+    call_0x5(context, function_name, args, gas_budget, serialize_unsigned_transaction).await
 }
 
 async fn get_validator_summary_from_cap_id(
@@ -686,7 +753,7 @@ async fn get_validator_summary_from_cap_id(
     Ok((status, summary))
 }
 
-pub async fn construct_unsigned_0x5_txn(
+async fn construct_unsigned_0x5_txn(
     context: &mut WalletContext,
     sender: SuiAddress,
     function: &'static str,
@@ -712,7 +779,35 @@ pub async fn construct_unsigned_0x5_txn(
     )
 }
 
-pub async fn call_0x5(
+pub(crate) async fn call_0x5(
+    context: &mut WalletContext,
+    function: &'static str,
+    call_args: Vec<CallArg>,
+    gas_budget: u64,
+    serialize_unsigned_transaction: bool,
+) -> anyhow::Result<(Option<SuiTransactionBlockResponse>, Option<String>)> {
+    let sender = context.active_address()?;
+    let tx_data = construct_unsigned_0x5_txn(context, sender, function, call_args, gas_budget).await?;
+    if serialize_unsigned_transaction {
+        let serialized_data = Base64::encode(bcs::to_bytes(&tx_data)?);
+        return Ok((None, Some(serialized_data)));
+    }
+    let signature = context.config.keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction()).await?;
+    let transaction = Transaction::from_data(tx_data, vec![signature]);
+    let sui_client = context.get_client().await?;
+    let response = sui_client
+        .quorum_driver_api()
+        .execute_transaction_block(
+            transaction,
+            SuiTransactionBlockResponseOptions::new().with_input().with_effects(),
+            Some(sui_types::quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution),
+        )
+        .await
+        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+    Ok((Some(response), None))
+}
+
+pub(crate)async fn call_0x5_new(
     context: &mut WalletContext,
     function: &'static str,
     call_args: Vec<CallArg>,
@@ -720,7 +815,7 @@ pub async fn call_0x5(
 ) -> anyhow::Result<SuiTransactionBlockResponse> {
     let sender = context.active_address()?;
     let tx_data = construct_unsigned_0x5_txn(context, sender, function, call_args, gas_budget).await?;
-    let signature = context.config.keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction())?;
+    let signature = context.config.keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction()).await?;
     let transaction = Transaction::from_data(tx_data, vec![signature]);
     let sui_client = context.get_client().await?;
     sui_client
@@ -740,23 +835,17 @@ impl Display for SuiValidatorCommandResponse {
         match self {
             SuiValidatorCommandResponse::MakeValidatorInfo => {}
             SuiValidatorCommandResponse::DisplayMetadata => {}
-            SuiValidatorCommandResponse::BecomeCandidate(response) => {
-                write!(writer, "{}", write_transaction_response(response)?)?;
-            }
-            SuiValidatorCommandResponse::JoinCommittee(response) => {
-                write!(writer, "{}", write_transaction_response(response)?)?;
-            }
-            SuiValidatorCommandResponse::LeaveCommittee(response) => {
-                write!(writer, "{}", write_transaction_response(response)?)?;
-            }
-            SuiValidatorCommandResponse::UpdateMetadata(response) => {
-                write!(writer, "{}", write_transaction_response(response)?)?;
-            }
-            SuiValidatorCommandResponse::UpdateGasPrice(response) => {
-                write!(writer, "{}", write_transaction_response(response)?)?;
-            }
-            SuiValidatorCommandResponse::ReportValidator(response) => {
-                write!(writer, "{}", write_transaction_response(response)?)?;
+            SuiValidatorCommandResponse::BecomeCandidate { response, serialized_unsigned_transaction }
+            | SuiValidatorCommandResponse::JoinCommittee { response, serialized_unsigned_transaction }
+            | SuiValidatorCommandResponse::LeaveCommittee { response, serialized_unsigned_transaction }
+            | SuiValidatorCommandResponse::UpdateMetadata { response, serialized_unsigned_transaction }
+            | SuiValidatorCommandResponse::UpdateGasPrice { response, serialized_unsigned_transaction }
+            | SuiValidatorCommandResponse::ReportValidator { response, serialized_unsigned_transaction } => {
+                if let Some(response) = response {
+                    write!(writer, "{}", write_transaction_response(response)?)?;
+                } else {
+                    write!(writer, "Serialized transaction for signing: {:?}", serialized_unsigned_transaction)?;
+                }
             }
             SuiValidatorCommandResponse::SerializedPayload(response) => {
                 write!(writer, "Serialized payload: {}", response)?;
@@ -950,24 +1039,25 @@ async fn update_metadata(
     context: &mut WalletContext,
     metadata: MetadataUpdate,
     gas_budget: u64,
-) -> anyhow::Result<SuiTransactionBlockResponse> {
+    serialize_unsigned_transaction: bool,
+) -> anyhow::Result<(Option<SuiTransactionBlockResponse>, Option<String>)> {
     use ValidatorStatus::*;
     match metadata {
         MetadataUpdate::Name { name } => {
             let args = vec![CallArg::Pure(bcs::to_bytes(&name.into_bytes()).unwrap())];
-            call_0x5(context, "update_validator_name", args, gas_budget).await
+            call_0x5(context, "update_validator_name", args, gas_budget, serialize_unsigned_transaction).await
         }
         MetadataUpdate::Description { description } => {
             let args = vec![CallArg::Pure(bcs::to_bytes(&description.into_bytes()).unwrap())];
-            call_0x5(context, "update_validator_description", args, gas_budget).await
+            call_0x5(context, "update_validator_description", args, gas_budget, serialize_unsigned_transaction).await
         }
         MetadataUpdate::ImageUrl { image_url } => {
             let args = vec![CallArg::Pure(bcs::to_bytes(&image_url.into_bytes()).unwrap())];
-            call_0x5(context, "update_validator_image_url", args, gas_budget).await
+            call_0x5(context, "update_validator_image_url", args, gas_budget, serialize_unsigned_transaction).await
         }
         MetadataUpdate::ProjectUrl { project_url } => {
             let args = vec![CallArg::Pure(bcs::to_bytes(&project_url.into_bytes()).unwrap())];
-            call_0x5(context, "update_validator_project_url", args, gas_budget).await
+            call_0x5(context, "update_validator_project_url", args, gas_budget, serialize_unsigned_transaction).await
         }
         MetadataUpdate::NetworkAddress { network_address } => {
             // Check the network address to be in TCP.
@@ -976,7 +1066,14 @@ async fn update_metadata(
             }
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&network_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_network_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_network_address",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
         MetadataUpdate::PrimaryAddress { primary_address } => {
             primary_address
@@ -984,7 +1081,14 @@ async fn update_metadata(
                 .map_err(|_| anyhow!("Invalid primary address, it must look like `/[ip4,ip6,dns]/.../udp/port`"))?;
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&primary_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_primary_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_primary_address",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
         MetadataUpdate::WorkerAddress { worker_address } => {
             worker_address
@@ -993,7 +1097,14 @@ async fn update_metadata(
             // Only an active validator can leave committee.
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&worker_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_worker_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_worker_address",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
         MetadataUpdate::P2pAddress { p2p_address } => {
             p2p_address
@@ -1001,19 +1112,40 @@ async fn update_metadata(
                 .map_err(|_| anyhow!("Invalid p2p address, it must look like `/[ip4,ip6,dns]/.../udp/port`"))?;
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let args = vec![CallArg::Pure(bcs::to_bytes(&p2p_address).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_p2p_address", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_p2p_address",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
         MetadataUpdate::NetworkPubKey { file } => {
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let network_pub_key: NetworkPublicKey = read_network_keypair_from_file(file)?.public().clone();
             let args = vec![CallArg::Pure(bcs::to_bytes(&network_pub_key.as_bytes().to_vec()).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_network_pubkey", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_network_pubkey",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
         MetadataUpdate::WorkerPubKey { file } => {
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
             let worker_pub_key: NetworkPublicKey = read_network_keypair_from_file(file)?.public().clone();
             let args = vec![CallArg::Pure(bcs::to_bytes(&worker_pub_key.as_bytes().to_vec()).unwrap())];
-            call_0x5(context, "update_validator_next_epoch_worker_pubkey", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_worker_pubkey",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
         MetadataUpdate::ProtocolPubKey { file } => {
             let _status = check_status(context, HashSet::from([Pending, Active])).await?;
@@ -1027,7 +1159,14 @@ async fn update_metadata(
                 ),
                 CallArg::Pure(bcs::to_bytes(&pop.as_ref().to_vec()).unwrap()),
             ];
-            call_0x5(context, "update_validator_next_epoch_protocol_pubkey", args, gas_budget).await
+            call_0x5(
+                context,
+                "update_validator_next_epoch_protocol_pubkey",
+                args,
+                gas_budget,
+                serialize_unsigned_transaction,
+            )
+            .await
         }
     }
 }

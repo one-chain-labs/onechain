@@ -58,7 +58,7 @@ async fn test_object_wrapping_unwrapping() {
         call_move(&authority, &gas, &sender, &sender_key, &package.0, "object_wrapping", "create_child", vec![], vec![])
             .await
             .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let child_object_ref = effects.created()[0].0;
     assert_eq!(child_object_ref.1, create_child_version);
 
@@ -71,7 +71,7 @@ async fn test_object_wrapping_unwrapping() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     // Child object is wrapped, Parent object is created.
     assert_eq!(
         (
@@ -100,7 +100,7 @@ async fn test_object_wrapping_unwrapping() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     // Check that the child shows up in unwrapped, not created.
     // mutated contains parent and gas.
     assert_eq!((effects.mutated().len(), effects.created().len(), effects.unwrapped().len()), (2, 0, 1));
@@ -120,7 +120,7 @@ async fn test_object_wrapping_unwrapping() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     // Check that child object showed up in wrapped.
     // mutated contains parent and gas.
     assert_eq!((effects.mutated().len(), effects.wrapped().len()), (2, 1));
@@ -139,7 +139,7 @@ async fn test_object_wrapping_unwrapping() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     assert_eq!(effects.deleted().len(), 1);
     assert_eq!(effects.unwrapped_then_deleted().len(), 1);
     // Check that both objects are marked as deleted in the authority.
@@ -207,7 +207,9 @@ async fn test_object_owning_another_object() {
     // Check that the child is now owned by the parent.
     let field_id = match child_effect.1 {
         Owner::ObjectOwner(field_id) => field_id.into(),
-        Owner::Shared { .. } | Owner::Immutable | Owner::AddressOwner(_) | Owner::ConsensusV2 { .. } => panic!(),
+        Owner::Shared { .. } | Owner::Immutable | Owner::AddressOwner(_) | Owner::ConsensusAddressOwner { .. } => {
+            panic!()
+        }
     };
     let field_object = authority.get_object(&field_id).await.unwrap();
     assert_eq!(field_object.owner, parent.0);
@@ -591,7 +593,7 @@ async fn test_entry_point_vector_empty() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     // call a function with an empty vector whose type is generic
     let pt = {
@@ -616,7 +618,7 @@ async fn test_entry_point_vector_empty() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     // same tests again without the type tag
     // call a function with an empty vector, no type tag
@@ -642,7 +644,7 @@ async fn test_entry_point_vector_empty() {
     )
     .await
     .unwrap_err();
-    assert_eq!(err, SuiError::UserInputError { error: UserInputError::EmptyCommandInput });
+    assert_eq!(err, SuiErrorKind::UserInputError { error: UserInputError::EmptyCommandInput });
 
     // call a function with an empty vector whose type is generic
     let pt = {
@@ -667,7 +669,7 @@ async fn test_entry_point_vector_empty() {
     )
     .await
     .unwrap_err();
-    assert_eq!(err, SuiError::UserInputError { error: UserInputError::EmptyCommandInput });
+    assert_eq!(err, SuiErrorKind::UserInputError { error: UserInputError::EmptyCommandInput });
 }
 
 #[tokio::test]
@@ -701,7 +703,7 @@ async fn test_entry_point_vector_primitive() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 }
 
 #[tokio::test]
@@ -728,7 +730,7 @@ async fn test_entry_point_vector() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one owned object
     let effects = call_move(
@@ -744,7 +746,7 @@ async fn test_entry_point_vector() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     // mint a parent object and a child object and make sure that parent stored in the vector
     // authenticates the child passed by-value
@@ -754,7 +756,7 @@ async fn test_entry_point_vector() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (parent_id, _, _) = effects.created()[0].0;
     let effects =
         call_move(&authority, &gas, &sender, &sender_key, &package.0, "entry_point_vector", "mint_child", vec![], vec![
@@ -763,7 +765,7 @@ async fn test_entry_point_vector() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (child_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing the same owned object as another one passed as
     // a reference argument
@@ -814,7 +816,7 @@ async fn test_entry_point_vector_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one owned object
     let effects = call_move(
@@ -847,7 +849,7 @@ async fn test_entry_point_vector_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (wrong_obj_id, _, _) = effects.created()[0].0;
     let effects =
         call_move(&authority, &gas, &sender, &sender_key, &package.0, "entry_point_vector", "mint", vec![], vec![
@@ -855,7 +857,7 @@ async fn test_entry_point_vector_error() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (correct_obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one owned object
     let effects = call_move(
@@ -888,7 +890,7 @@ async fn test_entry_point_vector_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (shared_obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one shared object
     let effects = call_move_(
@@ -907,7 +909,7 @@ async fn test_entry_point_vector_error() {
     .await
     .unwrap();
     // support shared objects in vectors
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     // mint an owned object
     let effects =
@@ -916,7 +918,7 @@ async fn test_entry_point_vector_error() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing the same owned object as another one passed as
     // argument
@@ -934,7 +936,7 @@ async fn test_entry_point_vector_error() {
     .await;
     // should fail as we have the same object passed in vector and as a separate by-value argument
     assert_eq!(result.unwrap().status(), &ExecutionStatus::Failure {
-        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::InvalidValueUsage },
+        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::ArgumentWithoutValue },
         command: Some(1)
     });
 
@@ -945,7 +947,7 @@ async fn test_entry_point_vector_error() {
         ])
         .await
         .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing the same owned object as another one passed as
     // a reference argument
@@ -963,7 +965,7 @@ async fn test_entry_point_vector_error() {
     .await;
     // should fail as we have the same object passed in vector and as a separate by-reference argument
     assert_eq!(result.unwrap().status(), &ExecutionStatus::Failure {
-        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::InvalidValueUsage },
+        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::ArgumentWithoutValue },
         command: Some(1)
     });
 }
@@ -1001,7 +1003,7 @@ async fn test_entry_point_vector_any() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one owned object
     let effects = call_move(
@@ -1017,7 +1019,7 @@ async fn test_entry_point_vector_any() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     // mint a parent object and a child object and make sure that parent stored in the vector
     // authenticates the child passed by-value
@@ -1034,7 +1036,7 @@ async fn test_entry_point_vector_any() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (parent_id, _, _) = effects.created()[0].0;
     let effects = call_move(
         &authority,
@@ -1049,7 +1051,7 @@ async fn test_entry_point_vector_any() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (child_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing the same owned object as another one passed as
     // a reference argument
@@ -1102,7 +1104,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one owned object
     let effects = call_move(
@@ -1135,7 +1137,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (wrong_obj_id, _, _) = effects.created()[0].0;
     let effects = call_move(
         &authority,
@@ -1150,7 +1152,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (correct_obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one owned object
     let effects = call_move(
@@ -1183,7 +1185,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (shared_obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing one shared object
     let effects = call_move_(
@@ -1202,7 +1204,7 @@ async fn test_entry_point_vector_any_error() {
     .await
     .unwrap();
     // support shared objects in vectors
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     // mint an owned object
     let effects = call_move(
@@ -1218,7 +1220,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing the same owned object as another one passed as
     // argument
@@ -1236,7 +1238,7 @@ async fn test_entry_point_vector_any_error() {
     .await;
     // should fail as we have the same object passed in vector and as a separate by-value argument
     assert_eq!(result.unwrap().status(), &ExecutionStatus::Failure {
-        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::InvalidValueUsage },
+        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::ArgumentWithoutValue },
         command: Some(1)
     });
 
@@ -1254,7 +1256,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
     let (obj_id, _, _) = effects.created()[0].0;
     // call a function with a vector containing the same owned object as another one passed as
     // a reference argument
@@ -1271,7 +1273,7 @@ async fn test_entry_point_vector_any_error() {
     )
     .await;
     assert_eq!(result.unwrap().status(), &ExecutionStatus::Failure {
-        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::InvalidValueUsage },
+        error: ExecutionErrorKind::CommandArgumentError { arg_idx: 0, kind: CommandArgumentError::ArgumentWithoutValue },
         command: Some(1)
     });
 }
@@ -1949,7 +1951,10 @@ async fn error_test_make_move_vec_for_type<T: Clone + Serialize>(
             .await
             .unwrap();
     assert_eq!(effects.status(), &ExecutionStatus::Failure {
-        error: ExecutionFailureStatus::command_argument_error(CommandArgumentError::TypeMismatch, 0),
+        error: ExecutionFailureStatus::command_argument_error(
+            CommandArgumentError::InvalidMakeMoveVecNonObjectArgument,
+            0
+        ),
         command: Some(0)
     });
 
@@ -2071,7 +2076,7 @@ async fn test_make_move_vec_empty() {
     )
     .await
     .unwrap_err();
-    assert_eq!(result, SuiError::UserInputError { error: UserInputError::EmptyCommandInput });
+    assert_eq!(result, SuiErrorKind::UserInputError { error: UserInputError::EmptyCommandInput });
 }
 
 fn resolved_struct(
@@ -2110,7 +2115,7 @@ async fn test_object_no_id_error() {
     path.extend(["src", "unit_tests", "data", "object_no_id"]);
     let res = build_config.build(&path);
 
-    matches!(res.err(), Some(SuiError::ExecutionError(err_str)) if
+    matches!(res.err().map(|e|e.into_inner()), Some(SuiErrorKind::ExecutionError(err_str)) if
                  err_str.contains("SuiMoveVerificationError")
                  && err_str.contains("First field of struct NotObject must be 'id'"));
 }
@@ -2203,7 +2208,7 @@ pub async fn build_and_publish_test_package_with_upgrade_cap(
     .await
     .1
     .into_data();
-    assert!(matches!(effects.status(), ExecutionStatus::Success { .. }), "{:?}", effects.status());
+    assert!(matches!(effects.status(), ExecutionStatus::Success), "{:?}", effects.status());
 
     let package = effects.created().into_iter().find(|(_, owner)| matches!(owner, Owner::Immutable)).unwrap();
     let upgrade_cap = effects.created().into_iter().find(|(_, owner)| matches!(owner, Owner::AddressOwner(_))).unwrap();

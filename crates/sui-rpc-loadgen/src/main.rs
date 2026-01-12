@@ -143,9 +143,9 @@ fn get_keypair() -> Result<SignerInfo> {
     // TODO(chris) allow pass in custom path for keystore
     // Load keystore from ~/.sui/sui_config/sui.keystore
     let keystore_path = get_sui_config_directory().join("sui.keystore");
-    let keystore = Keystore::from(FileBasedKeystore::new(&keystore_path)?);
+    let keystore = Keystore::from(FileBasedKeystore::load_or_create(&keystore_path)?);
     let active_address = keystore.addresses().pop().unwrap();
-    let keypair: &SuiKeyPair = keystore.get_key(&active_address)?;
+    let keypair: &SuiKeyPair = keystore.export(&active_address)?;
     println!("using address {active_address} for signing");
     Ok(SignerInfo::new(keypair.encode_base64()))
 }
@@ -177,7 +177,9 @@ fn get_log_file_path(dir_path: String) -> String {
 async fn main() -> Result<(), Box<dyn Error>> {
     let tracing_level = "debug";
     let network_tracing_level = "info";
-    let log_filter = format!("{tracing_level},h2={network_tracing_level},tower={network_tracing_level},hyper={network_tracing_level},tonic::transport={network_tracing_level}");
+    let log_filter = format!(
+        "{tracing_level},h2={network_tracing_level},tower={network_tracing_level},hyper={network_tracing_level},tonic::transport={network_tracing_level}"
+    );
     let opts = Opts::parse();
 
     let log_filename = get_log_file_path(opts.logs_directory);

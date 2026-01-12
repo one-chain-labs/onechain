@@ -49,7 +49,6 @@ mod checked {
         },
         coin::Coin,
         error::{command_argument_error, ExecutionError, ExecutionErrorKind},
-        execution_config_utils::to_binary_config,
         execution_status::{CommandArgumentError, PackageUpgradeError},
         id::RESOLVED_SUI_ID,
         metrics::LimitsMetrics,
@@ -121,7 +120,7 @@ mod checked {
         // Save loaded objects for debug. We dont want to lose the info
         state_view.save_loaded_runtime_objects(loaded_runtime_objects);
         state_view.save_wrapped_object_containers(wrapped_object_containers);
-        state_view.record_execution_results(finished?);
+        state_view.record_execution_results(finished?)?;
         Ok(mode_results)
     }
 
@@ -547,12 +546,14 @@ mod checked {
             }));
         };
 
-        let binary_config = to_binary_config(context.protocol_config);
-        let Ok(current_normalized) = existing_package.normalize(&binary_config) else {
+        let pool = &mut normalized::RcPool::new();
+        let binary_config = context.protocol_config.binary_config(None);
+        let Ok(current_normalized) = existing_package.normalize(pool, &binary_config, /* include code */ true) else {
             invariant_violation!("Tried to normalize modules in existing package but failed")
         };
 
-        let mut new_normalized = normalize_deserialized_modules(upgrading_modules.into_iter());
+        let mut new_normalized =
+            normalize_deserialized_modules(pool, upgrading_modules.into_iter(), /* include code */ true);
         for (name, cur_module) in current_normalized {
             let Some(new_module) = new_normalized.remove(&name) else {
                 return Err(ExecutionError::new_with_source(
@@ -569,8 +570,8 @@ mod checked {
 
     fn check_module_compatibility(
         policy: &UpgradePolicy,
-        cur_module: &normalized::Module,
-        new_module: &normalized::Module,
+        cur_module: &move_binary_format::compatibility::Module,
+        new_module: &move_binary_format::compatibility::Module,
     ) -> Result<(), ExecutionError> {
         match policy {
             UpgradePolicy::Additive => InclusionCheck::Subset.check(cur_module, new_module),
@@ -671,7 +672,7 @@ mod checked {
         context: &mut ExecutionContext<'_, '_, '_>,
         module_bytes: &[Vec<u8>],
     ) -> Result<Vec<CompiledModule>, ExecutionError> {
-        let binary_config = to_binary_config(context.protocol_config);
+        let binary_config = context.protocol_config.binary_config(None);
         let modules = module_bytes
             .iter()
             .map(|b| {

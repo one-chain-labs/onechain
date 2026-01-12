@@ -43,7 +43,16 @@ use sui_types::{
         SuiKeyPair,
         ZkLoginPublicIdentifier,
     },
-    effects::{IDOperation, ObjectIn, ObjectOut, TransactionEffects, TransactionEvents, UnchangedSharedKind},
+    effects::{
+        AccumulatorOperation,
+        AccumulatorValue,
+        IDOperation,
+        ObjectIn,
+        ObjectOut,
+        TransactionEffects,
+        TransactionEvents,
+        UnchangedConsensusKind,
+    },
     event::Event,
     execution::ExecutionTimeObservationKey,
     execution_status::{
@@ -77,11 +86,15 @@ use sui_types::{
         EndOfEpochTransactionKind,
         GenesisObject,
         ObjectArg,
+        Reservation,
         SenderSignedData,
+        SharedObjectMutability,
         StoredExecutionTimeObservations,
         TransactionData,
         TransactionExpiration,
         TransactionKind,
+        WithdrawFrom,
+        WithdrawalTypeArg,
     },
     type_input::{StructInput, TypeInput},
     utils::DEFAULT_ADDRESS_SEED,
@@ -196,8 +209,12 @@ fn get_registry() -> Result<Registry> {
     tracer.trace_type::<Owner>(&samples).unwrap();
     tracer.trace_type::<ExecutionStatus>(&samples).unwrap();
     tracer.trace_type::<ExecutionFailureStatus>(&samples).unwrap();
+    tracer.trace_type::<Reservation>(&samples).unwrap();
+    tracer.trace_type::<WithdrawFrom>(&samples).unwrap();
+    tracer.trace_type::<WithdrawalTypeArg>(&samples).unwrap();
     tracer.trace_type::<CallArg>(&samples).unwrap();
     tracer.trace_type::<ObjectArg>(&samples).unwrap();
+    tracer.trace_type::<SharedObjectMutability>(&samples).unwrap();
     tracer.trace_type::<Data>(&samples).unwrap();
     tracer.trace_type::<TypeTag>(&samples).unwrap();
     tracer.trace_type::<TypedStoreError>(&samples).unwrap();
@@ -221,7 +238,9 @@ fn get_registry() -> Result<Registry> {
     tracer.trace_type::<IDOperation>(&samples).unwrap();
     tracer.trace_type::<ObjectIn>(&samples).unwrap();
     tracer.trace_type::<ObjectOut>(&samples).unwrap();
-    tracer.trace_type::<UnchangedSharedKind>(&samples).unwrap();
+    tracer.trace_type::<UnchangedConsensusKind>(&samples).unwrap();
+    tracer.trace_type::<AccumulatorValue>(&samples).unwrap();
+    tracer.trace_type::<AccumulatorOperation>(&samples).unwrap();
     tracer.trace_type::<TransactionEffects>(&samples).unwrap();
 
     // uncomment once GenericSignature is added
@@ -269,7 +288,6 @@ fn get_registry() -> Result<Registry> {
     tracer.trace_type::<TransactionData>(&samples).unwrap();
     tracer.trace_type::<GenesisObject>(&samples).unwrap();
     tracer.trace_type::<CheckpointCommitment>(&samples).unwrap();
-    tracer.trace_type::<sui_types::object::Authenticator>(&samples).unwrap();
 
     tracer.registry()
 }

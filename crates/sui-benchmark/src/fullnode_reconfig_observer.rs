@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use sui_core::{
@@ -63,11 +63,12 @@ impl ReconfigObserver<NetworkAuthorityClient> for FullNodeReconfigObserver {
                         let new_committee = sui_system_state.get_sui_committee_for_benchmarking();
                         let _ = self.committee_store.insert_new_committee(new_committee.committee());
                         let auth_agg = AuthorityAggregator::new_from_committee(
-                            sui_system_state.get_sui_committee_for_benchmarking(),
+                            new_committee,
+                            Arc::new(sui_system_state.get_committee_authority_names_to_hostnames()),
+                            sui_system_state.reference_gas_price,
                             &self.committee_store,
                             self.safe_client_metrics_base.clone(),
                             self.auth_agg_metrics.clone(),
-                            Arc::new(HashMap::new()),
                         );
                         driver.update_authority_aggregator(Arc::new(auth_agg));
                     } else {

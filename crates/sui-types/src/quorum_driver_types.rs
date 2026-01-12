@@ -2,7 +2,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
@@ -13,7 +13,7 @@ use crate::{
     committee::StakeUnit,
     crypto::{AuthorityStrongQuorumSignInfo, ConciseAuthorityPublicKeyBytes},
     effects::{CertifiedTransactionEffects, TransactionEffects, TransactionEvents, VerifiedCertifiedTransactionEffects},
-    error::SuiError,
+    error::{ErrorCategory, SuiError},
     messages_checkpoint::CheckpointSequenceNumber,
     object::Object,
     transaction::{Transaction, VerifiedTransaction},
@@ -28,7 +28,7 @@ pub const NON_RECOVERABLE_ERROR_MSG: &str = "Transaction has non recoverable err
 
 /// Client facing errors regarding transaction submission via Quorum Driver.
 /// Every invariant needs detailed documents to instruct client handling.
-#[derive(Eq, PartialEq, Clone, Debug, Serialize, Deserialize, Error, Hash, AsRefStr)]
+#[derive(Eq, PartialEq, Clone, Debug, Error, Hash, AsRefStr)]
 pub enum QuorumDriverError {
     #[error("QuorumDriver internal error: {0}.")]
     QuorumDriverInternalError(SuiError),
@@ -38,16 +38,44 @@ pub enum QuorumDriverError {
     ObjectsDoubleUsed { conflicting_txes: BTreeMap<TransactionDigest, (Vec<(AuthorityName, ObjectRef)>, StakeUnit)> },
     #[error("Transaction timed out before reaching finality")]
     TimeoutBeforeFinality,
+    #[error("Transaction timed out before reaching finality. Last recorded retriable error: {last_error}")]
+    TimeoutBeforeFinalityWithErrors { last_error: String, attempts: u32, timeout: Duration },
     #[error("Transaction failed to reach finality with transient error after {total_attempts} attempts.")]
     FailedWithTransientErrorAfterMaximumAttempts { total_attempts: u32 },
     #[error("{NON_RECOVERABLE_ERROR_MSG}: {errors:?}.")]
     NonRecoverableTransactionError { errors: GroupedErrors },
-    #[error("Transaction is not processed because {overloaded_stake} of validators by stake are overloaded with certificates pending execution.")]
+    #[error(
+        "Transaction is not processed because {overloaded_stake} of validators by stake are overloaded with certificates pending execution."
+    )]
     SystemOverload { overloaded_stake: StakeUnit, errors: GroupedErrors },
+    #[error(
+        "Transaction is not processed because {overload_stake} of validators are overloaded and asked client to retry after {retry_after_secs}."
+    )]
+    SystemOverloadRetryAfter { overload_stake: StakeUnit, errors: GroupedErrors, retry_after_secs: u64 },
     #[error("Transaction is already finalized but with different user signatures")]
     TxAlreadyFinalizedWithDifferentUserSignatures,
-    #[error("Transaction is not processed because {overload_stake} of validators are overloaded and asked client to retry after {retry_after_secs}.")]
-    SystemOverloadRetryAfter { overload_stake: StakeUnit, errors: GroupedErrors, retry_after_secs: u64 },
+
+    // Wrapped error from Transaction Driver.
+    #[error("Transaction processing failed. Details: {details}")]
+    TransactionFailed { category: ErrorCategory, details: String },
+}
+
+impl QuorumDriverError {
+    pub fn is_retriable(&self) -> bool {
+        match self {
+            QuorumDriverError::QuorumDriverInternalError { .. } => false,
+            QuorumDriverError::InvalidUserSignature { .. } => false,
+            QuorumDriverError::ObjectsDoubleUsed { .. } => false,
+            QuorumDriverError::TimeoutBeforeFinality => true,
+            QuorumDriverError::TimeoutBeforeFinalityWithErrors { .. } => true,
+            QuorumDriverError::FailedWithTransientErrorAfterMaximumAttempts { .. } => true,
+            QuorumDriverError::NonRecoverableTransactionError { .. } => false,
+            QuorumDriverError::SystemOverload { .. } => true,
+            QuorumDriverError::SystemOverloadRetryAfter { .. } => true,
+            QuorumDriverError::TxAlreadyFinalizedWithDifferentUserSignatures => false,
+            QuorumDriverError::TransactionFailed { category, .. } => category.is_submission_retriable(),
+        }
+    }
 }
 
 pub type GroupedErrors = Vec<(SuiError, StakeUnit, Vec<ConciseAuthorityPublicKeyBytes>)>;

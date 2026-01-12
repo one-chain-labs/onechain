@@ -27,14 +27,13 @@ module examples::sword {
 /// Module that defines the in-game currency: GEMs which can be purchased with
 /// OCT and used to buy swords (in the `sword` module).
 module examples::gem {
-    use std::{option::none, string::{Self, String}};
-    use one::{
-        balance::{Self, Balance},
-        coin::{Self, Coin, TreasuryCap},
-        oct::OCT,
-        token::{Self, Token, ActionRequest},
-        tx_context::sender
-    };
+    use std::option::none;
+    use std::string::{Self, String};
+    use one::balance::{Self, Balance};
+    use one::coin::{Self, Coin, TreasuryCap};
+    use one::oct::OCT;
+    use one::token::{Self, Token, ActionRequest};
+    use one::tx_context::sender;
 
     /// Trying to purchase Gems with an unexpected amount.
     const EUnknownAmount: u64 = 0;
@@ -52,7 +51,6 @@ module examples::gem {
     const LARGE_BUNDLE: u64 = 1_000_000_000_000;
     const LARGE_AMOUNT: u64 = 100_000;
 
-    #[allow(lint(coin_field))]
     /// Gems can be purchased through the `Store`.
     public struct GemStore has key {
         id: UID,
@@ -67,6 +65,7 @@ module examples::gem {
 
     // In the module initializer we create the in-game currency and define the
     // rules for different types of actions.
+    #[allow(deprecated_usage)]
     fun init(otw: GEM, ctx: &mut TxContext) {
         let (treasury_cap, coin_metadata) = coin::create_currency(
             otw,

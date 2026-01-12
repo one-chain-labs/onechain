@@ -172,7 +172,7 @@ module t2::o2 {
 //> 1: t2::o2::pop_coin(Result(0));
 //> 2: SplitCoins(Result(1), [Input(0)]);
 //> 3: TransferObjects([Result(2)], Input(2));
-//> 4: one::transfer::public_share_object(Input(1));
+//> 4: one::transfer::public_share_object<one::coin::Coin<one::oct::OCT>>(Input(1));
 
 // Try to reshare the shared object -- this should fail since the input was
 // used for the `MakeMoveVec` call

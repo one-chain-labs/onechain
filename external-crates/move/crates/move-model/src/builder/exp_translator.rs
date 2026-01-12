@@ -261,7 +261,7 @@ impl ExpTranslator<'_, '_, '_> {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U128));
                         }
                         "u256" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::U256))
+                            return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
                         }
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
@@ -330,6 +330,7 @@ impl ExpTranslator<'_, '_, '_> {
 // # Expression Translation
 
 impl ExpTranslator<'_, '_, '_> {
+    #[allow(dead_code)]
     pub fn translate_value(&mut self, v: &EA::Value) -> Option<(Value, Type)> {
         let loc = self.to_loc(&v.loc);
         match &v.value {
@@ -364,6 +365,10 @@ impl ExpTranslator<'_, '_, '_> {
             )),
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
+                let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
+                Some((Value::ByteArray(x.clone()), ty))
+            }
+            EA::Value_::InferredString(x) => {
                 let ty = Type::Vector(Box::new(Type::new_prim(PrimitiveType::U8)));
                 Some((Value::ByteArray(x.clone()), ty))
             }

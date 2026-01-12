@@ -508,7 +508,6 @@ pub fn all_natives(silent: bool) -> NativeFunctionTable {
         ("transfer", "receive_impl", make_native!(transfer::receive_object_internal)),
         ("tx_context", "derive_id", make_native!(tx_context::derive_id)),
         ("types", "is_one_time_witness", make_native!(types::is_one_time_witness)),
-        ("test_utils", "destroy", make_native!(test_utils::destroy)),
         ("test_utils", "create_one_time_witness", make_native!(test_utils::create_one_time_witness)),
         ("zklogin_verified_id", "check_zklogin_id_internal", make_native!(zklogin::check_zklogin_id_internal)),
         (

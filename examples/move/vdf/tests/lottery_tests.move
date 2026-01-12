@@ -4,7 +4,8 @@
 #[test_only]
 module vdf::lottery_tests;
 
-use one::{clock, test_scenario as ts};
+use one::clock;
+use one::test_scenario as ts;
 use vdf::lottery::{Self, Game, GameWinner};
 
 const OUTPUT: vector<u8> =

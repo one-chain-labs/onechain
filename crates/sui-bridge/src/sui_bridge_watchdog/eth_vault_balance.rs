@@ -12,17 +12,18 @@ use prometheus::IntGauge;
 use tokio::time::Duration;
 use tracing::{error, info};
 
-use crate::{abi::EthERC20, metered_eth_provider::MeteredEthHttpProvier, sui_bridge_watchdog::Observable};
+use crate::{abi::EthERC20, metered_eth_provider::MeteredEthHttpProvider, sui_bridge_watchdog::Observable};
 
 #[derive(Debug)]
 pub enum VaultAsset {
     WETH,
     USDT,
     WBTC,
+    LBTC,
 }
 
 pub struct EthereumVaultBalance {
-    coin_contract: EthERC20<Provider<MeteredEthHttpProvier>>,
+    coin_contract: EthERC20<Provider<MeteredEthHttpProvider>>,
     asset: VaultAsset,
     decimals: u8,
     vault_address: EthAddress,
@@ -31,7 +32,7 @@ pub struct EthereumVaultBalance {
 
 impl EthereumVaultBalance {
     pub async fn new(
-        provider: Arc<Provider<MeteredEthHttpProvier>>,
+        provider: Arc<Provider<MeteredEthHttpProvider>>,
         vault_address: EthAddress,
         coin_address: EthAddress, // for now this only support one coin which is WETH
         asset: VaultAsset,
@@ -54,7 +55,7 @@ impl Observable for EthereumVaultBalance {
     }
 
     async fn observe_and_report(&self) {
-        let balance: Result<U256, ethers::contract::ContractError<Provider<MeteredEthHttpProvier>>> =
+        let balance: Result<U256, ethers::contract::ContractError<Provider<MeteredEthHttpProvider>>> =
             self.coin_contract.balance_of(self.vault_address).call().await;
         match balance {
             Ok(balance) => {

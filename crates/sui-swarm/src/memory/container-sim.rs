@@ -6,9 +6,9 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use one_node::{SuiNode, SuiNodeHandle};
 use prometheus::Registry;
 use sui_config::NodeConfig;
+use one_node::{SuiNode, SuiNodeHandle};
 use sui_types::base_types::ConciseableName;
 use tokio::sync::watch;
 use tracing::{info, trace};
@@ -63,7 +63,7 @@ impl Container {
                 let startup_sender = startup_sender.clone();
                 async move {
                     let registry_service = mysten_metrics::RegistryService::new(Registry::new());
-                    let server = SuiNode::start(config, registry_service, None).await.unwrap();
+                    let server = SuiNode::start(config, registry_service).await.unwrap();
 
                     startup_sender.send(Arc::downgrade(&server)).ok();
 

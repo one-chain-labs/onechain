@@ -27,8 +27,10 @@ title: Module `one::config`
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -140,20 +142,20 @@ title: Module `one::config`
 
 
 
-<a name="one_config_EBCSSerializationFailure"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/config.md#one_config_EBCSSerializationFailure">EBCSSerializationFailure</a>: u64 = 2;
-</code></pre>
-
-
-
 <a name="one_config_ENotSetForEpoch"></a>
 
 
 
 <pre><code><b>const</b> <a href="../one/config.md#one_config_ENotSetForEpoch">ENotSetForEpoch</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="one_config_EBCSSerializationFailure"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/config.md#one_config_EBCSSerializationFailure">EBCSSerializationFailure</a>: u64 = 2;
 </code></pre>
 
 
@@ -274,22 +276,23 @@ title: Module `one::config`
             newer_value,
             older_value_opt,
         } = sobj.data.extract();
-        <b>let</b> (older_value_opt, removed_value) =
-            <b>if</b> (epoch &gt; newer_value_epoch) {
-                // <b>if</b> the `newer_value` is <b>for</b> a previous epoch, <b>move</b> it to `older_value_opt`
-                (<b>move</b> newer_value, <b>move</b> older_value_opt)
-            } <b>else</b> {
-                // the current epoch cannot be less than the `newer_value_epoch`
-                <b>assert</b>!(epoch == newer_value_epoch);
-                // <b>if</b> the `newer_value` is <b>for</b> the current epoch, then the option must be `none`
-                <b>assert</b>!(newer_value.is_none(), <a href="../one/config.md#one_config_EAlreadySetForEpoch">EAlreadySetForEpoch</a>);
-                (<b>move</b> older_value_opt, option::none())
-            };
-        sobj.data.fill(<a href="../one/config.md#one_config_SettingData">SettingData</a> {
-            newer_value_epoch: epoch,
-            newer_value: option::some(value),
-            older_value_opt,
-        });
+        <b>let</b> (older_value_opt, removed_value) = <b>if</b> (epoch &gt; newer_value_epoch) {
+            // <b>if</b> the `newer_value` is <b>for</b> a previous epoch, <b>move</b> it to `older_value_opt`
+            (<b>move</b> newer_value, <b>move</b> older_value_opt)
+        } <b>else</b> {
+            // the current epoch cannot be less than the `newer_value_epoch`
+            <b>assert</b>!(epoch == newer_value_epoch);
+            // <b>if</b> the `newer_value` is <b>for</b> the current epoch, then the option must be `none`
+            <b>assert</b>!(newer_value.is_none(), <a href="../one/config.md#one_config_EAlreadySetForEpoch">EAlreadySetForEpoch</a>);
+            (<b>move</b> older_value_opt, option::none())
+        };
+        sobj
+            .data
+            .fill(<a href="../one/config.md#one_config_SettingData">SettingData</a> {
+                newer_value_epoch: epoch,
+                newer_value: option::some(value),
+                older_value_opt,
+            });
         removed_value
     }
 }
@@ -332,21 +335,22 @@ title: Module `one::config`
         newer_value,
         older_value_opt,
     } = sobj.data.extract();
-    <b>let</b> (older_value_opt, removed_value) =
-        <b>if</b> (epoch &gt; newer_value_epoch) {
-            // <b>if</b> the `newer_value` is <b>for</b> a previous epoch, <b>move</b> it to `older_value_opt`
-            (<b>move</b> newer_value, option::none())
-        } <b>else</b> {
-            // the current epoch cannot be less than the `newer_value_epoch`
-            <b>assert</b>!(epoch == newer_value_epoch);
-            (<b>move</b> older_value_opt, <b>move</b> newer_value)
-        };
+    <b>let</b> (older_value_opt, removed_value) = <b>if</b> (epoch &gt; newer_value_epoch) {
+        // <b>if</b> the `newer_value` is <b>for</b> a previous epoch, <b>move</b> it to `older_value_opt`
+        (<b>move</b> newer_value, option::none())
+    } <b>else</b> {
+        // the current epoch cannot be less than the `newer_value_epoch`
+        <b>assert</b>!(epoch == newer_value_epoch);
+        (<b>move</b> older_value_opt, <b>move</b> newer_value)
+    };
     <b>let</b> older_value_opt_is_none = older_value_opt.is_none();
-    sobj.data.fill(<a href="../one/config.md#one_config_SettingData">SettingData</a> {
-        newer_value_epoch: epoch,
-        newer_value: option::none(),
-        older_value_opt,
-    });
+    sobj
+        .data
+        .fill(<a href="../one/config.md#one_config_SettingData">SettingData</a> {
+            newer_value_epoch: epoch,
+            newer_value: option::none(),
+            older_value_opt,
+        });
     <b>if</b> (older_value_opt_is_none) {
         field::remove&lt;_, <a href="../one/config.md#one_config_Setting">Setting</a>&lt;Value&gt;&gt;(&<b>mut</b> <a href="../one/config.md#one_config">config</a>.id, name);
     };
@@ -513,11 +517,7 @@ title: Module `one::config`
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>macro</b> <b>fun</b> <b>entry</b>&lt;
-    $WriteCap,
-    $Name: <b>copy</b> + drop + store,
-    $Value: <b>copy</b> + drop + store,
-&gt;(
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>macro</b> <b>fun</b> <b>entry</b>&lt;$WriteCap, $Name: <b>copy</b> + drop + store, $Value: <b>copy</b> + drop + store&gt;(
     $<a href="../one/config.md#one_config">config</a>: &<b>mut</b> <a href="../one/config.md#one_config_Config">Config</a>&lt;$WriteCap&gt;,
     $cap: &<b>mut</b> $WriteCap,
     $name: $Name,
@@ -571,13 +571,12 @@ title: Module `one::config`
     <b>let</b> cap = $cap;
     <b>let</b> name = $name;
     <b>let</b> ctx = $ctx;
-    <b>let</b> old_value_opt =
-        <b>if</b> (!<a href="../one/config.md#one_config">config</a>.<a href="../one/config.md#one_config_exists_with_type_for_next_epoch">exists_with_type_for_next_epoch</a>&lt;_, _, $Value&gt;(name, ctx)) {
-            <b>let</b> initial = $initial_for_next_epoch(<a href="../one/config.md#one_config">config</a>, cap, ctx);
-            <a href="../one/config.md#one_config">config</a>.<a href="../one/config.md#one_config_add_for_next_epoch">add_for_next_epoch</a>(cap, name, initial, ctx)
-        } <b>else</b> {
-            option::none()
-        };
+    <b>let</b> old_value_opt = <b>if</b> (!<a href="../one/config.md#one_config">config</a>.<a href="../one/config.md#one_config_exists_with_type_for_next_epoch">exists_with_type_for_next_epoch</a>&lt;_, _, $Value&gt;(name, ctx)) {
+        <b>let</b> initial = $initial_for_next_epoch(<a href="../one/config.md#one_config">config</a>, cap, ctx);
+        <a href="../one/config.md#one_config">config</a>.<a href="../one/config.md#one_config_add_for_next_epoch">add_for_next_epoch</a>(cap, name, initial, ctx)
+    } <b>else</b> {
+        option::none()
+    };
     $update_for_next_epoch(old_value_opt, <a href="../one/config.md#one_config">config</a>.<a href="../one/config.md#one_config_borrow_for_next_epoch_mut">borrow_for_next_epoch_mut</a>(cap, name, ctx));
 }
 </code></pre>

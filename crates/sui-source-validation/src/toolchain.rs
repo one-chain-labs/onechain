@@ -16,7 +16,7 @@ use move_binary_format::CompiledModule;
 use move_bytecode_source_map::utils::source_map_from_file;
 use move_command_line_common::{
     env::MOVE_HOME,
-    files::{extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION},
+    files::{extension_equals, find_filenames, DEBUG_INFO_EXTENSION, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION},
 };
 use move_compiler::{
     compiled_unit::NamedCompiledModule,
@@ -307,9 +307,9 @@ fn decode_bytecode_file(
     let bytecode_bytes = std::fs::read(bytecode_path)?;
     let source_map = source_map_from_file(
         &root_path
-            .join(CompiledPackageLayout::SourceMaps.path())
+            .join(CompiledPackageLayout::DebugInfo.path())
             .join(&path_to_file)
-            .with_extension(SOURCE_MAP_EXTENSION),
+            .with_extension(DEBUG_INFO_EXTENSION),
     )?;
     let source_path =
         &root_path.join(CompiledPackageLayout::Sources.path()).join(path_to_file).with_extension(MOVE_EXTENSION);

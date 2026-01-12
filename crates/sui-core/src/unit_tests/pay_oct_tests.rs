@@ -8,7 +8,7 @@ use sui_types::{
     base_types::{dbg_addr, ObjectID, ObjectRef, SuiAddress},
     crypto::{get_key_pair, AccountKeyPair},
     effects::{SignedTransactionEffects, TransactionEffectsAPI},
-    error::{SuiError, UserInputError},
+    error::{SuiError, SuiErrorKind, UserInputError},
     execution_status::{ExecutionFailureStatus, ExecutionStatus},
     gas_coin::GasCoin,
     object::Object,
@@ -141,9 +141,9 @@ async fn test_pay_oct_success_one_input_coin() -> anyhow::Result<()> {
     let addr1 = effects.created()[0].1.get_owner_address()?;
     let addr2 = effects.created()[1].1.get_owner_address()?;
     let addr3 = effects.created()[2].1.get_owner_address()?;
-    let coin_val1 = *recipient_amount_map.get(&addr1).ok_or(SuiError::InvalidAddress)?;
-    let coin_val2 = *recipient_amount_map.get(&addr2).ok_or(SuiError::InvalidAddress)?;
-    let coin_val3 = *recipient_amount_map.get(&addr3).ok_or(SuiError::InvalidAddress)?;
+    let coin_val1 = *recipient_amount_map.get(&addr1).ok_or(SuiErrorKind::InvalidAddress)?;
+    let coin_val2 = *recipient_amount_map.get(&addr2).ok_or(SuiErrorKind::InvalidAddress)?;
+    let coin_val3 = *recipient_amount_map.get(&addr3).ok_or(SuiErrorKind::InvalidAddress)?;
     assert_eq!(GasCoin::try_from(&created_obj1)?.value(), coin_val1);
     assert_eq!(GasCoin::try_from(&created_obj2)?.value(), coin_val2);
     assert_eq!(GasCoin::try_from(&created_obj3)?.value(), coin_val3);
@@ -192,8 +192,8 @@ async fn test_pay_oct_success_multiple_input_coins() -> anyhow::Result<()> {
     let created_obj2 = res.authority_state.get_object(&created_obj_id2).await.unwrap();
     let addr1 = effects.created()[0].1.get_owner_address()?;
     let addr2 = effects.created()[1].1.get_owner_address()?;
-    let coin_val1 = *recipient_amount_map.get(&addr1).ok_or(SuiError::InvalidAddress)?;
-    let coin_val2 = *recipient_amount_map.get(&addr2).ok_or(SuiError::InvalidAddress)?;
+    let coin_val1 = *recipient_amount_map.get(&addr1).ok_or(SuiErrorKind::InvalidAddress)?;
+    let coin_val2 = *recipient_amount_map.get(&addr2).ok_or(SuiErrorKind::InvalidAddress)?;
     assert_eq!(GasCoin::try_from(&created_obj1)?.value(), coin_val1);
     assert_eq!(GasCoin::try_from(&created_obj2)?.value(), coin_val2);
     // make sure the first input coin still belongs to the sender,

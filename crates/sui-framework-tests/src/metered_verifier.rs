@@ -15,7 +15,7 @@ use sui_framework::BuiltInFramework;
 use sui_move_build::{CompiledPackage, SuiPackageHooks};
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
-    error::{SuiError, SuiResult},
+    error::{SuiErrorKind, SuiResult},
     metrics::BytecodeVerifierMetrics,
 };
 use sui_verifier::meter::SuiVerifierMeter;
@@ -97,7 +97,7 @@ fn test_metered_move_bytecode_verifier() {
         run_metered_move_bytecode_verifier(&compiled_modules, &verifier_config, &mut meter, &bytecode_verifier_metrics);
     let elapsed = timer_start.elapsed().as_micros() as f64 / (1000.0 * 1000.0);
 
-    assert!(matches!(r.unwrap_err(), SuiError::ModuleVerificationFailure { .. }));
+    assert!(matches!(r.unwrap_err().into_inner(), SuiErrorKind::ModuleVerificationFailure { .. }));
 
     // Some new modules might have passed
     let module_success_samples =

@@ -1,14 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use reqwest::{Client, StatusCode};
 use tracing::{debug, error};
 use url::Url;
 
 use crate::ingestion::{
-    client::{FetchError, FetchResult, IngestionClientTrait},
+    ingestion_client::{FetchData, FetchError, FetchResult, IngestionClientTrait},
     Result as IngestionResult,
 };
+
+/// Default timeout for remote checkpoint fetches.
+/// This prevents requests from hanging indefinitely due to network issues,
+/// unresponsive servers, or other connection problems.
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub enum HttpError {
@@ -20,14 +27,36 @@ fn status_code_to_error(code: StatusCode) -> anyhow::Error {
     HttpError::Http(code).into()
 }
 
-pub(crate) struct RemoteIngestionClient {
+pub struct RemoteIngestionClient {
     url: Url,
     client: Client,
 }
 
 impl RemoteIngestionClient {
-    pub(crate) fn new(url: Url) -> IngestionResult<Self> {
-        Ok(Self { url, client: Client::builder().build()? })
+    pub fn new(url: Url) -> IngestionResult<Self> {
+        Ok(Self { url, client: Client::builder().timeout(DEFAULT_REQUEST_TIMEOUT).build()? })
+    }
+
+    pub fn new_with_timeout(url: Url, timeout: Duration) -> IngestionResult<Self> {
+        Ok(Self { url, client: Client::builder().timeout(timeout).build()? })
+    }
+
+    /// Fetch metadata mapping epoch IDs to the sequence numbers of their last checkpoints.
+    /// The response is a JSON-encoded array of checkpoint sequence numbers.
+    pub async fn end_of_epoch_checkpoints(&self) -> reqwest::Result<reqwest::Response> {
+        // SAFETY: The path being joined is statically known to be valid.
+        let url = self.url.join("/epochs.json").expect("Unexpected invalid URL");
+
+        self.client.get(url).send().await
+    }
+
+    /// Fetch the bytes for a checkpoint by its sequence number.
+    /// The response is the serialized representation of a checkpoint, as raw bytes.
+    pub async fn checkpoint(&self, checkpoint: u64) -> reqwest::Result<reqwest::Response> {
+        // SAFETY: The path being joined is statically known to be valid.
+        let url = self.url.join(&format!("/{checkpoint}.chk")).expect("Unexpected invalid URL");
+
+        self.client.get(url).send().await
     }
 }
 
@@ -43,13 +72,8 @@ impl IngestionClientTrait for RemoteIngestionClient {
     /// - server errors (5xx),
     /// - issues getting a full response.
     async fn fetch(&self, checkpoint: u64) -> FetchResult {
-        // SAFETY: The path being joined is statically known to be valid.
-        let url = self.url.join(&format!("/{checkpoint}.chk")).expect("Unexpected invalid URL");
-
         let response = self
-            .client
-            .get(url)
-            .send()
+            .checkpoint(checkpoint)
             .await
             .map_err(|e| FetchError::Transient { reason: "request", error: e.into() })?;
 
@@ -59,7 +83,11 @@ impl IngestionClientTrait for RemoteIngestionClient {
                 // checkpoint from them is considered a transient error -- the store being
                 // fetched from needs to be corrected, and ingestion will keep retrying it
                 // until it is.
-                response.bytes().await.map_err(|e| FetchError::Transient { reason: "bytes", error: e.into() })
+                response
+                    .bytes()
+                    .await
+                    .map_err(|e| FetchError::Transient { reason: "bytes", error: e.into() })
+                    .map(FetchData::Raw)
             }
 
             // Treat 404s as a special case so we can match on this error type.
@@ -84,21 +112,20 @@ impl IngestionClientTrait for RemoteIngestionClient {
                 Err(FetchError::Transient { reason: "server_error", error: status_code_to_error(code) })
             }
 
-            // For everything else, assume it's a permanent error and don't retry.
-            code => {
-                error!(checkpoint, %code, "Permanent error, giving up!");
-                Err(FetchError::Permanent(status_code_to_error(code)))
-            }
+            // Still retry on other unsuccessful codes, but the reason is unclear.
+            code => Err(FetchError::Transient { reason: "unknown", error: status_code_to_error(code) }),
         }
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::sync::Mutex;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    };
 
     use axum::http::StatusCode;
-    use tokio_util::sync::CancellationToken;
     use wiremock::{
         matchers::{method, path_regex},
         Mock,
@@ -110,8 +137,8 @@ pub(crate) mod tests {
 
     use super::*;
     use crate::{
-        ingestion::{client::IngestionClient, error::Error, test_utils::test_checkpoint_data},
-        metrics::tests::test_metrics,
+        ingestion::{error::Error, ingestion_client::IngestionClient, test_utils::test_checkpoint_data},
+        metrics::tests::test_ingestion_metrics,
     };
 
     pub(crate) async fn respond_with(server: &MockServer, response: impl Respond + 'static) {
@@ -123,18 +150,7 @@ pub(crate) mod tests {
     }
 
     fn remote_test_client(uri: String) -> IngestionClient {
-        IngestionClient::new_remote(Url::parse(&uri).unwrap(), test_metrics()).unwrap()
-    }
-
-    fn assert_http_error(error: Error, checkpoint: u64, code: StatusCode) {
-        let Error::FetchError(c, inner) = error else {
-            panic!("Expected FetchError, got: {:?}", error);
-        };
-        assert_eq!(c, checkpoint);
-        let Some(http_error) = inner.downcast_ref::<HttpError>() else {
-            panic!("Expected HttpError, got: {:?}", inner);
-        };
-        assert_eq!(http_error, &HttpError::Http(code));
+        IngestionClient::new_remote(Url::parse(&uri).unwrap(), test_ingestion_metrics()).unwrap()
     }
 
     #[tokio::test]
@@ -143,49 +159,9 @@ pub(crate) mod tests {
         respond_with(&server, status(StatusCode::NOT_FOUND)).await;
 
         let client = remote_test_client(server.uri());
-        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
+        let error = client.fetch(42).await.unwrap_err();
 
         assert!(matches!(error, Error::NotFound(42)));
-    }
-
-    #[tokio::test]
-    async fn fail_on_client_error() {
-        let server = MockServer::start().await;
-        respond_with(&server, status(StatusCode::IM_A_TEAPOT)).await;
-
-        let client = remote_test_client(server.uri());
-        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
-
-        assert_http_error(error, 42, StatusCode::IM_A_TEAPOT);
-    }
-
-    /// Even if the server is repeatedly returning transient errors, it is possible to cancel the
-    /// fetch request via its cancellation token.
-    #[tokio::test]
-    async fn fail_on_cancel() {
-        let cancel = CancellationToken::new();
-        let server = MockServer::start().await;
-
-        // This mock server repeatedly returns internal server errors, but will also send a
-        // cancellation with the second request (this is a bit of a contrived test set-up).
-        let times: Mutex<u64> = Mutex::new(0);
-        let server_cancel = cancel.clone();
-        respond_with(&server, move |_: &Request| {
-            let mut times = times.lock().unwrap();
-            *times += 1;
-
-            if *times > 2 {
-                server_cancel.cancel();
-            }
-
-            status(StatusCode::INTERNAL_SERVER_ERROR)
-        })
-        .await;
-
-        let client = remote_test_client(server.uri());
-        let error = client.fetch(42, &cancel.clone()).await.unwrap_err();
-
-        assert!(matches!(error, Error::Cancelled));
     }
 
     /// Assume that failures to send the request to the remote store are due to temporary
@@ -206,17 +182,16 @@ pub(crate) mod tests {
                 // Set-up checkpoint 0 as an infinite redirect loop.
                 (_, "/0.chk") => status(StatusCode::MOVED_PERMANENTLY).append_header("Location", r.url.as_str()),
 
-                // Subsequently, requests will fail with a permanent error, this is what we expect
-                // to see.
-                _ => status(StatusCode::IM_A_TEAPOT),
+                // Subsequently, requests will succeed.
+                _ => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42)),
             }
         })
         .await;
 
         let client = remote_test_client(server.uri());
-        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
+        let checkpoint = client.fetch(42).await.unwrap();
 
-        assert_http_error(error, 42, StatusCode::IM_A_TEAPOT);
+        assert_eq!(42, checkpoint.summary.sequence_number)
     }
 
     /// Assume that certain errors will recover by themselves, and keep retrying with an
@@ -229,23 +204,23 @@ pub(crate) mod tests {
         respond_with(&server, move |_: &Request| {
             let mut times = times.lock().unwrap();
             *times += 1;
-            status(match *times {
-                1 => StatusCode::INTERNAL_SERVER_ERROR,
-                2 => StatusCode::REQUEST_TIMEOUT,
-                3 => StatusCode::TOO_MANY_REQUESTS,
-                _ => StatusCode::IM_A_TEAPOT,
-            })
+            match *times {
+                1 => status(StatusCode::INTERNAL_SERVER_ERROR),
+                2 => status(StatusCode::REQUEST_TIMEOUT),
+                3 => status(StatusCode::TOO_MANY_REQUESTS),
+                _ => status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42)),
+            }
         })
         .await;
 
         let client = remote_test_client(server.uri());
-        let error = client.fetch(42, &CancellationToken::new()).await.unwrap_err();
+        let checkpoint = client.fetch(42).await.unwrap();
 
-        assert_http_error(error, 42, StatusCode::IM_A_TEAPOT);
+        assert_eq!(42, checkpoint.summary.sequence_number)
     }
 
     /// Treat deserialization failure as another kind of transient error -- all checkpoint data
-    /// that is fetched should be valid (deserializable as a `CheckpointData`).
+    /// that is fetched should be valid (deserializable as a `Checkpoint`).
     #[tokio::test]
     async fn retry_on_deserialization_error() {
         let server = MockServer::start().await;
@@ -262,7 +237,51 @@ pub(crate) mod tests {
         .await;
 
         let client = remote_test_client(server.uri());
-        let checkpoint = client.fetch(42, &CancellationToken::new()).await.unwrap();
-        assert_eq!(42, checkpoint.checkpoint_summary.sequence_number)
+        let checkpoint = client.fetch(42).await.unwrap();
+
+        assert_eq!(42, checkpoint.summary.sequence_number)
+    }
+
+    /// Test that timeout errors are retried as transient errors.
+    /// The first request will timeout, the second will succeed.
+    #[tokio::test]
+    async fn retry_on_timeout() {
+        use std::sync::Arc;
+
+        let server = MockServer::start().await;
+        let times: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
+        let times_clone = times.clone();
+
+        // First request will delay longer than timeout, second will succeed immediately
+        respond_with(&server, move |_: &Request| {
+            match times_clone.fetch_add(1, Ordering::Relaxed) {
+                0 => {
+                    // Delay longer than our test timeout (2 seconds)
+                    std::thread::sleep(std::time::Duration::from_secs(4));
+                    status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42))
+                }
+                _ => {
+                    // Respond immediately on retry attempts
+                    status(StatusCode::OK).set_body_bytes(test_checkpoint_data(42))
+                }
+            }
+        })
+        .await;
+
+        // Create a client with a 2 second timeout for testing
+        let ingestion_client = IngestionClient::new_remote_with_timeout(
+            Url::parse(&server.uri()).unwrap(),
+            Duration::from_secs(2),
+            test_ingestion_metrics(),
+        )
+        .unwrap();
+
+        // This should timeout once, then succeed on retry
+        let checkpoint = ingestion_client.fetch(42).await.unwrap();
+        assert_eq!(42, checkpoint.summary.sequence_number);
+
+        // Verify that the server received exactly 2 requests (1 timeout + 1 successful retry)
+        let final_count = times.load(Ordering::Relaxed);
+        assert_eq!(final_count, 2);
     }
 }

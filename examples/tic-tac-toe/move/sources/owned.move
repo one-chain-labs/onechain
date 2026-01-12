@@ -19,7 +19,8 @@
 /// only requires one transaction.
 module tic_tac_toe::owned;
 
-use one::{event, transfer::Receiving};
+use one::event;
+use one::transfer::Receiving;
 
 // === Object Types ===
 

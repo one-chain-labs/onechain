@@ -15,7 +15,7 @@ use mysten_metrics::monitored_scope;
 use sui_config::node::AuthorityOverloadConfig;
 use sui_types::{
     digests::TransactionDigest,
-    error::{SuiError, SuiResult},
+    error::{SuiErrorKind, SuiResult},
     fp_bail,
 };
 use tokio::time::sleep;
@@ -210,7 +210,7 @@ pub fn overload_monitor_accept_tx(load_shedding_percentage: u32, tx_digest: Tran
     if should_reject_tx(load_shedding_percentage, tx_digest, temporal_seed) {
         // TODO: using `SEED_UPDATE_DURATION_SECS` is a safe suggestion that the time based seed
         // is definitely different by then. However, a shorter suggestion may be available.
-        fp_bail!(SuiError::ValidatorOverloadedRetryAfter { retry_after_secs: SEED_UPDATE_DURATION_SECS });
+        fp_bail!(SuiErrorKind::ValidatorOverloadedRetryAfter { retry_after_secs: SEED_UPDATE_DURATION_SECS }.into());
     }
     Ok(())
 }

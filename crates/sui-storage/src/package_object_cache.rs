@@ -7,7 +7,7 @@ use lru::LruCache;
 use parking_lot::RwLock;
 use sui_types::{
     base_types::ObjectID,
-    error::{SuiError, SuiResult, UserInputError},
+    error::{SuiErrorKind, SuiResult, UserInputError},
     storage::{ObjectStore, PackageObject},
 };
 
@@ -50,7 +50,10 @@ impl PackageObjectCache {
                 self.cache.write().push(*package_id, p.clone());
                 Ok(Some(p))
             } else {
-                Err(SuiError::UserInputError { error: UserInputError::MoveObjectAsPackage { object_id: *package_id } })
+                Err(SuiErrorKind::UserInputError {
+                    error: UserInputError::MoveObjectAsPackage { object_id: *package_id },
+                }
+                .into())
             }
         } else {
             Ok(None)
@@ -68,7 +71,7 @@ impl PackageObjectCache {
                 self.cache.write().push(package_id, PackageObject::new(p));
             }
             // It's possible that a package is not found if it's newly added system package ID
-            // that hasn't got created yet. This should be very very rare though.
+            // that hasn't got created yet. This should be very rare though.
         }
     }
 }

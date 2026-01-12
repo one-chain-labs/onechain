@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use cached::{proc_macro::cached, SizedCache};
 use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
-use mysten_metrics::spawn_monitored_task;
 use sui_core::authority::AuthorityState;
 use sui_json_rpc_api::{GovernanceReadApiOpenRpc, GovernanceReadApiServer, JsonRpcMetrics};
 use sui_json_rpc_types::{DelegatedStake, Stake, StakeStatus, SuiCommittee, ValidatorApy, ValidatorApys};
@@ -16,7 +15,7 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress},
     committee::EpochId,
     dynamic_field::get_dynamic_field_from_store,
-    error::{SuiError, UserInputError},
+    error::{SuiError, SuiErrorKind, UserInputError},
     governance::StakedOct,
     id::ID,
     object::ObjectRead,
@@ -52,7 +51,7 @@ impl GovernanceReadApi {
 
     async fn get_staked_oct(&self, owner: SuiAddress) -> Result<Vec<StakedOct>, Error> {
         let state = self.state.clone();
-        let result = spawn_monitored_task!(async move { state.get_staked_oct(owner).await }).await??;
+        let result = state.get_staked_oct(owner).await?;
 
         self.metrics.get_stake_sui_result_size.observe(result.len() as f64);
         self.metrics.get_stake_sui_result_size_total.inc_by(result.len() as u64);
@@ -61,10 +60,8 @@ impl GovernanceReadApi {
 
     async fn get_stakes_by_ids(&self, staked_oct_ids: Vec<ObjectID>) -> Result<Vec<DelegatedStake>, Error> {
         let state = self.state.clone();
-        let stakes_read = spawn_monitored_task!(async move {
-            staked_oct_ids.iter().map(|id| state.get_object_read(id)).collect::<Result<Vec<_>, _>>()
-        })
-        .await??;
+        let stakes_read: Vec<_> =
+            staked_oct_ids.iter().map(|id| state.get_object_read(id)).collect::<Result<Vec<_>, _>>()?;
 
         if stakes_read.is_empty() {
             return Ok(vec![]);
@@ -103,8 +100,7 @@ impl GovernanceReadApi {
 
         let _timer = self.metrics.get_delegated_sui_latency.start_timer();
 
-        let self_clone = self.clone();
-        spawn_monitored_task!(self_clone.get_delegated_stakes(stakes.into_iter().map(|s| (s, true)).collect())).await?
+        self.get_delegated_stakes(stakes.into_iter().map(|s| (s, true)).collect()).await
     }
 
     async fn get_delegated_stakes(&self, stakes: Vec<(StakedOct, bool)>) -> Result<Vec<DelegatedStake>, Error> {
@@ -334,7 +330,7 @@ async fn exchange_rates(
         system_state_summary.inactive_pools_size as usize,
     )? {
         let pool_id: ID = bcs::from_bytes(&df.1.bcs_name)
-            .map_err(|e| SuiError::ObjectDeserializationError { error: e.to_string() })?;
+            .map_err(|e| SuiErrorKind::ObjectDeserializationError { error: e.to_string() })?;
         let validator = get_validator_from_table(
             state.get_object_store().as_ref(),
             system_state_summary.inactive_pools_id,
@@ -357,7 +353,7 @@ async fn exchange_rates(
             .into_iter()
             .map(|df| {
                 let epoch: EpochId = bcs::from_bytes(&df.1.bcs_name)
-                    .map_err(|e| SuiError::ObjectDeserializationError { error: e.to_string() })?;
+                    .map_err(|e| SuiErrorKind::ObjectDeserializationError { error: e.to_string() })?;
 
                 let exchange_rate: PoolTokenExchangeRate =
                     get_dynamic_field_from_store(&state.get_object_store().as_ref(), exchange_rates_id, &epoch)?;

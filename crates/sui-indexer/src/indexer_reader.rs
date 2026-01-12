@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as _, Result};
 use diesel::{
     dsl::sql,
     sql_types::Bool,
@@ -17,15 +17,11 @@ use diesel::{
 };
 use fastcrypto::encoding::{Encoding, Hex};
 use itertools::Itertools;
-use move_core_types::{
-    annotated_value::MoveStructLayout,
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::language_storage::{StructTag, TypeTag};
 use sui_json_rpc_types::{
     Balance,
     CheckpointId,
     Coin as SuiCoin,
-    DisplayFieldsResponse,
     EpochInfo,
     EventFilter,
     SuiCoinMetadata,
@@ -57,7 +53,6 @@ use crate::{
     errors::IndexerError,
     models::{
         checkpoints::StoredCheckpoint,
-        display::StoredDisplay,
         epoch::StoredEpochInfo,
         events::StoredEvent,
         objects::{CoinBalance, StoredHistoryObject, StoredObject, StoredObjectSnapshot},
@@ -71,7 +66,6 @@ use crate::{
     },
     schema::{
         checkpoints,
-        display,
         epochs,
         events,
         objects,
@@ -877,9 +871,15 @@ impl IndexerReader {
         let query = if let EventFilter::Sender(sender) = &filter {
             // Need to remove ambiguities for tx_sequence_number column
             let cursor_clause = if descending_order {
-                format!("(e.{TX_SEQUENCE_NUMBER_STR} < {} OR (e.{TX_SEQUENCE_NUMBER_STR} = {} AND e.{EVENT_SEQUENCE_NUMBER_STR} < {}))", tx_seq, tx_seq, event_seq)
+                format!(
+                    "(e.{TX_SEQUENCE_NUMBER_STR} < {} OR (e.{TX_SEQUENCE_NUMBER_STR} = {} AND e.{EVENT_SEQUENCE_NUMBER_STR} < {}))",
+                    tx_seq, tx_seq, event_seq
+                )
             } else {
-                format!("(e.{TX_SEQUENCE_NUMBER_STR} > {} OR (e.{TX_SEQUENCE_NUMBER_STR} = {} AND e.{EVENT_SEQUENCE_NUMBER_STR} > {}))", tx_seq, tx_seq, event_seq)
+                format!(
+                    "(e.{TX_SEQUENCE_NUMBER_STR} > {} OR (e.{TX_SEQUENCE_NUMBER_STR} = {} AND e.{EVENT_SEQUENCE_NUMBER_STR} > {}))",
+                    tx_seq, tx_seq, event_seq
+                )
             };
             let order_clause = if descending_order {
                 format!("e.{TX_SEQUENCE_NUMBER_STR} DESC, e.{EVENT_SEQUENCE_NUMBER_STR} DESC")
@@ -935,9 +935,15 @@ impl IndexerReader {
             };
 
             let cursor_clause = if descending_order {
-                format!("AND ({TX_SEQUENCE_NUMBER_STR} < {} OR ({TX_SEQUENCE_NUMBER_STR} = {} AND {EVENT_SEQUENCE_NUMBER_STR} < {}))", tx_seq, tx_seq, event_seq)
+                format!(
+                    "AND ({TX_SEQUENCE_NUMBER_STR} < {} OR ({TX_SEQUENCE_NUMBER_STR} = {} AND {EVENT_SEQUENCE_NUMBER_STR} < {}))",
+                    tx_seq, tx_seq, event_seq
+                )
             } else {
-                format!("AND ({TX_SEQUENCE_NUMBER_STR} > {} OR ({TX_SEQUENCE_NUMBER_STR} = {} AND {EVENT_SEQUENCE_NUMBER_STR} > {}))", tx_seq, tx_seq, event_seq)
+                format!(
+                    "AND ({TX_SEQUENCE_NUMBER_STR} > {} OR ({TX_SEQUENCE_NUMBER_STR} = {} AND {EVENT_SEQUENCE_NUMBER_STR} > {}))",
+                    tx_seq, tx_seq, event_seq
+                )
             };
             let order_clause = if descending_order {
                 format!("{TX_SEQUENCE_NUMBER_STR} DESC, {EVENT_SEQUENCE_NUMBER_STR} DESC")
@@ -1050,14 +1056,17 @@ impl IndexerReader {
             ))
         })?;
 
-        let field = DFV::FieldVisitor::deserialize(move_object.contents(), &layout).tap_err(|e| warn!("{e}"))?;
+        let field = DFV::FieldVisitor::deserialize(move_object.contents(), &layout)
+            .tap_err(|e| warn!("{e}"))
+            .context("Failed to deserialize dynamic field")?;
 
         let type_ = field.kind;
         let name_type: TypeTag = field.name_layout.into();
         let bcs_name = field.name_bytes.to_owned();
 
-        let name_value =
-            BoundedVisitor::deserialize_value(field.name_bytes, field.name_layout).tap_err(|e| warn!("{e}"))?;
+        let name_value = BoundedVisitor::deserialize_value(field.name_bytes, field.name_layout)
+            .tap_err(|e| warn!("{e}"))
+            .context("Failed to deserialize dynamic field name")?;
 
         let name = DynamicFieldName { type_: name_type, value: SuiMoveValue::from(name_value).to_json_value() };
 
@@ -1106,31 +1115,6 @@ impl IndexerReader {
         let sui_json_value = sui_json::SuiJsonValue::new(name.value.clone())?;
         let name_bcs_value = sui_json_value.to_bcs_bytes(&move_type_layout)?;
         Ok(name_bcs_value)
-    }
-
-    async fn get_display_object_by_type(
-        &self,
-        object_type: &move_core_types::language_storage::StructTag,
-    ) -> Result<Option<sui_types::display::DisplayVersionUpdatedEvent>, IndexerError> {
-        use diesel_async::RunQueryDsl;
-
-        let mut connection = self.pool.get().await?;
-
-        let object_type = object_type.to_canonical_string(/* with_prefix */ true);
-        let stored_display = display::table
-            .filter(display::object_type.eq(object_type))
-            .first::<StoredDisplay>(&mut connection)
-            .await
-            .optional()?;
-
-        let stored_display = match stored_display {
-            Some(display) => display,
-            None => return Ok(None),
-        };
-
-        let display_update = stored_display.to_display_update_event()?;
-
-        Ok(Some(display_update))
     }
 
     pub async fn get_owned_coins(
@@ -1202,27 +1186,6 @@ impl IndexerReader {
             .into_iter()
             .map(|cb| cb.try_into())
             .collect::<IndexerResult<Vec<_>>>()
-    }
-
-    pub(crate) async fn get_display_fields(
-        &self,
-        original_object: &sui_types::object::Object,
-        original_layout: &Option<MoveStructLayout>,
-    ) -> Result<DisplayFieldsResponse, IndexerError> {
-        let (object_type, layout) = if let Some((object_type, layout)) =
-            sui_json_rpc::read_api::get_object_type_and_struct(original_object, original_layout)
-                .map_err(|e| IndexerError::GenericError(e.to_string()))?
-        {
-            (object_type, layout)
-        } else {
-            return Ok(DisplayFieldsResponse { data: None, error: None });
-        };
-
-        if let Some(display_object) = self.get_display_object_by_type(&object_type).await? {
-            return sui_json_rpc::read_api::get_rendered_fields(display_object.fields, &layout)
-                .map_err(|e| IndexerError::GenericError(e.to_string()));
-        }
-        Ok(DisplayFieldsResponse { data: None, error: None })
     }
 
     pub async fn get_singleton_object(&self, type_: &StructTag) -> Result<Option<Object>> {

@@ -16,22 +16,30 @@ This module provides handy functionality for wallets and <code>one::Coin</code> 
 -  [Function `join_vec_and_transfer`](#one_pay_join_vec_and_transfer)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
 <b>use</b> <a href="../one/url.md#one_url">one::url</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
 <b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
@@ -88,8 +96,8 @@ Transfer <code>c</code> to the sender of the current transaction
 
 ## Function `split`
 
-Split coin <code>self</code> to two coins, one with balance <code>split_amount</code>,
-and the remaining balance is left is <code>self</code>.
+Split <code><a href="../one/coin.md#one_coin">coin</a></code> to two coins, one with balance <code>split_amount</code>,
+and the remaining balance is left in <code><a href="../one/coin.md#one_coin">coin</a></code>.
 
 
 <pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one/pay.md#one_pay_split">split</a>&lt;T&gt;(<a href="../one/coin.md#one_coin">coin</a>: &<b>mut</b> <a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a>&lt;T&gt;, split_amount: u64, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
@@ -128,11 +136,7 @@ in <code>split_amounts</code>. Remaining balance is left in <code>self</code>.
 
 
 <pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one/pay.md#one_pay_split_vec">split_vec</a>&lt;T&gt;(self: &<b>mut</b> Coin&lt;T&gt;, split_amounts: vector&lt;u64&gt;, ctx: &<b>mut</b> TxContext) {
-    <b>let</b> (<b>mut</b> i, len) = (0, split_amounts.length());
-    <b>while</b> (i &lt; len) {
-        <a href="../one/pay.md#one_pay_split">split</a>(self, split_amounts[i], ctx);
-        i = i + 1;
-    };
+    split_amounts.do!(|amount| <a href="../one/pay.md#one_pay_split">split</a>(self, amount, ctx));
 }
 </code></pre>
 
@@ -145,7 +149,7 @@ in <code>split_amounts</code>. Remaining balance is left in <code>self</code>.
 ## Function `split_and_transfer`
 
 Send <code>amount</code> units of <code>c</code> to <code>recipient</code>
-Aborts with <code>EVALUE</code> if <code>amount</code> is greater than or equal to <code>amount</code>
+Aborts with <code><a href="../one/balance.md#one_balance_ENotEnough">one::balance::ENotEnough</a></code> if <code>amount</code> is greater than the balance in <code>c</code>
 
 
 <pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one/pay.md#one_pay_split_and_transfer">split_and_transfer</a>&lt;T&gt;(c: &<b>mut</b> <a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a>&lt;T&gt;, amount: u64, recipient: <b>address</b>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>)
@@ -189,13 +193,7 @@ not evenly divisible by <code>n</code>, the remainder is left in <code>self</cod
 
 
 <pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one/pay.md#one_pay_divide_and_keep">divide_and_keep</a>&lt;T&gt;(self: &<b>mut</b> Coin&lt;T&gt;, n: u64, ctx: &<b>mut</b> TxContext) {
-    <b>let</b> <b>mut</b> vec: vector&lt;Coin&lt;T&gt;&gt; = self.divide_into_n(n, ctx);
-    <b>let</b> (<b>mut</b> i, len) = (0, vec.length());
-    <b>while</b> (i &lt; len) {
-        <a href="../one/transfer.md#one_transfer_public_transfer">transfer::public_transfer</a>(vec.pop_back(), ctx.sender());
-        i = i + 1;
-    };
-    vec.destroy_empty();
+    self.divide_into_n(n, ctx).destroy!(|<a href="../one/coin.md#one_coin">coin</a>| <a href="../one/transfer.md#one_transfer_public_transfer">transfer::public_transfer</a>(<a href="../one/coin.md#one_coin">coin</a>, ctx.sender()));
 }
 </code></pre>
 
@@ -245,15 +243,8 @@ Join everything in <code>coins</code> with <code>self</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one/pay.md#one_pay_join_vec">join_vec</a>&lt;T&gt;(self: &<b>mut</b> Coin&lt;T&gt;, <b>mut</b> coins: vector&lt;Coin&lt;T&gt;&gt;) {
-    <b>let</b> (<b>mut</b> i, len) = (0, coins.length());
-    <b>while</b> (i &lt; len) {
-        <b>let</b> <a href="../one/coin.md#one_coin">coin</a> = coins.pop_back();
-        self.<a href="../one/pay.md#one_pay_join">join</a>(<a href="../one/coin.md#one_coin">coin</a>);
-        i = i + 1
-    };
-    // safe because we've drained the vector
-    coins.destroy_empty()
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one/pay.md#one_pay_join_vec">join_vec</a>&lt;T&gt;(self: &<b>mut</b> Coin&lt;T&gt;, coins: vector&lt;Coin&lt;T&gt;&gt;) {
+    coins.destroy!(|<a href="../one/coin.md#one_coin">coin</a>| self.<a href="../one/pay.md#one_pay_join">join</a>(<a href="../one/coin.md#one_coin">coin</a>));
 }
 </code></pre>
 

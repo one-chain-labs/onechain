@@ -8,11 +8,11 @@ use std::{
 };
 
 use consensus_config::AuthorityIndex;
-use futures::{stream::FuturesUnordered, StreamExt as _};
+use futures::{StreamExt as _, stream::FuturesUnordered};
 use tokio::{
     sync::broadcast,
     task::JoinSet,
-    time::{error::Elapsed, sleep_until, timeout, Instant},
+    time::{Instant, error::Elapsed, sleep_until, timeout},
 };
 use tracing::{trace, warn};
 
@@ -108,8 +108,13 @@ impl Broadcaster {
             let start = Instant::now();
             let req_timeout = rtt_estimate.mul_f64(TIMEOUT_THRESHOLD_MULTIPLIER);
             // Use a minimum timeout of 5s so the receiver does not terminate the request too early.
-            let network_timeout = std::cmp::max(req_timeout, Broadcaster::MIN_SEND_BLOCK_NETWORK_TIMEOUT);
-            let resp = timeout(req_timeout, network_client.send_block(peer, &block, network_timeout)).await;
+            let network_timeout =
+                std::cmp::max(req_timeout, Broadcaster::MIN_SEND_BLOCK_NETWORK_TIMEOUT);
+            let resp = timeout(
+                req_timeout,
+                network_client.send_block(peer, &block, network_timeout),
+            )
+            .await;
             if matches!(resp, Ok(Err(_))) {
                 // Add a delay before retrying.
                 sleep_until(start + req_timeout).await;
@@ -160,11 +165,10 @@ impl Broadcaster {
                 }
 
                 _ = retry_timer.tick() => {
-                    if requests.is_empty() {
-                        if let Some(block) = last_block.clone() {
+                    if requests.is_empty()
+                        && let Some(block) = last_block.clone() {
                             requests.push(send_block(network_client.clone(), peer, rtt_estimate, block));
                         }
-                    }
                 }
             };
 
@@ -187,16 +191,16 @@ mod test {
 
     use async_trait::async_trait;
     use bytes::Bytes;
+    use consensus_types::block::{BlockRef, Round};
     use parking_lot::Mutex;
     use tokio::time::sleep;
 
     use super::*;
     use crate::{
-        block::{BlockRef, ExtendedBlock, TestBlock},
+        block::{ExtendedBlock, TestBlock},
         commit::CommitRange,
         core::CoreSignals,
         network::BlockStream,
-        Round,
     };
 
     struct FakeNetworkClient {
@@ -205,7 +209,9 @@ mod test {
 
     impl FakeNetworkClient {
         fn new() -> Self {
-            Self { blocks_sent: Mutex::new(BTreeMap::new()) }
+            Self {
+                blocks_sent: Mutex::new(BTreeMap::new()),
+            }
         }
 
         fn blocks_sent(&self) -> BTreeMap<AuthorityIndex, Vec<Bytes>> {
@@ -218,8 +224,6 @@ mod test {
 
     #[async_trait]
     impl NetworkClient for FakeNetworkClient {
-        const SUPPORT_STREAMING: bool = false;
-
         async fn send_block(
             &self,
             peer: AuthorityIndex,
@@ -246,6 +250,7 @@ mod test {
             _peer: AuthorityIndex,
             _block_refs: Vec<BlockRef>,
             _highest_accepted_rounds: Vec<Round>,
+            _breadth_first: bool,
             _timeout: Duration,
         ) -> ConsensusResult<Vec<Bytes>> {
             unimplemented!("Unimplemented")
@@ -284,11 +289,17 @@ mod test {
         let context = Arc::new(context);
         let network_client = Arc::new(FakeNetworkClient::new());
         let (core_signals, signals_receiver) = CoreSignals::new(context.clone());
-        let _broadcaster = Broadcaster::new(context.clone(), network_client.clone(), &signals_receiver);
+        let _broadcaster =
+            Broadcaster::new(context.clone(), network_client.clone(), &signals_receiver);
 
         let block = VerifiedBlock::new_for_test(TestBlock::new(9, 1).build());
         assert!(
-            core_signals.new_block(ExtendedBlock { block: block.clone(), excluded_ancestors: vec![] }).is_ok(),
+            core_signals
+                .new_block(ExtendedBlock {
+                    block: block.clone(),
+                    excluded_ancestors: vec![],
+                })
+                .is_ok(),
             "No subscriber active to receive the block"
         );
 

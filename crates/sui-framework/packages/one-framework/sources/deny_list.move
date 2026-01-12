@@ -213,8 +213,10 @@ public(package) fun migrate_v1_to_v2(
     ctx: &mut TxContext,
 ) {
     let bag_entry: &mut PerTypeList = &mut deny_list.lists[per_type_index];
-    let elements = if (!bag_entry.denied_addresses.contains(per_type_key)) vector[]
-    else bag_entry.denied_addresses.remove(per_type_key).into_keys();
+    let elements = if (!bag_entry.denied_addresses.contains(per_type_key)) vector[] else bag_entry
+        .denied_addresses
+        .remove(per_type_key)
+        .into_keys();
     elements.do_ref!(|addr| {
         let addr = *addr;
         let denied_count = &mut bag_entry.denied_count[addr];
@@ -413,7 +415,7 @@ public fun reserved_addresses(): vector<address> {
 }
 
 #[test_only]
-public fun create_for_test(ctx: &mut TxContext) {
+public fun create_for_testing(ctx: &mut TxContext) {
     create(ctx);
 }
 
@@ -427,4 +429,10 @@ public fun new_for_testing(ctx: &mut TxContext): DenyList {
         id: object::new(ctx),
         lists,
     }
+}
+
+#[test_only]
+#[deprecated(note = b"Use `create_for_testing` instead")]
+public fun create_for_test(ctx: &mut TxContext) {
+    create_for_testing(ctx);
 }

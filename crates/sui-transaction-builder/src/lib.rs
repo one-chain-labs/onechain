@@ -23,7 +23,7 @@ use sui_json_rpc_types::{
 };
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{
-    base_types::{ObjectID, ObjectInfo, ObjectRef, ObjectType, SuiAddress},
+    base_types::{FullObjectRef, ObjectID, ObjectInfo, ObjectRef, ObjectType, SuiAddress},
     coin,
     error::UserInputError,
     fp_ensure,
@@ -33,7 +33,16 @@ use sui_types::{
     object::{Object, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     sui_system_state::SUI_SYSTEM_MODULE_NAME,
-    transaction::{Argument, CallArg, Command, InputObjectKind, ObjectArg, TransactionData, TransactionKind},
+    transaction::{
+        Argument,
+        CallArg,
+        Command,
+        InputObjectKind,
+        ObjectArg,
+        SharedObjectMutability,
+        TransactionData,
+        TransactionKind,
+    },
     SUI_FRAMEWORK_PACKAGE_ID,
     SUI_SYSTEM_PACKAGE_ID,
 };
@@ -63,7 +72,7 @@ impl TransactionBuilder {
         Self(data_reader)
     }
 
-    async fn select_gas(
+    pub async fn select_gas(
         &self,
         signer: SuiAddress,
         input_gas: Option<ObjectID>,
@@ -72,7 +81,9 @@ impl TransactionBuilder {
         gas_price: u64,
     ) -> Result<ObjectRef, anyhow::Error> {
         if gas_budget < gas_price {
-            bail!("Gas budget {gas_budget} is less than the reference gas price {gas_price}. The gas budget must be at least the current reference gas price of {gas_price}.")
+            bail!(
+                "Gas budget {gas_budget} is less than the reference gas price {gas_price}. The gas budget must be at least the current reference gas price of {gas_price}."
+            )
         }
         if let Some(gas) = input_gas {
             self.get_object_ref(gas).await
@@ -95,58 +106,10 @@ impl TransactionBuilder {
                     return Ok(obj.object_ref());
                 }
             }
-            Err(anyhow!("Cannot find gas coin for signer address {signer} with amount sufficient for the required gas budget {gas_budget}. If you are using the pay or transfer commands, you can use pay-oct or transfer-oct commands instead, which will use the only object as gas payment."))
+            Err(anyhow!(
+                "Cannot find gas coin for signer address {signer} with amount sufficient for the required gas budget {gas_budget}. If you are using the pay or transfer commands, you can use pay-oct or transfer-oct commands instead, which will use the only object as gas payment."
+            ))
         }
-    }
-
-    /// Construct the transaction data for a dry run
-    pub async fn tx_data_for_dry_run(
-        &self,
-        sender: SuiAddress,
-        kind: TransactionKind,
-        gas_budget: u64,
-        gas_price: u64,
-        gas_payment: Option<Vec<ObjectID>>,
-        gas_sponsor: Option<SuiAddress>,
-    ) -> TransactionData {
-        let gas_payment = self.input_refs(gas_payment.unwrap_or_default().as_ref()).await.unwrap_or_default();
-        let gas_sponsor = gas_sponsor.unwrap_or(sender);
-        TransactionData::new_with_gas_coins_allow_sponsor(kind, sender, gas_payment, gas_budget, gas_price, gas_sponsor)
-    }
-
-    /// Construct the transaction data from a transaction kind, and other parameters.
-    /// If the gas_payment list is empty, it will pick the first gas coin that has at least
-    /// the required gas budget that is not in the input coins.
-    pub async fn tx_data(
-        &self,
-        sender: SuiAddress,
-        kind: TransactionKind,
-        gas_budget: u64,
-        gas_price: u64,
-        gas_payment: Vec<ObjectID>,
-        gas_sponsor: Option<SuiAddress>,
-    ) -> Result<TransactionData, anyhow::Error> {
-        let gas_payment = if gas_payment.is_empty() {
-            let input_objs = kind
-                .input_objects()?
-                .iter()
-                .flat_map(|obj| match obj {
-                    InputObjectKind::ImmOrOwnedMoveObject((id, _, _)) => Some(*id),
-                    _ => None,
-                })
-                .collect();
-            vec![self.select_gas(sender, None, gas_budget, input_objs, gas_price).await?]
-        } else {
-            self.input_refs(&gas_payment).await?
-        };
-        Ok(TransactionData::new_with_gas_coins_allow_sponsor(
-            kind,
-            sender,
-            gas_payment,
-            gas_budget,
-            gas_price,
-            gas_sponsor.unwrap_or(sender),
-        ))
     }
 
     pub async fn transfer_object_tx_kind(
@@ -154,9 +117,9 @@ impl TransactionBuilder {
         object_id: ObjectID,
         recipient: SuiAddress,
     ) -> Result<TransactionKind, anyhow::Error> {
-        let obj_ref = self.get_object_ref(object_id).await?;
+        let full_obj_ref = self.get_full_object_ref(object_id).await?;
         let mut builder = ProgrammableTransactionBuilder::new();
-        builder.transfer_object(recipient, obj_ref)?;
+        builder.transfer_object(recipient, full_obj_ref)?;
         Ok(TransactionKind::programmable(builder.finish()))
     }
 
@@ -182,7 +145,7 @@ impl TransactionBuilder {
         object_id: ObjectID,
         recipient: SuiAddress,
     ) -> anyhow::Result<()> {
-        builder.transfer_object(recipient, self.get_object_ref(object_id).await?)?;
+        builder.transfer_object(recipient, self.get_full_object_ref(object_id).await?)?;
         Ok(())
     }
 
@@ -228,10 +191,10 @@ impl TransactionBuilder {
         gas: Option<ObjectID>,
         gas_budget: u64,
     ) -> anyhow::Result<TransactionData> {
-        if let Some(gas) = gas {
-            if input_coins.contains(&gas) {
-                return Err(anyhow!("Gas coin is in input coins of Pay transaction, use PayOct transaction instead!"));
-            }
+        if let Some(gas) = gas
+            && input_coins.contains(&gas)
+        {
+            return Err(anyhow!("Gas coin is in input coins of Pay transaction, use PayOct transaction instead!"));
         }
 
         let coin_refs = self.input_refs(&input_coins).await?;
@@ -249,9 +212,6 @@ impl TransactionBuilder {
     }
 
     /// Construct a transaction kind for the PayOct transaction type
-    ///
-    /// Use this function together with tx_data_for_dry_run or tx_data
-    /// for maximum reusability
     pub fn pay_oct_tx_kind(
         &self,
         recipients: Vec<SuiAddress>,
@@ -388,9 +348,15 @@ impl TransactionBuilder {
         }
         Ok(match owner {
             Owner::Shared { initial_shared_version }
-            | Owner::ConsensusV2 { start_version: initial_shared_version, authenticator: _ } => {
-                ObjectArg::SharedObject { id, initial_shared_version, mutable: is_mutable_ref }
-            }
+            | Owner::ConsensusAddressOwner { start_version: initial_shared_version, .. } => ObjectArg::SharedObject {
+                id,
+                initial_shared_version,
+                mutability: if is_mutable_ref {
+                    SharedObjectMutability::Mutable
+                } else {
+                    SharedObjectMutability::Immutable
+                },
+            },
             Owner::AddressOwner(_) | Owner::ObjectOwner(_) | Owner::Immutable => ObjectArg::ImmOrOwnedObject(obj_ref),
         })
     }
@@ -513,11 +479,11 @@ impl TransactionBuilder {
             let capability_arg = match capability_owner {
                 Owner::AddressOwner(_) => ObjectArg::ImmOrOwnedObject(upgrade_capability.object_ref()),
                 Owner::Shared { initial_shared_version }
-                | Owner::ConsensusV2 { start_version: initial_shared_version, authenticator: _ } => {
+                | Owner::ConsensusAddressOwner { start_version: initial_shared_version, .. } => {
                     ObjectArg::SharedObject {
                         id: upgrade_capability.object_ref().0,
                         initial_shared_version,
-                        mutable: true,
+                        mutability: SharedObjectMutability::Mutable,
                     }
                 }
                 Owner::Immutable => {
@@ -525,7 +491,9 @@ impl TransactionBuilder {
                 }
                 // If the capability is owned by an object, then the module defining the owning
                 // object gets to decide how the upgrade capability should be used.
-                Owner::ObjectOwner(_) => return Err(anyhow::anyhow!("Upgrade capability controlled by object")),
+                Owner::ObjectOwner(_) => {
+                    return Err(anyhow::anyhow!("Upgrade capability controlled by object"));
+                }
             };
             builder.obj(capability_arg).unwrap();
             let upgrade_arg = builder.pure(upgrade_policy).unwrap();
@@ -880,10 +848,38 @@ impl TransactionBuilder {
         self.get_object_ref_and_type(object_id).await.map(|(oref, _)| oref)
     }
 
+    pub async fn get_full_object_ref(&self, object_id: ObjectID) -> anyhow::Result<FullObjectRef> {
+        let object_data =
+            self.0.get_object_with_options(object_id, SuiObjectDataOptions::new().with_owner()).await?.into_object()?;
+
+        let object_ref = object_data.object_ref();
+        let owner = object_data.owner.unwrap();
+
+        Ok(FullObjectRef::from_object_ref_and_owner(object_ref, &owner))
+    }
+
     async fn get_object_ref_and_type(&self, object_id: ObjectID) -> anyhow::Result<(ObjectRef, ObjectType)> {
         let object =
             self.0.get_object_with_options(object_id, SuiObjectDataOptions::new().with_type()).await?.into_object()?;
 
         Ok((object.object_ref(), object.object_type()?))
+    }
+
+    pub async fn get_full_object_ref_and_type(
+        &self,
+        object_id: ObjectID,
+    ) -> anyhow::Result<(FullObjectRef, ObjectType)> {
+        let object_data = self
+            .0
+            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_owner().with_type())
+            .await?
+            .into_object()?;
+
+        let object_ref = object_data.object_ref();
+        let object_type = object_data.object_type()?;
+        let owner = object_data.owner.unwrap();
+
+        let full_object_ref = FullObjectRef::from_object_ref_and_owner(object_ref, &owner);
+        Ok((full_object_ref, object_type))
     }
 }

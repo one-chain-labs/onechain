@@ -75,6 +75,24 @@ Generic Move and native functions for group operations.
 ## Constants
 
 
+<a name="one_group_ops_ENotSupported"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/group_ops.md#one_group_ops_ENotSupported">ENotSupported</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="one_group_ops_EInvalidInput"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/group_ops.md#one_group_ops_EInvalidInput">EInvalidInput</a>: u64 = 1;
+</code></pre>
+
+
+
 <a name="one_group_ops_EInputTooLong"></a>
 
 
@@ -89,24 +107,6 @@ Generic Move and native functions for group operations.
 
 
 <pre><code><b>const</b> <a href="../one/group_ops.md#one_group_ops_EInvalidBufferLength">EInvalidBufferLength</a>: u64 = 3;
-</code></pre>
-
-
-
-<a name="one_group_ops_EInvalidInput"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/group_ops.md#one_group_ops_EInvalidInput">EInvalidInput</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="one_group_ops_ENotSupported"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/group_ops.md#one_group_ops_ENotSupported">ENotSupported</a>: u64 = 0;
 </code></pre>
 
 
@@ -165,7 +165,7 @@ Generic Move and native functions for group operations.
 
 
 
-<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_from_bytes">from_bytes</a>&lt;G&gt;(type_: u8, <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>: &vector&lt;u8&gt;, is_trusted: bool): <a href="../one/group_ops.md#one_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_from_bytes">from_bytes</a>&lt;G&gt;(type_: u8, <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>: vector&lt;u8&gt;, is_trusted: bool): <a href="../one/group_ops.md#one_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
 
 
@@ -174,9 +174,9 @@ Generic Move and native functions for group operations.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_from_bytes">from_bytes</a>&lt;G&gt;(type_: u8, <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>: &vector&lt;u8&gt;, is_trusted: bool): <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;G&gt; {
-    <b>assert</b>!(is_trusted || <a href="../one/group_ops.md#one_group_ops_internal_validate">internal_validate</a>(type_, <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>), <a href="../one/group_ops.md#one_group_ops_EInvalidInput">EInvalidInput</a>);
-    <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;G&gt; { <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>: *<a href="../one/group_ops.md#one_group_ops_bytes">bytes</a> }
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_from_bytes">from_bytes</a>&lt;G&gt;(type_: u8, <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>: vector&lt;u8&gt;, is_trusted: bool): <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;G&gt; {
+    <b>assert</b>!(is_trusted || <a href="../one/group_ops.md#one_group_ops_internal_validate">internal_validate</a>(type_, &<a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>), <a href="../one/group_ops.md#one_group_ops_EInvalidInput">EInvalidInput</a>);
+    <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;G&gt; { <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a> }
 }
 </code></pre>
 
@@ -311,6 +311,8 @@ Fails if scalar = 0. Else returns 1/scalar * e.
 
 Aborts with <code><a href="../one/group_ops.md#one_group_ops_EInputTooLong">EInputTooLong</a></code> if the vectors are too long.
 
+This function is currently only enabled on Devnet.
+
 
 <pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_multi_scalar_multiplication">multi_scalar_multiplication</a>&lt;S, G&gt;(type_: u8, scalars: &vector&lt;<a href="../one/group_ops.md#one_group_ops_Element">one::group_ops::Element</a>&lt;S&gt;&gt;, elements: &vector&lt;<a href="../one/group_ops.md#one_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;&gt;): <a href="../one/group_ops.md#one_group_ops_Element">one::group_ops::Element</a>&lt;G&gt;
 </code></pre>
@@ -389,7 +391,11 @@ Aborts with <code><a href="../one/group_ops.md#one_group_ops_EInputTooLong">EInp
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_convert">convert</a>&lt;From, To&gt;(from_type_: u8, to_type_: u8, e: &<a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;From&gt;): <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;To&gt; {
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/group_ops.md#one_group_ops_convert">convert</a>&lt;From, To&gt;(
+    from_type_: u8,
+    to_type_: u8,
+    e: &<a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;From&gt;,
+): <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;To&gt; {
     <a href="../one/group_ops.md#one_group_ops_Element">Element</a>&lt;To&gt; { <a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>: <a href="../one/group_ops.md#one_group_ops_internal_convert">internal_convert</a>(from_type_, to_type_, &e.<a href="../one/group_ops.md#one_group_ops_bytes">bytes</a>) }
 }
 </code></pre>

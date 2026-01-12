@@ -2,7 +2,7 @@
 title: Module `one::object`
 ---
 
-Sui object identifiers
+Oct object identifiers
 
 
 -  [Struct `ID`](#one_object_ID)
@@ -17,6 +17,10 @@ Sui object identifiers
 -  [Function `authenticator_state`](#one_object_authenticator_state)
 -  [Function `randomness_state`](#one_object_randomness_state)
 -  [Function `sui_deny_list_object_id`](#one_object_sui_deny_list_object_id)
+-  [Function `sui_accumulator_root_object_id`](#one_object_sui_accumulator_root_object_id)
+-  [Function `sui_accumulator_root_address`](#one_object_sui_accumulator_root_address)
+-  [Function `sui_coin_registry_object_id`](#one_object_sui_coin_registry_object_id)
+-  [Function `sui_coin_registry_address`](#one_object_sui_coin_registry_address)
 -  [Function `bridge`](#one_object_bridge)
 -  [Function `uid_as_inner`](#one_object_uid_as_inner)
 -  [Function `uid_to_inner`](#one_object_uid_to_inner)
@@ -115,32 +119,12 @@ This is a privileged type that can only be derived from a <code>TxContext</code>
 ## Constants
 
 
-<a name="one_object_ENotSystemAddress"></a>
+<a name="one_object_SUI_SYSTEM_STATE_OBJECT_ID"></a>
 
-Sender is not @0x0 the system address.
-
-
-<pre><code><b>const</b> <a href="../one/object.md#one_object_ENotSystemAddress">ENotSystemAddress</a>: u64 = 0;
-</code></pre>
+The hardcoded ID for the singleton Sui System State Object.
 
 
-
-<a name="one_object_SUI_AUTHENTICATOR_STATE_ID"></a>
-
-The hardcoded ID for the singleton AuthenticatorState Object.
-
-
-<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_AUTHENTICATOR_STATE_ID">SUI_AUTHENTICATOR_STATE_ID</a>: <b>address</b> = 0x7;
-</code></pre>
-
-
-
-<a name="one_object_SUI_BRIDGE_ID"></a>
-
-The hardcoded ID for the Bridge Object.
-
-
-<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_BRIDGE_ID">SUI_BRIDGE_ID</a>: <b>address</b> = 0x9;
+<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_SYSTEM_STATE_OBJECT_ID">SUI_SYSTEM_STATE_OBJECT_ID</a>: <b>address</b> = 0x5;
 </code></pre>
 
 
@@ -155,12 +139,12 @@ The hardcoded ID for the singleton Clock Object.
 
 
 
-<a name="one_object_SUI_DENY_LIST_OBJECT_ID"></a>
+<a name="one_object_SUI_AUTHENTICATOR_STATE_ID"></a>
 
-The hardcoded ID for the singleton DenyList.
+The hardcoded ID for the singleton AuthenticatorState Object.
 
 
-<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_DENY_LIST_OBJECT_ID">SUI_DENY_LIST_OBJECT_ID</a>: <b>address</b> = 0x403;
+<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_AUTHENTICATOR_STATE_ID">SUI_AUTHENTICATOR_STATE_ID</a>: <b>address</b> = 0x7;
 </code></pre>
 
 
@@ -175,12 +159,52 @@ The hardcoded ID for the singleton Random Object.
 
 
 
-<a name="one_object_SUI_SYSTEM_STATE_OBJECT_ID"></a>
+<a name="one_object_SUI_DENY_LIST_OBJECT_ID"></a>
 
-The hardcoded ID for the singleton Sui System State Object.
+The hardcoded ID for the singleton DenyList.
 
 
-<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_SYSTEM_STATE_OBJECT_ID">SUI_SYSTEM_STATE_OBJECT_ID</a>: <b>address</b> = 0x5;
+<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_DENY_LIST_OBJECT_ID">SUI_DENY_LIST_OBJECT_ID</a>: <b>address</b> = 0x403;
+</code></pre>
+
+
+
+<a name="one_object_SUI_ACCUMULATOR_ROOT_OBJECT_ID"></a>
+
+The hardcoded ID for the singleton AccumulatorRoot Object.
+
+
+<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_ACCUMULATOR_ROOT_OBJECT_ID">SUI_ACCUMULATOR_ROOT_OBJECT_ID</a>: <b>address</b> = 0xacc;
+</code></pre>
+
+
+
+<a name="one_object_SUI_BRIDGE_ID"></a>
+
+The hardcoded ID for the Bridge Object.
+
+
+<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_BRIDGE_ID">SUI_BRIDGE_ID</a>: <b>address</b> = 0x9;
+</code></pre>
+
+
+
+<a name="one_object_SUI_COIN_REGISTRY_OBJECT_ID"></a>
+
+The hardcoded ID for the Coin Registry Object.
+
+
+<pre><code><b>const</b> <a href="../one/object.md#one_object_SUI_COIN_REGISTRY_OBJECT_ID">SUI_COIN_REGISTRY_OBJECT_ID</a>: <b>address</b> = 0xc;
+</code></pre>
+
+
+
+<a name="one_object_ENotSystemAddress"></a>
+
+Sender is not @0x0 the system address.
+
+
+<pre><code><b>const</b> <a href="../one/object.md#one_object_ENotSystemAddress">ENotSystemAddress</a>: u64 = 0;
 </code></pre>
 
 
@@ -419,6 +443,108 @@ This should only be called once from <code><a href="../one/deny_list.md#one_deny
     <a href="../one/object.md#one_object_UID">UID</a> {
         <a href="../one/object.md#one_object_id">id</a>: <a href="../one/object.md#one_object_ID">ID</a> { bytes: <a href="../one/object.md#one_object_SUI_DENY_LIST_OBJECT_ID">SUI_DENY_LIST_OBJECT_ID</a> },
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_object_sui_accumulator_root_object_id"></a>
+
+## Function `sui_accumulator_root_object_id`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_accumulator_root_object_id">sui_accumulator_root_object_id</a>(): <a href="../one/object.md#one_object_UID">one::object::UID</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_accumulator_root_object_id">sui_accumulator_root_object_id</a>(): <a href="../one/object.md#one_object_UID">UID</a> {
+    <a href="../one/object.md#one_object_UID">UID</a> {
+        <a href="../one/object.md#one_object_id">id</a>: <a href="../one/object.md#one_object_ID">ID</a> { bytes: <a href="../one/object.md#one_object_SUI_ACCUMULATOR_ROOT_OBJECT_ID">SUI_ACCUMULATOR_ROOT_OBJECT_ID</a> },
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_object_sui_accumulator_root_address"></a>
+
+## Function `sui_accumulator_root_address`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_accumulator_root_address">sui_accumulator_root_address</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_accumulator_root_address">sui_accumulator_root_address</a>(): <b>address</b> {
+    <a href="../one/object.md#one_object_SUI_ACCUMULATOR_ROOT_OBJECT_ID">SUI_ACCUMULATOR_ROOT_OBJECT_ID</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_object_sui_coin_registry_object_id"></a>
+
+## Function `sui_coin_registry_object_id`
+
+Create the <code><a href="../one/object.md#one_object_UID">UID</a></code> for the singleton <code>CoinRegistry</code> object.
+This should only be called once from <code><a href="../one/coin_registry.md#one_coin_registry">coin_registry</a></code>.
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_coin_registry_object_id">sui_coin_registry_object_id</a>(): <a href="../one/object.md#one_object_UID">one::object::UID</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_coin_registry_object_id">sui_coin_registry_object_id</a>(): <a href="../one/object.md#one_object_UID">UID</a> {
+    <a href="../one/object.md#one_object_UID">UID</a> {
+        <a href="../one/object.md#one_object_id">id</a>: <a href="../one/object.md#one_object_ID">ID</a> { bytes: <a href="../one/object.md#one_object_SUI_COIN_REGISTRY_OBJECT_ID">SUI_COIN_REGISTRY_OBJECT_ID</a> },
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_object_sui_coin_registry_address"></a>
+
+## Function `sui_coin_registry_address`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_coin_registry_address">sui_coin_registry_address</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/object.md#one_object_sui_coin_registry_address">sui_coin_registry_address</a>(): <b>address</b> {
+    <a href="../one/object.md#one_object_SUI_COIN_REGISTRY_OBJECT_ID">SUI_COIN_REGISTRY_OBJECT_ID</a>
 }
 </code></pre>
 

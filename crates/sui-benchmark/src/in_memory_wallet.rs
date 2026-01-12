@@ -68,6 +68,10 @@ pub struct InMemoryWallet {
 }
 
 impl InMemoryWallet {
+    pub fn new_empty() -> Self {
+        InMemoryWallet { accounts: BTreeMap::new() }
+    }
+
     pub fn new(gas: &Gas) -> Self {
         let mut wallet = InMemoryWallet { accounts: BTreeMap::new() };
         wallet.add_account(gas.1, gas.2.clone(), gas.0, Vec::new());
@@ -81,11 +85,12 @@ impl InMemoryWallet {
     /// Apply updates from `effects` to `self`
     pub fn update(&mut self, effects: &ExecutionEffects) {
         for (obj, owner) in effects.mutated().into_iter().chain(effects.created()) {
-            if let Owner::AddressOwner(a) = owner {
-                if let Some(account) = self.accounts.get_mut(&a) {
-                    account.add_or_update(obj);
-                } // else, doesn't belong to an account we can spend from, we don't care
-            } // TODO: support owned, shared objects
+            if let Owner::AddressOwner(a) = owner
+                && let Some(account) = self.accounts.get_mut(&a)
+            {
+                account.add_or_update(obj);
+            } // else, doesn't belong to an account we can spend from, we don't care
+              // TODO: support owned, shared objects
         }
         if let Some(sender_account) = self.accounts.get_mut(&effects.sender()) {
             for obj in effects.deleted() {
@@ -106,6 +111,10 @@ impl InMemoryWallet {
 
     pub fn account(&self, addr: &SuiAddress) -> Option<&SuiAccount> {
         self.accounts.get(addr)
+    }
+
+    pub fn accounts(&self) -> impl Iterator<Item = &SuiAddress> {
+        self.accounts.keys()
     }
 
     pub fn gas(&self, addr: &SuiAddress) -> Option<&ObjectRef> {

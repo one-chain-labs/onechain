@@ -53,7 +53,7 @@ module.exports = grammar({
   ],
 
   rules: {
-    source_file: $ => repeat($.module_definition),
+    source_file: $ => repeat(choice($.module_extension_definition, $.module_definition)),
 
     // parse use declarations
     use_declaration: $ => seq(
@@ -108,6 +108,13 @@ module.exports = grammar({
       'store',
       'key',
     ),
+
+    module_extension_definition: $ => {
+      return seq(
+        'extend',
+        field('module', $.module_definition),
+      );
+    },
 
     module_definition: $ => {
       return seq(
@@ -493,6 +500,12 @@ module.exports = grammar({
       ),
       seq(
         $.module_identity,
+        '::',
+        field('member', $.identifier),
+        field('type_arguments', $.type_arguments),
+      ),
+      seq(
+        $.module_identity,
         optional(field('type_arguments', $.type_arguments)),
       ),
       seq(
@@ -690,11 +703,14 @@ module.exports = grammar({
     loop_expression: $ => seq('loop', field('body', $._expression)),
 
     // return expression
-    return_expression: $ => prec.left(seq(
-      'return',
-      optional(field('label', $.label)),
-      optional(field('return', $._expression))
-    )),
+    return_expression: $ => choice(
+      prec.left(seq(
+        'return',
+        optional(field('label', $.label)),
+        field('return', $._expression)
+      )),
+      prec(-1, seq('return', optional(field('label', $.label)))),
+    ),
 
     // abort expression
     abort_expression: $ => seq('abort', optional(field('abort', $._expression))),
@@ -970,9 +986,22 @@ module.exports = grammar({
     mut_ref: $ => seq('&', 'mut'),
     block_identifier: $ => seq($.label, ':'),
     label: $ => seq('\'', $.identifier),
-    address_literal: $ => /@(0x[a-fA-F0-9]+|[0-9]+)/,
+    address_literal: $ => /@(0x[a-fA-F0-9][a-fA-F0-9_]*|[0-9]+)/,
     bool_literal: $ => choice('true', 'false'),
-    num_literal: $ => choice(/[0-9][0-9_]*(?:u8|u16|u32|u64|u128|u256)?/, /0x[a-fA-F0-9_]+/),
+    num_literal: $ => seq(
+      choice(
+        /[0-9][0-9_]*/,
+        /0x[a-fA-F0-9_]+/
+      ),
+      optional(choice(
+        'u8',
+        'u16',
+        'u32',
+        'u64',
+        'u128',
+        'u256'
+      ))
+    ),
     hex_string_literal: $ => /x"[0-9a-fA-F]*"/,
     byte_string_literal: $ => /b"(\\.|[^\\"])*"/,
     _module_identifier: $ => alias($.identifier, $.module_identifier),

@@ -10,15 +10,13 @@
 
 module raffles::example2;
 
-use one::{
-    balance::{Self, Balance},
-    clock::Clock,
-    coin::{Self, Coin},
-    random::{Random, new_generator},
-    oct::OCT,
-    table_vec::{Self, TableVec},
-    tx_context::sender
-};
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::random::{Random, new_generator};
+use one::oct::OCT;
+use one::table_vec::{Self, TableVec};
+use one::tx_context::sender;
 
 /// Error codes
 const EGameInProgress: u64 = 0;

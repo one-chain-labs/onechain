@@ -76,17 +76,24 @@ control over the currency which a simple open-loop system can't provide.
 -  [Function `key`](#one_token_key)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
@@ -361,32 +368,12 @@ we emit this event in the <code><a href="../one/token.md#one_token_share_policy"
 ## Constants
 
 
-<a name="one_token_EBalanceTooLow"></a>
+<a name="one_token_EUnknownAction"></a>
 
-The balance is too low to perform the action.
-
-
-<pre><code><b>const</b> <a href="../one/token.md#one_token_EBalanceTooLow">EBalanceTooLow</a>: u64 = 3;
-</code></pre>
+The action is not allowed (defined) in the policy.
 
 
-
-<a name="one_token_ECantConsumeBalance"></a>
-
-The balance is not zero when trying to confirm with <code>TransferPolicyCap</code>.
-
-
-<pre><code><b>const</b> <a href="../one/token.md#one_token_ECantConsumeBalance">ECantConsumeBalance</a>: u64 = 5;
-</code></pre>
-
-
-
-<a name="one_token_ENoConfig"></a>
-
-Rule is trying to access a missing config (with type).
-
-
-<pre><code><b>const</b> <a href="../one/token.md#one_token_ENoConfig">ENoConfig</a>: u64 = 6;
+<pre><code><b>const</b> <a href="../one/token.md#one_token_EUnknownAction">EUnknownAction</a>: u64 = 0;
 </code></pre>
 
 
@@ -411,6 +398,16 @@ Trying to perform an admin action with a wrong cap.
 
 
 
+<a name="one_token_EBalanceTooLow"></a>
+
+The balance is too low to perform the action.
+
+
+<pre><code><b>const</b> <a href="../one/token.md#one_token_EBalanceTooLow">EBalanceTooLow</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="one_token_ENotZero"></a>
 
 The balance is not zero.
@@ -421,12 +418,22 @@ The balance is not zero.
 
 
 
-<a name="one_token_EUnknownAction"></a>
+<a name="one_token_ECantConsumeBalance"></a>
 
-The action is not allowed (defined) in the policy.
+The balance is not zero when trying to confirm with <code>TransferPolicyCap</code>.
 
 
-<pre><code><b>const</b> <a href="../one/token.md#one_token_EUnknownAction">EUnknownAction</a>: u64 = 0;
+<pre><code><b>const</b> <a href="../one/token.md#one_token_ECantConsumeBalance">ECantConsumeBalance</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="one_token_ENoConfig"></a>
+
+Rule is trying to access a missing config (with type).
+
+
+<pre><code><b>const</b> <a href="../one/token.md#one_token_ENoConfig">ENoConfig</a>: u64 = 6;
 </code></pre>
 
 
@@ -442,22 +449,22 @@ of the function must be used instead.
 
 
 
-<a name="one_token_FROM_COIN"></a>
-
-A Tag for the <code><a href="../one/token.md#one_token_from_coin">from_coin</a></code> action.
-
-
-<pre><code><b>const</b> <a href="../one/token.md#one_token_FROM_COIN">FROM_COIN</a>: vector&lt;u8&gt; = vector[102, 114, 111, 109, 95, 99, 111, 105, 110];
-</code></pre>
-
-
-
 <a name="one_token_SPEND"></a>
 
 A Tag for the <code><a href="../one/token.md#one_token_spend">spend</a></code> action.
 
 
 <pre><code><b>const</b> <a href="../one/token.md#one_token_SPEND">SPEND</a>: vector&lt;u8&gt; = vector[115, 112, 101, 110, 100];
+</code></pre>
+
+
+
+<a name="one_token_TRANSFER"></a>
+
+A Tag for the <code><a href="../one/transfer.md#one_transfer">transfer</a></code> action.
+
+
+<pre><code><b>const</b> <a href="../one/token.md#one_token_TRANSFER">TRANSFER</a>: vector&lt;u8&gt; = vector[116, 114, 97, 110, 115, 102, 101, 114];
 </code></pre>
 
 
@@ -472,12 +479,12 @@ A Tag for the <code><a href="../one/token.md#one_token_to_coin">to_coin</a></cod
 
 
 
-<a name="one_token_TRANSFER"></a>
+<a name="one_token_FROM_COIN"></a>
 
-A Tag for the <code><a href="../one/transfer.md#one_transfer">transfer</a></code> action.
+A Tag for the <code><a href="../one/token.md#one_token_from_coin">from_coin</a></code> action.
 
 
-<pre><code><b>const</b> <a href="../one/token.md#one_token_TRANSFER">TRANSFER</a>: vector&lt;u8&gt; = vector[116, 114, 97, 110, 115, 102, 101, 114];
+<pre><code><b>const</b> <a href="../one/token.md#one_token_FROM_COIN">FROM_COIN</a>: vector&lt;u8&gt; = vector[102, 114, 111, 109, 95, 99, 111, 105, 110];
 </code></pre>
 
 
@@ -1090,7 +1097,7 @@ required by the <code><a href="../one/token.md#one_token_TokenPolicy">TokenPolic
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/token.md#one_token_add_approval">add_approval</a>&lt;T, W: drop&gt;(_t: W, request: &<b>mut</b> <a href="../one/token.md#one_token_ActionRequest">ActionRequest</a>&lt;T&gt;, _ctx: &<b>mut</b> TxContext) {
-    request.<a href="../one/token.md#one_token_approvals">approvals</a>.insert(type_name::get&lt;W&gt;())
+    request.<a href="../one/token.md#one_token_approvals">approvals</a>.insert(type_name::with_defining_ids&lt;W&gt;())
 }
 </code></pre>
 
@@ -1395,7 +1402,7 @@ Aborts if the <code><a href="../one/token.md#one_token_TokenPolicyCap">TokenPoli
     <b>if</b> (!self.<a href="../one/token.md#one_token_rules">rules</a>.contains(&<a href="../one/token.md#one_token_action">action</a>)) {
         <a href="../one/token.md#one_token_allow">allow</a>(self, cap, <a href="../one/token.md#one_token_action">action</a>, ctx);
     };
-    self.<a href="../one/token.md#one_token_rules">rules</a>.get_mut(&<a href="../one/token.md#one_token_action">action</a>).insert(type_name::get&lt;Rule&gt;())
+    self.<a href="../one/token.md#one_token_rules">rules</a>.get_mut(&<a href="../one/token.md#one_token_action">action</a>).insert(type_name::with_defining_ids&lt;Rule&gt;())
 }
 </code></pre>
 
@@ -1429,7 +1436,7 @@ Aborts if the <code><a href="../one/token.md#one_token_TokenPolicyCap">TokenPoli
     _ctx: &<b>mut</b> TxContext,
 ) {
     <b>assert</b>!(<a href="../one/object.md#one_object_id">object::id</a>(self) == cap.`<b>for</b>`, <a href="../one/token.md#one_token_ENotAuthorized">ENotAuthorized</a>);
-    self.<a href="../one/token.md#one_token_rules">rules</a>.get_mut(&<a href="../one/token.md#one_token_action">action</a>).remove(&type_name::get&lt;Rule&gt;())
+    self.<a href="../one/token.md#one_token_rules">rules</a>.get_mut(&<a href="../one/token.md#one_token_action">action</a>).remove(&type_name::with_defining_ids&lt;Rule&gt;())
 }
 </code></pre>
 

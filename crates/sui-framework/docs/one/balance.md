@@ -20,15 +20,30 @@ custom coins with <code><a href="../one/balance.md#one_balance_Supply">Supply</a
 -  [Function `split`](#one_balance_split)
 -  [Function `withdraw_all`](#one_balance_withdraw_all)
 -  [Function `destroy_zero`](#one_balance_destroy_zero)
+-  [Function `send_funds`](#one_balance_send_funds)
+-  [Function `redeem_funds`](#one_balance_redeem_funds)
+-  [Function `withdraw_funds_from_object`](#one_balance_withdraw_funds_from_object)
+-  [Function `create_supply_internal`](#one_balance_create_supply_internal)
 -  [Function `create_staking_rewards`](#one_balance_create_staking_rewards)
 -  [Function `destroy_storage_rebates`](#one_balance_destroy_storage_rebates)
 -  [Function `destroy_supply`](#one_balance_destroy_supply)
 
 
-<pre><code><b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
+<b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
+<b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
+<b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
+<b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
+<b>use</b> <a href="../std/string.md#std_string">std::string</a>;
 <b>use</b> <a href="../std/type_name.md#std_type_name">std::type_name</a>;
 <b>use</b> <a href="../std/vector.md#std_vector">std::vector</a>;
 </code></pre>
@@ -106,22 +121,22 @@ For when trying to destroy a non-zero balance.
 
 
 
+<a name="one_balance_EOverflow"></a>
+
+For when an overflow is happening on Supply operations.
+
+
+<pre><code><b>const</b> <a href="../one/balance.md#one_balance_EOverflow">EOverflow</a>: u64 = 1;
+</code></pre>
+
+
+
 <a name="one_balance_ENotEnough"></a>
 
 For when trying to withdraw more than there is.
 
 
 <pre><code><b>const</b> <a href="../one/balance.md#one_balance_ENotEnough">ENotEnough</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="one_balance_ENotSUI"></a>
-
-System operation performed for a coin other than SUI
-
-
-<pre><code><b>const</b> <a href="../one/balance.md#one_balance_ENotSUI">ENotSUI</a>: u64 = 4;
 </code></pre>
 
 
@@ -136,12 +151,12 @@ Sender is not @0x0 the system address.
 
 
 
-<a name="one_balance_EOverflow"></a>
+<a name="one_balance_ENotSUI"></a>
 
-For when an overflow is happening on Supply operations.
+System operation performed for a coin other than SUI
 
 
-<pre><code><b>const</b> <a href="../one/balance.md#one_balance_EOverflow">EOverflow</a>: u64 = 1;
+<pre><code><b>const</b> <a href="../one/balance.md#one_balance_ENotSUI">ENotSUI</a>: u64 = 4;
 </code></pre>
 
 
@@ -416,6 +431,109 @@ Destroy a zero <code><a href="../one/balance.md#one_balance_Balance">Balance</a>
 
 </details>
 
+<a name="one_balance_send_funds"></a>
+
+## Function `send_funds`
+
+Send a <code><a href="../one/balance.md#one_balance_Balance">Balance</a></code> to an address's funds accumulator.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/balance.md#one_balance_send_funds">send_funds</a>&lt;T&gt;(<a href="../one/balance.md#one_balance">balance</a>: <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;T&gt;, recipient: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/balance.md#one_balance_send_funds">send_funds</a>&lt;T&gt;(<a href="../one/balance.md#one_balance">balance</a>: <a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;, recipient: <b>address</b>) {
+    <a href="../one/funds_accumulator.md#one_funds_accumulator_add_impl">one::funds_accumulator::add_impl</a>(<a href="../one/balance.md#one_balance">balance</a>, recipient);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_balance_redeem_funds"></a>
+
+## Function `redeem_funds`
+
+Redeem a <code>Withdrawal&lt;<a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;&gt;</code> to get the underlying <code><a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;</code> from an address's funds
+accumulator.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/balance.md#one_balance_redeem_funds">redeem_funds</a>&lt;T&gt;(withdrawal: <a href="../one/funds_accumulator.md#one_funds_accumulator_Withdrawal">one::funds_accumulator::Withdrawal</a>&lt;<a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;T&gt;&gt;): <a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/balance.md#one_balance_redeem_funds">redeem_funds</a>&lt;T&gt;(withdrawal: <a href="../one/funds_accumulator.md#one_funds_accumulator_Withdrawal">one::funds_accumulator::Withdrawal</a>&lt;<a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;&gt;): <a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt; {
+    withdrawal.redeem()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_balance_withdraw_funds_from_object"></a>
+
+## Function `withdraw_funds_from_object`
+
+Create a <code>Withdrawal&lt;<a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;&gt;</code> from an object to withdraw funds from it.
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/balance.md#one_balance_withdraw_funds_from_object">withdraw_funds_from_object</a>&lt;T&gt;(obj: &<b>mut</b> <a href="../one/object.md#one_object_UID">one::object::UID</a>, <a href="../one/balance.md#one_balance_value">value</a>: u64): <a href="../one/funds_accumulator.md#one_funds_accumulator_Withdrawal">one::funds_accumulator::Withdrawal</a>&lt;<a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;T&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/balance.md#one_balance_withdraw_funds_from_object">withdraw_funds_from_object</a>&lt;T&gt;(
+    obj: &<b>mut</b> UID,
+    <a href="../one/balance.md#one_balance_value">value</a>: u64,
+): Withdrawal&lt;<a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;&gt; {
+    <a href="../one/funds_accumulator.md#one_funds_accumulator_withdraw_from_object">one::funds_accumulator::withdraw_from_object</a>(obj, <a href="../one/balance.md#one_balance_value">value</a> <b>as</b> u256)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_balance_create_supply_internal"></a>
+
+## Function `create_supply_internal`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/balance.md#one_balance_create_supply_internal">create_supply_internal</a>&lt;T&gt;(): <a href="../one/balance.md#one_balance_Supply">one::balance::Supply</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/balance.md#one_balance_create_supply_internal">create_supply_internal</a>&lt;T&gt;(): <a href="../one/balance.md#one_balance_Supply">Supply</a>&lt;T&gt; {
+    <a href="../one/balance.md#one_balance_Supply">Supply</a> { <a href="../one/balance.md#one_balance_value">value</a>: 0 }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="one_balance_create_staking_rewards"></a>
 
 ## Function `create_staking_rewards`
@@ -436,7 +554,10 @@ and nowhere else.
 
 <pre><code><b>fun</b> <a href="../one/balance.md#one_balance_create_staking_rewards">create_staking_rewards</a>&lt;T&gt;(<a href="../one/balance.md#one_balance_value">value</a>: u64, ctx: &TxContext): <a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt; {
     <b>assert</b>!(ctx.sender() == @0x0, <a href="../one/balance.md#one_balance_ENotSystemAddress">ENotSystemAddress</a>);
-    <b>assert</b>!(<a href="../std/type_name.md#std_type_name_get">std::type_name::get</a>&lt;T&gt;().into_string().into_bytes() == <a href="../one/balance.md#one_balance_SUI_TYPE_NAME">SUI_TYPE_NAME</a>, <a href="../one/balance.md#one_balance_ENotSUI">ENotSUI</a>);
+    <b>assert</b>!(
+        <a href="../std/type_name.md#std_type_name_with_defining_ids">std::type_name::with_defining_ids</a>&lt;T&gt;().into_string().into_bytes() == <a href="../one/balance.md#one_balance_SUI_TYPE_NAME">SUI_TYPE_NAME</a>,
+        <a href="../one/balance.md#one_balance_ENotSUI">ENotSUI</a>,
+    );
     <a href="../one/balance.md#one_balance_Balance">Balance</a> { <a href="../one/balance.md#one_balance_value">value</a> }
 }
 </code></pre>
@@ -465,7 +586,10 @@ and nowhere else.
 
 <pre><code><b>fun</b> <a href="../one/balance.md#one_balance_destroy_storage_rebates">destroy_storage_rebates</a>&lt;T&gt;(self: <a href="../one/balance.md#one_balance_Balance">Balance</a>&lt;T&gt;, ctx: &TxContext) {
     <b>assert</b>!(ctx.sender() == @0x0, <a href="../one/balance.md#one_balance_ENotSystemAddress">ENotSystemAddress</a>);
-    <b>assert</b>!(<a href="../std/type_name.md#std_type_name_get">std::type_name::get</a>&lt;T&gt;().into_string().into_bytes() == <a href="../one/balance.md#one_balance_SUI_TYPE_NAME">SUI_TYPE_NAME</a>, <a href="../one/balance.md#one_balance_ENotSUI">ENotSUI</a>);
+    <b>assert</b>!(
+        <a href="../std/type_name.md#std_type_name_with_defining_ids">std::type_name::with_defining_ids</a>&lt;T&gt;().into_string().into_bytes() == <a href="../one/balance.md#one_balance_SUI_TYPE_NAME">SUI_TYPE_NAME</a>,
+        <a href="../one/balance.md#one_balance_ENotSUI">ENotSUI</a>,
+    );
     <b>let</b> <a href="../one/balance.md#one_balance_Balance">Balance</a> { <a href="../one/balance.md#one_balance_value">value</a>: _ } = self;
 }
 </code></pre>

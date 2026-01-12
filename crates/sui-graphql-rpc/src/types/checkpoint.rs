@@ -16,7 +16,7 @@ use sui_indexer::{
     models::{checkpoints::StoredCheckpoint, raw_checkpoints::StoredRawCheckpoint},
     schema::{checkpoints, raw_checkpoints},
 };
-use sui_types::messages_checkpoint::{CertifiedCheckpointSummary, CheckpointDigest};
+use sui_types::messages_checkpoint::{CertifiedCheckpointSummary, CheckpointCommitment, CheckpointDigest};
 
 use super::{
     base64::Base64,
@@ -198,6 +198,20 @@ impl Checkpoint {
         let checkpoint_bcs = summary.map(|c| c.into_summary_and_sequence().1).map(|c| bcs::to_bytes(&c).unwrap());
 
         Ok(checkpoint_bcs.map(Base64::from))
+    }
+
+    /// A commitment by the committee on the artifacts of the checkpoint.
+    /// e.g., object checkpoint states
+    async fn artifacts_digest(&self) -> Result<Option<String>> {
+        let commitments: Vec<CheckpointCommitment> = bcs::from_bytes(&self.stored.checkpoint_commitments)
+            .map_err(|e| Error::Internal(format!("Error deserializing commitments: {e}")).extend())?;
+
+        for commitment in commitments {
+            if let CheckpointCommitment::CheckpointArtifactsDigest(digest) = commitment {
+                return Ok(Some(digest.base58_encode()));
+            }
+        }
+        Ok(None)
     }
 }
 

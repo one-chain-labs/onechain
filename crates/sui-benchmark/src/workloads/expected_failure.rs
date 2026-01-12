@@ -241,4 +241,8 @@ impl Workload<dyn Payload> for ExpectedFailureWorkload {
             .map(|b| Box::<dyn Payload>::from(b))
             .collect()
     }
+
+    fn name(&self) -> &str {
+        "ExpectedFailure"
+    }
 }

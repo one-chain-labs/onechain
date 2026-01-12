@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -18,12 +22,14 @@ use itertools::Itertools;
 use jsonrpsee::{core::RpcResult, RpcModule};
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{
-    annotated_value::{MoveStruct, MoveStructLayout, MoveValue},
+    annotated_value::{MoveStructLayout, MoveTypeLayout},
     language_storage::StructTag,
 };
-use mysten_metrics::{add_server_timing, spawn_monitored_task};
+use mysten_metrics::add_server_timing;
+use once_cell::sync::Lazy;
 use shared_crypto::intent::{Intent, IntentMessage, PersonalMessage};
 use sui_core::authority::AuthorityState;
+use sui_display::v1::Format;
 use sui_json_rpc_api::{
     validate_limit,
     JsonRpcMetrics,
@@ -43,9 +49,6 @@ use sui_json_rpc_types::{
     ProtocolConfigResponse,
     SuiEvent,
     SuiGetPastObjectRequest,
-    SuiMoveStruct,
-    SuiMoveValue,
-    SuiMoveVariant,
     SuiObjectDataOptions,
     SuiObjectResponse,
     SuiPastObjectResponse,
@@ -62,7 +65,6 @@ use sui_storage::key_value_store::TransactionKeyValueStore;
 use sui_types::{
     authenticator_state::{get_authenticator_state, ActiveJwk},
     base_types::{ObjectID, SequenceNumber, SuiAddress, TransactionDigest},
-    collection_types::VecMap,
     crypto::AggregateAuthoritySignature,
     display::DisplayVersionUpdatedEvent,
     effects::{TransactionEffects, TransactionEffectsAPI, TransactionEvents},
@@ -71,6 +73,7 @@ use sui_types::{
     object::{Object, ObjectRead, PastObjectRead},
     signature::{GenericSignature, VerifyParams},
     signature_verification::VerifiedDigestCache,
+    storage::ObjectKey,
     sui_serde::BigInt,
     transaction::{Transaction, TransactionData, TransactionDataAPI},
 };
@@ -87,7 +90,24 @@ use crate::{
     ObjectProviderCache,
     SuiRpcModule,
 };
+
+/// A field access in a  Display string cannot exceed this level of nesting.
 const MAX_DISPLAY_NESTED_LEVEL: usize = 10;
+
+/// Default budget for Display output size.
+const DEFAULT_MAX_DISPLAY_OUTPUT_SIZE: usize = 1024 * 1024;
+
+/// Overall display output cannot exceed this size.
+static MAX_DISPLAY_OUTPUT_SIZE: Lazy<usize> = Lazy::new(|| {
+    let max_opt = std::env::var("MAX_DISPLAY_OUTPUT_SIZE").ok().and_then(|s| s.parse().ok());
+
+    if let Some(max) = max_opt {
+        info!("Using custom value for 'MAX_DISPLAY_OUTPUT_SIZE': {max}");
+        max
+    } else {
+        DEFAULT_MAX_DISPLAY_OUTPUT_SIZE
+    }
+});
 
 // An implementation of the read portion of the JSON-RPC interface intended for use in
 // Fullnodes.
@@ -281,10 +301,10 @@ impl ReadApi {
             trace!("getting events");
             let mut non_empty_digests = vec![];
             for cache_entry in temp_response.values() {
-                if let Some(effects) = &cache_entry.effects {
-                    if effects.events_digest().is_some() {
-                        non_empty_digests.push(cache_entry.digest);
-                    }
+                if let Some(effects) = &cache_entry.effects
+                    && effects.events_digest().is_some()
+                {
+                    non_empty_digests.push(cache_entry.digest);
                 }
             }
             // fetch events from the DB with retry, retry each 0.5s for 3s
@@ -323,7 +343,9 @@ impl ReadApi {
                             cache_entry.events = Some(to_sui_transaction_events(self, cache_entry.digest, ev)?)
                         }
                         None | Some(None) => {
-                            error!("Failed to fetch events with event digest {events_digest:?} for txn {transaction_digest}");
+                            error!(
+                                "Failed to fetch events with event digest {events_digest:?} for txn {transaction_digest}"
+                            );
                             cache_entry
                                 .errors
                                 .push(format!("Failed to fetch events with event digest {events_digest:?}",))
@@ -337,7 +359,34 @@ impl ReadApi {
             }
         }
 
-        let object_cache = ObjectProviderCache::new((self.state.clone(), self.transaction_kv_store.clone()));
+        let mut object_cache = ObjectProviderCache::new((self.state.clone(), self.transaction_kv_store.clone()));
+
+        // Prefetch the objects if we need to show balance or object changes
+        if opts.show_balance_changes || opts.show_object_changes {
+            let mut keys = vec![];
+            for resp in temp_response.values() {
+                let effects = resp.effects.as_ref().ok_or_else(|| {
+                    SuiRpcInputError::GenericNotFound(
+                        "unable to derive balance/object changes because effect is empty".to_string(),
+                    )
+                })?;
+
+                for change in effects.object_changes() {
+                    if let Some(input_version) = change.input_version {
+                        keys.push(ObjectKey(change.id, input_version));
+                    }
+                    if let Some(output_version) = change.output_version {
+                        keys.push(ObjectKey(change.id, output_version));
+                    }
+                }
+            }
+
+            let objects =
+                self.transaction_kv_store.multi_get_objects(&keys).await?.into_iter().flatten().collect::<Vec<_>>();
+
+            object_cache.insert_objects_into_cache(objects);
+        }
+
         if opts.show_balance_changes {
             trace!("getting balance changes");
 
@@ -433,14 +482,10 @@ impl ReadApiServer for ReadApi {
     ) -> RpcResult<SuiObjectResponse> {
         with_tracing!(async move {
             let state = self.state.clone();
-            let object_read = spawn_monitored_task!(async move {
-                state.get_object_read(&object_id).map_err(|e| {
-                    warn!(?object_id, "Failed to get object: {:?}", e);
-                    Error::from(e)
-                })
-            })
-            .await
-            .map_err(Error::from)??;
+            let object_read = state.get_object_read(&object_id).map_err(|e| {
+                warn!(?object_id, "Failed to get object: {:?}", e);
+                Error::from(e)
+            })?;
             let options = options.unwrap_or_default();
 
             match object_read {
@@ -516,12 +561,12 @@ impl ReadApiServer for ReadApi {
     ) -> RpcResult<SuiPastObjectResponse> {
         with_tracing!(async move {
             let state = self.state.clone();
-            let past_read = spawn_monitored_task!(async move {
-            state.get_past_object_read(&object_id, version)
-            .map_err(|e| {
-                error!("Failed to call try_get_past_object for object: {object_id:?} version: {version:?} with error: {e:?}");
-                Error::from(e)
-            })}).await.map_err(Error::from)??;
+            let past_read = state
+                .get_past_object_read(&object_id, version)
+                .map_err(|e| {
+                    error!("Failed to call try_get_past_object for object: {object_id:?} version: {version:?} with error: {e:?}");
+                    Error::from(e)
+                })?;
             let options = options.unwrap_or_default();
             match past_read {
                 PastObjectRead::ObjectNotExists(id) => Ok(SuiPastObjectResponse::ObjectNotExists(id)),
@@ -610,16 +655,15 @@ impl ReadApiServer for ReadApi {
 
             // Fetch transaction to determine existence
             let transaction_kv_store = self.transaction_kv_store.clone();
-            let transaction = spawn_monitored_task!(async move {
+            let transaction = async move {
                 let ret = transaction_kv_store.get_tx(digest).await.map_err(|err| {
-                    debug!(tx_digest=?digest, "Failed to get transaction: {:?}", err);
+                    debug!(tx_digest=?digest, "Failed to get transaction: {}", err);
                     Error::from(err)
                 });
                 add_server_timing("tx_kv_lookup");
                 ret
-            })
-            .await
-            .map_err(Error::from)??;
+            }
+            .await?;
             let input_objects = transaction.data().inner().intent_message.value.input_objects().unwrap_or_default();
 
             // the input is needed for object_changes to retrieve the sender address.
@@ -630,16 +674,10 @@ impl ReadApiServer for ReadApi {
             // Fetch effects when `show_events` is true because events relies on effects
             if opts.require_effects() {
                 let transaction_kv_store = self.transaction_kv_store.clone();
-                temp_response.effects = Some(
-                    spawn_monitored_task!(async move {
-                        transaction_kv_store.get_fx_by_tx_digest(digest).await.map_err(|err| {
-                            debug!(tx_digest=?digest, "Failed to get effects: {:?}", err);
-                            Error::from(err)
-                        })
-                    })
-                    .await
-                    .map_err(Error::from)??,
-                );
+                temp_response.effects = Some(transaction_kv_store.get_fx_by_tx_digest(digest).await.map_err(|err| {
+                    debug!(tx_digest=?digest, "Failed to get effects: {:?}", err);
+                    Error::from(err)
+                })?);
             }
 
             temp_response.checkpoint_seq =
@@ -651,34 +689,29 @@ impl ReadApiServer for ReadApi {
             if let Some(checkpoint_seq) = &temp_response.checkpoint_seq {
                 let kv_store = self.transaction_kv_store.clone();
                 let checkpoint_seq = *checkpoint_seq;
-                let checkpoint = spawn_monitored_task!(async move {
-                    kv_store
+                let checkpoint = kv_store
                     // safe to unwrap because we have checked `is_some` above
                     .get_checkpoint_summary(checkpoint_seq)
                     .await
                     .map_err(|e| {
                         error!("Failed to get checkpoint by sequence number: {checkpoint_seq:?} with error: {e:?}");
                         Error::from(e)
-                    })
-                })
-                .await
-                .map_err(Error::from)??;
+                    })?;
                 // TODO(chris): we don't need to fetch the whole checkpoint summary
                 temp_response.timestamp = Some(checkpoint.timestamp_ms);
             }
 
             if opts.show_events && temp_response.effects.is_some() {
                 let transaction_kv_store = self.transaction_kv_store.clone();
-                let events = spawn_monitored_task!(async move {
-                    transaction_kv_store.multi_get_events_by_tx_digests(&[digest]).await.map_err(|e| {
+                let events = transaction_kv_store
+                    .multi_get_events_by_tx_digests(&[digest])
+                    .await
+                    .map_err(|e| {
                         error!("Failed to call get transaction events for transaction: {digest:?} with error {e:?}");
                         Error::from(e)
-                    })
-                })
-                .await
-                .map_err(Error::from)??
-                .pop()
-                .flatten();
+                    })?
+                    .pop()
+                    .flatten();
                 match events {
                     None => temp_response.events = Some(SuiTransactionBlockEvents::default()),
                     Some(events) => match to_sui_transaction_events(self, digest, events) {
@@ -689,41 +722,40 @@ impl ReadApiServer for ReadApi {
             }
 
             let object_cache = ObjectProviderCache::new((self.state.clone(), self.transaction_kv_store.clone()));
-            if opts.show_balance_changes {
-                if let Some(effects) = &temp_response.effects {
-                    let balance_changes =
-                        get_balance_changes_from_effect(&object_cache, effects, input_objects, None).await;
+            if opts.show_balance_changes
+                && let Some(effects) = &temp_response.effects
+            {
+                let balance_changes = get_balance_changes_from_effect(&object_cache, effects, input_objects, None).await;
 
-                    if let Ok(balance_changes) = balance_changes {
-                        temp_response.balance_changes = Some(balance_changes);
-                    } else {
-                        temp_response
-                            .errors
-                            .push(format!("Cannot retrieve balance changes: {}", balance_changes.unwrap_err()));
-                    }
+                if let Ok(balance_changes) = balance_changes {
+                    temp_response.balance_changes = Some(balance_changes);
+                } else {
+                    temp_response
+                        .errors
+                        .push(format!("Cannot retrieve balance changes: {}", balance_changes.unwrap_err()));
                 }
             }
 
-            if opts.show_object_changes {
-                if let (Some(effects), Some(input)) = (&temp_response.effects, &temp_response.transaction) {
-                    let sender = input.data().intent_message().value.sender();
-                    let object_changes = get_object_changes(
-                        &object_cache,
-                        effects,
-                        sender,
-                        effects.modified_at_versions(),
-                        effects.all_changed_objects(),
-                        effects.all_removed_objects(),
-                    )
-                    .await;
+            if opts.show_object_changes
+                && let (Some(effects), Some(input)) = (&temp_response.effects, &temp_response.transaction)
+            {
+                let sender = input.data().intent_message().value.sender();
+                let object_changes = get_object_changes(
+                    &object_cache,
+                    effects,
+                    sender,
+                    effects.modified_at_versions(),
+                    effects.all_changed_objects(),
+                    effects.all_removed_objects(),
+                )
+                .await;
 
-                    if let Ok(object_changes) = object_changes {
-                        temp_response.object_changes = Some(object_changes);
-                    } else {
-                        temp_response
-                            .errors
-                            .push(format!("Cannot retrieve object changes: {}", object_changes.unwrap_err()));
-                    }
+                if let Ok(object_changes) = object_changes {
+                    temp_response.object_changes = Some(object_changes);
+                } else {
+                    temp_response
+                        .errors
+                        .push(format!("Cannot retrieve object changes: {}", object_changes.unwrap_err()));
                 }
             }
             let epoch_store = self.state.load_epoch_store_one_call_per_task();
@@ -737,12 +769,7 @@ impl ReadApiServer for ReadApi {
         digests: Vec<TransactionDigest>,
         opts: Option<SuiTransactionBlockResponseOptions>,
     ) -> RpcResult<Vec<SuiTransactionBlockResponse>> {
-        with_tracing!(async move {
-            let cloned_self = self.clone();
-            spawn_monitored_task!(async move { cloned_self.multi_get_transaction_blocks_internal(digests, opts).await })
-                .await
-                .map_err(Error::from)?
-        })
+        with_tracing!(async move { self.multi_get_transaction_blocks_internal(digests, opts).await })
     }
 
     #[instrument(skip(self))]
@@ -750,7 +777,7 @@ impl ReadApiServer for ReadApi {
         with_tracing!(async move {
             let state = self.state.clone();
             let transaction_kv_store = self.transaction_kv_store.clone();
-            spawn_monitored_task!(async move {
+            async move {
                 let store = state.load_epoch_store_one_call_per_task();
                 let events = transaction_kv_store
                     .multi_get_events_by_tx_digests(&[transaction_digest])
@@ -779,9 +806,8 @@ impl ReadApiServer for ReadApi {
                         .map_err(Error::SuiError)?,
                     None => vec![],
                 })
-            })
+            }
             .await
-            .map_err(Error::from)?
         })
     }
 
@@ -821,16 +847,10 @@ impl ReadApiServer for ReadApi {
 
             self.metrics.get_checkpoints_limit.observe(limit as f64);
 
-            let mut data = spawn_monitored_task!(Self::get_checkpoints_internal(
-                state,
-                kv_store,
-                cursor.map(|s| *s),
-                limit as u64 + 1,
-                descending_order,
-            ))
-            .await
-            .map_err(Error::from)?
-            .map_err(Error::from)?;
+            let mut data =
+                Self::get_checkpoints_internal(state, kv_store, cursor.map(|s| *s), limit as u64 + 1, descending_order)
+                    .await
+                    .map_err(Error::from)?;
 
             let has_next_page = data.len() > limit;
             data.truncate(limit);
@@ -911,7 +931,7 @@ impl ReadApiServer for ReadApi {
             }
         }
         let verify_params =
-            VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, true, Some(30));
+            VerifyParams::new(oidc_provider_jwks, vec![], zklogin_env_native, true, true, true, Some(30), true);
         match intent_scope {
             ZkLoginIntentScope::TransactionData => {
                 let tx_data: TransactionData =
@@ -999,13 +1019,57 @@ async fn get_display_fields(
     original_object: &Object,
     original_layout: &Option<MoveStructLayout>,
 ) -> Result<DisplayFieldsResponse, ObjectDisplayError> {
-    let Some((object_type, layout)) = get_object_type_and_struct(original_object, original_layout)? else {
+    let Some(layout) = original_layout else {
         return Ok(DisplayFieldsResponse { data: None, error: None });
     };
-    if let Some(display_object) = get_display_object_by_type(kv_store, fullnode_api, &object_type).await? {
-        return get_rendered_fields(display_object.fields, &layout);
+
+    let Some(move_object) = original_object.data.try_as_move() else {
+        return Err(ObjectDisplayError::MoveObject);
+    };
+
+    let Some(display_object) = get_display_object_by_type(kv_store, fullnode_api, &layout.type_).await? else {
+        return Ok(DisplayFieldsResponse { data: None, error: None });
+    };
+
+    let format = match Format::parse(MAX_DISPLAY_NESTED_LEVEL, &display_object.fields) {
+        Ok(format) => format,
+        Err(e) => {
+            return Ok(DisplayFieldsResponse {
+                data: None,
+                error: Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
+            });
+        }
+    };
+
+    let layout = MoveTypeLayout::Struct(Box::new(layout.clone()));
+    let display = match format.display(*MAX_DISPLAY_OUTPUT_SIZE, move_object.contents(), &layout) {
+        Ok(fields) => fields,
+        Err(e) => {
+            return Ok(DisplayFieldsResponse {
+                data: None,
+                error: Some(SuiObjectResponseError::DisplayError { error: e.to_string() }),
+            });
+        }
+    };
+
+    let mut fields = BTreeMap::new();
+    let mut errors = vec![];
+
+    for (key, value) in display {
+        match value {
+            Ok(v) => {
+                fields.insert(key, v);
+            }
+            Err(e) => {
+                errors.push(e.to_string());
+            }
+        }
     }
-    Ok(DisplayFieldsResponse { data: None, error: None })
+
+    Ok(DisplayFieldsResponse {
+        data: (!fields.is_empty()).then_some(fields),
+        error: (!errors.is_empty()).then(|| SuiObjectResponseError::DisplayError { error: errors.join("; ") }),
+    })
 }
 
 #[instrument(skip(kv_store, fullnode_api))]
@@ -1033,127 +1097,6 @@ async fn get_display_object_by_type(
         Ok(Some(display))
     } else {
         Ok(None)
-    }
-}
-
-pub fn get_object_type_and_struct(
-    o: &Object,
-    layout: &Option<MoveStructLayout>,
-) -> Result<Option<(StructTag, MoveStruct)>, ObjectDisplayError> {
-    if let Some(object_type) = o.type_() {
-        let move_struct = get_move_struct(o, layout)?;
-        Ok(Some((object_type.clone().into(), move_struct)))
-    } else {
-        Ok(None)
-    }
-}
-
-fn get_move_struct(o: &Object, layout: &Option<MoveStructLayout>) -> Result<MoveStruct, ObjectDisplayError> {
-    let layout = layout.as_ref().ok_or_else(|| ObjectDisplayError::Layout)?;
-    Ok(o.data.try_as_move().ok_or_else(|| ObjectDisplayError::MoveObject)?.to_move_struct(layout)?)
-}
-
-pub fn get_rendered_fields(
-    fields: VecMap<String, String>,
-    move_struct: &MoveStruct,
-) -> Result<DisplayFieldsResponse, ObjectDisplayError> {
-    let sui_move_value: SuiMoveValue = MoveValue::Struct(move_struct.clone()).into();
-    if let SuiMoveValue::Struct(move_struct) = sui_move_value {
-        let fields = fields.contents.iter().map(|entry| match parse_template(&entry.value, &move_struct) {
-            Ok(value) => Ok((entry.key.clone(), value)),
-            Err(e) => Err(e),
-        });
-        let (oks, errs): (Vec<_>, Vec<_>) = fields.partition(Result::is_ok);
-        let success = oks.into_iter().filter_map(Result::ok).collect();
-        let errors: Vec<_> = errs.into_iter().filter_map(Result::err).collect();
-        let error_string = errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join("; ");
-        let error = if !error_string.is_empty() {
-            Some(SuiObjectResponseError::DisplayError { error: anyhow!("{error_string}").to_string() })
-        } else {
-            None
-        };
-
-        return Ok(DisplayFieldsResponse { data: Some(success), error });
-    }
-    Err(ObjectDisplayError::NotMoveStruct)?
-}
-
-fn parse_template(template: &str, move_struct: &SuiMoveStruct) -> Result<String, Error> {
-    let mut output = template.to_string();
-    let mut var_name = String::new();
-    let mut in_braces = false;
-    let mut escaped = false;
-
-    for ch in template.chars() {
-        match ch {
-            '\\' => {
-                escaped = true;
-                continue;
-            }
-            '{' if !escaped => {
-                in_braces = true;
-                var_name.clear();
-            }
-            '}' if !escaped => {
-                in_braces = false;
-                let value = get_value_from_move_struct(move_struct, &var_name)?;
-                output = output.replace(&format!("{{{}}}", var_name), &value.to_string());
-            }
-            _ if !escaped => {
-                if in_braces {
-                    var_name.push(ch);
-                }
-            }
-            _ => {}
-        }
-        escaped = false;
-    }
-
-    Ok(output.replace('\\', ""))
-}
-
-fn get_value_from_move_struct(move_struct: &SuiMoveStruct, var_name: &str) -> Result<String, Error> {
-    let parts: Vec<&str> = var_name.split('.').collect();
-    if parts.is_empty() {
-        Err(anyhow!("Display template value cannot be empty"))?;
-    }
-    if parts.len() > MAX_DISPLAY_NESTED_LEVEL {
-        Err(anyhow!("Display template value nested depth cannot exist {}", MAX_DISPLAY_NESTED_LEVEL))?;
-    }
-    let mut current_value = &SuiMoveValue::Struct(move_struct.clone());
-    // iterate over the parts and try to access the corresponding field
-    for part in parts {
-        match current_value {
-            SuiMoveValue::Struct(move_struct) => {
-                if let SuiMoveStruct::WithTypes { type_: _, fields } | SuiMoveStruct::WithFields(fields) = move_struct {
-                    if let Some(value) = fields.get(part) {
-                        current_value = value;
-                    } else {
-                        Err(anyhow!("Field value {} cannot be found in struct", var_name))?;
-                    }
-                } else {
-                    Err(Error::UnexpectedError(format!("Unexpected move struct type for field {}", var_name)))?;
-                }
-            }
-            SuiMoveValue::Variant(SuiMoveVariant { fields, variant, .. }) => {
-                if let Some(value) = fields.get(part) {
-                    current_value = value;
-                } else {
-                    Err(anyhow!("Field value {var_name} cannot be found in variant {variant}",))?
-                }
-            }
-            _ => return Err(Error::UnexpectedError(format!("Unexpected move value type for field {}", var_name)))?,
-        }
-    }
-
-    match current_value {
-        SuiMoveValue::Option(move_option) => match move_option.as_ref() {
-            Some(move_value) => Ok(move_value.to_string()),
-            None => Ok("".to_string()),
-        },
-        SuiMoveValue::Vector(_) => Err(anyhow!("Vector is not supported as a Display value {}", var_name))?,
-
-        _ => Ok(current_value.to_string()),
     }
 }
 

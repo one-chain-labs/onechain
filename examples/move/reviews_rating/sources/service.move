@@ -3,16 +3,15 @@
 
 module reviews_rating::service;
 
-use reviews_rating::{moderator::Moderator, review::{Self, Review}};
+use reviews_rating::moderator::Moderator;
+use reviews_rating::review::{Self, Review};
 use std::string::String;
-use one::{
-    balance::{Self, Balance},
-    clock::Clock,
-    coin::{Self, Coin},
-    dynamic_field as df,
-    object_table::{Self, ObjectTable},
-    oct::OCT
-};
+use one::balance::{Self, Balance};
+use one::clock::Clock;
+use one::coin::{Self, Coin};
+use one::dynamic_field as df;
+use one::object_table::{Self, ObjectTable};
+use one::oct::OCT;
 
 const EInvalidPermission: u64 = 1;
 const ENotEnoughBalance: u64 = 2;
@@ -44,7 +43,7 @@ public struct ProofOfExperience has key {
 }
 
 /// Represents a review record
-public struct ReviewRecord has store, drop {
+public struct ReviewRecord has drop, store {
     owner: address,
     overall_rate: u8,
     time_issued: u64,

@@ -44,7 +44,7 @@ impl Context {
         let edges = self
             .datatype_neighbors
             .iter()
-            .flat_map(|(parent, children)| children.iter().map(move |(child, _)| (parent, child)));
+            .flat_map(|(parent, children)| children.keys().map(move |child| (parent, child)));
         DiGraphMap::from_edges(edges)
     }
 }
@@ -119,7 +119,7 @@ fn type_(context: &mut Context, sp!(loc, ty_): &N::Type) {
     use N::Type_::*;
     match ty_ {
         Var(_) => panic!("ICE tvar in struct field type"),
-        Unit | Anything | UnresolvedError | Param(_) => (),
+        Unit | Anything | Void | UnresolvedError | Param(_) => (),
         Ref(_, t) => type_(context, t),
         Apply(_, sp!(_, tn_), tys) => {
             if let TypeName_::ModuleType(m, s) = tn_ {

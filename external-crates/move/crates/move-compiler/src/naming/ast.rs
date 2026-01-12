@@ -5,17 +5,17 @@
 use crate::{
     diagnostics::warning_filters::{WarningFilters, WarningFiltersTable},
     expansion::ast::{
-        ability_constraints_ast_debug, ability_modifiers_ast_debug, AbilitySet, Attributes,
-        DottedUsage, Fields, Friend, ImplicitUseFunCandidate, ModuleIdent, Mutability, Value,
-        Value_, Visibility,
+        AbilitySet, Attributes, DottedUsage, Fields, Friend, ImplicitUseFunCandidate, ModuleIdent,
+        Mutability, Value, Value_, Visibility, ability_constraints_ast_debug,
+        ability_modifiers_ast_debug,
     },
     parser::ast::{
-        self as P, Ability_, BinOp, ConstantName, DatatypeName, DocComment, Field, FunctionName,
-        TargetKind, UnaryOp, VariantName, ENTRY_MODIFIER, MACRO_MODIFIER, NATIVE_MODIFIER,
+        self as P, Ability_, BinOp, ConstantName, DatatypeName, DocComment, ENTRY_MODIFIER, Field,
+        FunctionName, MACRO_MODIFIER, NATIVE_MODIFIER, TargetKind, UnaryOp, VariantName,
     },
     shared::{
         ast_debug::*, known_attributes::SyntaxAttribute, program_info::NamingProgramInfo,
-        unique_map::UniqueMap, *,
+        stdlib_definitions::StdlibName, unique_map::UniqueMap, *,
     },
 };
 use move_ir_types::location::*;
@@ -135,6 +135,16 @@ pub struct SyntaxMethodEntry {
 pub type SyntaxMethods = BTreeMap<TypeName, SyntaxMethodEntry>;
 
 //**************************************************************************************************
+// Std Library Definitions
+//**************************************************************************************************
+
+#[derive(Debug, Clone)]
+pub struct StdlibDefinitions {
+    pub functions: BTreeMap<StdlibName, (ModuleIdent, FunctionName)>,
+    pub types: BTreeMap<StdlibName, Type>,
+}
+
+//**************************************************************************************************
 // Modules
 //**************************************************************************************************
 
@@ -145,11 +155,14 @@ pub struct ModuleDefinition {
     pub warning_filter: WarningFilters,
     // package name metadata from compiler arguments, not used for any language rules
     pub package_name: Option<Symbol>,
+    /// The named address map used by this module during `expansion`.
+    pub named_address_map: Arc<NamedAddressMap>,
     pub attributes: Attributes,
     pub target_kind: TargetKind,
     pub use_funs: UseFuns,
     pub syntax_methods: SyntaxMethods,
     pub friends: UniqueMap<ModuleIdent, Friend>,
+    pub stdlib_definitions: StdlibDefinitions,
     pub structs: UniqueMap<DatatypeName, StructDefinition>,
     pub enums: UniqueMap<DatatypeName, EnumDefinition>,
     pub constants: UniqueMap<ConstantName, Constant>,
@@ -291,7 +304,7 @@ pub enum BuiltinTypeName_ {
 }
 pub type BuiltinTypeName = Spanned<BuiltinTypeName_>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 pub enum TypeName_ {
     // exp-list/tuple type
@@ -324,6 +337,7 @@ pub enum Type_ {
     Fun(Vec<Type>, Box<Type>),
     Var(TVar),
     Anything,
+    Void,
     UnresolvedError,
 }
 pub type Type = Spanned<Type_>;
@@ -396,6 +410,12 @@ pub struct Lambda {
     pub return_label: BlockLabel,
     pub use_fun_color: Color,
     pub body: Box<Exp>,
+    // Collected during macro expansion. These additional annotations can come from `Annotate` or
+    // more subtly by passing a lambda from one macro to another.
+    // Conceptually we could handle this by eta-expanding the lambda
+    // invocation, so that `$f` becomes `|...|$f(...)`, but due to the limited nature here, just
+    // collecting the annotations is easier
+    pub extra_annotations: Vec<Spanned<(Vec<Type>, Type)>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -484,7 +504,9 @@ pub enum Exp_ {
 pub type Exp = Spanned<Exp_>;
 
 pub type Sequence = (UseFuns, VecDeque<SequenceItem>);
+
 #[derive(Debug, PartialEq, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum SequenceItem_ {
     Seq(Box<Exp>),
     Declare(LValueList, Option<Type>),
@@ -772,10 +794,26 @@ impl TypeName_ {
         }
     }
 
+    /// Indicates this is a module type with address, module, and name matching the inputs as
+    /// `address::module::name`. Returns false if the address is does not have a symbol name.
+    pub fn named_address_is(
+        &self,
+        address: impl AsRef<str>,
+        module: impl AsRef<str>,
+        name: impl AsRef<str>,
+    ) -> bool {
+        match self {
+            TypeName_::Builtin(_) | TypeName_::Multiple(_) => false,
+            TypeName_::ModuleType(mident, n) => {
+                mident.value.named_address_is(address, module) && n == name.as_ref()
+            }
+        }
+    }
+
     pub fn single_type(&self) -> Option<TypeName_> {
         match self {
             TypeName_::Multiple(_) => None,
-            TypeName_::Builtin(_) | TypeName_::ModuleType(_, _) => Some(self.clone()),
+            TypeName_::Builtin(_) | TypeName_::ModuleType(_, _) => Some(*self),
         }
     }
 
@@ -845,6 +883,10 @@ impl Type_ {
         Self::builtin(loc, sp(loc, BuiltinTypeName_::Vector), vec![elem])
     }
 
+    pub fn bytearray(loc: Loc) -> Type {
+        Type_::vector(loc, Type_::u8(loc))
+    }
+
     pub fn multiple(loc: Loc, tys: Vec<Type>) -> Type {
         sp(loc, Self::multiple_(loc, tys))
     }
@@ -903,27 +945,36 @@ impl Type_ {
             .is_some_and(|tn| tn.value.is(address, module, name))
     }
 
+    pub fn is_builtin(&self, builtin: &BuiltinTypeName_) -> bool {
+        match &self {
+            Type_::Apply(_, sp!(_, TypeName_::Builtin(sp!(_, bt))), _) => bt == builtin,
+            _ => false,
+        }
+    }
+
     pub fn abilities(&self, loc: Loc) -> Option<AbilitySet> {
+        use Type_ as T;
         match self {
-            Type_::Apply(abilities, _, _) => abilities.clone(),
-            Type_::Param(tp) => Some(tp.abilities.clone()),
-            Type_::Unit => Some(AbilitySet::collection(loc)),
-            Type_::Ref(_, _) => Some(AbilitySet::references(loc)),
-            Type_::Anything | Type_::UnresolvedError => Some(AbilitySet::all(loc)),
-            Type_::Fun(_, _) => Some(AbilitySet::functions(loc)),
-            Type_::Var(_) => None,
+            T::Apply(abilities, _, _) => abilities.clone(),
+            T::Param(tp) => Some(tp.abilities.clone()),
+            T::Unit => Some(AbilitySet::collection(loc)),
+            T::Ref(_, _) => Some(AbilitySet::references(loc)),
+            T::Anything | T::Void | T::UnresolvedError => Some(AbilitySet::all(loc)),
+            T::Fun(_, _) => Some(AbilitySet::functions(loc)),
+            T::Var(_) => None,
         }
     }
 
     pub fn has_ability_(&self, ability: Ability_) -> Option<bool> {
+        use Type_ as T;
         match self {
-            Type_::Apply(abilities, _, _) => abilities.as_ref().map(|s| s.has_ability_(ability)),
-            Type_::Param(tp) => Some(tp.abilities.has_ability_(ability)),
-            Type_::Unit => Some(AbilitySet::COLLECTION.contains(&ability)),
-            Type_::Ref(_, _) => Some(AbilitySet::REFERENCES.contains(&ability)),
-            Type_::Anything | Type_::UnresolvedError => Some(true),
-            Type_::Fun(_, _) => Some(AbilitySet::FUNCTIONS.contains(&ability)),
-            Type_::Var(_) => None,
+            T::Apply(abilities, _, _) => abilities.as_ref().map(|s| s.has_ability_(ability)),
+            T::Param(tp) => Some(tp.abilities.has_ability_(ability)),
+            T::Unit => Some(AbilitySet::COLLECTION.contains(&ability)),
+            T::Ref(_, _) => Some(AbilitySet::REFERENCES.contains(&ability)),
+            T::Anything | T::Void | T::UnresolvedError => Some(true),
+            T::Fun(_, _) => Some(AbilitySet::FUNCTIONS.contains(&ability)),
+            T::Var(_) => None,
         }
     }
 
@@ -939,6 +990,7 @@ impl Type_ {
             | Type_::Fun(_, _)
             | Type_::Var(_)
             | Type_::Anything
+            | Type_::Void
             | Type_::UnresolvedError => None,
         }
     }
@@ -953,6 +1005,7 @@ impl Type_ {
             | Type_::Fun(_, _)
             | Type_::Var(_)
             | Type_::Anything
+            | Type_::Void
             | Type_::UnresolvedError => self.clone(),
         }
     }
@@ -984,6 +1037,7 @@ impl Value_ {
         Some(match self {
             Address(_) => Type_::address(loc),
             InferredNum(_) => return None,
+            InferredString(_) => return None,
             U8(_) => Type_::u8(loc),
             U16(_) => Type_::u16(loc),
             U32(_) => Type_::u32(loc),
@@ -1195,6 +1249,20 @@ impl AstDebug for SyntaxMethods {
     }
 }
 
+impl AstDebug for StdlibDefinitions {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.writeln("stdlib definitions: ");
+        for (key, (mident, name)) in &self.functions {
+            w.writeln(format!("  {} -> {}::{}", key, mident, name));
+        }
+        for (key, ty) in &self.types {
+            w.write(format!("  {} -> ", key));
+            ty.ast_debug(w);
+            w.new_line();
+        }
+    }
+}
+
 impl AstDebug for ModuleDefinition {
     fn ast_debug(&self, w: &mut AstWriter) {
         let ModuleDefinition {
@@ -1202,11 +1270,13 @@ impl AstDebug for ModuleDefinition {
             loc: _,
             warning_filter,
             package_name,
+            named_address_map: _,
             attributes,
             target_kind,
             use_funs,
             syntax_methods,
             friends,
+            stdlib_definitions,
             structs,
             enums,
             constants,
@@ -1221,6 +1291,7 @@ impl AstDebug for ModuleDefinition {
         target_kind.ast_debug(w);
         use_funs.ast_debug(w);
         syntax_methods.ast_debug(w);
+        stdlib_definitions.ast_debug(w);
         for (mident, _loc) in friends.key_cloned_iter() {
             w.write(format!("friend {};", mident));
             w.new_line();
@@ -1577,6 +1648,7 @@ impl AstDebug for Type_ {
             }
             Type_::Var(tv) => w.write(format!("#{}", tv.0)),
             Type_::Anything => w.write("_"),
+            Type_::Void => w.write("_"),
             Type_::UnresolvedError => w.write("_|_"),
         }
     }
@@ -1840,22 +1912,40 @@ impl AstDebug for Exp_ {
 
 impl AstDebug for Lambda {
     fn ast_debug(&self, w: &mut AstWriter) {
+        struct LambdaAnnot<'a>(&'a (Vec<Type>, Type));
+        impl AstDebug for LambdaAnnot<'_> {
+            fn ast_debug(&self, w: &mut AstWriter) {
+                let (args, result) = &self.0;
+                w.write("|");
+                w.comma(args, |w, ty| ty.ast_debug(w));
+                w.write("|");
+                result.ast_debug(w);
+            }
+        }
+
         let Lambda {
             parameters: sp!(_, bs),
             return_type,
             return_label,
             use_fun_color,
             body: e,
+            extra_annotations,
         } = self;
         return_label.ast_debug(w);
         w.write(": ");
-        bs.ast_debug(w);
-        if let Some(ty) = return_type {
-            w.write(" -> ");
-            ty.ast_debug(w);
+        let mut display: Box<dyn FnOnce(&mut AstWriter)> = Box::new(|w: &mut AstWriter| {
+            bs.ast_debug(w);
+            if let Some(ty) = return_type {
+                w.write(" -> ");
+                ty.ast_debug(w);
+            }
+            w.write(format!("use_funs#{}", use_fun_color));
+            e.ast_debug(w);
+        });
+        for sp!(_, annot) in extra_annotations {
+            display = Box::new(|w: &mut AstWriter| w.annotate(display, &LambdaAnnot(annot)));
         }
-        w.write(format!("use_funs#{}", use_fun_color));
-        e.ast_debug(w);
+        display(w)
     }
 }
 

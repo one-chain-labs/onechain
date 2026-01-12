@@ -11,18 +11,22 @@ use crypto::{
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     annotated_value as A,
-    gas_algebra::InternalGas,
+    gas_algebra::{AbstractMemorySize, InternalGas},
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     runtime_value as R,
     vm_status::StatusCode,
 };
 use move_stdlib_natives::{self as MSN, GasParameters};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction, NativeFunctionTable};
+use move_vm_runtime::{
+    native_extensions::NativeExtensionMarker,
+    native_functions::{NativeContext, NativeFunction, NativeFunctionTable},
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     values::{Struct, Value},
+    views::{SizeConfig, ValueView},
 };
 use sui_protocol_config::ProtocolConfig;
 use sui_types::{MOVE_STDLIB_ADDRESS, SUI_FRAMEWORK_ADDRESS, SUI_SYSTEM_ADDRESS};
@@ -61,33 +65,54 @@ use self::{
     event::EventEmitCostParams,
     object::{BorrowUidCostParams, DeleteImplCostParams, RecordNewIdCostParams},
     transfer::{TransferFreezeObjectCostParams, TransferInternalCostParams, TransferShareObjectCostParams},
-    tx_context::TxContextDeriveIdCostParams,
+    tx_context::{
+        TxContextDeriveIdCostParams,
+        TxContextEpochCostParams,
+        TxContextEpochTimestampMsCostParams,
+        TxContextFreshIdCostParams,
+        TxContextGasBudgetCostParams,
+        TxContextGasPriceCostParams,
+        TxContextIdsCreatedCostParams,
+        TxContextRGPCostParams,
+        TxContextReplaceCostParams,
+        TxContextSenderCostParams,
+        TxContextSponsorCostParams,
+    },
     types::TypesIsOneTimeWitnessCostParams,
     validator::ValidatorValidateMetadataBcsCostParams,
 };
-use crate::crypto::{
-    group_ops,
-    group_ops::GroupOpsCostParams,
-    poseidon::PoseidonBN254CostParams,
-    zklogin,
-    zklogin::{CheckZkloginIdCostParams, CheckZkloginIssuerCostParams},
+use crate::{
+    crypto::{
+        group_ops,
+        group_ops::GroupOpsCostParams,
+        poseidon::PoseidonBN254CostParams,
+        zklogin,
+        zklogin::{CheckZkloginIdCostParams, CheckZkloginIssuerCostParams},
+    },
+    transfer::PartyTransferInternalCostParams,
 };
 
+mod accumulator;
 mod address;
 mod config;
 mod crypto;
 mod dynamic_field;
-mod event;
+pub mod event;
+mod funds_accumulator;
 mod object;
 pub mod object_runtime;
+mod protocol_config;
 mod random;
 pub mod test_scenario;
 mod test_utils;
+pub mod transaction_context;
 mod transfer;
 mod tx_context;
 mod types;
 mod validator;
 
+// TODO: remove in later PRs once we define the proper cost of native functions
+const DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST: u64 = 10;
 #[derive(Tid)]
 pub struct NativesCostTable {
     // Address natives
@@ -116,11 +141,22 @@ pub struct NativesCostTable {
 
     // Transfer
     pub transfer_transfer_internal_cost_params: TransferInternalCostParams,
+    pub transfer_party_transfer_internal_cost_params: PartyTransferInternalCostParams,
     pub transfer_freeze_object_cost_params: TransferFreezeObjectCostParams,
     pub transfer_share_object_cost_params: TransferShareObjectCostParams,
 
     // TxContext
     pub tx_context_derive_id_cost_params: TxContextDeriveIdCostParams,
+    pub tx_context_fresh_id_cost_params: TxContextFreshIdCostParams,
+    pub tx_context_sender_cost_params: TxContextSenderCostParams,
+    pub tx_context_epoch_cost_params: TxContextEpochCostParams,
+    pub tx_context_epoch_timestamp_ms_cost_params: TxContextEpochTimestampMsCostParams,
+    pub tx_context_sponsor_cost_params: TxContextSponsorCostParams,
+    pub tx_context_rgp_cost_params: TxContextRGPCostParams,
+    pub tx_context_gas_price_cost_params: TxContextGasPriceCostParams,
+    pub tx_context_gas_budget_cost_params: TxContextGasBudgetCostParams,
+    pub tx_context_ids_created_cost_params: TxContextIdsCreatedCostParams,
+    pub tx_context_replace_cost_params: TxContextReplaceCostParams,
 
     // Type
     pub type_is_one_time_witness_cost_params: TypesIsOneTimeWitnessCostParams,
@@ -179,6 +215,8 @@ pub struct NativesCostTable {
     // nitro attestation
     pub nitro_attestation_cost_params: NitroAttestationCostParams,
 }
+
+impl NativeExtensionMarker<'_> for NativesCostTable {}
 
 impl NativesCostTable {
     pub fn from_protocol_config(protocol_config: &ProtocolConfig) -> NativesCostTable {
@@ -278,6 +316,7 @@ impl NativesCostTable {
                     .into(),
                 event_emit_output_cost_per_byte: protocol_config.event_emit_output_cost_per_byte().into(),
                 event_emit_cost_base: protocol_config.event_emit_cost_base().into(),
+                event_emit_auth_stream_cost: protocol_config.event_emit_auth_stream_cost_as_option().map(Into::into),
             },
 
             borrow_uid_cost_params: BorrowUidCostParams {
@@ -316,14 +355,89 @@ impl NativesCostTable {
             transfer_transfer_internal_cost_params: TransferInternalCostParams {
                 transfer_transfer_internal_cost_base: protocol_config.transfer_transfer_internal_cost_base().into(),
             },
+            transfer_party_transfer_internal_cost_params: PartyTransferInternalCostParams {
+                transfer_party_transfer_internal_cost_base: protocol_config
+                    .transfer_party_transfer_internal_cost_base_as_option()
+                    .map(Into::into),
+            },
             transfer_freeze_object_cost_params: TransferFreezeObjectCostParams {
                 transfer_freeze_object_cost_base: protocol_config.transfer_freeze_object_cost_base().into(),
             },
             transfer_share_object_cost_params: TransferShareObjectCostParams {
                 transfer_share_object_cost_base: protocol_config.transfer_share_object_cost_base().into(),
             },
+            // tx_context
             tx_context_derive_id_cost_params: TxContextDeriveIdCostParams {
                 tx_context_derive_id_cost_base: protocol_config.tx_context_derive_id_cost_base().into(),
+            },
+            tx_context_fresh_id_cost_params: TxContextFreshIdCostParams {
+                tx_context_fresh_id_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_fresh_id_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_sender_cost_params: TxContextSenderCostParams {
+                tx_context_sender_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_sender_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_epoch_cost_params: TxContextEpochCostParams {
+                tx_context_epoch_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_epoch_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_epoch_timestamp_ms_cost_params: TxContextEpochTimestampMsCostParams {
+                tx_context_epoch_timestamp_ms_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_epoch_timestamp_ms_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_sponsor_cost_params: TxContextSponsorCostParams {
+                tx_context_sponsor_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_sponsor_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_rgp_cost_params: TxContextRGPCostParams {
+                tx_context_rgp_cost_base: protocol_config
+                    .tx_context_rgp_cost_base_as_option()
+                    .unwrap_or(DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST)
+                    .into(),
+            },
+            tx_context_gas_price_cost_params: TxContextGasPriceCostParams {
+                tx_context_gas_price_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_gas_price_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_gas_budget_cost_params: TxContextGasBudgetCostParams {
+                tx_context_gas_budget_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_gas_budget_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_ids_created_cost_params: TxContextIdsCreatedCostParams {
+                tx_context_ids_created_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_ids_created_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
+            },
+            tx_context_replace_cost_params: TxContextReplaceCostParams {
+                tx_context_replace_cost_base: if protocol_config.move_native_context() {
+                    protocol_config.tx_context_replace_cost_base().into()
+                } else {
+                    DEFAULT_UNUSED_TX_CONTEXT_ENTRY_COST.into()
+                },
             },
             type_is_one_time_witness_cost_params: TypesIsOneTimeWitnessCostParams {
                 types_is_one_time_witness_cost_base: protocol_config.types_is_one_time_witness_cost_base().into(),
@@ -634,6 +748,7 @@ pub fn make_stdlib_gas_params_for_protocol_config(protocol_config: &ProtocolConf
                 base: get_gas_cost_or_default!(type_name_get_base_cost_as_option),
                 per_byte: get_gas_cost_or_default!(type_name_get_per_byte_cost_as_option),
             },
+            id: MSN::type_name::IdGasParameters::new(protocol_config.type_name_id_base_cost_as_option()),
         },
         MSN::vector::GasParameters {
             empty: MSN::vector::EmptyGasParameters { base: get_gas_cost_or_default!(vector_empty_base_cost_as_option) },
@@ -662,6 +777,13 @@ pub fn make_stdlib_gas_params_for_protocol_config(protocol_config: &ProtocolConf
 
 pub fn all_natives(silent: bool, protocol_config: &ProtocolConfig) -> NativeFunctionTable {
     let sui_framework_natives: &[(&str, &str, NativeFunction)] = &[
+        ("accumulator", "emit_deposit_event", make_native!(accumulator::emit_deposit_event)),
+        ("accumulator", "emit_withdraw_event", make_native!(accumulator::emit_withdraw_event)),
+        (
+            "accumulator_settlement",
+            "record_settlement_sui_conservation",
+            make_native!(accumulator::record_settlement_sui_conservation),
+        ),
         ("address", "from_bytes", make_native!(address::from_bytes)),
         ("address", "to_u256", make_native!(address::to_u256)),
         ("address", "from_u256", make_native!(address::from_u256)),
@@ -684,8 +806,15 @@ pub fn all_natives(silent: bool, protocol_config: &ProtocolConfig) -> NativeFunc
         ("ecdsa_r1", "secp256r1_verify", make_native!(ecdsa_r1::secp256r1_verify)),
         ("ed25519", "ed25519_verify", make_native!(ed25519::ed25519_verify)),
         ("event", "emit", make_native!(event::emit)),
+        ("event", "emit_authenticated_impl", make_native!(event::emit_authenticated_impl)),
         ("event", "events_by_type", make_native!(event::get_events_by_type)),
         ("event", "num_events", make_native!(event::num_events)),
+        ("funds_accumulator", "add_to_accumulator_address", make_native!(funds_accumulator::add_to_accumulator_address)),
+        (
+            "funds_accumulator",
+            "withdraw_from_accumulator_address",
+            make_native!(funds_accumulator::withdraw_from_accumulator_address),
+        ),
         ("groth16", "verify_groth16_proof_internal", make_native!(groth16::verify_groth16_proof_internal)),
         ("groth16", "prepare_verifying_key_internal", make_native!(groth16::prepare_verifying_key_internal)),
         ("hmac", "hmac_sha3_256", make_native!(hmac::hmac_sha3_256)),
@@ -725,12 +854,23 @@ pub fn all_natives(silent: bool, protocol_config: &ProtocolConfig) -> NativeFunc
             make_native!(test_scenario::deallocate_receiving_ticket_for_object),
         ),
         ("transfer", "transfer_impl", make_native!(transfer::transfer_internal)),
+        ("transfer", "party_transfer_impl", make_native!(transfer::party_transfer_internal)),
         ("transfer", "freeze_object_impl", make_native!(transfer::freeze_object)),
         ("transfer", "share_object_impl", make_native!(transfer::share_object)),
         ("transfer", "receive_impl", make_native!(transfer::receive_object_internal)),
+        ("tx_context", "last_created_id", make_native!(tx_context::last_created_id)),
         ("tx_context", "derive_id", make_native!(tx_context::derive_id)),
+        ("tx_context", "fresh_id", make_native!(tx_context::fresh_id)),
+        ("tx_context", "native_sender", make_native!(tx_context::sender)),
+        ("tx_context", "native_epoch", make_native!(tx_context::epoch)),
+        ("tx_context", "native_epoch_timestamp_ms", make_native!(tx_context::epoch_timestamp_ms)),
+        ("tx_context", "native_sponsor", make_native!(tx_context::sponsor)),
+        ("tx_context", "native_rgp", make_native!(tx_context::rgp)),
+        ("tx_context", "native_gas_price", make_native!(tx_context::gas_price)),
+        ("tx_context", "native_gas_budget", make_native!(tx_context::gas_budget)),
+        ("tx_context", "native_ids_created", make_native!(tx_context::ids_created)),
+        ("tx_context", "replace", make_native!(tx_context::replace)),
         ("types", "is_one_time_witness", make_native!(types::is_one_time_witness)),
-        ("test_utils", "destroy", make_native!(test_utils::destroy)),
         ("test_utils", "create_one_time_witness", make_native!(test_utils::create_one_time_witness)),
         ("random", "generate_rand_seed_for_testing", make_native!(random::generate_rand_seed_for_testing)),
         ("zklogin_verified_id", "check_zklogin_id_internal", make_native!(zklogin::check_zklogin_id_internal)),
@@ -740,6 +880,7 @@ pub fn all_natives(silent: bool, protocol_config: &ProtocolConfig) -> NativeFunc
             make_native!(zklogin::check_zklogin_issuer_internal),
         ),
         ("poseidon", "poseidon_bn254_internal", make_native!(poseidon::poseidon_bn254_internal)),
+        ("protocol_config", "is_feature_enabled", make_native!(protocol_config::is_feature_enabled)),
         ("vdf", "vdf_verify_internal", make_native!(vdf::vdf_verify_internal)),
         ("vdf", "hash_to_input_internal", make_native!(vdf::hash_to_input_internal)),
         ("ecdsa_k1", "secp256k1_sign", make_native!(ecdsa_k1::secp256k1_sign)),
@@ -805,7 +946,7 @@ pub(crate) fn get_tag_and_layouts(
         TypeTag::Struct(s) => s,
         _ => {
             return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Sui verifier guarantees this is a struct".to_string()))
+                .with_message("Sui verifier guarantees this is a struct".to_string()));
         }
     };
     let Some(layout) = context.type_to_type_layout(ty)? else {
@@ -824,6 +965,56 @@ macro_rules! make_native {
     };
 }
 
+#[macro_export]
+macro_rules! get_extension {
+    ($context: expr, $ext: ty) => {
+        $context.extensions().get::<$ext>()
+    };
+    ($context: expr) => {
+        $context.extensions().get()
+    };
+}
+
+#[macro_export]
+macro_rules! get_extension_mut {
+    ($context: expr, $ext: ty) => {
+        $context.extensions_mut().get_mut::<$ext>()
+    };
+    ($context: expr) => {
+        $context.extensions_mut().get_mut()
+    };
+}
+
+#[macro_export]
+macro_rules! charge_cache_or_load_gas {
+    ($context:ident, $cache_info:expr) => {{
+        use $crate::object_runtime::object_store::CacheInfo;
+        match $cache_info {
+            CacheInfo::CachedObject | CacheInfo::CachedValue => (),
+            CacheInfo::Loaded(bytes_opt) => {
+                let config = get_extension!($context, ObjectRuntime)?.protocol_config;
+                if config.object_runtime_charge_cache_load_gas() {
+                    let bytes = bytes_opt.unwrap_or(0).max(1);
+                    native_charge_gas_early_exit!($context, InternalGas::new(bytes as u64));
+                }
+            }
+        }
+    }};
+}
+
 pub(crate) fn legacy_test_cost() -> InternalGas {
     InternalGas::new(0)
+}
+
+pub(crate) fn abstract_size(protocol_config: &ProtocolConfig, v: &Value) -> AbstractMemorySize {
+    if protocol_config.abstract_size_in_object_runtime() {
+        v.abstract_memory_size(&SizeConfig {
+            include_vector_size: true,
+            traverse_references: false,
+            fine_grained_value_size: true,
+        })
+    } else {
+        // TODO: Remove this (with glee!) in the next execution version cut.
+        v.legacy_size()
+    }
 }

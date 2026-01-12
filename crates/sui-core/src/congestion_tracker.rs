@@ -6,7 +6,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use moka::{ops::compute::Op, sync::Cache};
 use sui_types::{
     base_types::ObjectID,
-    effects::{InputSharedObject, TransactionEffects, TransactionEffectsAPI},
+    effects::{InputConsensusObject, TransactionEffects, TransactionEffectsAPI},
     execution_status::CongestedObjects,
     messages_checkpoint::{CheckpointTimestamp, VerifiedCheckpoint},
     transaction::{TransactionData, TransactionDataAPI},
@@ -90,14 +90,14 @@ impl CongestionTracker {
                 cleared_events.push((
                     gas_price,
                     effect
-                        .input_shared_objects()
+                        .input_consensus_objects()
                         .into_iter()
                         .filter_map(|object| match object {
-                            InputSharedObject::Mutate((id, _, _)) => Some(id),
-                            InputSharedObject::Cancelled(_, _)
-                            | InputSharedObject::ReadOnly(_)
-                            | InputSharedObject::ReadDeleted(_, _)
-                            | InputSharedObject::MutateDeleted(_, _) => None,
+                            InputConsensusObject::Mutate((id, _, _)) => Some(id),
+                            InputConsensusObject::Cancelled(_, _)
+                            | InputConsensusObject::ReadOnly(_)
+                            | InputConsensusObject::ReadConsensusStreamEnded(_, _)
+                            | InputConsensusObject::MutateConsensusStreamEnded(_, _) => None,
                         })
                         .collect::<Vec<_>>(),
                 ));
@@ -111,7 +111,7 @@ impl CongestionTracker {
     /// and the lowest maximum cancelled price.
     pub fn get_suggested_gas_prices(&self, transaction: &TransactionData) -> Option<u64> {
         self.get_suggested_gas_price_for_objects(
-            transaction.shared_input_objects().into_iter().filter(|id| id.mutable).map(|id| id.id),
+            transaction.shared_input_objects().into_iter().filter(|id| id.is_accessed_exclusively()).map(|id| id.id),
         )
     }
 }

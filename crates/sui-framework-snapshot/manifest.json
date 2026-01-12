@@ -89,8 +89,8 @@
       }
     ]
   },
-  "78": {
-    "git_revision": "615516edb0ed55e45d599f042f9570b493ce9643",
+    "78": {
+    "git_revision": "de9c7167e2f82ef420e599cc0ab3297c4eb8b4c9",
     "packages": [
       {
         "name": "MoveStdlib",
@@ -118,9 +118,9 @@
         "id": "0x000000000000000000000000000000000000000000000000000000000000000b"
       }
     ]
-  },
+  } ,
   "85": {
-    "git_revision": "a371474cbfd2b71a611d3bb1800c55c5405aa60f",
+    "git_revision": "615516edb0ed55e45d599f042f9570b493ce9643",
     "packages": [
       {
         "name": "MoveStdlib",
@@ -178,7 +178,7 @@
         "id": "0x000000000000000000000000000000000000000000000000000000000000000b"
       }
     ]
-  },
+  } ,
   "104": {
     "git_revision": "613eda102ec09662c8d7f5c56f0e47b7453e2822",
     "packages": [

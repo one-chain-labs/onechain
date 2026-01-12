@@ -9,7 +9,7 @@ use move_vm_runtime::{native_charge_gas_early_exit, native_functions::NativeCont
 use move_vm_types::{loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value};
 use smallvec::smallvec;
 
-use crate::NativesCostTable;
+use crate::{get_extension, NativesCostTable};
 
 const E_ADDRESS_PARSE_ERROR: u64 = 0;
 #[derive(Clone)]
@@ -31,7 +31,7 @@ pub fn from_bytes(
     debug_assert!(args.len() == 1);
 
     let address_from_bytes_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().address_from_bytes_cost_params.clone();
+        get_extension!(context, NativesCostTable)?.address_from_bytes_cost_params.clone();
 
     // Charge base fee
     native_charge_gas_early_exit!(context, address_from_bytes_cost_params.address_from_bytes_cost_base);
@@ -63,8 +63,7 @@ pub fn to_u256(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let address_to_u256_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().address_to_u256_cost_params.clone();
+    let address_to_u256_cost_params = get_extension!(context, NativesCostTable)?.address_to_u256_cost_params.clone();
 
     // Charge flat cost
     native_charge_gas_early_exit!(context, address_to_u256_cost_params.address_to_u256_cost_base);
@@ -96,8 +95,7 @@ pub fn from_u256(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let address_from_u256_cost_params =
-        context.extensions_mut().get::<NativesCostTable>().address_from_u256_cost_params.clone();
+    let address_from_u256_cost_params = get_extension!(context, NativesCostTable)?.address_from_u256_cost_params.clone();
 
     // charge flat fee
     native_charge_gas_early_exit!(context, address_from_u256_cost_params.address_from_u256_cost_base);

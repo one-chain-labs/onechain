@@ -66,7 +66,7 @@ Execution Error: ExecutionError: ExecutionError { inner: ExecutionErrorInner { k
 
 task 10, line 59:
 //# run tto::M1::receiver6 --args object(2,1)
-Error: Error checking transaction input objects: IncorrectUserSignature { error: "Object object(2,1) is owned by account address object(2,0), but given owner/signer address is 0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e" }
+Error: Error checking transaction input objects: Transaction was not signed by the correct sender: Object object(2,1) is owned by account address object(2,0), but given owner/signer address is 0xfccc9a421bbb13c1a66a1aa98f0ad75029ede94857779c6915b44f94068b921e
 
 task 11, line 61:
 //# run tto::M1::receiver6 --args object(2,0)
@@ -81,9 +81,9 @@ gas summary: computation_cost: 1000000, storage_cost: 988000,  storage_rebate: 9
 task 13, line 65:
 //# run tto::M1::receiver6 --args 0
 Error: Transaction Effects Status: Invalid command argument at 0. The argument cannot be instantiated from raw bytes
-Execution Error: ExecutionError: ExecutionError { inner: ExecutionErrorInner { kind: CommandArgumentError { arg_idx: 0, kind: InvalidUsageOfPureArg }, source: Some("Non-primitive argument at index 0. If it is an object, it must be populated by an object"), command: Some(0) } }
+Execution Error: ExecutionError: ExecutionError { inner: ExecutionErrorInner { kind: CommandArgumentError { arg_idx: 0, kind: InvalidUsageOfPureArg }, source: Some("Invalid usage of `Pure` argument for a non-primitive argument type at index 0."), command: Some(0) } }
 
 task 14, line 67:
 //# run tto::M1::receiver6 --args vector[0,0,0,0,0,0,0,0,0,0]
 Error: Transaction Effects Status: Invalid command argument at 0. The argument cannot be instantiated from raw bytes
-Execution Error: ExecutionError: ExecutionError { inner: ExecutionErrorInner { kind: CommandArgumentError { arg_idx: 0, kind: InvalidUsageOfPureArg }, source: Some("Non-primitive argument at index 0. If it is an object, it must be populated by an object"), command: Some(0) } }
+Execution Error: ExecutionError: ExecutionError { inner: ExecutionErrorInner { kind: CommandArgumentError { arg_idx: 0, kind: InvalidUsageOfPureArg }, source: Some("Invalid usage of `Pure` argument for a non-primitive argument type at index 0."), command: Some(0) } }

@@ -70,6 +70,7 @@ fn async_verifier_bench(c: &mut Criterion) {
                         true,
                         true,
                         Some(30),
+                        true,
                     ));
 
                     b.iter(|| {

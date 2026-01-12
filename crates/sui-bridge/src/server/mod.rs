@@ -24,7 +24,7 @@ use crate::{
     crypto::BridgeAuthorityPublicKeyBytes,
     error::BridgeError,
     metrics::BridgeMetrics,
-    server::handler::{BridgeRequestHandler, BridgeRequestHandlerTrait},
+    server::handler::BridgeRequestHandlerTrait,
     types::{
         AddTokensOnEvmAction,
         AddTokensOnSuiAction,
@@ -49,24 +49,28 @@ pub(crate) mod mock_handler;
 
 pub const APPLICATION_JSON: &str = "application/json";
 
+// Maximum number of items allowed in comma-separated lists in governance endpoints
+// This prevents DoS attacks where oversized lists cause panics during u8 conversion
+pub const MAX_LIST_SIZE: usize = 255;
+
 pub const PING_PATH: &str = "/ping";
 pub const METRICS_KEY_PATH: &str = "/metrics_pub_key";
 
 // Important: for BridgeActions, the paths need to match the ones in bridge_client.rs
-pub const ETH_TO_SUI_TX_PATH: &str = "/sign/bridge_tx/eth/sui/:tx_hash/:event_index";
-pub const SUI_TO_ETH_TX_PATH: &str = "/sign/bridge_tx/sui/eth/:tx_digest/:event_index";
-pub const COMMITTEE_BLOCKLIST_UPDATE_PATH: &str = "/sign/update_committee_blocklist/:chain_id/:nonce/:type/:keys";
-pub const EMERGENCY_BUTTON_PATH: &str = "/sign/emergency_button/:chain_id/:nonce/:type";
-pub const LIMIT_UPDATE_PATH: &str = "/sign/update_limit/:chain_id/:nonce/:sending_chain_id/:new_usd_limit";
-pub const ASSET_PRICE_UPDATE_PATH: &str = "/sign/update_asset_price/:chain_id/:nonce/:token_id/:new_usd_price";
+pub const ETH_TO_SUI_TX_PATH: &str = "/sign/bridge_tx/eth/sui/{tx_hash}/{event_index}";
+pub const SUI_TO_ETH_TX_PATH: &str = "/sign/bridge_tx/sui/eth/{tx_digest}/{event_index}";
+pub const SUI_TO_ETH_TRANSFER_PATH: &str = "/sign/bridge_action/sui/eth/{source_chain}/{message_type}/{bridge_seq_num}";
+pub const COMMITTEE_BLOCKLIST_UPDATE_PATH: &str = "/sign/update_committee_blocklist/{chain_id}/{nonce}/{type}/{keys}";
+pub const EMERGENCY_BUTTON_PATH: &str = "/sign/emergency_button/{chain_id}/{nonce}/{type}";
+pub const LIMIT_UPDATE_PATH: &str = "/sign/update_limit/{chain_id}/{nonce}/{sending_chain_id}/{new_usd_limit}";
+pub const ASSET_PRICE_UPDATE_PATH: &str = "/sign/update_asset_price/{chain_id}/{nonce}/{token_id}/{new_usd_price}";
 pub const EVM_CONTRACT_UPGRADE_PATH_WITH_CALLDATA: &str =
-    "/sign/upgrade_evm_contract/:chain_id/:nonce/:proxy_address/:new_impl_address/:calldata";
+    "/sign/upgrade_evm_contract/{chain_id}/{nonce}/{proxy_address}/{new_impl_address}/{calldata}";
 pub const EVM_CONTRACT_UPGRADE_PATH: &str =
-    "/sign/upgrade_evm_contract/:chain_id/:nonce/:proxy_address/:new_impl_address";
+    "/sign/upgrade_evm_contract/{chain_id}/{nonce}/{proxy_address}/{new_impl_address}";
 pub const ADD_TOKENS_ON_SUI_PATH: &str =
-    "/sign/add_tokens_on_sui/:chain_id/:nonce/:native/:token_ids/:token_type_names/:token_prices";
-pub const ADD_TOKENS_ON_EVM_PATH: &str =
-    "/sign/add_tokens_on_evm/:chain_id/:nonce/:native/:token_ids/:token_addresses/:token_sui_decimals/:token_prices";
+    "/sign/add_tokens_on_sui/{chain_id}/{nonce}/{native}/{token_ids}/{token_type_names}/{token_prices}";
+pub const ADD_TOKENS_ON_EVM_PATH: &str = "/sign/add_tokens_on_evm/{chain_id}/{nonce}/{native}/{token_ids}/{token_addresses}/{token_sui_decimals}/{token_prices}";
 
 // BridgeNode's public metadata that is accessible via the `/ping` endpoint.
 // Be careful with what to put here, as it is public.
@@ -88,7 +92,7 @@ impl BridgeNodePublicMetadata {
 
 pub fn run_server(
     socket_address: &SocketAddr,
-    handler: BridgeRequestHandler,
+    handler: impl BridgeRequestHandlerTrait + Sync + Send + 'static,
     metrics: Arc<BridgeMetrics>,
     metadata: Arc<BridgeNodePublicMetadata>,
 ) -> tokio::task::JoinHandle<()> {
@@ -110,6 +114,7 @@ pub(crate) fn make_router(
         .route(METRICS_KEY_PATH, get(metrics_key_fetch))
         .route(ETH_TO_SUI_TX_PATH, get(handle_eth_tx_hash))
         .route(SUI_TO_ETH_TX_PATH, get(handle_sui_tx_digest))
+        .route(SUI_TO_ETH_TRANSFER_PATH, get(handle_sui_token_transfer))
         .route(COMMITTEE_BLOCKLIST_UPDATE_PATH, get(handle_update_committee_blocklist_action))
         .route(EMERGENCY_BUTTON_PATH, get(handle_emergency_action))
         .route(LIMIT_UPDATE_PATH, get(handle_limit_update_action))
@@ -139,6 +144,19 @@ where
 
 async fn health_check() -> StatusCode {
     StatusCode::OK
+}
+
+/// Validates that a comma-separated list doesn't exceed the maximum allowed size
+/// to prevent DoS attacks during u8 conversion in encoding
+fn validate_list_size(list_str: &str, field_name: &str) -> Result<(), BridgeError> {
+    let count = list_str.split(',').count();
+    if count > MAX_LIST_SIZE {
+        return Err(BridgeError::InvalidBridgeClientRequest(format!(
+            "{} list size {} exceeds maximum allowed size of {}",
+            field_name, count, MAX_LIST_SIZE
+        )));
+    }
+    Ok(())
 }
 
 async fn ping(
@@ -193,6 +211,23 @@ async fn handle_sui_tx_digest(
     with_metrics!(metrics.clone(), "handle_sui_tx_digest", future).await
 }
 
+#[instrument(level = "error", skip_all, fields(source_chain=source_chain, message_type=message_type, bridge_seq_num=bridge_seq_num))]
+async fn handle_sui_token_transfer(
+    Path((source_chain, message_type, bridge_seq_num)): Path<(u8, u8, u64)>,
+    State((handler, metrics, _metadata)): State<(
+        Arc<impl BridgeRequestHandlerTrait + Sync + Send>,
+        Arc<BridgeMetrics>,
+        Arc<BridgeNodePublicMetadata>,
+    )>,
+) -> Result<Json<SignedBridgeAction>, BridgeError> {
+    let future = async {
+        let sig: Json<SignedBridgeAction> =
+            handler.handle_sui_token_transfer(source_chain, message_type, bridge_seq_num).await?;
+        Ok(sig)
+    };
+    with_metrics!(metrics.clone(), "handle_sui_token_transfer", future).await
+}
+
 #[instrument(level = "error", skip_all, fields(chain_id=chain_id, nonce=nonce, blocklist_type=blocklist_type, keys=keys))]
 async fn handle_update_committee_blocklist_action(
     Path((chain_id, nonce, blocklist_type, keys)): Path<(u8, u64, u8, String)>,
@@ -208,6 +243,8 @@ async fn handle_update_committee_blocklist_action(
         let blocklist_type = BlocklistType::try_from(blocklist_type).map_err(|err| {
             BridgeError::InvalidBridgeClientRequest(format!("Invalid blocklist action type: {:?}", err))
         })?;
+        // Validate list size to prevent DoS
+        validate_list_size(&keys, "keys")?;
         let members_to_update = keys
             .split(',')
             .map(|s| {
@@ -375,8 +412,15 @@ async fn handle_add_tokens_on_sui(
         let native = match native {
             1 => true,
             0 => false,
-            _ => return Err(BridgeError::InvalidBridgeClientRequest(format!("Invalid native flag: {}", native))),
+            _ => {
+                return Err(BridgeError::InvalidBridgeClientRequest(format!("Invalid native flag: {}", native)));
+            }
         };
+        // Validate list sizes to prevent DoS
+        validate_list_size(&token_ids, "token_ids")?;
+        validate_list_size(&token_type_names, "token_type_names")?;
+        validate_list_size(&token_prices, "token_prices")?;
+
         let token_ids = token_ids
             .split(',')
             .map(|s| {
@@ -442,8 +486,16 @@ async fn handle_add_tokens_on_evm(
         let native = match native {
             1 => true,
             0 => false,
-            _ => return Err(BridgeError::InvalidBridgeClientRequest(format!("Invalid native flag: {}", native))),
+            _ => {
+                return Err(BridgeError::InvalidBridgeClientRequest(format!("Invalid native flag: {}", native)));
+            }
         };
+        // Validate list sizes to prevent DoS
+        validate_list_size(&token_ids, "token_ids")?;
+        validate_list_size(&token_addresses, "token_addresses")?;
+        validate_list_size(&token_sui_decimals, "token_sui_decimals")?;
+        validate_list_size(&token_prices, "token_prices")?;
+
         let token_ids = token_ids
             .split(',')
             .map(|s| {

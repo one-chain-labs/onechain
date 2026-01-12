@@ -86,7 +86,7 @@ pub fn generate_bridge_client_key_and_write_to_file(path: &PathBuf, use_ecdsa: b
 pub async fn get_eth_contract_addresses<P: ethers::providers::JsonRpcClient + 'static>(
     bridge_proxy_address: EthAddress,
     provider: &Arc<Provider<P>>,
-) -> anyhow::Result<(EthAddress, EthAddress, EthAddress, EthAddress, EthAddress, EthAddress, EthAddress)> {
+) -> anyhow::Result<(EthAddress, EthAddress, EthAddress, EthAddress, EthAddress, EthAddress, EthAddress, EthAddress)> {
     let sui_bridge = EthSuiBridge::new(bridge_proxy_address, provider.clone());
     let committee_address: EthAddress = sui_bridge.committee().call().await?;
     let committee = EthBridgeCommittee::new(committee_address, provider.clone());
@@ -98,8 +98,18 @@ pub async fn get_eth_contract_addresses<P: ethers::providers::JsonRpcClient + 's
     let weth_address: EthAddress = vault.w_eth().call().await?;
     let usdt_address: EthAddress = bridge_config.token_address_of(4).call().await?;
     let wbtc_address: EthAddress = bridge_config.token_address_of(1).call().await?;
+    let lbtc_address: EthAddress = bridge_config.token_address_of(6).call().await?;
 
-    Ok((committee_address, limiter_address, vault_address, config_address, weth_address, usdt_address, wbtc_address))
+    Ok((
+        committee_address,
+        limiter_address,
+        vault_address,
+        config_address,
+        weth_address,
+        usdt_address,
+        wbtc_address,
+        lbtc_address,
+    ))
 }
 
 /// Given the address of SuiBridge Proxy, return the contracts of the committee, limiter, vault, and config.
@@ -219,7 +229,7 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
     for (token_package_dir, sender) in token_packages_dir.iter().zip(senders.clone()) {
         let gas = wallet_context.get_one_gas_object_owned_by_address(sender).await.unwrap().unwrap();
         let tx = TestTransactionBuilder::new(sender, gas, rgp).publish(token_package_dir.to_path_buf()).build();
-        let tx = wallet_context.sign_transaction(&tx);
+        let tx = wallet_context.sign_transaction(&tx).await;
         let api_clone = quorum_driver_api.clone();
         publish_tokens_tasks.push(tokio::spawn(async move {
             api_clone
@@ -281,7 +291,7 @@ pub async fn publish_and_register_coins_return_add_coins_on_sui_action(
         let pt = builder.finish();
         let gas = wallet_context.get_one_gas_object_owned_by_address(sender).await.unwrap().unwrap();
         let tx = TransactionData::new_programmable(sender, vec![gas], pt, 1_000_000_000, rgp);
-        let signed_tx = wallet_context.sign_transaction(&tx);
+        let signed_tx = wallet_context.sign_transaction(&tx).await;
         let api_clone = quorum_driver_api.clone();
         register_tasks.push(async move {
             api_clone

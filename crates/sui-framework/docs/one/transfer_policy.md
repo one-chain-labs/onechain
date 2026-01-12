@@ -51,24 +51,32 @@ of the type at once.
 -  [Function `from`](#one_transfer_policy_from)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
 <b>use</b> <a href="../one/package.md#one_package">one::package</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
 <b>use</b> <a href="../one/url.md#one_url">one::url</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
 <b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
@@ -297,6 +305,16 @@ Key to store "Rule" configuration for a specific <code><a href="../one/transfer_
 ## Constants
 
 
+<a name="one_transfer_policy_EPolicyNotSatisfied"></a>
+
+The number of receipts does not match the <code><a href="../one/transfer_policy.md#one_transfer_policy_TransferPolicy">TransferPolicy</a></code> requirement.
+
+
+<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_EPolicyNotSatisfied">EPolicyNotSatisfied</a>: u64 = 0;
+</code></pre>
+
+
+
 <a name="one_transfer_policy_EIllegalRule"></a>
 
 A completed rule is not set in the <code><a href="../one/transfer_policy.md#one_transfer_policy_TransferPolicy">TransferPolicy</a></code>.
@@ -307,32 +325,12 @@ A completed rule is not set in the <code><a href="../one/transfer_policy.md#one_
 
 
 
-<a name="one_transfer_policy_ENotEnough"></a>
+<a name="one_transfer_policy_EUnknownRequirement"></a>
 
-Trying to <code><a href="../one/transfer_policy.md#one_transfer_policy_withdraw">withdraw</a></code> more than there is.
-
-
-<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_ENotEnough">ENotEnough</a>: u64 = 5;
-</code></pre>
+A Rule is not set.
 
 
-
-<a name="one_transfer_policy_ENotOwner"></a>
-
-Trying to <code><a href="../one/transfer_policy.md#one_transfer_policy_withdraw">withdraw</a></code> or <code>close_and_withdraw</code> with a wrong Cap.
-
-
-<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_ENotOwner">ENotOwner</a>: u64 = 4;
-</code></pre>
-
-
-
-<a name="one_transfer_policy_EPolicyNotSatisfied"></a>
-
-The number of receipts does not match the <code><a href="../one/transfer_policy.md#one_transfer_policy_TransferPolicy">TransferPolicy</a></code> requirement.
-
-
-<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_EPolicyNotSatisfied">EPolicyNotSatisfied</a>: u64 = 0;
+<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_EUnknownRequirement">EUnknownRequirement</a>: u64 = 2;
 </code></pre>
 
 
@@ -347,12 +345,22 @@ Attempting to create a Rule that is already set.
 
 
 
-<a name="one_transfer_policy_EUnknownRequirement"></a>
+<a name="one_transfer_policy_ENotOwner"></a>
 
-A Rule is not set.
+Trying to <code><a href="../one/transfer_policy.md#one_transfer_policy_withdraw">withdraw</a></code> or <code>close_and_withdraw</code> with a wrong Cap.
 
 
-<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_EUnknownRequirement">EUnknownRequirement</a>: u64 = 2;
+<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_ENotOwner">ENotOwner</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="one_transfer_policy_ENotEnough"></a>
+
+Trying to <code><a href="../one/transfer_policy.md#one_transfer_policy_withdraw">withdraw</a></code> more than there is.
+
+
+<pre><code><b>const</b> <a href="../one/transfer_policy.md#one_transfer_policy_ENotEnough">ENotEnough</a>: u64 = 5;
 </code></pre>
 
 
@@ -552,7 +560,7 @@ Kiosk trades will not be possible.
     <b>let</b> <a href="../one/transfer_policy.md#one_transfer_policy_TransferRequest">TransferRequest</a> { <a href="../one/transfer_policy.md#one_transfer_policy_item">item</a>, <a href="../one/transfer_policy.md#one_transfer_policy_paid">paid</a>, <a href="../one/transfer_policy.md#one_transfer_policy_from">from</a>, receipts } = request;
     <b>let</b> <b>mut</b> completed = receipts.into_keys();
     <b>let</b> <b>mut</b> total = completed.length();
-    <b>assert</b>!(total == self.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.size(), <a href="../one/transfer_policy.md#one_transfer_policy_EPolicyNotSatisfied">EPolicyNotSatisfied</a>);
+    <b>assert</b>!(total == self.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.length(), <a href="../one/transfer_policy.md#one_transfer_policy_EPolicyNotSatisfied">EPolicyNotSatisfied</a>);
     <b>while</b> (total &gt; 0) {
         <b>let</b> rule_type = completed.pop_back();
         <b>assert</b>!(self.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.contains(&rule_type), <a href="../one/transfer_policy.md#one_transfer_policy_EIllegalRule">EIllegalRule</a>);
@@ -599,7 +607,7 @@ even if graceful unpacking has not been implemented in a "rule module".
     <b>assert</b>!(<a href="../one/object.md#one_object_id">object::id</a>(policy) == cap.policy_id, <a href="../one/transfer_policy.md#one_transfer_policy_ENotOwner">ENotOwner</a>);
     <b>assert</b>!(!<a href="../one/transfer_policy.md#one_transfer_policy_has_rule">has_rule</a>&lt;T, Rule&gt;(policy), <a href="../one/transfer_policy.md#one_transfer_policy_ERuleAlreadySet">ERuleAlreadySet</a>);
     df::add(&<b>mut</b> policy.id, <a href="../one/transfer_policy.md#one_transfer_policy_RuleKey">RuleKey</a>&lt;Rule&gt; {}, cfg);
-    policy.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.insert(type_name::get&lt;Rule&gt;())
+    policy.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.insert(type_name::with_defining_ids&lt;Rule&gt;())
 }
 </code></pre>
 
@@ -679,7 +687,7 @@ confirming that the policy requirements are satisfied.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/transfer_policy.md#one_transfer_policy_add_receipt">add_receipt</a>&lt;T, Rule: drop&gt;(_: Rule, request: &<b>mut</b> <a href="../one/transfer_policy.md#one_transfer_policy_TransferRequest">TransferRequest</a>&lt;T&gt;) {
-    request.receipts.insert(type_name::get&lt;Rule&gt;())
+    request.receipts.insert(type_name::with_defining_ids&lt;Rule&gt;())
 }
 </code></pre>
 
@@ -734,7 +742,7 @@ Remove the Rule from the <code><a href="../one/transfer_policy.md#one_transfer_p
 ) {
     <b>assert</b>!(<a href="../one/object.md#one_object_id">object::id</a>(policy) == cap.policy_id, <a href="../one/transfer_policy.md#one_transfer_policy_ENotOwner">ENotOwner</a>);
     <b>let</b> _: Config = df::remove(&<b>mut</b> policy.id, <a href="../one/transfer_policy.md#one_transfer_policy_RuleKey">RuleKey</a>&lt;Rule&gt; {});
-    policy.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.remove(&type_name::get&lt;Rule&gt;());
+    policy.<a href="../one/transfer_policy.md#one_transfer_policy_rules">rules</a>.remove(&type_name::with_defining_ids&lt;Rule&gt;());
 }
 </code></pre>
 

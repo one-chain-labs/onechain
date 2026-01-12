@@ -8,7 +8,7 @@ use clap::*;
 use prometheus::Registry;
 use rand::{seq::SliceRandom, Rng};
 use sui_benchmark::{
-    benchmark_setup::Env,
+    benchmark_setup::BenchmarkSetup,
     drivers::{bench_driver::BenchDriver, driver::Driver, BenchmarkCmp, BenchmarkStats},
     options::Opts,
     system_state_observer::SystemStateObserver,
@@ -77,8 +77,7 @@ async fn main() -> Result<()> {
 
     let barrier = Arc::new(Barrier::new(2));
     let cloned_barrier = barrier.clone();
-    let env = if opts.local { Env::Local } else { Env::Remote };
-    let bench_setup = env.setup(cloned_barrier, &registry, &opts).await?;
+    let bench_setup = BenchmarkSetup::new(cloned_barrier, &registry, &opts).await?;
     let system_state_observer = {
         // Only need to get system state from one proxy as it is shared for the
         // whole network.

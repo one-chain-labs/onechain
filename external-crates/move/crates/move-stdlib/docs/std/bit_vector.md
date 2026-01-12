@@ -42,7 +42,7 @@
 <dd>
 </dd>
 <dt>
-<code>bit_field: <a href="../std/vector.md#std_vector">vector</a>&lt;bool&gt;</code>
+<code>bit_field: <a href="../std/vector.md#std_vector">vector</a>&lt;<a href="../std/bool.md#std_bool">bool</a>&gt;</code>
 </dt>
 <dd>
 </dd>
@@ -76,21 +76,21 @@ An invalid length of bitvector was given
 
 
 
+<a name="std_bit_vector_WORD_SIZE"></a>
+
+
+
+<pre><code><b>const</b> <a href="../std/bit_vector.md#std_bit_vector_WORD_SIZE">WORD_SIZE</a>: <a href="../std/u64.md#std_u64">u64</a> = 1;
+</code></pre>
+
+
+
 <a name="std_bit_vector_MAX_SIZE"></a>
 
 The maximum allowed bitvector size
 
 
 <pre><code><b>const</b> <a href="../std/bit_vector.md#std_bit_vector_MAX_SIZE">MAX_SIZE</a>: <a href="../std/u64.md#std_u64">u64</a> = 1024;
-</code></pre>
-
-
-
-<a name="std_bit_vector_WORD_SIZE"></a>
-
-
-
-<pre><code><b>const</b> <a href="../std/bit_vector.md#std_bit_vector_WORD_SIZE">WORD_SIZE</a>: <a href="../std/u64.md#std_u64">u64</a> = 1;
 </code></pre>
 
 
@@ -203,13 +203,13 @@ bitvector's length the bitvector will be zeroed out.
 
 <pre><code><b>public</b> <b>fun</b> <a href="../std/bit_vector.md#std_bit_vector_shift_left">shift_left</a>(bitvector: &<b>mut</b> <a href="../std/bit_vector.md#std_bit_vector_BitVector">BitVector</a>, amount: <a href="../std/u64.md#std_u64">u64</a>) {
     <b>if</b> (amount &gt;= bitvector.<a href="../std/bit_vector.md#std_bit_vector_length">length</a>) {
-       <b>let</b> len = bitvector.bit_field.<a href="../std/bit_vector.md#std_bit_vector_length">length</a>();
-       <b>let</b> <b>mut</b> i = 0;
-       <b>while</b> (i &lt; len) {
-           <b>let</b> elem = &<b>mut</b> bitvector.bit_field[i];
-           *elem = <b>false</b>;
-           i = i + 1;
-       };
+        <b>let</b> len = bitvector.bit_field.<a href="../std/bit_vector.md#std_bit_vector_length">length</a>();
+        <b>let</b> <b>mut</b> i = 0;
+        <b>while</b> (i &lt; len) {
+            <b>let</b> elem = &<b>mut</b> bitvector.bit_field[i];
+            *elem = <b>false</b>;
+            i = i + 1;
+        };
     } <b>else</b> {
         <b>let</b> <b>mut</b> i = amount;
         <b>while</b> (i &lt; bitvector.<a href="../std/bit_vector.md#std_bit_vector_length">length</a>) {
@@ -238,7 +238,7 @@ Return the value of the bit at <code>bit_index</code> in the <code>bitvector</co
 represents "1" and <code><b>false</b></code> represents a 0
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../std/bit_vector.md#std_bit_vector_is_index_set">is_index_set</a>(bitvector: &<a href="../std/bit_vector.md#std_bit_vector_BitVector">std::bit_vector::BitVector</a>, bit_index: <a href="../std/u64.md#std_u64">u64</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="../std/bit_vector.md#std_bit_vector_is_index_set">is_index_set</a>(bitvector: &<a href="../std/bit_vector.md#std_bit_vector_BitVector">std::bit_vector::BitVector</a>, bit_index: <a href="../std/u64.md#std_u64">u64</a>): <a href="../std/bool.md#std_bool">bool</a>
 </code></pre>
 
 
@@ -247,7 +247,7 @@ represents "1" and <code><b>false</b></code> represents a 0
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../std/bit_vector.md#std_bit_vector_is_index_set">is_index_set</a>(bitvector: &<a href="../std/bit_vector.md#std_bit_vector_BitVector">BitVector</a>, bit_index: <a href="../std/u64.md#std_u64">u64</a>): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="../std/bit_vector.md#std_bit_vector_is_index_set">is_index_set</a>(bitvector: &<a href="../std/bit_vector.md#std_bit_vector_BitVector">BitVector</a>, bit_index: <a href="../std/u64.md#std_u64">u64</a>): <a href="../std/bool.md#std_bool">bool</a> {
     <b>assert</b>!(bit_index &lt; bitvector.bit_field.<a href="../std/bit_vector.md#std_bit_vector_length">length</a>(), <a href="../std/bit_vector.md#std_bit_vector_EINDEX">EINDEX</a>);
     bitvector.bit_field[bit_index]
 }

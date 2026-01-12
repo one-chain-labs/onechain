@@ -26,6 +26,7 @@ use crate::{
         NetworkPublicKey,
     },
     error::SuiError,
+    gas::GasCostSummary,
     id::ID,
     multiaddr::Multiaddr,
     storage::ObjectStore,
@@ -41,7 +42,7 @@ const E_METADATA_INVALID_P2P_ADDR: u64 = 5;
 const E_METADATA_INVALID_PRIMARY_ADDR: u64 = 6;
 const E_METADATA_INVALID_WORKER_ADDR: u64 = 7;
 
-/// Rust version of the Move sui::sui_system::SystemParameters type
+/// Rust version of the Move one::one_system::SystemParameters type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SystemParametersV1 {
     /// The duration of an epoch, in milliseconds.
@@ -266,7 +267,7 @@ impl ValidatorMetadataV1 {
     }
 }
 
-/// Rust version of the Move sui::validator::Validator type
+/// Rust version of the Move one::validator::Validator type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ValidatorV1 {
     pub metadata: ValidatorMetadataV1,
@@ -391,7 +392,7 @@ impl ValidatorV1 {
     }
 }
 
-/// Rust version of the Move sui_system::staking_pool::StakingPool type
+/// Rust version of the Move one_system::staking_pool::StakingPool type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct StakingPoolV1 {
     pub id: ObjectID,
@@ -419,7 +420,7 @@ impl SuiSupperCommittee {
     }
 }
 
-/// Rust version of the Move sui_system::validator_set::ValidatorSet type
+/// Rust version of the Move one_system::validator_set::ValidatorSet type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ValidatorSetV1 {
     pub total_stake: u64,
@@ -435,14 +436,14 @@ pub struct ValidatorSetV1 {
     pub extra_fields: Bag,
 }
 
-/// Rust version of the Move sui_system::storage_fund::StorageFund type
+/// Rust version of the Move one_system::storage_fund::StorageFund type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct StorageFundV1 {
     pub total_object_storage_rebates: Balance,
     pub non_refundable_balance: Balance,
 }
 
-/// Rust version of the Move sui_system::sui_system::SuiSystemStateInner type
+/// Rust version of the Move one_system::one_system::SuiSystemStateInner type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct SuiSystemStateInnerV1 {
     pub epoch: u64,
@@ -514,6 +515,15 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
 
     fn safe_mode(&self) -> bool {
         self.safe_mode
+    }
+
+    fn safe_mode_gas_cost_summary(&self) -> GasCostSummary {
+        GasCostSummary {
+            computation_cost: self.safe_mode_computation_rewards.value(),
+            storage_cost: self.safe_mode_storage_rewards.value(),
+            storage_rebate: self.safe_mode_storage_rebates,
+            non_refundable_storage_fee: self.safe_mode_non_refundable_storage_fee,
+        }
     }
 
     fn advance_epoch_safe_mode(&mut self, params: &AdvanceEpochParams) {
@@ -690,7 +700,7 @@ impl SuiSystemStateTrait for SuiSystemStateInnerV1 {
     }
 }
 
-/// Rust version of the Move sui_system::validator_cap::UnverifiedValidatorOperationCap type
+/// Rust version of the Move one_system::validator_cap::UnverifiedValidatorOperationCap type
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct UnverifiedValidatorOperationCapV1 {
     pub id: ObjectID,

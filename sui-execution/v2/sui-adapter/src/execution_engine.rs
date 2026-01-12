@@ -21,15 +21,14 @@ mod checked {
             AUTHENTICATOR_STATE_UPDATE_FUNCTION_NAME,
         },
         balance::{BALANCE_CREATE_REWARDS_FUNCTION_NAME, BALANCE_DESTROY_REBATES_FUNCTION_NAME, BALANCE_MODULE_NAME},
-        base_types::{ObjectID, ObjectRef, SequenceNumber, SuiAddress, TransactionDigest, TxContext},
+        base_types::{ObjectRef, SuiAddress, TransactionDigest, TxContext},
         clock::{CLOCK_MODULE_NAME, CONSENSUS_COMMIT_PROLOGUE_FUNCTION_NAME},
         committee::EpochId,
         deny_list_v1::{DENY_LIST_CREATE_FUNC, DENY_LIST_MODULE},
         effects::TransactionEffects,
         error::{ExecutionError, ExecutionErrorKind},
-        execution::is_certificate_denied,
-        execution_config_utils::to_binary_config,
-        execution_status::{CongestedObjects, ExecutionStatus},
+        execution_params::ExecutionOrEarlyError,
+        execution_status::ExecutionStatus,
         gas::{GasCostSummary, SuiGasStatus},
         gas_coin::GAS,
         inner_temporary_store::InnerTemporaryStore,
@@ -95,19 +94,17 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        certificate_deny_set: &HashSet<TransactionDigest>,
+        execution_params: ExecutionOrEarlyError,
     ) -> (InnerTemporaryStore, SuiGasStatus, TransactionEffects, Result<Mode::ExecutionResults, ExecutionError>) {
         let input_objects = input_objects.into_inner();
         let mutable_inputs = if enable_expensive_checks {
-            input_objects.mutable_inputs().keys().copied().collect()
+            input_objects.all_mutable_inputs().keys().copied().collect()
         } else {
             HashSet::new()
         };
         let shared_object_refs = input_objects.filter_shared_objects();
         let receiving_objects = transaction_kind.receiving_objects();
         let mut transaction_dependencies = input_objects.transaction_dependencies();
-        let contains_deleted_input = input_objects.contains_deleted_objects();
-        let cancelled_objects = input_objects.get_cancelled_objects();
 
         let mut temporary_store =
             TemporaryStore::new(store, input_objects, receiving_objects, transaction_digest, protocol_config);
@@ -121,12 +118,14 @@ mod checked {
             epoch_timestamp_ms,
             // Those values are unused in execution versions before 3 (or latest)
             1,
+            1,
+            1_000_000,
             None,
+            protocol_config,
         );
 
         let is_epoch_change = transaction_kind.is_end_of_epoch_tx();
 
-        let deny_cert = is_certificate_denied(&transaction_digest, certificate_deny_set);
         let (gas_cost_summary, execution_result) = execute_transaction::<Mode>(
             &mut temporary_store,
             transaction_kind,
@@ -136,9 +135,7 @@ mod checked {
             protocol_config,
             metrics,
             enable_expensive_checks,
-            deny_cert,
-            contains_deleted_input,
-            cancelled_objects,
+            execution_params,
         );
 
         let status = if let Err(error) = &execution_result {
@@ -254,9 +251,7 @@ mod checked {
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
         enable_expensive_checks: bool,
-        deny_cert: bool,
-        contains_deleted_input: bool,
-        cancelled_objects: Option<(Vec<ObjectID>, SequenceNumber)>,
+        execution_params: ExecutionOrEarlyError,
     ) -> (GasCostSummary, Result<Mode::ExecutionResults, ExecutionError>) {
         gas_charger.smash_gas(temporary_store);
 
@@ -270,25 +265,11 @@ mod checked {
         // we must still ensure an effect is committed and all objects versions incremented
         let result = gas_charger.charge_input_objects(temporary_store);
         let mut result = result.and_then(|()| {
-            let mut execution_result = if deny_cert {
-                Err(ExecutionError::new(ExecutionErrorKind::CertificateDenied, None))
-            } else if contains_deleted_input {
-                Err(ExecutionError::new(ExecutionErrorKind::InputObjectDeleted, None))
-            } else if let Some((cancelled_objects, reason)) = cancelled_objects {
-                match reason {
-                    SequenceNumber::CONGESTED => Err(ExecutionError::new(
-                        ExecutionErrorKind::ExecutionCancelledDueToSharedObjectCongestion {
-                            congested_objects: CongestedObjects(cancelled_objects),
-                        },
-                        None,
-                    )),
-                    SequenceNumber::RANDOMNESS_UNAVAILABLE => {
-                        Err(ExecutionError::new(ExecutionErrorKind::ExecutionCancelledDueToRandomnessUnavailable, None))
-                    }
-                    _ => panic!("invalid cancellation reason SequenceNumber: {reason}"),
+            let mut execution_result = match execution_params {
+                ExecutionOrEarlyError::Err(early_execution_error) => {
+                    Err(ExecutionError::new(early_execution_error, None))
                 }
-            } else {
-                execution_loop::<Mode>(
+                ExecutionOrEarlyError::Ok(()) => execution_loop::<Mode>(
                     temporary_store,
                     transaction_kind,
                     tx_ctx,
@@ -296,7 +277,7 @@ mod checked {
                     gas_charger,
                     protocol_config,
                     metrics.clone(),
-                )
+                ),
             };
 
             let meter_check = check_meter_limit(temporary_store, gas_charger, protocol_config, metrics.clone());
@@ -379,7 +360,7 @@ mod checked {
                 result = Err(conservation_err);
                 gas_charger.reset(temporary_store);
                 gas_charger.charge_gas(temporary_store, &mut result);
-                // check conservation once more more
+                // check conservation once more
                 if let Err(recovery_err) = {
                     temporary_store.check_sui_conserved(simple_conservation_checks, cost_summary).and_then(|()| {
                         if enable_expensive_checks {
@@ -641,6 +622,15 @@ mod checked {
                         EndOfEpochTransactionKind::StoreExecutionTimeObservations(_) => {
                             panic!("EndOfEpochTransactionKind::StoreExecutionTimeEstimates should not exist in v2");
                         }
+                        EndOfEpochTransactionKind::AccumulatorRootCreate => {
+                            panic!("EndOfEpochTransactionKind::AccumulatorRootCreate should not exist in v2");
+                        }
+                        EndOfEpochTransactionKind::CoinRegistryCreate => {
+                            panic!("EndOfEpochTransactionKind::CoinRegistryCreate should not exist in v2");
+                        }
+                        EndOfEpochTransactionKind::DisplayRegistryCreate => {
+                            panic!("EndOfEpochTransactionKind::DisplayRegistryCreate should not exist in v2");
+                        }
                     }
                 }
                 unreachable!("EndOfEpochTransactionKind::ChangeEpoch should be the last transaction in the list")
@@ -668,6 +658,9 @@ mod checked {
                     metrics,
                 )?;
                 Ok(Mode::empty_results())
+            }
+            TransactionKind::ProgrammableSystemTransaction(_) => {
+                panic!("ProgrammableSystemTransaction should not exist in execution layer v2");
             }
         }?;
         temporary_store.check_execution_results_consistency()?;
@@ -854,7 +847,7 @@ mod checked {
             }
         }
 
-        let binary_config = to_binary_config(protocol_config);
+        let binary_config = protocol_config.binary_config(None);
         for (version, modules, dependencies) in change_epoch.system_packages.into_iter() {
             let deserialized_modules: Vec<_> =
                 modules.iter().map(|m| CompiledModule::deserialize_with_config(m, &binary_config).unwrap()).collect();
@@ -979,7 +972,7 @@ mod checked {
                     CallArg::Object(ObjectArg::SharedObject {
                         id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
                         initial_shared_version: update.authenticator_obj_initial_shared_version,
-                        mutable: true,
+                        mutability: sui_types::transaction::SharedObjectMutability::Mutable,
                     }),
                     CallArg::Pure(bcs::to_bytes(&update.new_active_jwks).unwrap()),
                 ],
@@ -1012,7 +1005,7 @@ mod checked {
                     CallArg::Object(ObjectArg::SharedObject {
                         id: SUI_AUTHENTICATOR_STATE_OBJECT_ID,
                         initial_shared_version: expire.authenticator_obj_initial_shared_version,
-                        mutable: true,
+                        mutability: sui_types::transaction::SharedObjectMutability::Mutable,
                     }),
                     CallArg::Pure(bcs::to_bytes(&expire.min_epoch).unwrap()),
                 ],
@@ -1041,7 +1034,7 @@ mod checked {
                     CallArg::Object(ObjectArg::SharedObject {
                         id: SUI_RANDOMNESS_STATE_OBJECT_ID,
                         initial_shared_version: update.randomness_obj_initial_shared_version,
-                        mutable: true,
+                        mutability: sui_types::transaction::SharedObjectMutability::Mutable,
                     }),
                     CallArg::Pure(bcs::to_bytes(&update.randomness_round).unwrap()),
                     CallArg::Pure(bcs::to_bytes(&update.random_bytes).unwrap()),

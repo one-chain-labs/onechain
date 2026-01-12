@@ -3,16 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
+
+use ratatui::{
+    style::{Color, Style},
+    text::Line,
+};
+
 use crate::{
     interfaces::{LeftScreen, RightScreen},
     tui::{
         text_builder::TextBuilder,
         tui_interface::{TUIInterface, TUIOutput},
     },
-};
-use tui::{
-    style::{Color, Style},
-    text::Spans,
 };
 
 #[derive(Debug, Clone)]
@@ -44,7 +46,7 @@ impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> TUII
     const LEFT_TITLE: &'static str = "Bytecode";
     const RIGHT_TITLE: &'static str = "Source Code";
 
-    fn on_redraw(&mut self, line_number: u16, column_number: u16) -> TUIOutput {
+    fn on_redraw(&mut self, line_number: u16, column_number: u16) -> TUIOutput<'_> {
         // Highlight style
         let style: Style = Style::default().bg(Color::Red);
         let report = match self
@@ -71,7 +73,8 @@ impl<BytecodeViewer: LeftScreen, SourceViewer: RightScreen<BytecodeViewer>> TUII
             left_screen: self
                 .bytecode_text
                 .iter()
-                .map(|x| Spans::from(x.clone()))
+                .map(AsRef::as_ref)
+                .map(Line::from)
                 .collect(),
             right_screen: report,
         }

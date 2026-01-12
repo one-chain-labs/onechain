@@ -117,11 +117,14 @@ impl SubscriptionHandler {
         Ok(())
     }
 
-    pub fn subscribe_events(&self, filter: EventFilter) -> impl Stream<Item = SuiEvent> {
+    pub fn subscribe_events(&self, filter: EventFilter) -> impl Stream<Item = SuiEvent> + use<> {
         self.event_streamer.subscribe(filter)
     }
 
-    pub fn subscribe_transactions(&self, filter: TransactionFilter) -> impl Stream<Item = SuiTransactionBlockEffects> {
+    pub fn subscribe_transactions(
+        &self,
+        filter: TransactionFilter,
+    ) -> impl Stream<Item = SuiTransactionBlockEffects> + use<> {
         self.transaction_streamer.subscribe(filter)
     }
 }

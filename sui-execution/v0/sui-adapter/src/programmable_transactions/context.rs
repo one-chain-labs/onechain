@@ -189,25 +189,6 @@ mod checked {
                 metrics.clone(),
             );
 
-            // Set the profiler if in CLI
-            #[skip_checked_arithmetic]
-            move_vm_profiler::tracing_feature_enabled! {
-                use move_vm_profiler::GasProfiler;
-                use move_vm_types::gas::GasMeter;
-
-                let tx_digest = tx_context.digest();
-                let remaining_gas: u64 =
-                    move_vm_types::gas::GasMeter::remaining_gas(gas_charger.move_gas_status())
-                        .into();
-                gas_charger
-                    .move_gas_status_mut()
-                    .set_profiler(GasProfiler::init(
-                        &vm.config().profiler_config,
-                        format!("{}", tx_digest),
-                        remaining_gas,
-                    ));
-            }
-
             Ok(Self {
                 protocol_config,
                 metrics,
@@ -453,13 +434,7 @@ mod checked {
             modules: &[CompiledModule],
             dependencies: impl IntoIterator<Item = &'p MovePackage>,
         ) -> Result<Object, ExecutionError> {
-            Object::new_package(
-                modules,
-                self.tx_context.digest(),
-                self.protocol_config.max_move_package_size(),
-                self.protocol_config.move_binary_format_version(),
-                dependencies,
-            )
+            Object::new_package(modules, self.tx_context.digest(), self.protocol_config, dependencies)
         }
 
         /// Create a package upgrade from `previous_package` with `new_modules` and `dependencies`
@@ -1048,8 +1023,8 @@ mod checked {
                 // protected by transaction input checker
                 invariant_violation!("ObjectOwner objects cannot be input")
             }
-            Owner::ConsensusV2 { .. } => {
-                unimplemented!("ConsensusV2 does not exist for this execution version")
+            Owner::ConsensusAddressOwner { .. } => {
+                unimplemented!("ConsensusAddressOwner does not exist for this execution version")
             }
         };
         let owner = obj.owner.clone();
@@ -1087,6 +1062,7 @@ mod checked {
         Ok(match call_arg {
             CallArg::Pure(bytes) => InputValue::new_raw(RawValueType::Any, bytes),
             CallArg::Object(obj_arg) => load_object_arg(vm, state_view, session, input_object_map, obj_arg)?,
+            CallArg::FundsWithdrawal(_) => unreachable!("Impossible to hit BalanceWithdraw in v0"),
         })
     }
 
@@ -1102,9 +1078,14 @@ mod checked {
             ObjectArg::ImmOrOwnedObject((id, _, _)) => {
                 load_object(vm, state_view, session, input_object_map, /* imm override */ false, id)
             }
-            ObjectArg::SharedObject { id, mutable, .. } => {
-                load_object(vm, state_view, session, input_object_map, /* imm override */ !mutable, id)
-            }
+            ObjectArg::SharedObject { id, mutability, .. } => load_object(
+                vm,
+                state_view,
+                session,
+                input_object_map,
+                /* imm override */ !mutability.is_exclusive(),
+                id,
+            ),
             ObjectArg::Receiving(_) => unreachable!("Impossible to hit Receiving in v0"),
         }
     }
@@ -1194,6 +1175,7 @@ mod checked {
             old_obj_ver.unwrap_or_default(),
             contents,
             protocol_config,
+            /* system_mutation */ false,
         )
     }
 }

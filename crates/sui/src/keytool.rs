@@ -37,6 +37,7 @@ use serde_json::json;
 use shared_crypto::intent::{Intent, IntentMessage, IntentScope, PersonalMessage};
 use sui_keys::{
     key_derive::generate_new_key,
+    key_identity::KeyIdentity,
     keypair_file::{
         read_authority_keypair_from_file,
         read_keypair_from_file,
@@ -72,10 +73,7 @@ use tabled::{
 };
 use tracing::info;
 
-use crate::{
-    key_identity::{get_identity_address_from_keystore, KeyIdentity},
-    zklogin_commands_util::{perform_zk_login_test_tx, read_cli_line},
-};
+use crate::zklogin_commands_util::{perform_zk_login_test_tx, read_cli_line};
 #[cfg(test)]
 #[path = "unit_tests/keytool_tests.rs"]
 mod keytool_tests;
@@ -127,7 +125,7 @@ pub enum KeyToolCommand {
     /// The keypair file is output to the current directory. The content of the file is
     /// a Base64 encoded string of 33-byte `flag || privkey`.
     ///
-    /// Use `sui client new-address` if you want to generate and save the key into sui.keystore.
+    /// Use `one client new-address` if you want to generate and save the key into sui.keystore.
     Generate { key_scheme: SignatureScheme, derivation_path: Option<DerivationPath>, word_length: Option<String> },
 
     /// Add a new key to Sui CLI Keystore using either the input mnemonic phrase or a Bech32 encoded 33-byte
@@ -175,7 +173,7 @@ pub enum KeyToolCommand {
     /// Provides a list of participating signatures (`flag || sig || pk` encoded in Base64),
     /// threshold, a list of all public keys and a list of their weights that define the
     /// MultiSig address. Returns a valid MultiSig signature and its sender address. The
-    /// result can be used as signature field for `sui client execute-signed-tx`. The sum
+    /// result can be used as signature field for `one client execute-signed-tx`. The sum
     /// of weights of all signatures must be >= the threshold.
     ///
     /// The order of `sigs` must be the same as the order of `pks`.
@@ -493,9 +491,9 @@ pub enum CommandOutput {
 
 impl KeyToolCommand {
     pub async fn execute(self, keystore: &mut Keystore) -> Result<CommandOutput, anyhow::Error> {
-        let cmd_result = Ok(match self {
+        Ok(match self {
             KeyToolCommand::Alias { old_alias, new_alias } => {
-                let new_alias = keystore.update_alias(&old_alias, new_alias.as_deref())?;
+                let new_alias = keystore.update_alias(&old_alias, new_alias.as_deref()).await?;
                 CommandOutput::Alias(AliasUpdate { old_alias, new_alias })
             }
             KeyToolCommand::Convert { value } => {
@@ -605,9 +603,9 @@ impl KeyToolCommand {
             KeyToolCommand::Import { alias, input_string, key_scheme, derivation_path } => {
                 if Hex::decode(&input_string).is_ok() {
                     return Err(anyhow!(
-                        "Sui Keystore and Sui Wallet no longer support importing 
-                    private key as Hex, if you are sure your private key is encoded in Hex, use 
-                    `sui keytool convert $HEX` to convert first then import the Bech32 encoded 
+                        "Sui Keystore and Sui Wallet no longer support importing
+                    private key as Hex, if you are sure your private key is encoded in Hex, use
+                    `sui keytool convert $HEX` to convert first then import the Bech32 encoded
                     private key starting with `suiprivkey`."
                     ));
                 }
@@ -616,11 +614,11 @@ impl KeyToolCommand {
                     Ok(skp) => {
                         info!("Importing Bech32 encoded private key to keystore");
                         let mut key = Key::from(&skp);
-                        keystore.add_key(alias.clone(), skp)?;
+                        keystore.import(alias.clone(), skp).await?;
 
                         let alias = match alias {
                             Some(x) => x,
-                            None => keystore.get_alias_by_address(&key.sui_address)?,
+                            None => keystore.get_alias(&key.sui_address)?,
                         };
 
                         key.alias = Some(alias);
@@ -628,14 +626,15 @@ impl KeyToolCommand {
                     }
                     Err(_) => {
                         info!("Importing mneomonics to keystore");
-                        let sui_address =
-                            keystore.import_from_mnemonic(&input_string, key_scheme, derivation_path, alias.clone())?;
-                        let skp = keystore.get_key(&sui_address)?;
+                        let sui_address = keystore
+                            .import_from_mnemonic(&input_string, key_scheme, derivation_path, alias.clone())
+                            .await?;
+                        let skp = keystore.export(&sui_address)?;
                         let mut key = Key::from(skp);
 
                         let alias = match alias {
                             Some(x) => x,
-                            None => keystore.get_alias_by_address(&key.sui_address)?,
+                            None => keystore.get_alias(&key.sui_address)?,
                         };
 
                         key.alias = Some(alias);
@@ -644,21 +643,23 @@ impl KeyToolCommand {
                 }
             }
             KeyToolCommand::Export { key_identity } => {
-                let address = get_identity_address_from_keystore(key_identity, keystore)?;
-                let skp = keystore.get_key(&address)?;
+                let address = keystore.get_by_identity(&key_identity)?;
+                let skp = keystore.export(&address)?;
+                let mut key = Key::from(skp);
+                key.alias = keystore.get_alias(&key.sui_address).ok();
                 let key = ExportedKey {
                     exported_private_key: skp.encode().map_err(|_| anyhow!("Cannot decode keypair"))?,
-                    key: Key::from(skp),
+                    key,
                 };
                 CommandOutput::Export(key)
             }
             KeyToolCommand::List { sort_by_alias } => {
                 let mut keys = keystore
-                    .keys()
+                    .entries()
                     .into_iter()
                     .map(|pk| {
                         let mut key = Key::from(pk);
-                        key.alias = keystore.get_alias_by_address(&key.sui_address).ok();
+                        key.alias = keystore.get_alias(&key.sui_address).ok();
                         key
                     })
                     .collect::<Vec<Key>>();
@@ -772,7 +773,7 @@ impl KeyToolCommand {
             }
 
             KeyToolCommand::Sign { address, data, intent } => {
-                let address = get_identity_address_from_keystore(address, keystore)?;
+                let address = keystore.get_by_identity(&address)?;
                 let intent = intent.unwrap_or_else(Intent::sui_transaction);
                 let intent_clone = intent.clone();
                 let msg: TransactionData = bcs::from_bytes(
@@ -783,7 +784,7 @@ impl KeyToolCommand {
                 let mut hasher = DefaultHash::default();
                 hasher.update(bcs::to_bytes(&intent_msg)?);
                 let digest = hasher.finalize().digest;
-                let sui_signature = keystore.sign_secure(&address, &intent_msg.value, intent_msg.intent)?;
+                let sui_signature = keystore.sign_secure(&address, &intent_msg.value, intent_msg.intent).await?;
                 CommandOutput::Sign(SignData {
                     sui_address: address,
                     raw_tx_data: data,
@@ -913,7 +914,7 @@ impl KeyToolCommand {
                 let pk = skp.public();
                 let ephemeral_key_identifier: SuiAddress = (&skp.public()).into();
                 println!("Ephemeral key identifier: {ephemeral_key_identifier}");
-                keystore.add_key(None, skp)?;
+                keystore.import(None, skp).await?;
 
                 let mut eph_pk_bytes = vec![pk.flag()];
                 eph_pk_bytes.extend(pk.as_ref());
@@ -1046,6 +1047,30 @@ impl KeyToolCommand {
                     "https://trace.fan",
                     &jwt_randomness,
                 )?;
+                let url_16 = get_oidc_url(
+                    OIDCProvider::EveFrontier,
+                    &eph_pk_bytes,
+                    max_epoch,
+                    "583ebc6d-abd8-4057-8c77-78405628e42d",
+                    "https://www.sui.io",
+                    &jwt_randomness,
+                )?;
+                let url_17 = get_oidc_url(
+                    OIDCProvider::TestEveFrontier,
+                    &eph_pk_bytes,
+                    max_epoch,
+                    "c8815001-f950-4147-905e-4833d904cd38",
+                    "https://www.sui.io",
+                    &jwt_randomness,
+                )?;
+                let url_18 = get_oidc_url(
+                    OIDCProvider::AwsTenant(("ap-southeast-1".to_string(), "decot".to_string())),
+                    &eph_pk_bytes,
+                    max_epoch,
+                    "42e9pih2409ktfhmkmo2ipup2h",
+                    "https://www.sui.io",
+                    &jwt_randomness,
+                )?;
                 // This is only for CLI testing. If frontend apps will be built, no need to add anything here.
                 println!("Visit URL (Google): {url}");
                 println!("Visit URL (Twitch): {url_2}");
@@ -1063,6 +1088,9 @@ impl KeyToolCommand {
                 println!("Visit URL (AWS - Ambrus): {url_13}");
                 println!("Visit URL (Arden): {url_14}");
                 println!("Visit URL (AWS - Trace): {url_15}");
+                println!("Visit URL (EveFrontier): {url_16}");
+                println!("Visit URL (TestEveFrontier): {url_17}");
+                println!("Visit URL (AWS - Decot): {url_18}");
 
                 println!("Finish login and paste the entire URL here (e.g. https://sui.io/#id_token=...):");
 
@@ -1125,14 +1153,14 @@ impl KeyToolCommand {
 
                         let client = reqwest::Client::new();
                         let provider = OIDCProvider::from_iss(zk.get_iss()).map_err(|_| anyhow!("Invalid iss"))?;
-                        let jwks = fetch_jwks(&provider, &client).await?;
+                        let jwks = fetch_jwks(&provider, &client, true).await?;
                         let parsed: ImHashMap<JwkId, JWK> = jwks.clone().into_iter().collect();
                         let env = match network.as_str() {
                             "devnet" | "localnet" => ZkLoginEnv::Test,
                             "mainnet" | "testnet" => ZkLoginEnv::Prod,
                             _ => return Err(anyhow!("Invalid network")),
                         };
-                        let verify_params = VerifyParams::new(parsed, vec![], env, true, true, true, Some(2));
+                        let verify_params = VerifyParams::new(parsed, vec![], env, true, true, true, Some(2), true);
 
                         let (serialized, res) =
                             match IntentScope::try_from(intent_scope).map_err(|_| anyhow!("Invalid scope"))? {
@@ -1183,9 +1211,7 @@ impl KeyToolCommand {
                     _ => CommandOutput::Error("Not a zkLogin signature".to_string()),
                 }
             }
-        });
-
-        cmd_result
+        })
     }
 }
 

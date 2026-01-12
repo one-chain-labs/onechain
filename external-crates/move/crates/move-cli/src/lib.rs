@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use base::{
-    build::Build, coverage::Coverage, disassemble::Disassemble, docgen::Docgen, info::Info,
-    migrate::Migrate, new::New, test::Test,
+    build::Build, coverage::Coverage, decompile::Decompile, disassemble::Disassemble,
+    docgen::Docgen, info::Info, migrate::Migrate, new::New, summary::Summary, test::Test,
 };
-use move_package::BuildConfig;
+use move_package::{BuildConfig, resolution::resolution_graph::ResolvedGraph};
 
 pub mod base;
 pub mod sandbox;
@@ -23,6 +23,8 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::path::PathBuf;
+
+use crate::base::profile::Profile;
 
 type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunction);
 
@@ -59,11 +61,13 @@ pub enum Command {
     Build(Build),
     Coverage(Coverage),
     Disassemble(Disassemble),
+    Decompile(Decompile),
     Docgen(Docgen),
     Info(Info),
     Migrate(Migrate),
     New(New),
     Test(Test),
+    Profile(Profile),
     /// Execute a sandbox command.
     #[clap(name = "sandbox")]
     Sandbox {
@@ -74,6 +78,7 @@ pub enum Command {
         #[clap(subcommand)]
         cmd: sandbox::cli::SandboxCommand,
     },
+    Summary(Summary),
 }
 
 pub fn run_cli(
@@ -90,6 +95,9 @@ pub fn run_cli(
         Command::Coverage(c) => {
             c.execute(move_args.package_path.as_deref(), move_args.build_config)
         }
+        Command::Decompile(c) => {
+            c.execute(move_args.package_path.as_deref(), move_args.build_config)
+        }
         Command::Disassemble(c) => {
             c.execute(move_args.package_path.as_deref(), move_args.build_config)
         }
@@ -103,9 +111,17 @@ pub fn run_cli(
             natives,
             Some(cost_table.clone()),
         ),
+        Command::Profile(c) => c.execute(),
         Command::Sandbox { storage_dir, cmd } => {
             cmd.handle_command(natives, cost_table, &move_args, &storage_dir)
         }
+        Command::Summary(summary) => summary
+            .execute::<(), fn(&mut ResolvedGraph) -> anyhow::Result<()>>(
+                move_args.package_path.as_deref(),
+                move_args.build_config,
+                None,
+                None,
+            ),
     }
 }
 

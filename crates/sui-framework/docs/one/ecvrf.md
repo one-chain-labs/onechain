@@ -26,20 +26,20 @@ title: Module `one::ecvrf`
 
 
 
-<a name="one_ecvrf_EInvalidProofEncoding"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/ecvrf.md#one_ecvrf_EInvalidProofEncoding">EInvalidProofEncoding</a>: u64 = 3;
-</code></pre>
-
-
-
 <a name="one_ecvrf_EInvalidPublicKeyEncoding"></a>
 
 
 
 <pre><code><b>const</b> <a href="../one/ecvrf.md#one_ecvrf_EInvalidPublicKeyEncoding">EInvalidPublicKeyEncoding</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="one_ecvrf_EInvalidProofEncoding"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/ecvrf.md#one_ecvrf_EInvalidProofEncoding">EInvalidProofEncoding</a>: u64 = 3;
 </code></pre>
 
 

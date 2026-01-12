@@ -218,6 +218,12 @@ impl ValidationMode {
                     message: e.to_string(),
                 })?;
 
+            // only keep modules that are actually used
+            let deps_compiled_units: Vec<_> = deps_compiled_units
+                .into_iter()
+                .filter(|pkg| sui_package.dependency_ids.published.contains_key(&pkg.0))
+                .collect();
+
             for (package, local_unit) in deps_compiled_units {
                 let m = &local_unit.unit;
                 let module = m.name;

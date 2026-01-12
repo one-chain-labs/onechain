@@ -7,11 +7,6 @@ use clap::Parser;
 use move_cli::base::new;
 use move_package::source_package::layout::SourcePackageLayout;
 
-const SUI_PKG_NAME: &str = "One";
-
-// Use testnet by default. Probably want to add options to make this configurable later
-const SUI_PKG_PATH: &str = "{ git = \"https://github.com/one-chain-labs/onechain.git\", subdir = \"crates/sui-framework/packages/one-framework\", rev = \"framework/testnet\", override = true }";
-
 #[derive(Parser)]
 #[group(id = "sui-move-new")]
 pub struct New {
@@ -24,7 +19,7 @@ impl New {
         let name = &self.new.name.to_lowercase();
         let provided_name = &self.new.name.to_string();
 
-        self.new.execute(path, [(SUI_PKG_NAME, SUI_PKG_PATH)], [(name, "0x0")], "")?;
+        self.new.execute(path, [] as [(&str, &str); 0], [(name, "0x0")], "")?;
         let p = path.unwrap_or_else(|| Path::new(&provided_name));
         let mut w = std::fs::File::create(p.join(SourcePackageLayout::Sources.path()).join(format!("{name}.move")))?;
         writeln!(

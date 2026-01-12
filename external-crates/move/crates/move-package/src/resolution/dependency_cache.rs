@@ -67,7 +67,12 @@ impl DependencyCache {
                     return Ok(());
                 }
 
-                if Command::new("git").arg("--version").output().is_err() {
+                if Command::new("git")
+                    .arg("--version")
+                    .stdin(Stdio::null())
+                    .output()
+                    .is_err()
+                {
                     writeln!(progress_output, "Git is not installed or not in the PATH.")?;
                     return Err(anyhow::anyhow!("Git is not installed or not in the PATH."));
                 }
@@ -85,7 +90,14 @@ impl DependencyCache {
                     )?;
                     // If the cached folder does not exist, download and clone accordingly
                     if let Ok(mut output) = Command::new("git")
-                        .args([OsStr::new("clone"), os_git_url, git_path.as_os_str()])
+                        .args([
+                            OsStr::new("clone"),
+                            OsStr::new("--filter=tree:0"),
+                            OsStr::new("--no-checkout"),
+                            os_git_url,
+                            git_path.as_os_str(),
+                        ])
+                        .stdin(Stdio::null())
                         .spawn()
                     {
                         output.wait().map_err(|_| {
@@ -111,6 +123,7 @@ impl DependencyCache {
                             OsStr::new("checkout"),
                             os_git_rev,
                         ])
+                        .stdin(Stdio::null())
                         .output()
                         .map_err(|_| {
                             anyhow::anyhow!(
@@ -131,13 +144,13 @@ impl DependencyCache {
                             OsStr::new("--verify"),
                             os_git_rev,
                         ])
+                        .stdin(Stdio::null())
                         .output()
+                        && let Ok(parsable_version) = String::from_utf8(rev.stdout)
                     {
-                        if let Ok(parsable_version) = String::from_utf8(rev.stdout) {
-                            // If it's exactly the same, then it's a git rev
-                            if parsable_version.trim().starts_with(git_rev.as_str()) {
-                                return Ok(());
-                            }
+                        // If it's exactly the same, then it's a git rev
+                        if parsable_version.trim().starts_with(git_rev.as_str()) {
+                            return Ok(());
                         }
                     }
 
@@ -149,16 +162,17 @@ impl DependencyCache {
                             OsStr::new("--list"),
                             os_git_rev,
                         ])
+                        .stdin(Stdio::null())
                         .output();
 
-                    if let Ok(tag) = tag {
-                        if let Ok(parsable_version) = String::from_utf8(tag.stdout) {
-                            // If it's exactly the same, then it's a git tag, for now tags won't be updated
-                            // Tags don't easily update locally and you can't use reset --hard to cleanup
-                            // any extra files
-                            if parsable_version.trim().starts_with(git_rev.as_str()) {
-                                return Ok(());
-                            }
+                    if let Ok(tag) = tag
+                        && let Ok(parsable_version) = String::from_utf8(tag.stdout)
+                    {
+                        // If it's exactly the same, then it's a git tag, for now tags won't be updated
+                        // Tags don't easily update locally and you can't use reset --hard to cleanup
+                        // any extra files
+                        if parsable_version.trim().starts_with(git_rev.as_str()) {
+                            return Ok(());
                         }
                     }
 
@@ -182,6 +196,7 @@ impl DependencyCache {
                             OsStr::new("fetch"),
                             OsStr::new("origin"),
                         ])
+                        .stdin(Stdio::null())
                         .spawn()
                     {
                         output.wait().map_err(|_| {
@@ -225,12 +240,12 @@ impl DependencyCache {
 
                     if !status.success() {
                         return Err(anyhow::anyhow!(
-                        "Failed to reset to latest Git state '{}' for package '{}', to skip set \
+                            "Failed to reset to latest Git state '{}' for package '{}', to skip set \
                          --skip-fetch-latest-git-deps | Exit status: {}",
-                        git_rev,
-                        dep_name,
-                        status
-                    ));
+                            git_rev,
+                            dep_name,
+                            status
+                        ));
                     }
                 }
 

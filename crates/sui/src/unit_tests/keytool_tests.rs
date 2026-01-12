@@ -11,7 +11,10 @@ use fastcrypto::{
 };
 use rand::{rngs::StdRng, SeedableRng};
 use shared_crypto::intent::{Intent, IntentScope};
-use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, InMemKeystore, Keystore};
+use sui_keys::{
+    key_identity::KeyIdentity,
+    keystore::{AccountKeystore, FileBasedKeystore, InMemKeystore, Keystore},
+};
 use sui_types::{
     base_types::{ObjectDigest, ObjectID, SequenceNumber, SuiAddress},
     crypto::{
@@ -33,10 +36,7 @@ use tempfile::TempDir;
 use tokio::test;
 
 use super::{write_keypair_to_file, KeyToolCommand};
-use crate::{
-    key_identity::KeyIdentity,
-    keytool::{read_authority_keypair_from_file, read_keypair_from_file, CommandOutput},
-};
+use crate::keytool::{read_authority_keypair_from_file, read_keypair_from_file, CommandOutput};
 
 const TEST_MNEMONIC: &str =
     "result crisp session latin must fruit genuine question prevent start coconut brave speak student dismiss";
@@ -48,7 +48,7 @@ async fn test_addresses_command() -> Result<(), anyhow::Error> {
 
     // Add another 3 Secp256k1 KeyPairs
     for _ in 0 .. 3 {
-        keystore.add_key(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
+        keystore.import(None, SuiKeyPair::Secp256k1(get_key_pair().1)).await?;
     }
 
     // List all addresses with flag
@@ -60,12 +60,12 @@ async fn test_addresses_command() -> Result<(), anyhow::Error> {
 async fn test_flag_in_signature_and_keypair() -> Result<(), anyhow::Error> {
     let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(0));
 
-    keystore.add_key(None, SuiKeyPair::Secp256k1(get_key_pair().1))?;
-    keystore.add_key(None, SuiKeyPair::Ed25519(get_key_pair().1))?;
+    keystore.import(None, SuiKeyPair::Secp256k1(get_key_pair().1)).await?;
+    keystore.import(None, SuiKeyPair::Ed25519(get_key_pair().1)).await?;
 
-    for pk in keystore.keys() {
+    for pk in keystore.entries() {
         let pk1 = pk.clone();
-        let sig = keystore.sign_secure(&(&pk).into(), b"hello", Intent::sui_transaction())?;
+        let sig = keystore.sign_secure(&(&pk).into(), b"hello", Intent::sui_transaction()).await?;
         match sig {
             Signature::Ed25519SuiSignature(_) => {
                 // signature contains corresponding flag
@@ -144,7 +144,7 @@ async fn test_sui_operations_config() {
     let contents = vec![kp.encode_base64()];
     let res = std::fs::write(path, serde_json::to_string_pretty(&contents).unwrap());
     assert!(res.is_ok());
-    let read = FileBasedKeystore::new(&path1);
+    let read = FileBasedKeystore::load_or_create(&path1);
     assert!(read.is_ok());
     assert_eq!(
         SuiAddress::from_str("7d20dcdb2bca4f508ea9613994683eb4e76e9c4ed371169677c1be02aaf0b58e").unwrap(),
@@ -159,7 +159,7 @@ async fn test_sui_operations_config() {
     let contents = vec![kp.encode_base64()];
     let res = std::fs::write(path2, serde_json::to_string_pretty(&contents).unwrap());
     assert!(res.is_ok());
-    let read = FileBasedKeystore::new(&path3);
+    let read = FileBasedKeystore::load_or_create(&path3);
     assert_eq!(
         SuiAddress::from_str("160ef6ce4f395208a12119c5011bf8d8ceb760e3159307c819bd0197d154d384").unwrap(),
         read.unwrap().addresses()[0]
@@ -179,7 +179,7 @@ async fn test_load_keystore_err() {
     assert!(res.is_ok());
 
     // cannot load keypair due to missing flag
-    assert!(FileBasedKeystore::new(&path2).is_err());
+    assert!(FileBasedKeystore::load_or_create(&path2).is_err());
 }
 
 #[test]
@@ -269,9 +269,23 @@ async fn test_private_keys_import_export() -> Result<(), anyhow::Error> {
 #[test]
 async fn test_mnemonics_ed25519() -> Result<(), anyhow::Error> {
     // Test case matches with /mysten/sui/sdk/typescript/test/unit/cryptography/ed25519-keypair.test.ts
-    const TEST_CASES: [[&str; 3]; 3] = [["film crazy soon outside stand loop subway crumble thrive popular green nuclear struggle pistol arm wife phrase warfare march wheat nephew ask sunny firm", "suiprivkey1qrwsjvr6gwaxmsvxk4cfun99ra8uwxg3c9pl0nhle7xxpe4s80y05ctazer", "a2d14fad60c56049ecf75246a481934691214ce413e6a8ae2fe6834c173a6133"],
-    ["require decline left thought grid priority false tiny gasp angle royal system attack beef setup reward aunt skill wasp tray vital bounce inflict level", "suiprivkey1qzdvpa77ct272ultqcy20dkw78dysnfyg90fhcxkdm60el0qht9mvzlsh4j", "1ada6e6f3f3e4055096f606c746690f1108fcc2ca479055cc434a3e1d3f758aa"],
-    ["organ crash swim stick traffic remember army arctic mesh slice swear summer police vast chaos cradle squirrel hood useless evidence pet hub soap lake", "suiprivkey1qqqscjyyr64jea849dfv9cukurqj2swx0m3rr4hr7sw955jy07tzgcde5ut", "e69e896ca10f5a77732769803cc2b5707f0ab9d4407afb5e4b4464b89769af14"]];
+    const TEST_CASES: [[&str; 3]; 3] = [
+        [
+            "film crazy soon outside stand loop subway crumble thrive popular green nuclear struggle pistol arm wife phrase warfare march wheat nephew ask sunny firm",
+            "suiprivkey1qrwsjvr6gwaxmsvxk4cfun99ra8uwxg3c9pl0nhle7xxpe4s80y05ctazer",
+            "a2d14fad60c56049ecf75246a481934691214ce413e6a8ae2fe6834c173a6133",
+        ],
+        [
+            "require decline left thought grid priority false tiny gasp angle royal system attack beef setup reward aunt skill wasp tray vital bounce inflict level",
+            "suiprivkey1qzdvpa77ct272ultqcy20dkw78dysnfyg90fhcxkdm60el0qht9mvzlsh4j",
+            "1ada6e6f3f3e4055096f606c746690f1108fcc2ca479055cc434a3e1d3f758aa",
+        ],
+        [
+            "organ crash swim stick traffic remember army arctic mesh slice swear summer police vast chaos cradle squirrel hood useless evidence pet hub soap lake",
+            "suiprivkey1qqqscjyyr64jea849dfv9cukurqj2swx0m3rr4hr7sw955jy07tzgcde5ut",
+            "e69e896ca10f5a77732769803cc2b5707f0ab9d4407afb5e4b4464b89769af14",
+        ],
+    ];
 
     for t in TEST_CASES {
         let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(0));
@@ -294,9 +308,23 @@ async fn test_mnemonics_ed25519() -> Result<(), anyhow::Error> {
 #[test]
 async fn test_mnemonics_secp256k1() -> Result<(), anyhow::Error> {
     // Test case matches with /mysten/sui/sdk/typescript/test/unit/cryptography/secp256k1-keypair.test.ts
-    const TEST_CASES: [[&str; 3]; 3] = [["film crazy soon outside stand loop subway crumble thrive popular green nuclear struggle pistol arm wife phrase warfare march wheat nephew ask sunny firm", "suiprivkey1qyqr6yvxdqkh32ep4pk9caqvphmk9epn6rhkczcrhaeermsyvwsg783y9am", "9e8f732575cc5386f8df3c784cd3ed1b53ce538da79926b2ad54dcc1197d2532"],
-    ["require decline left thought grid priority false tiny gasp angle royal system attack beef setup reward aunt skill wasp tray vital bounce inflict level", "suiprivkey1q8hexn5m2u36tx39ln5e22hfseadknp7d2qlkhe30ejy7fc6am5aqkqpqsj", "9fd5a804ed6b46d36949ff7434247f0fd594673973ece24aede6b86a7b5dae01"],
-    ["organ crash swim stick traffic remember army arctic mesh slice swear summer police vast chaos cradle squirrel hood useless evidence pet hub soap lake", "suiprivkey1qxx6yf53jgxvsmccst8cuwnj0rx4k4uzvn9aalvag7ns0xf0g8j2x246jst", "60287d7c38dee783c2ab1077216124011774be6b0764d62bd05f32c88979d5c5"]];
+    const TEST_CASES: [[&str; 3]; 3] = [
+        [
+            "film crazy soon outside stand loop subway crumble thrive popular green nuclear struggle pistol arm wife phrase warfare march wheat nephew ask sunny firm",
+            "suiprivkey1qyqr6yvxdqkh32ep4pk9caqvphmk9epn6rhkczcrhaeermsyvwsg783y9am",
+            "9e8f732575cc5386f8df3c784cd3ed1b53ce538da79926b2ad54dcc1197d2532",
+        ],
+        [
+            "require decline left thought grid priority false tiny gasp angle royal system attack beef setup reward aunt skill wasp tray vital bounce inflict level",
+            "suiprivkey1q8hexn5m2u36tx39ln5e22hfseadknp7d2qlkhe30ejy7fc6am5aqkqpqsj",
+            "9fd5a804ed6b46d36949ff7434247f0fd594673973ece24aede6b86a7b5dae01",
+        ],
+        [
+            "organ crash swim stick traffic remember army arctic mesh slice swear summer police vast chaos cradle squirrel hood useless evidence pet hub soap lake",
+            "suiprivkey1qxx6yf53jgxvsmccst8cuwnj0rx4k4uzvn9aalvag7ns0xf0g8j2x246jst",
+            "60287d7c38dee783c2ab1077216124011774be6b0764d62bd05f32c88979d5c5",
+        ],
+    ];
 
     for t in TEST_CASES {
         let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(0));
@@ -483,7 +511,7 @@ async fn test_sign_command() -> Result<(), anyhow::Error> {
     let mut keystore = Keystore::from(InMemKeystore::new_insecure_for_tests(1));
     let binding = keystore.addresses();
     let sender = binding.first().unwrap();
-    let alias = keystore.get_alias_by_address(sender).unwrap();
+    let alias = keystore.get_alias(sender).unwrap();
 
     // Create a dummy TransactionData
     let gas = (ObjectID::random(), SequenceNumber::new(), ObjectDigest::random());

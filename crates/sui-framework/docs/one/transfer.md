@@ -8,6 +8,8 @@ title: Module `one::transfer`
 -  [Constants](#@Constants_0)
 -  [Function `transfer`](#one_transfer_transfer)
 -  [Function `public_transfer`](#one_transfer_public_transfer)
+-  [Function `party_transfer`](#one_transfer_party_transfer)
+-  [Function `public_party_transfer`](#one_transfer_public_party_transfer)
 -  [Function `freeze_object`](#one_transfer_freeze_object)
 -  [Function `public_freeze_object`](#one_transfer_public_freeze_object)
 -  [Function `share_object`](#one_transfer_share_object)
@@ -17,6 +19,7 @@ title: Module `one::transfer`
 -  [Function `receiving_object_id`](#one_transfer_receiving_object_id)
 -  [Function `freeze_object_impl`](#one_transfer_freeze_object_impl)
 -  [Function `share_object_impl`](#one_transfer_share_object_impl)
+-  [Function `party_transfer_impl`](#one_transfer_party_transfer_impl)
 -  [Function `transfer_impl`](#one_transfer_transfer_impl)
 -  [Function `receive_impl`](#one_transfer_receive_impl)
 
@@ -24,7 +27,9 @@ title: Module `one::transfer`
 <pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -77,6 +82,17 @@ Internals of this struct are opaque outside this module.
 ## Constants
 
 
+<a name="one_transfer_ESharedNonNewObject"></a>
+
+Shared an object that was previously created. Shared objects must currently
+be constructed in the transaction they are created.
+
+
+<pre><code><b>const</b> <a href="../one/transfer.md#one_transfer_ESharedNonNewObject">ESharedNonNewObject</a>: u64 = 0;
+</code></pre>
+
+
+
 <a name="one_transfer_EBCSSerializationFailure"></a>
 
 Serialization of the object failed.
@@ -97,13 +113,13 @@ The object being received is not of the expected type.
 
 
 
-<a name="one_transfer_ESharedNonNewObject"></a>
+<a name="one_transfer_EUnableToReceiveObject"></a>
 
-Shared an object that was previously created. Shared objects must currently
-be constructed in the transaction they are created.
+Represents both the case where the object does not exist and the case where the object is not
+able to be accessed through the parent that is passed-in.
 
 
-<pre><code><b>const</b> <a href="../one/transfer.md#one_transfer_ESharedNonNewObject">ESharedNonNewObject</a>: u64 = 0;
+<pre><code><b>const</b> <a href="../one/transfer.md#one_transfer_EUnableToReceiveObject">EUnableToReceiveObject</a>: u64 = 3;
 </code></pre>
 
 
@@ -118,13 +134,22 @@ Shared object operations such as wrapping, freezing, and converting to owned are
 
 
 
-<a name="one_transfer_EUnableToReceiveObject"></a>
+<a name="one_transfer_ENotSupported"></a>
 
-Represents both the case where the object does not exist and the case where the object is not
-able to be accessed through the parent that is passed-in.
+Operation is not yet supported by the network. The functionality might still be in development.
 
 
-<pre><code><b>const</b> <a href="../one/transfer.md#one_transfer_EUnableToReceiveObject">EUnableToReceiveObject</a>: u64 = 3;
+<pre><code><b>const</b> <a href="../one/transfer.md#one_transfer_ENotSupported">ENotSupported</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="one_transfer_EInvalidPartyPermissions"></a>
+
+
+
+<pre><code>#[error]
+<b>const</b> <a href="../one/transfer.md#one_transfer_EInvalidPartyPermissions">EInvalidPartyPermissions</a>: vector&lt;u8&gt; = b"Party <a href="../one/transfer.md#one_transfer">transfer</a> is currently limited to one <a href="../one/party.md#one_party">party</a>.";
 </code></pre>
 
 
@@ -182,6 +207,80 @@ The object must have <code>store</code> to be transferred outside of its module.
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_public_transfer">public_transfer</a>&lt;T: key + store&gt;(obj: T, recipient: <b>address</b>) {
     <a href="../one/transfer.md#one_transfer_transfer_impl">transfer_impl</a>(obj, recipient)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_transfer_party_transfer"></a>
+
+## Function `party_transfer`
+
+NOT YET SUPPORTED ON MAINNET. The function will abort with <code><a href="../one/transfer.md#one_transfer_ENotSupported">ENotSupported</a></code> if used on a network
+where party objects are not yet supported.
+Transfer ownership of <code>obj</code> to the <code><a href="../one/party.md#one_party">party</a></code>. This transfer behaves similar to both
+<code><a href="../one/transfer.md#one_transfer">transfer</a></code> and <code><a href="../one/transfer.md#one_transfer_share_object">share_object</a></code>. It is similar to <code><a href="../one/transfer.md#one_transfer">transfer</a></code> in that the object is authorized for
+use only by the recipient(s), in this case the <code><a href="../one/party.md#one_party">party</a></code>. This means that only the members
+can use the object as an input to a transaction. It is similar to <code><a href="../one/transfer.md#one_transfer_share_object">share_object</a></code> two ways. One
+in that the object can potentially be used by anyone, as defined by the <code>default</code> permissions of
+the <code>Party</code> value. The other in that the object must be used in consensus and cannot be
+used in the fast path.
+This function has custom rules performed by the Sui Move bytecode verifier that ensures that <code>T</code>
+is an object defined in the module where <code><a href="../one/transfer.md#one_transfer">transfer</a></code> is invoked. Use <code><a href="../one/transfer.md#one_transfer_public_party_transfer">public_party_transfer</a></code>
+to transfer an object with <code>store</code> outside of its module.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_party_transfer">party_transfer</a>&lt;T: key&gt;(obj: T, <a href="../one/party.md#one_party">party</a>: <a href="../one/party.md#one_party_Party">one::party::Party</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_party_transfer">party_transfer</a>&lt;T: key&gt;(obj: T, <a href="../one/party.md#one_party">party</a>: <a href="../one/party.md#one_party_Party">one::party::Party</a>) {
+    <b>assert</b>!(<a href="../one/party.md#one_party">party</a>.is_single_owner(), <a href="../one/transfer.md#one_transfer_EInvalidPartyPermissions">EInvalidPartyPermissions</a>);
+    <b>let</b> (default, addresses, permissions) = <a href="../one/party.md#one_party">party</a>.into_native();
+    <a href="../one/transfer.md#one_transfer_party_transfer_impl">party_transfer_impl</a>(obj, default, addresses, permissions)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_transfer_public_party_transfer"></a>
+
+## Function `public_party_transfer`
+
+NOT YET SUPPORTED ON MAINNET. The function will abort with <code><a href="../one/transfer.md#one_transfer_ENotSupported">ENotSupported</a></code> if used on a network
+where party objects are not yet supported.
+Transfer ownership of <code>obj</code> to the <code><a href="../one/party.md#one_party">party</a></code>. This transfer behaves similar to both
+<code><a href="../one/transfer.md#one_transfer">transfer</a></code> and <code><a href="../one/transfer.md#one_transfer_share_object">share_object</a></code>. It is similar to <code><a href="../one/transfer.md#one_transfer">transfer</a></code> in that the object is authorized for
+use only by the recipient(s), in this case the <code><a href="../one/party.md#one_party">party</a></code>. This means that only the members
+can use the object as an input to a transaction. It is similar to <code><a href="../one/transfer.md#one_transfer_share_object">share_object</a></code> two ways. One
+in that the object can potentially be used by anyone, as defined by the <code>default</code> permissions of
+the <code>Party</code> value. The other in that the object must be used in consensus and cannot be
+used in the fast path.
+The object must have <code>store</code> to be transferred outside of its module.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_public_party_transfer">public_party_transfer</a>&lt;T: key, store&gt;(obj: T, <a href="../one/party.md#one_party">party</a>: <a href="../one/party.md#one_party_Party">one::party::Party</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_public_party_transfer">public_party_transfer</a>&lt;T: key + store&gt;(obj: T, <a href="../one/party.md#one_party">party</a>: <a href="../one/party.md#one_party_Party">one::party::Party</a>) {
+    <b>assert</b>!(<a href="../one/party.md#one_party">party</a>.is_single_owner(), <a href="../one/transfer.md#one_transfer_EInvalidPartyPermissions">EInvalidPartyPermissions</a>);
+    <b>let</b> (default, addresses, permissions) = <a href="../one/party.md#one_party">party</a>.into_native();
+    <a href="../one/transfer.md#one_transfer_party_transfer_impl">party_transfer_impl</a>(obj, default, addresses, permissions)
 }
 </code></pre>
 
@@ -428,6 +527,33 @@ Return the object ID that the given <code><a href="../one/transfer.md#one_transf
 
 
 <pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>native</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_share_object_impl">share_object_impl</a>&lt;T: key&gt;(obj: T);
+</code></pre>
+
+
+
+</details>
+
+<a name="one_transfer_party_transfer_impl"></a>
+
+## Function `party_transfer_impl`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/transfer.md#one_transfer_party_transfer_impl">party_transfer_impl</a>&lt;T: key&gt;(obj: T, default_permissions: u64, addresses: vector&lt;<b>address</b>&gt;, permissions: vector&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>native</b> <b>fun</b> <a href="../one/transfer.md#one_transfer_party_transfer_impl">party_transfer_impl</a>&lt;T: key&gt;(
+    obj: T,
+    default_permissions: u64,
+    addresses: vector&lt;<b>address</b>&gt;,
+    permissions: vector&lt;u64&gt;,
+);
 </code></pre>
 
 

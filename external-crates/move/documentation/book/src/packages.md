@@ -165,7 +165,7 @@ take a look at the `Move.lock` file and what it contains.
 
 ## Move.lock
 
-The `Move.lock` file is generated at the root of the Move pacakge when the
+The `Move.lock` file is generated at the root of the Move package when the
 package is built. The `Move.lock` file contains information about your package
 and its build configuration, and acts as a communication layer between the Move
 compiler and other tools, like chain-specific command line interfaces and
@@ -196,7 +196,7 @@ This section contains the core information needed in the lockfile:
 * The version of the lockfile (needed for backwards compatibility checking, and
   versioning lockfile changes in the future).
 * The hash of the `Move.toml` file that was used to generate this lock file.
-* The hash of the `Move.lock` file of all dependencies. If no depencies are
+* The hash of the `Move.lock` file of all dependencies. If no dependencies are
   present, this will be an empty string.
 * The list of dependencies.
 
@@ -382,9 +382,9 @@ named_addr = "0xC0FFEE"
 ## Usage and Artifacts
 
 The Move package system comes with a command line option as part of the CLI:
-`sui move <command> <command_flags>`. Unless a particular path is provided, all
+`one move <command> <command_flags>`. Unless a particular path is provided, all
 package commands will run in the current working directory. The full list of
-commands and flags for the Move CLI can be found by running `sui move --help`.
+commands and flags for the Move CLI can be found by running `one move --help`.
 
 ### Artifacts
 

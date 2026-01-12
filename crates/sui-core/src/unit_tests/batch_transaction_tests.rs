@@ -5,6 +5,7 @@ use authority_tests::send_and_confirm_transaction;
 use bcs;
 use move_core_types::{account_address::AccountAddress, ident_str};
 use sui_types::{
+    base_types::FullObjectRef,
     crypto::{get_key_pair, AccountKeyPair},
     execution_status::ExecutionStatus,
     object::Owner,
@@ -30,7 +31,12 @@ async fn test_batch_transaction_ok() -> anyhow::Result<()> {
     let mut builder = ProgrammableTransactionBuilder::new();
     for obj_id in all_ids.iter().take(N) {
         builder
-            .transfer_object(recipient, authority_state.get_object(obj_id).await.unwrap().compute_object_reference())
+            .transfer_object(
+                recipient,
+                FullObjectRef::from_fastpath_ref(
+                    authority_state.get_object(obj_id).await.unwrap().compute_object_reference(),
+                ),
+            )
             .unwrap()
     }
     for _ in 0 .. N {
@@ -76,7 +82,12 @@ async fn test_batch_transaction_last_one_fail() -> anyhow::Result<()> {
     let mut builder = ProgrammableTransactionBuilder::new();
     for obj_id in all_ids.iter().take(N) {
         builder
-            .transfer_object(recipient, authority_state.get_object(obj_id).await.unwrap().compute_object_reference())
+            .transfer_object(
+                recipient,
+                FullObjectRef::from_fastpath_ref(
+                    authority_state.get_object(obj_id).await.unwrap().compute_object_reference(),
+                ),
+            )
             .unwrap()
     }
     builder

@@ -206,6 +206,7 @@ impl<'l, I: Iterator<Item = &'l str>> Iterator for Lexer<'l, I> {
             sp!(_, ">") => token!(T::RAngle),
             sp!(_, "@") => token!(T::At),
             sp!(_, ".") => token!(T::Dot),
+            sp!(_, "/") => token!(T::ForwardSlash),
 
             sp!(_, "'" | "\"") => self.string(c),
 
@@ -329,7 +330,7 @@ mod tests {
     use super::*;
 
     /// Tokenize the input up to and including the first terminal token.
-    fn lex(input: Vec<&str>) -> Vec<Spanned<Lexeme>> {
+    fn lex(input: Vec<&str>) -> Vec<Spanned<Lexeme<'_>>> {
         let mut lexer = Lexer::new(input.into_iter()).unwrap();
         let mut lexemes: Vec<_> = (&mut lexer).take_while(|sp!(_, lex)| !lex.is_terminal()).collect();
         lexemes.push(lexer.next().unwrap());

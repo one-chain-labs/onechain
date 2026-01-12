@@ -6,6 +6,7 @@
 //! parameters, locals, and fields of structs are well-formed. References can only occur at the
 //! top-level in all tokens.  Additionally, references cannot occur at all in field types.
 use move_binary_format::{
+    IndexKind,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         AbilitySet, Bytecode, CodeUnit, CompiledModule, DatatypeTyParameter, EnumDefinition,
@@ -13,7 +14,6 @@ use move_binary_format::{
         StructDefinition, StructFieldInformation, TableIndex,
     },
     file_format_common::VERSION_6,
-    IndexKind,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::vm_status::StatusCode;
@@ -421,10 +421,10 @@ impl<'env, 'a, 'b, M: Meter + ?Sized> SignatureChecker<'env, 'a, 'b, M> {
         idx: SignatureIndex,
         type_parameters: &[AbilitySet],
     ) -> PartialVMResult<()> {
-        if let Some(checked_abilities) = self.abilities_cache.get(&idx) {
-            if checked_abilities.contains(type_parameters) {
-                return Ok(());
-            }
+        if let Some(checked_abilities) = self.abilities_cache.get(&idx)
+            && checked_abilities.contains(type_parameters)
+        {
+            return Ok(());
         };
         for ty in &self.module.signature_at(idx).0 {
             self.check_type_instantiation(ty, type_parameters)?

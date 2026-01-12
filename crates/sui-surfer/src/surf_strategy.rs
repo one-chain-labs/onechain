@@ -3,12 +3,12 @@
 
 use std::time::Duration;
 
-use move_binary_format::normalized::Type;
+use move_binary_format::normalized;
 use move_core_types::language_storage::StructTag;
 use rand::{seq::SliceRandom, Rng};
 use sui_types::{
     base_types::ObjectRef,
-    transaction::{CallArg, ObjectArg},
+    transaction::{CallArg, ObjectArg, SharedObjectMutability},
 };
 use tokio::time::Instant;
 use tracing::debug;
@@ -20,6 +20,8 @@ enum InputObjectPassKind {
     ByRef,
     MutRef,
 }
+
+type Type = normalized::Type<normalized::ArcIdentifier>;
 
 #[derive(Clone, Default)]
 pub struct SurfStrategy {
@@ -54,16 +56,16 @@ impl SurfStrategy {
         let mut failed = false;
         for param in params {
             let arg = match param {
-                Type::Bool => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<bool>()).unwrap()),
-                Type::U8 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u8>()).unwrap()),
-                Type::U16 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u16>()).unwrap()),
-                Type::U32 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u32>()).unwrap()),
-                Type::U64 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u64>()).unwrap()),
-                Type::U128 => CallArg::Pure(bcs::to_bytes(&state.rng.gen::<u128>()).unwrap()),
+                Type::Bool => CallArg::Pure(bcs::to_bytes(&state.rng.r#gen::<bool>()).unwrap()),
+                Type::U8 => CallArg::Pure(bcs::to_bytes(&state.rng.r#gen::<u8>()).unwrap()),
+                Type::U16 => CallArg::Pure(bcs::to_bytes(&state.rng.r#gen::<u16>()).unwrap()),
+                Type::U32 => CallArg::Pure(bcs::to_bytes(&state.rng.r#gen::<u32>()).unwrap()),
+                Type::U64 => CallArg::Pure(bcs::to_bytes(&state.rng.r#gen::<u64>()).unwrap()),
+                Type::U128 => CallArg::Pure(bcs::to_bytes(&state.rng.r#gen::<u128>()).unwrap()),
                 Type::Address => {
                     CallArg::Pure(bcs::to_bytes(&state.cluster.get_addresses().choose(&mut state.rng)).unwrap())
                 }
-                ty @ Type::Struct { .. } => {
+                ty @ Type::Datatype(_) => {
                     match Self::choose_object_call_arg(state, InputObjectPassKind::Value, ty, &mut chosen_owned_objects)
                         .await
                     {
@@ -74,26 +76,9 @@ impl SurfStrategy {
                         }
                     }
                 }
-                Type::Reference(ty) => {
-                    match Self::choose_object_call_arg(state, InputObjectPassKind::ByRef, *ty, &mut chosen_owned_objects)
-                        .await
-                    {
-                        Some(arg) => arg,
-                        None => {
-                            failed = true;
-                            break;
-                        }
-                    }
-                }
-                Type::MutableReference(ty) => {
-                    match Self::choose_object_call_arg(
-                        state,
-                        InputObjectPassKind::MutRef,
-                        *ty,
-                        &mut chosen_owned_objects,
-                    )
-                    .await
-                    {
+                Type::Reference(mut_, ty) => {
+                    let kind = if mut_ { InputObjectPassKind::MutRef } else { InputObjectPassKind::ByRef };
+                    match Self::choose_object_call_arg(state, kind, *ty, &mut chosen_owned_objects).await {
                         Some(arg) => arg,
                         None => {
                             failed = true;
@@ -124,17 +109,14 @@ impl SurfStrategy {
         arg_type: Type,
         chosen_owned_objects: &mut Vec<(StructTag, ObjectRef)>,
     ) -> Option<CallArg> {
+        let pool = state.pool.read().await;
         let type_tag = match arg_type {
-            Type::Struct { address, module, name, type_arguments } => StructTag {
-                address,
-                module,
-                name,
-                type_params: type_arguments.into_iter().map(|t| t.into_type_tag().unwrap()).collect(),
-            },
+            Type::Datatype(dt) => dt.to_struct_tag(&*pool),
             _ => {
                 return None;
             }
         };
+        drop(pool);
         let owned = state.matching_owned_objects_count(&type_tag);
         let shared = state.matching_shared_objects_count(&type_tag).await;
         let immutable = state.matching_immutable_objects_count(&type_tag).await;
@@ -159,7 +141,11 @@ impl SurfStrategy {
             return Some(CallArg::Object(ObjectArg::SharedObject {
                 id,
                 initial_shared_version,
-                mutable: matches!(kind, InputObjectPassKind::MutRef),
+                mutability: if matches!(kind, InputObjectPassKind::MutRef) {
+                    SharedObjectMutability::Mutable
+                } else {
+                    SharedObjectMutability::Immutable
+                },
             }));
         }
         n -= shared;

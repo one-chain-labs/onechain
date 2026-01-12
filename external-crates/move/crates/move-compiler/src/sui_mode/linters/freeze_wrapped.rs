@@ -8,20 +8,20 @@
 use crate::{
     diag,
     diagnostics::{
-        codes::{custom, DiagnosticInfo, Severity},
-        warning_filters::WarningFilters,
         Diagnostic, DiagnosticReporter, Diagnostics,
+        codes::{DiagnosticInfo, Severity, custom},
+        warning_filters::WarningFilters,
     },
     expansion::ast as E,
     naming::ast as N,
     parser::ast::{self as P, Ability_},
-    shared::{program_info::TypingProgramInfo, CompilationEnv, Identifier},
+    shared::{CompilationEnv, Identifier, program_info::TypingProgramInfo},
     sui_mode::{
+        SUI_ADDR_VALUE,
         linters::{
-            LinterDiagnosticCategory, LinterDiagnosticCode, FREEZE_FUN, LINT_WARNING_PREFIX,
+            FREEZE_FUN, LINT_WARNING_PREFIX, LinterDiagnosticCategory, LinterDiagnosticCode,
             PUBLIC_FREEZE_FUN, TRANSFER_MOD_NAME,
         },
-        SUI_ADDR_VALUE,
     },
     typing::{
         ast as T,
@@ -128,24 +128,24 @@ impl TypingVisitorContext for Context<'_> {
 
     fn visit_exp_custom(&mut self, exp: &T::Exp) -> bool {
         use T::UnannotatedExp_ as E;
-        if let E::ModuleCall(fun) = &exp.exp.value {
-            if FREEZE_FUNCTIONS.iter().any(|(addr, module, fname)| {
+        if let E::ModuleCall(fun) = &exp.exp.value
+            && FREEZE_FUNCTIONS.iter().any(|(addr, module, fname)| {
                 fun.module.value.is(addr, *module) && &fun.name.value().as_str() == fname
-            }) {
-                let Some(sp!(_, N::TypeName_::ModuleType(mident, sname))) =
-                    fun.type_arguments[0].value.type_name()
-                else {
-                    // struct with a given name not found
-                    return false;
-                };
-                if let Some(wrapping_field_info) = self.find_wrapping_field_loc(mident, sname) {
-                    add_diag(
-                        self,
-                        fun.arguments.exp.loc,
-                        sname.value(),
-                        wrapping_field_info,
-                    );
-                }
+            })
+        {
+            let Some(sp!(_, N::TypeName_::ModuleType(mident, sname))) =
+                fun.type_arguments[0].value.type_name()
+            else {
+                // struct with a given name not found
+                return false;
+            };
+            if let Some(wrapping_field_info) = self.find_wrapping_field_loc(mident, sname) {
+                add_diag(
+                    self,
+                    fun.arguments.exp.loc,
+                    sname.value(),
+                    wrapping_field_info,
+                );
             }
         }
         // always return false to process arguments of the call
@@ -193,6 +193,7 @@ impl Context<'_> {
             | T::Ref(_, _)
             | T::Var(_)
             | T::Anything
+            | T::Void
             | T::UnresolvedError
             | T::Fun(_, _) => None,
         }

@@ -72,6 +72,15 @@ pub fn run(args: Args) -> crate::Result<()> {
             "tonic".to_owned(),
             // jsonrpsee uses an older version of http-body
             "http-body".to_owned(),
+            // jsonrpsee uses an older version of tower
+            "tower".to_owned(),
+            // async-graphql uses an older version of axum, axum-extra
+            "axum".to_owned(),
+            "axum-extra".to_owned(),
+            // consistent-store uses a newer version of bincode with breaking interface changes
+            "bincode".to_owned(),
+            // TODO: remove once we've migrated ethers to alloy: https://linear.app/mysten-labs/issue/BR-191
+            "reqwest".to_owned(),
         ],
     };
 
@@ -142,10 +151,10 @@ pub fn handle_lint_results_exclude_external_crate_checks(results: LintResults) -
     // TODO: handle skipped results
     let mut errs = false;
     for (source, message) in &results.messages {
-        if let LintKind::Content(path) = source.kind() {
-            if ignore_funcs.iter().any(|func| func(source, path)) {
-                continue;
-            }
+        if let LintKind::Content(path) = source.kind()
+            && ignore_funcs.iter().any(|func| func(source, path))
+        {
+            continue;
         }
         println!("[{}] [{}] [{}]: {}\n", message.level(), source.name(), source.kind(), message.message());
         errs = true;

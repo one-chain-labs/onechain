@@ -131,20 +131,20 @@ removal
 ## Constants
 
 
-<a name="one_linked_table_ETableIsEmpty"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/linked_table.md#one_linked_table_ETableIsEmpty">ETableIsEmpty</a>: u64 = 1;
-</code></pre>
-
-
-
 <a name="one_linked_table_ETableNotEmpty"></a>
 
 
 
 <pre><code><b>const</b> <a href="../one/linked_table.md#one_linked_table_ETableNotEmpty">ETableNotEmpty</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="one_linked_table_ETableIsEmpty"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/linked_table.md#one_linked_table_ETableIsEmpty">ETableIsEmpty</a>: u64 = 1;
 </code></pre>
 
 
@@ -470,7 +470,7 @@ that key <code>k: K</code>. Note: this is also what happens when the table is em
 
 ## Function `pop_front`
 
-Removes the front of the table <code><a href="../one/table.md#one_table">table</a>: &<b>mut</b> <a href="../one/linked_table.md#one_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code> and returns the value.
+Removes the front of the table <code><a href="../one/table.md#one_table">table</a>: &<b>mut</b> <a href="../one/linked_table.md#one_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>, returns the key and value.
 Aborts with <code><a href="../one/linked_table.md#one_linked_table_ETableIsEmpty">ETableIsEmpty</a></code> if the table is empty
 
 
@@ -498,7 +498,7 @@ Aborts with <code><a href="../one/linked_table.md#one_linked_table_ETableIsEmpty
 
 ## Function `pop_back`
 
-Removes the back of the table <code><a href="../one/table.md#one_table">table</a>: &<b>mut</b> <a href="../one/linked_table.md#one_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code> and returns the value.
+Removes the back of the table <code><a href="../one/table.md#one_table">table</a>: &<b>mut</b> <a href="../one/linked_table.md#one_linked_table_LinkedTable">LinkedTable</a>&lt;K, V&gt;</code>, returns the key and value.
 Aborts with <code><a href="../one/linked_table.md#one_linked_table_ETableIsEmpty">ETableIsEmpty</a></code> if the table is empty
 
 
@@ -577,7 +577,7 @@ Returns the size of the table, the number of key-value pairs
 
 ## Function `is_empty`
 
-Returns true if the table is empty (if <code><a href="../one/linked_table.md#one_linked_table_length">length</a></code> returns <code>0</code>)
+Returns true iff the table is empty (if <code><a href="../one/linked_table.md#one_linked_table_length">length</a></code> returns <code>0</code>)
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/linked_table.md#one_linked_table_is_empty">is_empty</a>&lt;K: <b>copy</b>, <a href="../one/linked_table.md#one_linked_table_drop">drop</a>, store, V: store&gt;(<a href="../one/table.md#one_table">table</a>: &<a href="../one/linked_table.md#one_linked_table_LinkedTable">one::linked_table::LinkedTable</a>&lt;K, V&gt;): bool

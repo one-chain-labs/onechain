@@ -23,7 +23,7 @@ use move_binary_format::{
     file_format::CompiledModule,
     file_format_common::VERSION_6,
 };
-use move_bytecode_verifier_meter::{dummy::DummyMeter, Meter};
+use move_bytecode_verifier_meter::{Meter, dummy::DummyMeter};
 use move_vm_config::verifier::VerifierConfig;
 use std::time::Instant;
 
@@ -84,20 +84,7 @@ pub fn verify_module_with_config_metered(
     meter: &mut (impl Meter + ?Sized),
 ) -> VMResult<()> {
     let ability_cache = &mut AbilityCache::new(module);
-    BoundsChecker::verify_module(module).map_err(|e| {
-        // We can't point the error at the module, because if bounds-checking
-        // failed, we cannot safely index into module's handle to itself.
-        e.finish(Location::Undefined)
-    })?;
-    LimitsVerifier::verify_module(config, module)?;
-    DuplicationChecker::verify_module(module)?;
-    SignatureChecker::verify_module(module, ability_cache, meter)?;
-    InstructionConsistency::verify_module(module)?;
-    constants::verify_module(module)?;
-    friends::verify_module(module)?;
-    ability_field_requirements::verify_module(module, ability_cache, meter)?;
-    RecursiveDataDefChecker::verify_module(module)?;
-    InstantiationLoopChecker::verify_module(module)?;
+    verify_module_with_config_metered_up_to_code_units(config, module, ability_cache, meter)?;
     code_unit_verifier::verify_module(config, module, ability_cache, meter)?;
 
     script_signature::verify_module(module, no_additional_script_signature_checks)
@@ -108,4 +95,27 @@ pub fn verify_module_with_config_unmetered(
     module: &CompiledModule,
 ) -> VMResult<()> {
     verify_module_with_config_metered(config, module, &mut DummyMeter)
+}
+
+pub fn verify_module_with_config_metered_up_to_code_units<'env>(
+    config: &'env VerifierConfig,
+    module: &'env CompiledModule,
+    ability_cache: &mut AbilityCache<'env>,
+    meter: &mut (impl Meter + ?Sized),
+) -> VMResult<()> {
+    BoundsChecker::verify_module(module, config.deprecate_global_storage_ops).map_err(|e| {
+        // We can't point the error at the module, because if bounds-checking
+        // failed, we cannot safely index into module's handle to itself.
+        e.finish(Location::Undefined)
+    })?;
+    LimitsVerifier::verify_module(config, module)?;
+    DuplicationChecker::verify_module(module)?;
+    SignatureChecker::verify_module(module, ability_cache, meter)?;
+    InstructionConsistency::verify_module(config, module)?;
+    constants::verify_module(module)?;
+    friends::verify_module(module)?;
+    ability_field_requirements::verify_module(module, ability_cache, meter)?;
+    RecursiveDataDefChecker::verify_module(module)?;
+    InstantiationLoopChecker::verify_module(module)?;
+    Ok(())
 }

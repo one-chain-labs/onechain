@@ -237,7 +237,7 @@ that key <code>k: K</code>.
 
 ## Function `contains`
 
-Returns true iff there is a value associated with the key <code>k: K</code> in table <code><a href="../one/table.md#one_table">table</a>: &<a href="../one/table.md#one_table_Table">Table</a>&lt;K, V&gt;</code>
+Returns true if there is a value associated with the key <code>k: K</code> in table <code><a href="../one/table.md#one_table">table</a>: &<a href="../one/table.md#one_table_Table">Table</a>&lt;K, V&gt;</code>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/table.md#one_table_contains">contains</a>&lt;K: <b>copy</b>, <a href="../one/table.md#one_table_drop">drop</a>, store, V: store&gt;(<a href="../one/table.md#one_table">table</a>: &<a href="../one/table.md#one_table_Table">one::table::Table</a>&lt;K, V&gt;, k: K): bool

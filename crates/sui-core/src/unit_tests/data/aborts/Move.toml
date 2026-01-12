@@ -1,0 +1,10 @@
+[package]
+edition = "2024"
+name = "aborts"
+version = "0.0.1"
+
+[dependencies]
+One = { local = "../../../../../sui-framework/packages/one-framework" }
+
+[addresses]
+examples = "0x0"

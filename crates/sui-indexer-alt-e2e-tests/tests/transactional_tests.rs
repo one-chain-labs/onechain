@@ -11,20 +11,19 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context};
-use prometheus::Registry;
-use reqwest::Client;
+use anyhow::Context;
+use reqwest::{header::HeaderName, Client};
 use serde_json::{json, Value};
-use sui_indexer_alt::config::{IndexerConfig, Merge, PrunerLayer};
-use sui_indexer_alt_e2e_tests::OffchainCluster;
-use sui_indexer_alt_framework::{ingestion::ClientArgs, IndexerArgs};
-use sui_indexer_alt_jsonrpc::{config::RpcConfig, data::system_package_task::SystemPackageTaskArgs};
+use sui_indexer_alt::config::{ConcurrentLayer, IndexerConfig, Merge, PipelineLayer, PrunerLayer};
+use sui_indexer_alt_e2e_tests::{OffchainCluster, OffchainClusterConfig};
+use sui_indexer_alt_framework::ingestion::{ingestion_client::IngestionClientArgs, ClientArgs};
 use sui_transactional_test_runner::{
     create_adapter,
     offchain_state::{OffchainStateReader, TestResponse},
     run_tasks_with_adapter,
     test_adapter::{OffChainConfig, SuiTestAdapter, PRE_COMPILED},
 };
+use tokio::join;
 use tokio_util::sync::CancellationToken;
 
 struct OffchainReader {
@@ -44,15 +43,39 @@ impl OffchainReader {
 #[async_trait::async_trait]
 impl OffchainStateReader for OffchainReader {
     async fn wait_for_checkpoint_catchup(&self, checkpoint: u64, base_timeout: Duration) {
-        let _ = self.cluster.wait_for_checkpoint(checkpoint, base_timeout).await;
+        let indexer = self.cluster.wait_for_indexer(checkpoint, base_timeout);
+        let consistent_store = self.cluster.wait_for_consistent_store(checkpoint, base_timeout);
+        let graphql = self.cluster.wait_for_graphql(checkpoint, base_timeout);
+        let _ = join!(indexer, consistent_store, graphql);
     }
 
     async fn wait_for_pruned_checkpoint(&self, _: u64, _: Duration) {
         unimplemented!("Waiting for pruned checkpoints is not supported in these tests (add it if you need it)");
     }
 
-    async fn execute_graphql(&self, _: String, _: bool) -> anyhow::Result<TestResponse> {
-        bail!("GraphQL queries are not supported in these tests")
+    async fn execute_graphql(&self, query: String, show_usage: bool) -> anyhow::Result<TestResponse> {
+        let query = json!({ "query": query });
+
+        let mut request = self.client.post(self.cluster.graphql_url()).json(&query);
+
+        if show_usage {
+            request = request.header(HeaderName::from_static("x-sui-rpc-show-usage"), "true");
+        }
+
+        let response = request.send().await.context("Request to GraphQL server failed")?;
+
+        let mut headers = response.headers().clone();
+        headers.remove("date");
+
+        let version = headers.remove("x-sui-rpc-version").and_then(|v| v.to_str().ok().map(|s| s.to_owned()));
+
+        let body: Value = response.json().await.context("Failed to parse GraphQL response")?;
+
+        Ok(TestResponse {
+            response_body: serde_json::to_string_pretty(&body)?,
+            http_headers: Some(headers),
+            service_version: version,
+        })
     }
 
     async fn execute_jsonrpc(&self, method: String, params: Value) -> anyhow::Result<TestResponse> {
@@ -65,7 +88,7 @@ impl OffchainStateReader for OffchainReader {
 
         let response = self
             .client
-            .post(self.cluster.rpc_url())
+            .post(self.cluster.jsonrpc_url())
             .json(&query)
             .send()
             .await
@@ -86,40 +109,35 @@ impl OffchainStateReader for OffchainReader {
 }
 
 async fn cluster(config: &OffChainConfig) -> Arc<OffchainCluster> {
-    let cancel = CancellationToken::new();
-    let registry = Registry::new();
-
-    let indexer_args = IndexerArgs::default();
-
-    let client_args =
-        ClientArgs { local_ingestion_path: Some(config.data_ingestion_path.clone()), remote_store_url: None };
-
-    // This configuration controls how often the RPC service checks for changes to system packages.
-    // The default polling interval is probably too slow for changes to get picked up, so tests
-    // that rely on this behaviour will always fail, but this is better than flaky behavior.
-    let system_package_task_args = SystemPackageTaskArgs::default();
-
-    // The test config includes every pipeline, we configure its consistent range using the
-    // off-chain config that was passed in.
-    let indexer_config = IndexerConfig::for_test().merge(IndexerConfig {
-        consistency: PrunerLayer {
-            retention: Some(config.snapshot_config.snapshot_min_lag as u64),
+    let client_args = ClientArgs {
+        ingestion: IngestionClientArgs {
+            local_ingestion_path: Some(config.data_ingestion_path.clone()),
             ..Default::default()
         },
         ..Default::default()
-    });
+    };
 
-    let rpc_config = RpcConfig::default();
+    // The test config includes every pipeline, we configure its consistent range using the
+    // off-chain config that was passed in.
+    let pruner = PrunerLayer { retention: Some(config.snapshot_config.snapshot_min_lag as u64), ..Default::default() };
+
+    let indexer_config = IndexerConfig::for_test()
+        .merge(IndexerConfig {
+            pipeline: PipelineLayer {
+                coin_balance_buckets: Some(ConcurrentLayer { pruner: Some(pruner.clone()), ..Default::default() }),
+                obj_info: Some(ConcurrentLayer { pruner: Some(pruner), ..Default::default() }),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .expect("Failed to create indexer config");
 
     Arc::new(
         OffchainCluster::new(
-            indexer_args,
             client_args,
-            system_package_task_args,
-            indexer_config,
-            rpc_config,
-            &registry,
-            cancel,
+            OffchainClusterConfig { indexer_config, ..Default::default() },
+            &prometheus::Registry::new(),
+            CancellationToken::new(),
         )
         .await
         .expect("Failed to create off-chain cluster"),
@@ -143,7 +161,7 @@ async fn run_test(path: &Path) -> Result<(), Box<dyn Error>> {
     adapter.with_offchain_reader(Box::new(OffchainReader::new(c.clone())));
 
     // run the tasks in the test
-    run_tasks_with_adapter(path, adapter, output).await?;
+    run_tasks_with_adapter(path, adapter, output, None).await?;
 
     // clean-up the off-chain cluster
     Arc::try_unwrap(c).unwrap_or_else(|_| panic!("Failed to unwrap off-chain cluster")).stopped().await;

@@ -12,23 +12,31 @@ title: Module `one_system::stake_subsidy`
 -  [Function `get_distribution_counter`](#one_system_stake_subsidy_get_distribution_counter)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
 <b>use</b> <a href="../one/url.md#one_url">one::url</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
 <b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
@@ -106,20 +114,20 @@ title: Module `one_system::stake_subsidy`
 ## Constants
 
 
-<a name="one_system_stake_subsidy_BASIS_POINT_DENOMINATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy_BASIS_POINT_DENOMINATOR">BASIS_POINT_DENOMINATOR</a>: u128 = 10000;
-</code></pre>
-
-
-
 <a name="one_system_stake_subsidy_ESubsidyDecreaseRateTooLarge"></a>
 
 
 
 <pre><code><b>const</b> <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy_ESubsidyDecreaseRateTooLarge">ESubsidyDecreaseRateTooLarge</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="one_system_stake_subsidy_BASIS_POINT_DENOMINATOR"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy_BASIS_POINT_DENOMINATOR">BASIS_POINT_DENOMINATOR</a>: u128 = 10000;
 </code></pre>
 
 
@@ -192,9 +200,11 @@ Advance the epoch counter and draw down the subsidy for the epoch.
     self.distribution_counter = self.distribution_counter + 1;
     // Decrease the subsidy amount only when the current period ends.
     <b>if</b> (self.distribution_counter % self.stake_subsidy_period_length == 0) {
-        <b>let</b> decrease_amount = self.current_distribution_amount <b>as</b> u128
+        <b>let</b> decrease_amount =
+            self.current_distribution_amount <b>as</b> u128
             * (self.stake_subsidy_decrease_rate <b>as</b> u128) / <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy_BASIS_POINT_DENOMINATOR">BASIS_POINT_DENOMINATOR</a>;
-        self.current_distribution_amount = self.current_distribution_amount - (decrease_amount <b>as</b> u64)
+        self.current_distribution_amount =
+            self.current_distribution_amount - (decrease_amount <b>as</b> u64)
     };
     <a href="../one_system/stake_subsidy.md#one_system_stake_subsidy">stake_subsidy</a>
 }

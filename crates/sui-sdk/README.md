@@ -148,7 +148,7 @@ See the programmable transactions [example](https://github.com/one-chain-labs/on
    1. [Connect to Sui Devnet](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/connect.mdx).
    1. [Make sure you have two addresses with gas](https://github.com/one-chain-labs/onechain/blob/main/docs/content/guides/developer/getting-started/get-address.mdx) by using the `new-address` command to create new addresses:
       ```shell
-      sui client new-address ed25519
+      one client new-address ed25519
       ```
       You must specify the key scheme, one of `ed25519` or `secp256k1` or `secp256r1`.
       You can skip this step if you are going to play with a friend. :)
@@ -159,7 +159,7 @@ See the programmable transactions [example](https://github.com/one-chain-labs/on
    1. Publish the [`tic-tac-toe` package](https://github.com/one-chain-labs/onechain/tree/main/examples/tic-tac-toe/move)
       using the Sui client:
       ```shell
-      sui client publish --path /path-to-sui-source-code/examples/tic-tac-toe/move
+      one client publish --path /path-to-sui-source-code/examples/tic-tac-toe/move
       ```
    1. Record the package object ID.
 

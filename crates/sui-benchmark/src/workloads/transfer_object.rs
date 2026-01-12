@@ -232,4 +232,8 @@ impl Workload<dyn Payload> for TransferObjectWorkload {
             .map(|b| Box::<dyn Payload>::from(b))
             .collect()
     }
+
+    fn name(&self) -> &str {
+        "TransferObject"
+    }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Result;
 use sui_config::{transaction_deny_config::TransactionDenyConfig, verifier_signing_config::VerifierSigningConfig};
@@ -10,6 +10,7 @@ use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use sui_types::{
     committee::{Committee, EpochId},
     effects::TransactionEffects,
+    execution_params::ExecutionOrEarlyError,
     gas::SuiGasStatus,
     inner_temporary_store::InnerTemporaryStore,
     metrics::{BytecodeVerifierMetrics, LimitsMetrics},
@@ -37,13 +38,17 @@ pub struct EpochState {
 
 impl EpochState {
     pub fn new(system_state: SuiSystemState) -> Self {
+        let protocol_config = ProtocolConfig::get_for_version(system_state.protocol_version().into(), Chain::Unknown);
+        Self::new_with_protocol_config(system_state, protocol_config)
+    }
+
+    pub fn new_with_protocol_config(system_state: SuiSystemState, protocol_config: ProtocolConfig) -> Self {
         let epoch_start_state = system_state.into_epoch_start_state();
         let committee = epoch_start_state.get_sui_committee();
-        let protocol_config = ProtocolConfig::get_for_version(epoch_start_state.protocol_version(), Chain::Unknown);
         let registry = prometheus::Registry::new();
         let limits_metrics = Arc::new(LimitsMetrics::new(&registry));
         let bytecode_verifier_metrics = Arc::new(BytecodeVerifierMetrics::new(&registry));
-        let executor = sui_execution::executor(&protocol_config, true, None).unwrap();
+        let executor = sui_execution::executor(&protocol_config, true).unwrap();
 
         Self {
             epoch_start_state,
@@ -129,8 +134,9 @@ impl EpochState {
             store.backing_store(),
             &self.protocol_config,
             self.limits_metrics.clone(),
-            false,           // enable_expensive_checks
-            &HashSet::new(), // certificate_deny_set
+            false, // enable_expensive_checks
+            // TODO: Integrate with early execution error
+            ExecutionOrEarlyError::Ok(()),
             &self.epoch_start_state.epoch(),
             self.epoch_start_state.epoch_start_timestamp_ms(),
             checked_input_objects,

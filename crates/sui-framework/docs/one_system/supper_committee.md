@@ -20,9 +20,13 @@ title: Module `one_system::supper_committee`
 -  [Function `get_vote_power`](#one_system_supper_committee_get_vote_power)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/clock.md#one_clock">one::clock</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/coin_vesting.md#one_coin_vesting">one::coin_vesting</a>;
@@ -31,9 +35,12 @@ title: Module `one_system::supper_committee`
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
@@ -256,47 +263,11 @@ title: Module `one_system::supper_committee`
 ## Constants
 
 
-<a name="one_system_supper_committee_ENotProposalStatusProgress"></a>
+<a name="one_system_supper_committee_Timeout"></a>
 
 
 
-<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_ENotProposalStatusProgress">ENotProposalStatusProgress</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="one_system_supper_committee_ENotSupportStructType"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_ENotSupportStructType">ENotSupportStructType</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="one_system_supper_committee_PROPOSAl_STATUS_ACTIVE"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_PROPOSAl_STATUS_ACTIVE">PROPOSAl_STATUS_ACTIVE</a>: u8 = 2;
-</code></pre>
-
-
-
-<a name="one_system_supper_committee_PROPOSAl_STATUS_FAIL"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_PROPOSAl_STATUS_FAIL">PROPOSAl_STATUS_FAIL</a>: u8 = 4;
-</code></pre>
-
-
-
-<a name="one_system_supper_committee_PROPOSAl_STATUS_PASS"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_PROPOSAl_STATUS_PASS">PROPOSAl_STATUS_PASS</a>: u8 = 3;
+<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_Timeout">Timeout</a>: u64 = 604800000;
 </code></pre>
 
 
@@ -311,6 +282,33 @@ proposal status
 
 
 
+<a name="one_system_supper_committee_PROPOSAl_STATUS_ACTIVE"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_PROPOSAl_STATUS_ACTIVE">PROPOSAl_STATUS_ACTIVE</a>: u8 = 2;
+</code></pre>
+
+
+
+<a name="one_system_supper_committee_PROPOSAl_STATUS_PASS"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_PROPOSAl_STATUS_PASS">PROPOSAl_STATUS_PASS</a>: u8 = 3;
+</code></pre>
+
+
+
+<a name="one_system_supper_committee_PROPOSAl_STATUS_FAIL"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_PROPOSAl_STATUS_FAIL">PROPOSAl_STATUS_FAIL</a>: u8 = 4;
+</code></pre>
+
+
+
 <a name="one_system_supper_committee_PROPOSAl_STATUS_TIMEOUT"></a>
 
 
@@ -320,11 +318,20 @@ proposal status
 
 
 
-<a name="one_system_supper_committee_Timeout"></a>
+<a name="one_system_supper_committee_ENotProposalStatusProgress"></a>
 
 
 
-<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_Timeout">Timeout</a>: u64 = 604800000;
+<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_ENotProposalStatusProgress">ENotProposalStatusProgress</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="one_system_supper_committee_ENotSupportStructType"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one_system/supper_committee.md#one_system_supper_committee_ENotSupportStructType">ENotSupportStructType</a>: u64 = 2;
 </code></pre>
 
 
@@ -533,9 +540,9 @@ proposal status
     clock: &Clock,
     ctx: &<b>mut</b> TxContext,
 ){
-    <b>let</b> action_type = type_name::get&lt;Action&gt;();
+    <b>let</b> action_type = type_name::with_defining_ids&lt;Action&gt;();
     // only sui_system <a href="../one_system/supper_committee.md#one_system_supper_committee_action">action</a> <b>struct</b> types
-    <b>assert</b>!(action_type.get_address() == address::to_ascii_string(@0x3),<a href="../one_system/supper_committee.md#one_system_supper_committee_ENotSupportStructType">ENotSupportStructType</a>);
+    <b>assert</b>!(action_type.address_string() == address::to_ascii_string(@0x3),<a href="../one_system/supper_committee.md#one_system_supper_committee_ENotSupportStructType">ENotSupportStructType</a>);
     <b>let</b> <b>mut</b> proposal = <a href="../one_system/supper_committee.md#one_system_supper_committee_Proposal">Proposal</a>{
         id: object::new(ctx),
         proposer: validator_address,

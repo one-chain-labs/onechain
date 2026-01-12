@@ -33,7 +33,7 @@ use crate::{
         ZkLoginAuthenticatorAsBytes,
     },
     digests::ZKLoginInputsDigest,
-    error::{SuiError, SuiResult},
+    error::{SuiError, SuiErrorKind, SuiResult},
     multisig::MultiSig,
     multisig_legacy::MultiSigLegacy,
     passkey_authenticator::PasskeyAuthenticator,
@@ -50,6 +50,7 @@ pub struct VerifyParams {
     pub accept_zklogin_in_multisig: bool,
     pub accept_passkey_in_multisig: bool,
     pub zklogin_max_epoch_upper_bound_delta: Option<u64>,
+    pub additional_multisig_checks: bool,
 }
 
 impl VerifyParams {
@@ -61,6 +62,7 @@ impl VerifyParams {
         accept_zklogin_in_multisig: bool,
         accept_passkey_in_multisig: bool,
         zklogin_max_epoch_upper_bound_delta: Option<u64>,
+        additional_multisig_checks: bool,
     ) -> Self {
         Self {
             oidc_provider_jwks,
@@ -70,6 +72,7 @@ impl VerifyParams {
             accept_zklogin_in_multisig,
             accept_passkey_in_multisig,
             zklogin_max_epoch_upper_bound_delta,
+            additional_multisig_checks,
         }
     }
 }
@@ -140,27 +143,30 @@ impl GenericSignature {
                 let bytes = s.signature_bytes();
                 match s.scheme() {
                     SignatureScheme::ED25519 => Ok(CompressedSignature::Ed25519(
-                        (&Ed25519Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
+                        (&Ed25519Signature::from_bytes(bytes).map_err(|_| SuiErrorKind::InvalidSignature {
                             error: "Cannot parse ed25519 sig".to_string(),
                         })?)
                             .into(),
                     )),
                     SignatureScheme::Secp256k1 => Ok(CompressedSignature::Secp256k1(
-                        (&Secp256k1Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
+                        (&Secp256k1Signature::from_bytes(bytes).map_err(|_| SuiErrorKind::InvalidSignature {
                             error: "Cannot parse secp256k1 sig".to_string(),
                         })?)
                             .into(),
                     )),
                     SignatureScheme::Secp256r1 | SignatureScheme::PasskeyAuthenticator => {
                         Ok(CompressedSignature::Secp256r1(
-                            (&Secp256r1Signature::from_bytes(bytes).map_err(|_| SuiError::InvalidSignature {
+                            (&Secp256r1Signature::from_bytes(bytes).map_err(|_| SuiErrorKind::InvalidSignature {
                                 error: "Cannot parse secp256r1 sig".to_string(),
                             })?)
                                 .into(),
                         ))
                     }
 
-                    _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
+                    _ => {
+                        Err(SuiErrorKind::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }
+                            .into())
+                    }
                 }
             }
             GenericSignature::ZkLoginAuthenticator(s) => {
@@ -169,7 +175,7 @@ impl GenericSignature {
             GenericSignature::PasskeyAuthenticator(s) => {
                 Ok(CompressedSignature::Passkey(PasskeyAuthenticatorAsBytes(s.as_ref().to_vec())))
             }
-            _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
+            _ => Err(SuiErrorKind::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }.into()),
         }
     }
 
@@ -182,27 +188,28 @@ impl GenericSignature {
                 match s.scheme() {
                     SignatureScheme::ED25519 => Ok(PublicKey::Ed25519(
                         (&Ed25519PublicKey::from_bytes(bytes)
-                            .map_err(|_| SuiError::KeyConversionError("Cannot parse ed25519 pk".to_string()))?)
+                            .map_err(|_| SuiErrorKind::KeyConversionError("Cannot parse ed25519 pk".to_string()))?)
                             .into(),
                     )),
                     SignatureScheme::Secp256k1 => Ok(PublicKey::Secp256k1(
                         (&Secp256k1PublicKey::from_bytes(bytes)
-                            .map_err(|_| SuiError::KeyConversionError("Cannot parse secp256k1 pk".to_string()))?)
+                            .map_err(|_| SuiErrorKind::KeyConversionError("Cannot parse secp256k1 pk".to_string()))?)
                             .into(),
                     )),
                     SignatureScheme::Secp256r1 => Ok(PublicKey::Secp256r1(
                         (&Secp256r1PublicKey::from_bytes(bytes)
-                            .map_err(|_| SuiError::KeyConversionError("Cannot parse secp256r1 pk".to_string()))?)
+                            .map_err(|_| SuiErrorKind::KeyConversionError("Cannot parse secp256r1 pk".to_string()))?)
                             .into(),
                     )),
-                    _ => Err(SuiError::UnsupportedFeatureError {
+                    _ => Err(SuiErrorKind::UnsupportedFeatureError {
                         error: "Unsupported signature scheme in MultiSig".to_string(),
-                    }),
+                    }
+                    .into()),
                 }
             }
             GenericSignature::ZkLoginAuthenticator(s) => s.get_pk(),
             GenericSignature::PasskeyAuthenticator(s) => s.get_pk(),
-            _ => Err(SuiError::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }),
+            _ => Err(SuiErrorKind::UnsupportedFeatureError { error: "Unsupported signature scheme".to_string() }.into()),
         }
     }
 }

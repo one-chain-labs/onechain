@@ -2,7 +2,7 @@
 title: Module `one_system::one_system`
 ---
 
-Sui System State Type Upgrade Guide
+Oct System State Type Upgrade Guide
 <code><a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a></code> is a thin wrapper around <code>SuiSystemStateInner</code> that provides a versioned interface.
 The <code><a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a></code> object has a fixed ID 0x5, and the <code>SuiSystemStateInner</code> object is stored as a dynamic field.
 There are a few different ways to upgrade the <code>SuiSystemStateInner</code> type:
@@ -90,17 +90,26 @@ the SuiSystemStateInner version, or vice versa.
 -  [Function `validator_address_by_pool_id`](#one_system_one_system_validator_address_by_pool_id)
 -  [Function `pool_exchange_rates`](#one_system_one_system_pool_exchange_rates)
 -  [Function `active_validator_addresses`](#one_system_one_system_active_validator_addresses)
+-  [Function `active_validator_addresses_ref`](#one_system_one_system_active_validator_addresses_ref)
+-  [Function `active_validator_voting_powers`](#one_system_one_system_active_validator_voting_powers)
+-  [Function `calculate_rewards`](#one_system_one_system_calculate_rewards)
 -  [Function `advance_epoch`](#one_system_one_system_advance_epoch)
 -  [Function `load_system_state`](#one_system_one_system_load_system_state)
 -  [Function `load_system_state_mut`](#one_system_one_system_load_system_state_mut)
+-  [Function `load_system_state_ref`](#one_system_one_system_load_system_state_ref)
 -  [Function `load_inner_maybe_upgrade`](#one_system_one_system_load_inner_maybe_upgrade)
 -  [Function `validator_voting_powers`](#one_system_one_system_validator_voting_powers)
 -  [Function `store_execution_time_estimates`](#one_system_one_system_store_execution_time_estimates)
+-  [Function `store_execution_time_estimates_v2`](#one_system_one_system_store_execution_time_estimates_v2)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/clock.md#one_clock">one::clock</a>;
 <b>use</b> <a href="../one/coin.md#one_coin">one::coin</a>;
 <b>use</b> <a href="../one/coin_vesting.md#one_coin_vesting">one::coin_vesting</a>;
@@ -109,10 +118,12 @@ the SuiSystemStateInner version, or vice versa.
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
 <b>use</b> <a href="../one/oct.md#one_oct">one::oct</a>;
-<b>use</b> <a href="../one/pay.md#one_pay">one::pay</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/priority_queue.md#one_priority_queue">one::priority_queue</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/table_vec.md#one_table_vec">one::table_vec</a>;
@@ -415,25 +426,26 @@ To produce a valid PoP, run [fn test_proof_of_possession].
     commission_rate: u64,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_add_validator_candidate">request_add_validator_candidate</a>(
-        pubkey_bytes,
-        network_pubkey_bytes,
-        worker_pubkey_bytes,
-        proof_of_possession,
-        name,
-        description,
-        image_url,
-        project_url,
-        net_address,
-        p2p_address,
-        primary_address,
-        worker_address,
-        revenue_receiving_address,
-        gas_price,
-        commission_rate,
-        ctx,
-    )
+    wrapper
+        .<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>()
+        .<a href="../one_system/one_system.md#one_system_one_system_request_add_validator_candidate">request_add_validator_candidate</a>(
+            pubkey_bytes,
+            network_pubkey_bytes,
+            worker_pubkey_bytes,
+            proof_of_possession,
+            name,
+            description,
+            image_url,
+            project_url,
+            net_address,
+            p2p_address,
+            primary_address,
+            worker_address,
+            revenue_receiving_address,
+            gas_price,
+            commission_rate,
+            ctx,
+        )
 }
 </code></pre>
 
@@ -462,8 +474,7 @@ their staking pool becomes deactivate.
     wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_remove_validator_candidate">request_remove_validator_candidate</a>(ctx)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_remove_validator_candidate">request_remove_validator_candidate</a>(ctx)
 }
 </code></pre>
 
@@ -490,12 +501,8 @@ epoch has already reached the maximum.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_request_add_validator">request_add_validator</a>(
-    wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
-    ctx: &<b>mut</b> TxContext,
-) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_add_validator">request_add_validator</a>(ctx)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_request_add_validator">request_add_validator</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>, ctx: &<b>mut</b> TxContext) {
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_add_validator">request_add_validator</a>(ctx)
 }
 </code></pre>
 
@@ -523,12 +530,8 @@ of the validator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_request_remove_validator">request_remove_validator</a>(
-    wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
-    ctx: &<b>mut</b> TxContext,
-) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_remove_validator">request_remove_validator</a>(ctx)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_request_remove_validator">request_remove_validator</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>, ctx: &<b>mut</b> TxContext) {
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_remove_validator">request_remove_validator</a>(ctx)
 }
 </code></pre>
 
@@ -558,8 +561,7 @@ used for the reference gas price calculation at the end of the epoch.
     cap: &UnverifiedValidatorOperationCap,
     new_gas_price: u64,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_set_gas_price">request_set_gas_price</a>(cap, new_gas_price)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_set_gas_price">request_set_gas_price</a>(cap, new_gas_price)
 }
 </code></pre>
 
@@ -588,8 +590,7 @@ This entry function is used to set new gas price for candidate validators
     cap: &UnverifiedValidatorOperationCap,
     new_gas_price: u64,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_set_candidate_validator_gas_price">set_candidate_validator_gas_price</a>(cap, new_gas_price)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_set_candidate_validator_gas_price">set_candidate_validator_gas_price</a>(cap, new_gas_price)
 }
 </code></pre>
 
@@ -648,8 +649,7 @@ the epoch.
     new_commission_rate: u64,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_set_commission_rate">request_set_commission_rate</a>(new_commission_rate, ctx)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_set_commission_rate">request_set_commission_rate</a>(new_commission_rate, ctx)
 }
 </code></pre>
 
@@ -678,8 +678,9 @@ This entry function is used to set new commission rate for candidate validators
     new_commission_rate: u64,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_set_candidate_validator_commission_rate">set_candidate_validator_commission_rate</a>(new_commission_rate, ctx)
+    wrapper
+        .<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>()
+        .<a href="../one_system/one_system.md#one_system_one_system_set_candidate_validator_commission_rate">set_candidate_validator_commission_rate</a>(new_commission_rate, ctx)
 }
 </code></pre>
 
@@ -752,7 +753,7 @@ Add stake to a validator's staking pool.
 
 ## Function `request_add_stake_non_entry`
 
-The non-entry version of <code><a href="../one_system/one_system.md#one_system_one_system_request_add_stake">request_add_stake</a></code>, which returns the staked SUI instead of transferring it to the sender.
+The non-entry version of <code><a href="../one_system/one_system.md#one_system_one_system_request_add_stake">request_add_stake</a></code>, which returns the staked OCT instead of transferring it to the sender.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_request_add_stake_non_entry">request_add_stake_non_entry</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">one_system::one_system::SuiSystemState</a>, stake: <a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a>&lt;<a href="../one/oct.md#one_oct_OCT">one::oct::OCT</a>&gt;, validator_address: <b>address</b>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>
@@ -770,8 +771,7 @@ The non-entry version of <code><a href="../one_system/one_system.md#one_system_o
     validator_address: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
 ): StakedOct {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_add_stake">request_add_stake</a>(stake, validator_address, ctx)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_add_stake">request_add_stake</a>(stake, validator_address, ctx)
 }
 </code></pre>
 
@@ -832,8 +832,9 @@ Add stake to a validator's staking pool using multiple coins.
     validator_address: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    <b>let</b> staked_oct = self.<a href="../one_system/one_system.md#one_system_one_system_request_add_stake_mul_coin">request_add_stake_mul_coin</a>(stakes, stake_amount, validator_address, ctx);
+    <b>let</b> staked_oct = wrapper
+        .<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>()
+        .<a href="../one_system/one_system.md#one_system_one_system_request_add_stake_mul_coin">request_add_stake_mul_coin</a>(stakes, stake_amount, validator_address, ctx);
     transfer::public_transfer(staked_oct, ctx.sender());
 }
 </code></pre>
@@ -891,17 +892,17 @@ Withdraw stake from a validator's staking pool.
 
 
 <pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_request_withdraw_stake">request_withdraw_stake</a>(
-    wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
-    staked_oct: StakedOct,
-    ctx: &<b>mut</b> TxContext,
+   wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
+   staked_oct: StakedOct,
+   ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> (withdrawn_stake,coin_vesting) = <a href="../one_system/one_system.md#one_system_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(wrapper, staked_oct, ctx);
-    transfer::public_transfer(withdrawn_stake.into_coin(ctx), ctx.sender());
-    <b>if</b>(coin_vesting.is_some()){
-        transfer::public_transfer(coin_vesting.destroy_some(),ctx.sender());
-    }<b>else</b> {
-        coin_vesting.destroy_none();
-    }
+   <b>let</b> (withdrawn_stake,coin_vesting) = <a href="../one_system/one_system.md#one_system_one_system_request_withdraw_stake_non_entry">request_withdraw_stake_non_entry</a>(wrapper, staked_oct, ctx);
+   transfer::public_transfer(withdrawn_stake.into_coin(ctx), ctx.sender());
+   <b>if</b>(coin_vesting.is_some()){
+       transfer::public_transfer(coin_vesting.destroy_some(),ctx.sender());
+   }<b>else</b> {
+       coin_vesting.destroy_none();
+   }
 }
 </code></pre>
 
@@ -930,8 +931,7 @@ Convert StakedOct into a FungibleStakedOct object.
     staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
 ): FungibleStakedOct {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(staked_oct, ctx)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_convert_to_fungible_staked_oct">convert_to_fungible_staked_oct</a>(staked_oct, ctx)
 }
 </code></pre>
 
@@ -960,8 +960,7 @@ Convert FungibleStakedOct into a StakedOct object.
     fungible_staked_oct: FungibleStakedOct,
     ctx: &TxContext,
 ): Balance&lt;OCT&gt; {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(fungible_staked_oct, ctx)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_redeem_fungible_staked_oct">redeem_fungible_staked_oct</a>(fungible_staked_oct, ctx)
 }
 </code></pre>
 
@@ -990,8 +989,7 @@ Non-entry version of <code><a href="../one_system/one_system.md#one_system_one_s
     staked_oct: StakedOct,
     ctx: &<b>mut</b> TxContext,
 ) :(Balance&lt;OCT&gt;,Option&lt;CoinVesting&lt;OCT&gt;&gt;) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_request_withdraw_stake">request_withdraw_stake</a>(staked_oct, ctx)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_request_withdraw_stake">request_withdraw_stake</a>(staked_oct, ctx)
 }
 </code></pre>
 
@@ -1025,8 +1023,7 @@ This function is idempotent.
     cap: &UnverifiedValidatorOperationCap,
     reportee_addr: <b>address</b>,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_report_validator">report_validator</a>(cap, reportee_addr)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_report_validator">report_validator</a>(cap, reportee_addr)
 }
 </code></pre>
 
@@ -1058,8 +1055,7 @@ Undo a <code><a href="../one_system/one_system.md#one_system_one_system_report_v
     cap: &UnverifiedValidatorOperationCap,
     reportee_addr: <b>address</b>,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_undo_report_validator">undo_report_validator</a>(cap, reportee_addr)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_undo_report_validator">undo_report_validator</a>(cap, reportee_addr)
 }
 </code></pre>
 
@@ -1084,12 +1080,8 @@ validator and registers it. The original object is thus revoked.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_rotate_operation_cap">rotate_operation_cap</a>(
-    self: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
-    ctx: &<b>mut</b> TxContext,
-) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_rotate_operation_cap">rotate_operation_cap</a>(ctx)
+<pre><code><b>public</b> <b>entry</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_rotate_operation_cap">rotate_operation_cap</a>(self: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>, ctx: &<b>mut</b> TxContext) {
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_rotate_operation_cap">rotate_operation_cap</a>(ctx)
 }
 </code></pre>
 
@@ -1118,8 +1110,7 @@ Update a validator's name.
     name: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_name">update_validator_name</a>(name, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_name">update_validator_name</a>(name, ctx)
 }
 </code></pre>
 
@@ -1148,8 +1139,7 @@ Update a validator's description
     description: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_description">update_validator_description</a>(description, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_description">update_validator_description</a>(description, ctx)
 }
 </code></pre>
 
@@ -1178,8 +1168,7 @@ Update a validator's image url
     image_url: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_image_url">update_validator_image_url</a>(image_url, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_image_url">update_validator_image_url</a>(image_url, ctx)
 }
 </code></pre>
 
@@ -1208,8 +1197,7 @@ Update a validator's project url
     project_url: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_project_url">update_validator_project_url</a>(project_url, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_project_url">update_validator_project_url</a>(project_url, ctx)
 }
 </code></pre>
 
@@ -1239,8 +1227,7 @@ The change will only take effects starting from the next epoch.
     network_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_network_address">update_validator_next_epoch_network_address</a>(network_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_network_address">update_validator_next_epoch_network_address</a>(network_address, ctx)
 }
 </code></pre>
 
@@ -1269,8 +1256,7 @@ Update candidate validator's network address.
     network_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_network_address">update_candidate_validator_network_address</a>(network_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_network_address">update_candidate_validator_network_address</a>(network_address, ctx)
 }
 </code></pre>
 
@@ -1300,8 +1286,7 @@ The change will only take effects starting from the next epoch.
     p2p_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_p2p_address">update_validator_next_epoch_p2p_address</a>(p2p_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_p2p_address">update_validator_next_epoch_p2p_address</a>(p2p_address, ctx)
 }
 </code></pre>
 
@@ -1330,8 +1315,7 @@ Update candidate validator's p2p address.
     p2p_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_p2p_address">update_candidate_validator_p2p_address</a>(p2p_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_p2p_address">update_candidate_validator_p2p_address</a>(p2p_address, ctx)
 }
 </code></pre>
 
@@ -1361,8 +1345,7 @@ The change will only take effects starting from the next epoch.
     primary_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_primary_address">update_validator_next_epoch_primary_address</a>(primary_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_primary_address">update_validator_next_epoch_primary_address</a>(primary_address, ctx)
 }
 </code></pre>
 
@@ -1391,8 +1374,7 @@ Update candidate validator's narwhal primary address.
     primary_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_primary_address">update_candidate_validator_primary_address</a>(primary_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_primary_address">update_candidate_validator_primary_address</a>(primary_address, ctx)
 }
 </code></pre>
 
@@ -1422,8 +1404,7 @@ The change will only take effects starting from the next epoch.
     worker_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_worker_address">update_validator_next_epoch_worker_address</a>(worker_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_worker_address">update_validator_next_epoch_worker_address</a>(worker_address, ctx)
 }
 </code></pre>
 
@@ -1452,8 +1433,7 @@ Update candidate validator's narwhal worker address.
     worker_address: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_worker_address">update_candidate_validator_worker_address</a>(worker_address, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_worker_address">update_candidate_validator_worker_address</a>(worker_address, ctx)
 }
 </code></pre>
 
@@ -1484,8 +1464,9 @@ The change will only take effects starting from the next epoch.
     proof_of_possession: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_protocol_pubkey">update_validator_next_epoch_protocol_pubkey</a>(protocol_pubkey, proof_of_possession, ctx)
+    self
+        .<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>()
+        .<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_protocol_pubkey">update_validator_next_epoch_protocol_pubkey</a>(protocol_pubkey, proof_of_possession, ctx)
 }
 </code></pre>
 
@@ -1515,8 +1496,9 @@ Update candidate validator's public key of protocol key and proof of possession.
     proof_of_possession: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_protocol_pubkey">update_candidate_validator_protocol_pubkey</a>(protocol_pubkey, proof_of_possession, ctx)
+    self
+        .<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>()
+        .<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_protocol_pubkey">update_candidate_validator_protocol_pubkey</a>(protocol_pubkey, proof_of_possession, ctx)
 }
 </code></pre>
 
@@ -1546,8 +1528,7 @@ The change will only take effects starting from the next epoch.
     worker_pubkey: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_worker_pubkey">update_validator_next_epoch_worker_pubkey</a>(worker_pubkey, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_worker_pubkey">update_validator_next_epoch_worker_pubkey</a>(worker_pubkey, ctx)
 }
 </code></pre>
 
@@ -1576,8 +1557,7 @@ Update candidate validator's public key of worker key.
     worker_pubkey: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_worker_pubkey">update_candidate_validator_worker_pubkey</a>(worker_pubkey, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_worker_pubkey">update_candidate_validator_worker_pubkey</a>(worker_pubkey, ctx)
 }
 </code></pre>
 
@@ -1607,8 +1587,7 @@ The change will only take effects starting from the next epoch.
     network_pubkey: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_network_pubkey">update_validator_next_epoch_network_pubkey</a>(network_pubkey, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_validator_next_epoch_network_pubkey">update_validator_next_epoch_network_pubkey</a>(network_pubkey, ctx)
 }
 </code></pre>
 
@@ -1637,8 +1616,7 @@ Update candidate validator's public key of network key.
     network_pubkey: vector&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(self);
-    self.<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_network_pubkey">update_candidate_validator_network_pubkey</a>(network_pubkey, ctx)
+    self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_update_candidate_validator_network_pubkey">update_candidate_validator_network_pubkey</a>(network_pubkey, ctx)
 }
 </code></pre>
 
@@ -1662,8 +1640,7 @@ Update candidate validator's public key of network key.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_validator_address_by_pool_id">validator_address_by_pool_id</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>, pool_id: &ID): <b>address</b> {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_validator_address_by_pool_id">validator_address_by_pool_id</a>(pool_id)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_validator_address_by_pool_id">validator_address_by_pool_id</a>(pool_id)
 }
 </code></pre>
 
@@ -1689,10 +1666,9 @@ Getter of the pool token exchange rate of a staking pool. Works for both active 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_pool_exchange_rates">pool_exchange_rates</a>(
     wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
-    pool_id: &ID
-): &Table&lt;u64, PoolTokenExchangeRate&gt;  {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_pool_exchange_rates">pool_exchange_rates</a>(pool_id)
+    pool_id: &ID,
+): &Table&lt;u64, PoolTokenExchangeRate&gt; {
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_pool_exchange_rates">pool_exchange_rates</a>(pool_id)
 }
 </code></pre>
 
@@ -1717,8 +1693,92 @@ Getter returning addresses of the currently active validators.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_active_validator_addresses">active_validator_addresses</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>): vector&lt;<b>address</b>&gt; {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state">load_system_state</a>(wrapper);
-    self.<a href="../one_system/one_system.md#one_system_one_system_active_validator_addresses">active_validator_addresses</a>()
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_active_validator_addresses">active_validator_addresses</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_system_one_system_active_validator_addresses_ref"></a>
+
+## Function `active_validator_addresses_ref`
+
+Getter returning addresses of the currently active validators by reference.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_active_validator_addresses_ref">active_validator_addresses_ref</a>(wrapper: &<a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">one_system::one_system::SuiSystemState</a>): vector&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_active_validator_addresses_ref">active_validator_addresses_ref</a>(wrapper: &<a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>): vector&lt;<b>address</b>&gt; {
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_ref">load_system_state_ref</a>().<a href="../one_system/one_system.md#one_system_one_system_active_validator_addresses">active_validator_addresses</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_system_one_system_active_validator_voting_powers"></a>
+
+## Function `active_validator_voting_powers`
+
+Getter returns the voting power of the active validators, values are voting power in the scale of 10000.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_active_validator_voting_powers">active_validator_voting_powers</a>(wrapper: &<a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">one_system::one_system::SuiSystemState</a>): <a href="../one/vec_map.md#one_vec_map_VecMap">one::vec_map::VecMap</a>&lt;<b>address</b>, u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_active_validator_voting_powers">active_validator_voting_powers</a>(wrapper: &<a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>): VecMap&lt;<b>address</b>, u64&gt; {
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_ref">load_system_state_ref</a>().<a href="../one_system/one_system.md#one_system_one_system_active_validator_voting_powers">active_validator_voting_powers</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_system_one_system_calculate_rewards"></a>
+
+## Function `calculate_rewards`
+
+Calculate the rewards for a given staked OCT object.
+Used in the package, and can be dev-inspected.
+
+
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_calculate_rewards">calculate_rewards</a>(self: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">one_system::one_system::SuiSystemState</a>, staked_oct: &<a href="../one_system/staking_pool.md#one_system_staking_pool_StakedOct">one_system::staking_pool::StakedOct</a>, ctx: &<a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_calculate_rewards">calculate_rewards</a>(
+    self: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
+    staked_oct: &StakedOct,
+    ctx: &TxContext,
+): u64 {
+    <b>let</b> system_state = self.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>();
+    system_state
+        .validators_mut()
+        .validator_by_pool_id(&staked_oct.pool_id())
+        .get_staking_pool_ref()
+        .<a href="../one_system/one_system.md#one_system_one_system_calculate_rewards">calculate_rewards</a>(staked_oct, ctx.epoch())
 }
 </code></pre>
 
@@ -1757,26 +1817,27 @@ gas coins.
     storage_rebate: u64,
     non_refundable_storage_fee: u64,
     storage_fund_reinvest_rate: u64, // share of storage fund's rewards that's reinvested
-                                        // into storage fund, in basis point.
+    // into storage fund, in basis point.
     reward_slashing_rate: u64, // how much rewards are slashed to punish a <a href="../one_system/validator.md#one_system_validator">validator</a>, in bps.
     epoch_start_timestamp_ms: u64, // Timestamp of the epoch start
     ctx: &<b>mut</b> TxContext,
 ): Balance&lt;OCT&gt; {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
     // Validator will make a special system call with sender set <b>as</b> 0x0.
     <b>assert</b>!(ctx.sender() == @0x0, <a href="../one_system/one_system.md#one_system_one_system_ENotSystemAddress">ENotSystemAddress</a>);
-    <b>let</b> storage_rebate = self.<a href="../one_system/one_system.md#one_system_one_system_advance_epoch">advance_epoch</a>(
-        new_epoch,
-        next_protocol_version,
-        storage_reward,
-        computation_reward,
-        storage_rebate,
-        non_refundable_storage_fee,
-        storage_fund_reinvest_rate,
-        reward_slashing_rate,
-        epoch_start_timestamp_ms,
-        ctx,
-    );
+    <b>let</b> storage_rebate = wrapper
+        .<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>()
+        .<a href="../one_system/one_system.md#one_system_one_system_advance_epoch">advance_epoch</a>(
+            new_epoch,
+            next_protocol_version,
+            storage_reward,
+            computation_reward,
+            storage_rebate,
+            non_refundable_storage_fee,
+            storage_fund_reinvest_rate,
+            reward_slashing_rate,
+            epoch_start_timestamp_ms,
+            ctx,
+        );
     storage_rebate
 }
 </code></pre>
@@ -1833,6 +1894,35 @@ gas coins.
 
 </details>
 
+<a name="one_system_one_system_load_system_state_ref"></a>
+
+## Function `load_system_state_ref`
+
+
+
+<pre><code><b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_load_system_state_ref">load_system_state_ref</a>(self: &<a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">one_system::one_system::SuiSystemState</a>): &<a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_SuiSystemStateInnerV2">one_system::sui_system_state_inner::SuiSystemStateInnerV2</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_load_system_state_ref">load_system_state_ref</a>(self: &<a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>): &SuiSystemStateInnerV2 {
+    <b>let</b> inner: &SuiSystemStateInnerV2 = dynamic_field::borrow(
+        &self.id,
+        self.version,
+    );
+    <b>assert</b>!(inner.system_state_version() == self.version, <a href="../one_system/one_system.md#one_system_one_system_EWrongInnerVersion">EWrongInnerVersion</a>);
+    inner
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="one_system_one_system_load_inner_maybe_upgrade"></a>
 
 ## Function `load_inner_maybe_upgrade`
@@ -1857,7 +1947,7 @@ gas coins.
     };
     <b>let</b> inner: &<b>mut</b> SuiSystemStateInnerV2 = dynamic_field::borrow_mut(
         &<b>mut</b> self.id,
-        self.version
+        self.version,
     );
     <b>assert</b>!(inner.system_state_version() == self.version, <a href="../one_system/one_system.md#one_system_one_system_EWrongInnerVersion">EWrongInnerVersion</a>);
     inner
@@ -1885,8 +1975,7 @@ Returns the voting power of the active validators, values are voting power in th
 
 
 <pre><code><b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_validator_voting_powers">validator_voting_powers</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>): VecMap&lt;<b>address</b>, u64&gt; {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state">load_system_state</a>(wrapper);
-    <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_active_validator_voting_powers">sui_system_state_inner::active_validator_voting_powers</a>(self)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state">load_system_state</a>().<a href="../one_system/one_system.md#one_system_one_system_active_validator_voting_powers">active_validator_voting_powers</a>()
 }
 </code></pre>
 
@@ -1912,8 +2001,36 @@ at the start of the next epoch.
 
 
 <pre><code><b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_store_execution_time_estimates">store_execution_time_estimates</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>, estimates_bytes: vector&lt;u8&gt;) {
-    <b>let</b> self = <a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>(wrapper);
-    <a href="../one_system/sui_system_state_inner.md#one_system_sui_system_state_inner_store_execution_time_estimates">sui_system_state_inner::store_execution_time_estimates</a>(self, estimates_bytes)
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_store_execution_time_estimates">store_execution_time_estimates</a>(estimates_bytes)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_system_one_system_store_execution_time_estimates_v2"></a>
+
+## Function `store_execution_time_estimates_v2`
+
+Saves the given execution time estimate chunks to the SuiSystemState object, for system use
+at the start of the next epoch.
+
+
+<pre><code><b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_store_execution_time_estimates_v2">store_execution_time_estimates_v2</a>(wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">one_system::one_system::SuiSystemState</a>, estimate_chunks: vector&lt;vector&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="../one_system/one_system.md#one_system_one_system_store_execution_time_estimates_v2">store_execution_time_estimates_v2</a>(
+    wrapper: &<b>mut</b> <a href="../one_system/one_system.md#one_system_one_system_SuiSystemState">SuiSystemState</a>,
+    estimate_chunks: vector&lt;vector&lt;u8&gt;&gt;,
+) {
+    wrapper.<a href="../one_system/one_system.md#one_system_one_system_load_system_state_mut">load_system_state_mut</a>().<a href="../one_system/one_system.md#one_system_one_system_store_execution_time_estimates_v2">store_execution_time_estimates_v2</a>(estimate_chunks)
 }
 </code></pre>
 

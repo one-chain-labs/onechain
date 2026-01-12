@@ -13,6 +13,8 @@ const TEST_DIR: &str = "tests";
 #[cfg(not(msim))]
 #[tokio::main]
 async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
+    use std::collections::BTreeMap;
+
     use one::client_ptb::{
         error::build_error_reports,
         ptb::{to_source_string, PTBPreview, PTB},
@@ -23,7 +25,8 @@ async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
 
     let fname = || path.file_name().unwrap().to_string_lossy().to_string();
     let file_contents = std::fs::read_to_string(path).unwrap();
-    let shlexed = shlex::split(&file_contents).unwrap();
+    let file_contents = file_contents.trim();
+    let shlexed: Vec<_> = shlex::split(file_contents).unwrap().into_iter().filter(|s| !s.trim().is_empty()).collect();
     let file_contents = to_source_string(shlexed.clone());
 
     // Parsing
@@ -53,7 +56,7 @@ async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
     let context = &test_cluster.wallet;
     let client = context.get_client().await?;
 
-    let (built_ptb, warnings) = PTB::build_ptb(program, context, client).await;
+    let (built_ptb, warnings) = PTB::build_ptb(program, BTreeMap::new(), client).await;
 
     if !warnings.is_empty() {
         let rendered = build_error_reports(&file_contents, warnings);
@@ -82,9 +85,10 @@ async fn test_ptb_files(path: &Path) -> datatest_stable::Result<()> {
             results.push(format!("{:?}", e));
         }
     }
+    use normalize_line_endings::normalized;
 
     // === FINALLY DO THE ASSERTION ===
-    insta::assert_snapshot!(fname(), results.join("\n"));
+    insta::assert_snapshot!(fname(), &String::from_iter(normalized(results.join("\n").chars())));
 
     Ok(())
 }
@@ -95,11 +99,12 @@ fn stable_call_arg_display(ca: &CallArg) -> String {
         CallArg::Pure(v) => format!("Pure({:?})", v),
         CallArg::Object(oa) => match oa {
             ObjectArg::ImmOrOwnedObject(_) => "ImmutableOrOwnedObject".to_string(),
-            ObjectArg::SharedObject { mutable, .. } => {
-                format!("SharedObject(mutable: {})", mutable)
+            ObjectArg::SharedObject { mutability, .. } => {
+                format!("SharedObject(mutability: {:?})", mutability)
             }
             ObjectArg::Receiving(_) => "Receiving".to_string(),
         },
+        CallArg::FundsWithdrawal(_) => "FundsWithdrawal".to_string(),
     }
 }
 

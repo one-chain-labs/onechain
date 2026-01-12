@@ -26,6 +26,8 @@ tokens and coins. <code><a href="../one/coin.md#one_coin_Coin">Coin</a></code> c
 -  [Function `into_balance`](#one_coin_into_balance)
 -  [Function `take`](#one_coin_take)
 -  [Function `put`](#one_coin_put)
+-  [Function `redeem_funds`](#one_coin_redeem_funds)
+-  [Function `send_funds`](#one_coin_send_funds)
 -  [Function `join`](#one_coin_join)
 -  [Function `split`](#one_coin_split)
 -  [Function `divide_into_n`](#one_coin_divide_into_n)
@@ -55,6 +57,13 @@ tokens and coins. <code><a href="../one/coin.md#one_coin_Coin">Coin</a></code> c
 -  [Function `get_symbol`](#one_coin_get_symbol)
 -  [Function `get_description`](#one_coin_get_description)
 -  [Function `get_icon_url`](#one_coin_get_icon_url)
+-  [Function `destroy_metadata`](#one_coin_destroy_metadata)
+-  [Function `deny_cap_id`](#one_coin_deny_cap_id)
+-  [Function `new_deny_cap_v2`](#one_coin_new_deny_cap_v2)
+-  [Function `new_treasury_cap`](#one_coin_new_treasury_cap)
+-  [Function `allow_global_pause`](#one_coin_allow_global_pause)
+-  [Function `new_coin_metadata`](#one_coin_new_coin_metadata)
+-  [Function `update_coin_metadata`](#one_coin_update_coin_metadata)
 -  [Function `supply`](#one_coin_supply)
 -  [Function `create_regulated_currency`](#one_coin_create_regulated_currency)
 -  [Function `deny_list_add`](#one_coin_deny_list_add)
@@ -62,21 +71,29 @@ tokens and coins. <code><a href="../one/coin.md#one_coin_Coin">Coin</a></code> c
 -  [Function `deny_list_contains`](#one_coin_deny_list_contains)
 
 
-<pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
+<pre><code><b>use</b> <a href="../one/accumulator.md#one_accumulator">one::accumulator</a>;
+<b>use</b> <a href="../one/accumulator_metadata.md#one_accumulator_metadata">one::accumulator_metadata</a>;
+<b>use</b> <a href="../one/accumulator_settlement.md#one_accumulator_settlement">one::accumulator_settlement</a>;
+<b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/bag.md#one_bag">one::bag</a>;
 <b>use</b> <a href="../one/balance.md#one_balance">one::balance</a>;
+<b>use</b> <a href="../one/bcs.md#one_bcs">one::bcs</a>;
 <b>use</b> <a href="../one/config.md#one_config">one::config</a>;
 <b>use</b> <a href="../one/deny_list.md#one_deny_list">one::deny_list</a>;
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/dynamic_object_field.md#one_dynamic_object_field">one::dynamic_object_field</a>;
 <b>use</b> <a href="../one/event.md#one_event">one::event</a>;
+<b>use</b> <a href="../one/funds_accumulator.md#one_funds_accumulator">one::funds_accumulator</a>;
+<b>use</b> <a href="../one/hash.md#one_hash">one::hash</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/table.md#one_table">one::table</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
 <b>use</b> <a href="../one/types.md#one_types">one::types</a>;
 <b>use</b> <a href="../one/url.md#one_url">one::url</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../one/vec_set.md#one_vec_set">one::vec_set</a>;
 <b>use</b> <a href="../std/address.md#std_address">std::address</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
@@ -262,7 +279,7 @@ coins of type <code>T</code>. Transferable
 Capability allowing the bearer to deny addresses from using the currency's coins--
 immediately preventing those addresses from interacting with the coin as an input to a
 transaction and at the start of the next preventing them from receiving the coin.
-If <code>allow_global_pause</code> is true, the bearer can enable a global pause that behaves as if
+If <code><a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a></code> is true, the bearer can enable a global pause that behaves as if
 all addresses were added to the deny list.
 
 
@@ -282,7 +299,7 @@ all addresses were added to the deny list.
 <dd>
 </dd>
 <dt>
-<code>allow_global_pause: bool</code>
+<code><a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool</code>
 </dt>
 <dd>
 </dd>
@@ -350,31 +367,12 @@ interacting with the coin as an input to a transaction.
 ## Constants
 
 
-<a name="one_coin_DENY_LIST_COIN_INDEX"></a>
-
-The index into the deny list vector for the <code><a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a></code> type.
-
-
-<pre><code><b>const</b> <a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>: u64 = 0;
-</code></pre>
-
-
-
 <a name="one_coin_EBadWitness"></a>
 
 A type passed to create_supply is not a one-time witness.
 
 
 <pre><code><b>const</b> <a href="../one/coin.md#one_coin_EBadWitness">EBadWitness</a>: u64 = 0;
-</code></pre>
-
-
-
-<a name="one_coin_EGlobalPauseNotAllowed"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/coin.md#one_coin_EGlobalPauseNotAllowed">EGlobalPauseNotAllowed</a>: u64 = 3;
 </code></pre>
 
 
@@ -395,6 +393,25 @@ Trying to split a coin more times than its balance allows.
 
 
 <pre><code><b>const</b> <a href="../one/coin.md#one_coin_ENotEnough">ENotEnough</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="one_coin_EGlobalPauseNotAllowed"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/coin.md#one_coin_EGlobalPauseNotAllowed">EGlobalPauseNotAllowed</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="one_coin_DENY_LIST_COIN_INDEX"></a>
+
+The index into the deny list vector for the <code><a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a></code> type.
+
+
+<pre><code><b>const</b> <a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>: u64 = 0;
 </code></pre>
 
 
@@ -685,6 +702,59 @@ Put a <code><a href="../one/coin.md#one_coin_Coin">Coin</a>&lt;T&gt;</code> to t
 
 </details>
 
+<a name="one_coin_redeem_funds"></a>
+
+## Function `redeem_funds`
+
+Redeem a <code>Withdrawal&lt;Balance&lt;T&gt;&gt;</code> and create a <code><a href="../one/coin.md#one_coin_Coin">Coin</a>&lt;T&gt;</code> from the withdrawn Balance<T>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_redeem_funds">redeem_funds</a>&lt;T&gt;(withdrawal: <a href="../one/funds_accumulator.md#one_funds_accumulator_Withdrawal">one::funds_accumulator::Withdrawal</a>&lt;<a href="../one/balance.md#one_balance_Balance">one::balance::Balance</a>&lt;T&gt;&gt;, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_redeem_funds">redeem_funds</a>&lt;T&gt;(
+    withdrawal: <a href="../one/funds_accumulator.md#one_funds_accumulator_Withdrawal">one::funds_accumulator::Withdrawal</a>&lt;Balance&lt;T&gt;&gt;,
+    ctx: &<b>mut</b> TxContext,
+): <a href="../one/coin.md#one_coin_Coin">Coin</a>&lt;T&gt; {
+    <a href="../one/balance.md#one_balance_redeem_funds">balance::redeem_funds</a>(withdrawal).into_coin(ctx)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_send_funds"></a>
+
+## Function `send_funds`
+
+Send a coin to an address balance
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_send_funds">send_funds</a>&lt;T&gt;(<a href="../one/coin.md#one_coin">coin</a>: <a href="../one/coin.md#one_coin_Coin">one::coin::Coin</a>&lt;T&gt;, recipient: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_send_funds">send_funds</a>&lt;T&gt;(<a href="../one/coin.md#one_coin">coin</a>: <a href="../one/coin.md#one_coin_Coin">Coin</a>&lt;T&gt;, recipient: <b>address</b>) {
+    <a href="../one/balance.md#one_balance_send_funds">balance::send_funds</a>(<a href="../one/coin.md#one_coin">coin</a>.<a href="../one/coin.md#one_coin_into_balance">into_balance</a>(), recipient);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="one_coin_join"></a>
 
 ## Function `join`
@@ -758,15 +828,9 @@ Split coin <code>self</code> into <code>n - 1</code> coins with equal balances. 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_divide_into_n">divide_into_n</a>&lt;T&gt;(self: &<b>mut</b> <a href="../one/coin.md#one_coin_Coin">Coin</a>&lt;T&gt;, n: u64, ctx: &<b>mut</b> TxContext): vector&lt;<a href="../one/coin.md#one_coin_Coin">Coin</a>&lt;T&gt;&gt; {
     <b>assert</b>!(n &gt; 0, <a href="../one/coin.md#one_coin_EInvalidArg">EInvalidArg</a>);
-    <b>assert</b>!(n &lt;= <a href="../one/coin.md#one_coin_value">value</a>(self), <a href="../one/coin.md#one_coin_ENotEnough">ENotEnough</a>);
-    <b>let</b> <b>mut</b> vec = vector[];
-    <b>let</b> <b>mut</b> i = 0;
-    <b>let</b> split_amount = <a href="../one/coin.md#one_coin_value">value</a>(self) / n;
-    <b>while</b> (i &lt; n - 1) {
-        vec.push_back(self.<a href="../one/coin.md#one_coin_split">split</a>(split_amount, ctx));
-        i = i + 1;
-    };
-    vec
+    <b>assert</b>!(n &lt;= self.<a href="../one/coin.md#one_coin_value">value</a>(), <a href="../one/coin.md#one_coin_ENotEnough">ENotEnough</a>);
+    <b>let</b> split_amount = self.<a href="../one/coin.md#one_coin_value">value</a>() / n;
+    vector::tabulate!(n - 1, |_| self.<a href="../one/coin.md#one_coin_split">split</a>(split_amount, ctx))
 }
 </code></pre>
 
@@ -864,9 +928,9 @@ type, ensuring that there's only one <code><a href="../one/coin.md#one_coin_Trea
         <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a> {
             id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
             decimals,
-            name: string::utf8(name),
-            symbol: ascii::string(symbol),
-            description: string::utf8(description),
+            name: name.to_string(),
+            symbol: symbol.to_ascii_string(),
+            description: description.to_string(),
             icon_url,
         },
     )
@@ -886,12 +950,12 @@ allows for specific addresses to have their coins frozen. When an address is add
 deny list, it is immediately unable to interact with the currency's coin as input objects.
 Additionally at the start of the next epoch, they will be unable to receive the currency's
 coin.
-The <code>allow_global_pause</code> flag enables an additional API that will cause all addresses to be
+The <code><a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a></code> flag enables an additional API that will cause all addresses to
 be denied. Note however, that this doesn't affect per-address entries of the deny list and
 will not change the result of the "contains" APIs.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_create_regulated_currency_v2">create_regulated_currency_v2</a>&lt;T: drop&gt;(witness: T, decimals: u8, symbol: vector&lt;u8&gt;, name: vector&lt;u8&gt;, description: vector&lt;u8&gt;, icon_url: <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<a href="../one/url.md#one_url_Url">one::url::Url</a>&gt;, allow_global_pause: bool, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): (<a href="../one/coin.md#one_coin_TreasuryCap">one::coin::TreasuryCap</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_DenyCapV2">one::coin::DenyCapV2</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_CoinMetadata">one::coin::CoinMetadata</a>&lt;T&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_create_regulated_currency_v2">create_regulated_currency_v2</a>&lt;T: drop&gt;(witness: T, decimals: u8, symbol: vector&lt;u8&gt;, name: vector&lt;u8&gt;, description: vector&lt;u8&gt;, icon_url: <a href="../std/option.md#std_option_Option">std::option::Option</a>&lt;<a href="../one/url.md#one_url_Url">one::url::Url</a>&gt;, <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): (<a href="../one/coin.md#one_coin_TreasuryCap">one::coin::TreasuryCap</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_DenyCapV2">one::coin::DenyCapV2</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_CoinMetadata">one::coin::CoinMetadata</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -907,7 +971,7 @@ will not change the result of the "contains" APIs.
     name: vector&lt;u8&gt;,
     description: vector&lt;u8&gt;,
     icon_url: Option&lt;Url&gt;,
-    allow_global_pause: bool,
+    <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool,
     ctx: &<b>mut</b> TxContext,
 ): (<a href="../one/coin.md#one_coin_TreasuryCap">TreasuryCap</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a>&lt;T&gt;) {
     <b>let</b> (treasury_cap, metadata) = <a href="../one/coin.md#one_coin_create_currency">create_currency</a>(
@@ -921,7 +985,7 @@ will not change the result of the "contains" APIs.
     );
     <b>let</b> deny_cap = <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a> {
         id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
-        allow_global_pause,
+        <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>,
     };
     <a href="../one/transfer.md#one_transfer_freeze_object">transfer::freeze_object</a>(<a href="../one/coin.md#one_coin_RegulatedCoinMetadata">RegulatedCoinMetadata</a>&lt;T&gt; {
         id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
@@ -945,7 +1009,7 @@ All entries in the deny list will be migrated to the new format.
 See <code><a href="../one/coin.md#one_coin_create_regulated_currency_v2">create_regulated_currency_v2</a></code> for details on the new v2 of the deny list.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_migrate_regulated_currency_to_v2">migrate_regulated_currency_to_v2</a>&lt;T&gt;(<a href="../one/deny_list.md#one_deny_list">deny_list</a>: &<b>mut</b> <a href="../one/deny_list.md#one_deny_list_DenyList">one::deny_list::DenyList</a>, cap: <a href="../one/coin.md#one_coin_DenyCap">one::coin::DenyCap</a>&lt;T&gt;, allow_global_pause: bool, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/coin.md#one_coin_DenyCapV2">one::coin::DenyCapV2</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_migrate_regulated_currency_to_v2">migrate_regulated_currency_to_v2</a>&lt;T&gt;(<a href="../one/deny_list.md#one_deny_list">deny_list</a>: &<b>mut</b> <a href="../one/deny_list.md#one_deny_list_DenyList">one::deny_list::DenyList</a>, cap: <a href="../one/coin.md#one_coin_DenyCap">one::coin::DenyCap</a>&lt;T&gt;, <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/coin.md#one_coin_DenyCapV2">one::coin::DenyCapV2</a>&lt;T&gt;
 </code></pre>
 
 
@@ -957,16 +1021,16 @@ See <code><a href="../one/coin.md#one_coin_create_regulated_currency_v2">create_
 <pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_migrate_regulated_currency_to_v2">migrate_regulated_currency_to_v2</a>&lt;T&gt;(
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>: &<b>mut</b> DenyList,
     cap: <a href="../one/coin.md#one_coin_DenyCap">DenyCap</a>&lt;T&gt;,
-    allow_global_pause: bool,
+    <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool,
     ctx: &<b>mut</b> TxContext,
 ): <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a>&lt;T&gt; {
     <b>let</b> <a href="../one/coin.md#one_coin_DenyCap">DenyCap</a> { id } = cap;
-    <a href="../one/object.md#one_object_delete">object::delete</a>(id);
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    id.delete();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.migrate_v1_to_v2(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, ctx);
     <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a> {
         id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
-        allow_global_pause,
+        <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>,
     }
 }
 </code></pre>
@@ -1083,7 +1147,7 @@ address will be unable to receive objects of this coin type.
     addr: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_add(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, addr, ctx)
 }
 </code></pre>
@@ -1116,7 +1180,7 @@ next epoch.
     addr: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_remove(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, addr, ctx)
 }
 </code></pre>
@@ -1147,7 +1211,7 @@ in the current epoch will be unable to receive objects of this coin type.
     addr: <b>address</b>,
     ctx: &TxContext,
 ): bool {
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_contains_current_epoch(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, addr, ctx)
 }
 </code></pre>
@@ -1175,7 +1239,7 @@ start of the next epoch, the address will be unable to receive objects of this c
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_deny_list_v2_contains_next_epoch">deny_list_v2_contains_next_epoch</a>&lt;T&gt;(<a href="../one/deny_list.md#one_deny_list">deny_list</a>: &DenyList, addr: <b>address</b>): bool {
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_contains_next_epoch(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, addr)
 }
 </code></pre>
@@ -1207,8 +1271,8 @@ addresses will be unable to receive objects of this coin type.
     deny_cap: &<b>mut</b> <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a>&lt;T&gt;,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>assert</b>!(deny_cap.allow_global_pause, <a href="../one/coin.md#one_coin_EGlobalPauseNotAllowed">EGlobalPauseNotAllowed</a>);
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>assert</b>!(deny_cap.<a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>, <a href="../one/coin.md#one_coin_EGlobalPauseNotAllowed">EGlobalPauseNotAllowed</a>);
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_enable_global_pause(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, ctx)
 }
 </code></pre>
@@ -1240,8 +1304,8 @@ type will still be paused until the start of the next epoch.
     deny_cap: &<b>mut</b> <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a>&lt;T&gt;,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <b>assert</b>!(deny_cap.allow_global_pause, <a href="../one/coin.md#one_coin_EGlobalPauseNotAllowed">EGlobalPauseNotAllowed</a>);
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>assert</b>!(deny_cap.<a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>, <a href="../one/coin.md#one_coin_EGlobalPauseNotAllowed">EGlobalPauseNotAllowed</a>);
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_disable_global_pause(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, ctx)
 }
 </code></pre>
@@ -1270,7 +1334,7 @@ Check if the global pause is enabled for the given coin type in the current epoc
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>: &DenyList,
     ctx: &TxContext,
 ): bool {
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_is_global_pause_enabled_current_epoch(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty, ctx)
 }
 </code></pre>
@@ -1296,7 +1360,7 @@ Check if the global pause is enabled for the given coin type in the next epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_deny_list_v2_is_global_pause_enabled_next_epoch">deny_list_v2_is_global_pause_enabled_next_epoch</a>&lt;T&gt;(<a href="../one/deny_list.md#one_deny_list">deny_list</a>: &DenyList): bool {
-    <b>let</b> ty = type_name::get_with_original_ids&lt;T&gt;().into_string().into_bytes();
+    <b>let</b> ty = type_name::with_original_ids&lt;T&gt;().into_string().into_bytes();
     <a href="../one/deny_list.md#one_deny_list">deny_list</a>.v2_is_global_pause_enabled_next_epoch(<a href="../one/coin.md#one_coin_DENY_LIST_COIN_INDEX">DENY_LIST_COIN_INDEX</a>, ty)
 }
 </code></pre>
@@ -1327,7 +1391,7 @@ Mint <code>amount</code> of <code><a href="../one/coin.md#one_coin_Coin">Coin</a
     recipient: <b>address</b>,
     ctx: &<b>mut</b> TxContext,
 ) {
-    <a href="../one/transfer.md#one_transfer_public_transfer">transfer::public_transfer</a>(<a href="../one/coin.md#one_coin_mint">mint</a>(c, amount, ctx), recipient)
+    <a href="../one/transfer.md#one_transfer_public_transfer">transfer::public_transfer</a>(c.<a href="../one/coin.md#one_coin_mint">mint</a>(amount, ctx), recipient)
 }
 </code></pre>
 
@@ -1564,6 +1628,210 @@ Update the url of the coin in <code><a href="../one/coin.md#one_coin_CoinMetadat
 
 <pre><code><b>public</b> <b>fun</b> <a href="../one/coin.md#one_coin_get_icon_url">get_icon_url</a>&lt;T&gt;(metadata: &<a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a>&lt;T&gt;): Option&lt;Url&gt; {
     metadata.icon_url
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_destroy_metadata"></a>
+
+## Function `destroy_metadata`
+
+Destroy legacy <code><a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a></code> object
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_destroy_metadata">destroy_metadata</a>&lt;T&gt;(metadata: <a href="../one/coin.md#one_coin_CoinMetadata">one::coin::CoinMetadata</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_destroy_metadata">destroy_metadata</a>&lt;T&gt;(metadata: <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a>&lt;T&gt;) {
+    <b>let</b> <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a> { id, .. } = metadata;
+    id.delete()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_deny_cap_id"></a>
+
+## Function `deny_cap_id`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_deny_cap_id">deny_cap_id</a>&lt;T&gt;(metadata: &<a href="../one/coin.md#one_coin_RegulatedCoinMetadata">one::coin::RegulatedCoinMetadata</a>&lt;T&gt;): <a href="../one/object.md#one_object_ID">one::object::ID</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_deny_cap_id">deny_cap_id</a>&lt;T&gt;(metadata: &<a href="../one/coin.md#one_coin_RegulatedCoinMetadata">RegulatedCoinMetadata</a>&lt;T&gt;): ID {
+    metadata.deny_cap_object
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_new_deny_cap_v2"></a>
+
+## Function `new_deny_cap_v2`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_new_deny_cap_v2">new_deny_cap_v2</a>&lt;T&gt;(<a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/coin.md#one_coin_DenyCapV2">one::coin::DenyCapV2</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_new_deny_cap_v2">new_deny_cap_v2</a>&lt;T&gt;(
+    <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>: bool,
+    ctx: &<b>mut</b> TxContext,
+): <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a>&lt;T&gt; {
+    <a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a> {
+        id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
+        <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>,
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_new_treasury_cap"></a>
+
+## Function `new_treasury_cap`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_new_treasury_cap">new_treasury_cap</a>&lt;T&gt;(ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/coin.md#one_coin_TreasuryCap">one::coin::TreasuryCap</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_new_treasury_cap">new_treasury_cap</a>&lt;T&gt;(ctx: &<b>mut</b> TxContext): <a href="../one/coin.md#one_coin_TreasuryCap">TreasuryCap</a>&lt;T&gt; {
+    <a href="../one/coin.md#one_coin_TreasuryCap">TreasuryCap</a> {
+        id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
+        <a href="../one/coin.md#one_coin_total_supply">total_supply</a>: <a href="../one/balance.md#one_balance_create_supply_internal">balance::create_supply_internal</a>(),
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_allow_global_pause"></a>
+
+## Function `allow_global_pause`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>&lt;T&gt;(cap: &<a href="../one/coin.md#one_coin_DenyCapV2">one::coin::DenyCapV2</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>&lt;T&gt;(cap: &<a href="../one/coin.md#one_coin_DenyCapV2">DenyCapV2</a>&lt;T&gt;): bool {
+    cap.<a href="../one/coin.md#one_coin_allow_global_pause">allow_global_pause</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_new_coin_metadata"></a>
+
+## Function `new_coin_metadata`
+
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_new_coin_metadata">new_coin_metadata</a>&lt;T&gt;(decimals: u8, name: <a href="../std/string.md#std_string_String">std::string::String</a>, symbol: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>, description: <a href="../std/string.md#std_string_String">std::string::String</a>, icon_url: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>, ctx: &<b>mut</b> <a href="../one/tx_context.md#one_tx_context_TxContext">one::tx_context::TxContext</a>): <a href="../one/coin.md#one_coin_CoinMetadata">one::coin::CoinMetadata</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_new_coin_metadata">new_coin_metadata</a>&lt;T&gt;(
+    decimals: u8,
+    name: string::String,
+    symbol: ascii::String,
+    description: string::String,
+    icon_url: ascii::String,
+    ctx: &<b>mut</b> TxContext,
+): <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a>&lt;T&gt; {
+    <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a> {
+        id: <a href="../one/object.md#one_object_new">object::new</a>(ctx),
+        decimals,
+        name,
+        symbol,
+        description,
+        icon_url: option::some(<a href="../one/url.md#one_url_new_unsafe">url::new_unsafe</a>(icon_url)),
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="one_coin_update_coin_metadata"></a>
+
+## Function `update_coin_metadata`
+
+Internal function to refresh the <code><a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a></code> with new values in
+<code>CoinRegistry</code> borrowing.
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_update_coin_metadata">update_coin_metadata</a>&lt;T&gt;(metadata: &<b>mut</b> <a href="../one/coin.md#one_coin_CoinMetadata">one::coin::CoinMetadata</a>&lt;T&gt;, name: <a href="../std/string.md#std_string_String">std::string::String</a>, symbol: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>, description: <a href="../std/string.md#std_string_String">std::string::String</a>, icon_url: <a href="../std/ascii.md#std_ascii_String">std::ascii::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<a href="../one/package.md#one_package">package</a>) <b>fun</b> <a href="../one/coin.md#one_coin_update_coin_metadata">update_coin_metadata</a>&lt;T&gt;(
+    metadata: &<b>mut</b> <a href="../one/coin.md#one_coin_CoinMetadata">CoinMetadata</a>&lt;T&gt;,
+    name: string::String,
+    symbol: ascii::String,
+    description: string::String,
+    icon_url: ascii::String,
+) {
+    metadata.name = name;
+    metadata.symbol = symbol;
+    metadata.description = description;
+    metadata.icon_url = option::some(<a href="../one/url.md#one_url_new_unsafe">url::new_unsafe</a>(icon_url));
 }
 </code></pre>
 

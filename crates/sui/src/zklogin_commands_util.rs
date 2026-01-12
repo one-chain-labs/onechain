@@ -40,10 +40,10 @@ pub fn read_cli_line() -> Result<String, anyhow::Error> {
     let full_url = s.trim_end().to_string();
     let mut parsed_token = "";
     let re = Regex::new(r"id_token=([^&]+)").unwrap();
-    if let Some(captures) = re.captures(&full_url) {
-        if let Some(id_token) = captures.get(1) {
-            parsed_token = id_token.as_str();
-        }
+    if let Some(captures) = re.captures(&full_url)
+        && let Some(id_token) = captures.get(1)
+    {
+        parsed_token = id_token.as_str();
     }
     Ok(parsed_token.to_string())
 }
@@ -103,7 +103,7 @@ pub async fn perform_zk_login_test_tx(
         MultiSigPublicKey::new(vec![PublicKey::from_zklogin_inputs(&zk_login_inputs)?, skp1.public()], vec![1, 1], 1)?;
 
     let sender = if test_multisig {
-        keystore.add_key(None, skp1)?;
+        keystore.import(None, skp1).await?;
         println!("Use multisig address as sender");
         SuiAddress::from(&multisig_pk)
     } else {
@@ -142,14 +142,12 @@ pub async fn perform_zk_login_test_tx(
     let final_sig = if test_multisig {
         let sig = if sign_with_sk {
             // Create a generic sig from the traditional keypair
-            GenericSignature::Signature(keystore.sign_secure(
-                &ephemeral_key_identifier,
-                &txb_res,
-                Intent::sui_transaction(),
-            )?)
+            GenericSignature::Signature(
+                keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction()).await?,
+            )
         } else {
             // Sign transaction with the ephemeral key
-            let signature = keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction())?;
+            let signature = keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction()).await?;
 
             GenericSignature::from(ZkLoginAuthenticator::new(zk_login_inputs, max_epoch, signature))
         };
@@ -159,7 +157,7 @@ pub async fn perform_zk_login_test_tx(
         multisig
     } else {
         // Sign transaction with the ephemeral key
-        let signature = keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction())?;
+        let signature = keystore.sign_secure(&ephemeral_key_identifier, &txb_res, Intent::sui_transaction()).await?;
 
         let single_sig = GenericSignature::from(ZkLoginAuthenticator::new(zk_login_inputs, max_epoch, signature));
         println!("Single zklogin sig Serialized: {:?}", single_sig.encode_base64());
@@ -178,8 +176,8 @@ pub async fn perform_zk_login_test_tx(
 
 fn get_config(network: &str) -> (&str, &str) {
     match network {
-        "devnet" => ("https://faucet.devnet.sui.io/gas", "https://rpc-devnet.onelabs.cc:443"),
-        "localnet" => ("http://127.0.0.1:9123/gas", "http://127.0.0.1:9000"),
+        "devnet" => ("https://faucet-devnet.onelabs.cc/v1/gas", "https://rpc-devnet.onelabs.cc:443"),
+        "localnet" => ("http://127.0.0.1:9123/v2/gas", "http://127.0.0.1:9000"),
         _ => panic!("Invalid network"),
     }
 }

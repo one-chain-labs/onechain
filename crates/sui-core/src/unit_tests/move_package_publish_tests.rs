@@ -12,7 +12,7 @@ use sui_types::{
     base_types::ObjectID,
     crypto::{get_key_pair, AccountKeyPair},
     effects::TransactionEffectsAPI,
-    error::{SuiError, UserInputError},
+    error::{SuiErrorKind, UserInputError},
     execution_status::{ExecutionFailureStatus, ExecutionStatus},
     object::{Data, ObjectRead, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
@@ -92,7 +92,7 @@ async fn test_publish_empty_package() {
         TransactionData::new_module(sender, gas_object_ref, vec![], vec![], rgp * TEST_ONLY_GAS_UNIT_FOR_PUBLISH, rgp);
     let transaction = to_sender_signed_transaction(data, &sender_key);
     let err = send_and_confirm_transaction(&authority, transaction).await.unwrap_err();
-    assert_eq!(err, SuiError::UserInputError { error: UserInputError::EmptyCommandInput });
+    assert_eq!(err, SuiErrorKind::UserInputError { error: UserInputError::EmptyCommandInput });
 
     // empty module
     let data = TransactionData::new_module(
@@ -237,8 +237,11 @@ async fn test_custom_property_check_unpublished_dependencies() {
         .resolution_graph_for_package(&path, None, &mut std::io::sink())
         .expect("Could not build resolution graph.");
 
-    let SuiError::ModulePublishFailure { error } =
-        check_unpublished_dependencies(&gather_published_ids(&resolution_graph, None).1.unpublished).err().unwrap()
+    let SuiErrorKind::ModulePublishFailure { error } =
+        check_unpublished_dependencies(&gather_published_ids(&resolution_graph, None).1.unpublished)
+            .err()
+            .unwrap()
+            .into_inner()
     else {
         panic!("Expected ModulePublishFailure")
     };
@@ -386,7 +389,7 @@ async fn test_publish_more_than_max_packages_error() {
     let mut builder = ProgrammableTransactionBuilder::new();
     build_multi_publish_txns(&mut builder, sender, packages);
     let err = run_multi_txns(&authority, sender, &sender_key, &gas_object_id, builder).await.unwrap_err();
-    assert_eq!(err, SuiError::UserInputError {
+    assert_eq!(err, SuiErrorKind::UserInputError {
         error: UserInputError::MaxPublishCountExceeded {
             max_publish_commands: max_pub_cmd,
             publish_count: max_pub_cmd + 1,

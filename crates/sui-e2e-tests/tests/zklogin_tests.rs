@@ -13,12 +13,11 @@ use sui_types::{
     base_types::SuiAddress,
     committee::EpochId,
     crypto::Signature,
-    error::{SuiError, SuiResult, UserInputError},
+    error::{SuiErrorKind, SuiResult, UserInputError},
     signature::GenericSignature,
     transaction::Transaction,
     utils::{get_legacy_zklogin_user_address, get_zklogin_user_address, load_test_vectors, make_zklogin_tx},
     zk_login_authenticator::ZkLoginAuthenticator,
-    SUI_AUTHENTICATOR_STATE_OBJECT_ID,
 };
 use test_cluster::{TestCluster, TestClusterBuilder};
 
@@ -66,7 +65,7 @@ async fn test_zklogin_feature_deny() {
 
     let err = do_zklogin_test(get_zklogin_user_address(), false).await.unwrap_err();
 
-    assert!(matches!(err, SuiError::UserInputError { error: UserInputError::Unsupported(..) }));
+    assert!(matches!(err.as_inner(), SuiErrorKind::UserInputError { error: UserInputError::Unsupported(..) }));
 }
 
 #[sim_test]
@@ -80,7 +79,7 @@ async fn test_zklogin_feature_legacy_address_deny() {
     });
 
     let err = do_zklogin_test(get_legacy_zklogin_user_address(), true).await.unwrap_err();
-    assert!(matches!(err, SuiError::SignerSignatureAbsent { .. }));
+    assert!(matches!(err.as_inner(), SuiErrorKind::SignerSignatureAbsent { .. }));
 }
 
 #[sim_test]
@@ -92,11 +91,15 @@ async fn test_legacy_zklogin_address_accept() {
     let err = do_zklogin_test(get_legacy_zklogin_user_address(), true).await.unwrap_err();
 
     // it does not hit the signer absent error.
-    assert!(matches!(err, SuiError::InvalidSignature { .. }));
+    assert!(matches!(err.as_inner(), SuiErrorKind::InvalidSignature { .. }));
 }
 
 #[sim_test]
 async fn zklogin_end_to_end_test() {
+    if sui_simulator::has_mainnet_protocol_config_override() {
+        return;
+    }
+
     let test_cluster = TestClusterBuilder::new().with_epoch_duration_ms(15000).with_default_jwks().build().await;
 
     test_cluster.wait_for_authenticator_state_update().await;
@@ -158,56 +161,6 @@ async fn test_expired_zklogin_sig() {
 
     let res = context.execute_transaction_may_fail(signed_txn_expired).await;
     assert!(res.unwrap_err().to_string().contains("ZKLogin expired at epoch 2"));
-}
-
-#[sim_test]
-async fn test_auth_state_creation() {
-    // Create test cluster without auth state object in genesis
-    let test_cluster = TestClusterBuilder::new()
-        .with_protocol_version(23.into())
-        .with_epoch_duration_ms(15000)
-        .with_default_jwks()
-        .build()
-        .await;
-    // Wait until we are in an epoch that has zklogin enabled, but the auth state object is not
-    // created yet.
-    test_cluster.wait_for_protocol_version(24.into()).await;
-    // Now wait until the auth state object is created, ie. AuthenticatorStateUpdate transaction happened.
-    test_cluster.wait_for_authenticator_state_update().await;
-}
-
-#[sim_test]
-async fn test_create_authenticator_state_object() {
-    let test_cluster =
-        TestClusterBuilder::new().with_protocol_version(23.into()).with_epoch_duration_ms(15000).build().await;
-
-    let handles = test_cluster.all_node_handles();
-
-    // no node has the authenticator state object yet
-    for h in &handles {
-        h.with(|node| {
-            assert!(node
-                .state()
-                .get_object_cache_reader()
-                .get_latest_object_ref_or_tombstone(SUI_AUTHENTICATOR_STATE_OBJECT_ID)
-                .is_none());
-        });
-    }
-
-    // wait until feature is enabled
-    test_cluster.wait_for_protocol_version(24.into()).await;
-    // wait until next epoch - authenticator state object is created at the end of the first epoch
-    // in which it is supported.
-    test_cluster.wait_for_epoch_all_nodes(2).await; // protocol upgrade completes in epoch 1
-
-    for h in &handles {
-        h.with(|node| {
-            node.state()
-                .get_object_cache_reader()
-                .get_latest_object_ref_or_tombstone(SUI_AUTHENTICATOR_STATE_OBJECT_ID)
-                .expect("auth state object should exist");
-        });
-    }
 }
 
 // This test is intended to look for forks caused by conflicting / repeated JWK votes from

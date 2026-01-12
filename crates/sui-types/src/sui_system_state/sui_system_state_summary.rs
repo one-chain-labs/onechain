@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
+
 use fastcrypto::{encoding::Base64, traits::ToFromBytes};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -12,7 +14,7 @@ use crate::{
     committee::{CommitteeWithNetworkMetadata, NetworkMetadata},
     crypto::NetworkPublicKey,
     dynamic_field::get_dynamic_field_from_store,
-    error::SuiError,
+    error::{SuiError, SuiErrorKind},
     id::ID,
     multiaddr::Multiaddr,
     storage::ObjectStore,
@@ -215,6 +217,18 @@ impl SuiSystemStateSummary {
             })
             .collect();
         CommitteeWithNetworkMetadata::new(self.epoch, validators)
+    }
+
+    pub fn get_committee_authority_names_to_hostnames(&self) -> HashMap<AuthorityName, String> {
+        self.active_validators
+            .iter()
+            .map(|validator| {
+                let name = AuthorityName::from_bytes(&validator.protocol_pubkey_bytes).unwrap();
+                let hostname = validator.name.clone();
+
+                (name, hostname)
+            })
+            .collect()
     }
 }
 
@@ -454,7 +468,7 @@ where
     let candidate_address: SuiAddress =
         get_dynamic_field_from_store(&object_store, system_state_summary.staking_pool_mappings_id, &ID::new(pool_id))
             .map_err(|err| {
-                SuiError::SuiSystemStateReadError(format!(
+                SuiErrorKind::SuiSystemStateReadError(format!(
                     "Failed to load candidate address from pool mappings: {:?}",
                     err
                 ))

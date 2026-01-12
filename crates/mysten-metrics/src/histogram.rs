@@ -173,7 +173,7 @@ impl Histogram {
         }
     }
 
-    pub fn start_timer(&self) -> HistogramTimerGuard {
+    pub fn start_timer(&self) -> HistogramTimerGuard<'_> {
         HistogramTimerGuard { histogram: self, start: Instant::now() }
     }
 }
@@ -222,7 +222,10 @@ impl HistogramCollector {
         }
         if Arc::strong_count(&self.reporter) != 1 {
             #[cfg(not(debug_assertions))]
-            error!("Histogram data overflow - we receive histogram data for {} faster then can process. Some histogram data is dropped", self._name);
+            error!(
+                "Histogram data overflow - we receive histogram data for {} faster then can process. Some histogram data is dropped",
+                self._name
+            );
         } else {
             let reporter = self.reporter.clone();
             Handle::current().spawn_blocking(move || reporter.lock().report(labeled_data));

@@ -1,84 +1,111 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
+use std::{
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::anyhow;
 use diesel::{
-    migration::{MigrationSource, MigrationVersion},
+    migration::{Migration, MigrationSource, MigrationVersion},
     pg::Pg,
+    ConnectionError,
 };
 use diesel_async::{
     async_connection_wrapper::AsyncConnectionWrapper,
     pooled_connection::{
         bb8::{Pool, PooledConnection},
         AsyncDieselConnectionManager,
+        ManagerConfig,
     },
     AsyncPgConnection,
     RunQueryDsl,
 };
+use futures::FutureExt;
+use tls::{build_tls_config, establish_tls_connection};
 use tracing::info;
 use url::Url;
 
+mod model;
+mod tls;
+
+pub use sui_field_count::FieldCount;
+pub use sui_sql_macro::sql;
+
+pub mod query;
+pub mod schema;
+pub mod store;
 pub mod temp;
+
+use diesel_migrations::{embed_migrations, EmbeddedMigrations};
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 #[derive(clap::Args, Debug, Clone)]
 pub struct DbArgs {
-    /// The URL of the database to connect to.
-    #[arg(long, default_value_t = Self::default().database_url)]
-    pub database_url: Url,
-
     /// Number of connections to keep in the pool.
     #[arg(long, default_value_t = Self::default().db_connection_pool_size)]
     pub db_connection_pool_size: u32,
 
     /// Time spent waiting for a connection from the pool to become available, in milliseconds.
-    #[arg(long, default_value_t = Self::default().connection_timeout_ms)]
-    pub connection_timeout_ms: u64,
+    #[arg(long, default_value_t = Self::default().db_connection_timeout_ms)]
+    pub db_connection_timeout_ms: u64,
+
+    #[arg(long)]
+    /// Time spent waiting for statements to complete, in milliseconds.
+    pub db_statement_timeout_ms: Option<u64>,
+
+    #[arg(long)]
+    /// Enable server certificate verification. By default, this is set to false to match the
+    /// default behavior of libpq.
+    pub tls_verify_cert: bool,
+
+    #[arg(long)]
+    /// Path to a custom CA certificate to use for server certificate verification.
+    pub tls_ca_cert_path: Option<PathBuf>,
 }
 
 #[derive(Clone)]
-pub struct Db {
-    read_only: bool,
-    pool: Pool<AsyncPgConnection>,
-}
+pub struct Db(Pool<AsyncPgConnection>);
 
-pub type ManagedConnection = AsyncPgConnection;
-pub type Connection<'p> = PooledConnection<'p, ManagedConnection>;
+/// Wrapper struct over the remote `PooledConnection` type for dealing with the `Store` trait.
+pub struct Connection<'a>(PooledConnection<'a, AsyncPgConnection>);
 
 impl DbArgs {
     pub fn connection_timeout(&self) -> Duration {
-        Duration::from_millis(self.connection_timeout_ms)
+        Duration::from_millis(self.db_connection_timeout_ms)
+    }
+
+    pub fn statement_timeout(&self) -> Option<Duration> {
+        self.db_statement_timeout_ms.map(Duration::from_millis)
     }
 }
 
 impl Db {
-    /// Construct a new DB connection pool that supports write and reads. Instances of [Db] can be
-    /// cloned to share access to the same pool.
-    pub async fn for_write(config: DbArgs) -> anyhow::Result<Self> {
-        Ok(Self { read_only: false, pool: pool(config).await? })
+    /// Construct a new DB connection pool talking to the database at `database_url` that supports
+    /// write and reads. Instances of [Db] can be cloned to share access to the same pool.
+    pub async fn for_write(database_url: Url, config: DbArgs) -> anyhow::Result<Self> {
+        Ok(Self(pool(database_url, config, false).await?))
     }
 
-    /// Construct a new DB connection pool that defaults to read-only transactions. Instances of
-    /// [Db] can be cloned to share access to the same pool.
-    pub async fn for_read(config: DbArgs) -> anyhow::Result<Self> {
-        Ok(Self { read_only: true, pool: pool(config).await? })
+    /// Construct a new DB connection pool talking to the database at `database_url` that defaults
+    /// to read-only transactions. Instances of [Db] can be cloned to share access to the same
+    /// pool.
+    pub async fn for_read(database_url: Url, config: DbArgs) -> anyhow::Result<Self> {
+        Ok(Self(pool(database_url, config, true).await?))
     }
 
     /// Retrieves a connection from the pool. Can fail with a timeout if a connection cannot be
     /// established before the [DbArgs::connection_timeout] has elapsed.
     pub async fn connect(&self) -> anyhow::Result<Connection<'_>> {
-        let mut conn = self.pool.get().await?;
-        if self.read_only {
-            diesel::sql_query("SET default_transaction_read_only = 'on'").execute(&mut conn).await?;
-        }
-
-        Ok(conn)
+        Ok(Connection(self.0.get().await?))
     }
 
     /// Statistics about the connection pool
     pub fn state(&self) -> bb8::State {
-        self.pool.state()
+        self.0.state()
     }
 
     async fn clear_database(&self) -> anyhow::Result<()> {
@@ -128,20 +155,22 @@ impl Db {
 
     /// Run migrations on the database. Use Diesel's `embed_migrations!` macro to generate the
     /// `migrations` parameter for your indexer.
-    pub async fn run_migrations<S: MigrationSource<Pg> + Send + Sync + 'static>(
+    pub async fn run_migrations(
         &self,
-        migrations: S,
+        migrations: Option<&'static EmbeddedMigrations>,
     ) -> anyhow::Result<Vec<MigrationVersion<'static>>> {
         use diesel_migrations::MigrationHarness;
 
+        let merged_migrations = merge_migrations(migrations);
+
         info!("Running migrations ...");
-        let conn = self.pool.dedicated_connection().await?;
+        let conn = self.0.dedicated_connection().await?;
         let mut wrapper: AsyncConnectionWrapper<AsyncPgConnection> =
             diesel_async::async_connection_wrapper::AsyncConnectionWrapper::from(conn);
 
         let finished_migrations = tokio::task::spawn_blocking(move || {
             wrapper
-                .run_pending_migrations(migrations)
+                .run_pending_migrations(merged_migrations)
                 .map(|versions| versions.iter().map(MigrationVersion::as_owned).collect())
         })
         .await?
@@ -152,38 +181,81 @@ impl Db {
     }
 }
 
-impl DbArgs {
-    pub fn new_for_testing(database_url: Url) -> Self {
-        Self { database_url, ..Default::default() }
-    }
-}
-
 impl Default for DbArgs {
     fn default() -> Self {
         Self {
-            database_url: Url::parse("postgres://postgres:postgrespw@localhost:5432/sui_indexer_alt").unwrap(),
             db_connection_pool_size: 100,
-            connection_timeout_ms: 60_000,
+            db_connection_timeout_ms: 60_000,
+            db_statement_timeout_ms: None,
+            tls_verify_cert: false,
+            tls_ca_cert_path: None,
         }
     }
 }
 
 /// Drop all tables, and re-run migrations if supplied.
-pub async fn reset_database<S: MigrationSource<Pg> + Send + Sync + 'static>(
+pub async fn reset_database(
+    database_url: Url,
     db_config: DbArgs,
-    migrations: Option<S>,
+    migrations: Option<&'static EmbeddedMigrations>,
 ) -> anyhow::Result<()> {
-    let db = Db::for_write(db_config).await?;
+    let db = Db::for_write(database_url, db_config).await?;
     db.clear_database().await?;
     if let Some(migrations) = migrations {
-        db.run_migrations(migrations).await?;
+        db.run_migrations(Some(migrations)).await?;
     }
 
     Ok(())
 }
 
-async fn pool(args: DbArgs) -> anyhow::Result<Pool<AsyncPgConnection>> {
-    let manager = AsyncDieselConnectionManager::new(args.database_url.as_str());
+impl<'a> Deref for Connection<'a> {
+    type Target = PooledConnection<'a, AsyncPgConnection>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Connection<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+async fn pool(database_url: Url, args: DbArgs, read_only: bool) -> anyhow::Result<Pool<AsyncPgConnection>> {
+    let statement_timeout = args.statement_timeout();
+
+    // Build TLS configuration once
+    let tls_config = build_tls_config(args.tls_verify_cert, args.tls_ca_cert_path.clone())?;
+
+    let mut config = ManagerConfig::default();
+
+    config.custom_setup = Box::new(move |url| {
+        let tls_config = tls_config.clone();
+
+        async move {
+            let mut conn = establish_tls_connection(url, tls_config).await?;
+
+            if let Some(timeout) = statement_timeout {
+                diesel::sql_query(format!("SET statement_timeout = {}", timeout.as_millis()))
+                    .execute(&mut conn)
+                    .await
+                    .map_err(ConnectionError::CouldntSetupConfiguration)?;
+            }
+
+            if read_only {
+                diesel::sql_query("SET default_transaction_read_only = 'on'")
+                    .execute(&mut conn)
+                    .await
+                    .map_err(ConnectionError::CouldntSetupConfiguration)?;
+            }
+
+            Ok(conn)
+        }
+        .boxed()
+    });
+
+    let manager = AsyncDieselConnectionManager::new_with_config(database_url.as_str(), config);
 
     Ok(Pool::builder()
         .max_size(args.db_connection_pool_size)
@@ -192,11 +264,28 @@ async fn pool(args: DbArgs) -> anyhow::Result<Pool<AsyncPgConnection>> {
         .await?)
 }
 
+/// Returns new migrations derived from the combination of provided migrations and migrations
+/// defined in this crate.
+pub fn merge_migrations(
+    migrations: Option<&'static EmbeddedMigrations>,
+) -> impl MigrationSource<Pg> + Send + Sync + 'static {
+    struct Migrations(Option<&'static EmbeddedMigrations>);
+    impl MigrationSource<Pg> for Migrations {
+        fn migrations(&self) -> diesel::migration::Result<Vec<Box<dyn Migration<Pg>>>> {
+            let mut migrations = MIGRATIONS.migrations()?;
+            if let Some(more_migrations) = self.0 {
+                migrations.extend(more_migrations.migrations()?);
+            }
+            Ok(migrations)
+        }
+    }
+
+    Migrations(migrations)
+}
 #[cfg(test)]
 mod tests {
     use diesel::prelude::QueryableByName;
     use diesel_async::RunQueryDsl;
-    use diesel_migrations::EmbeddedMigrations;
 
     use super::*;
 
@@ -207,9 +296,7 @@ mod tests {
         let url = db.database().url();
 
         info!(%url);
-        let db_args = DbArgs { database_url: url.clone(), ..Default::default() };
-
-        let db = Db::for_write(db_args).await.unwrap();
+        let db = Db::for_write(url.clone(), DbArgs::default()).await.unwrap();
         let mut conn = db.connect().await.unwrap();
 
         // Run a simple query to verify the db can properly be queried
@@ -218,7 +305,7 @@ mod tests {
         info!(?resp);
     }
 
-    #[derive(QueryableByName)]
+    #[derive(Debug, QueryableByName)]
     struct CountResult {
         #[diesel(sql_type = diesel::sql_types::BigInt)]
         cnt: i64,
@@ -229,9 +316,7 @@ mod tests {
         let temp_db = temp::TempDb::new().unwrap();
         let url = temp_db.database().url();
 
-        let db_args = DbArgs { database_url: url.clone(), ..Default::default() };
-
-        let db = Db::for_write(db_args.clone()).await.unwrap();
+        let db = Db::for_write(url.clone(), DbArgs::default()).await.unwrap();
         let mut conn = db.connect().await.unwrap();
         diesel::sql_query("CREATE TABLE test_table (id INTEGER PRIMARY KEY)").execute(&mut conn).await.unwrap();
         let cnt =
@@ -241,7 +326,7 @@ mod tests {
                 .unwrap();
         assert_eq!(cnt.cnt, 1);
 
-        reset_database::<EmbeddedMigrations>(db_args, None).await.unwrap();
+        reset_database(url.clone(), DbArgs::default(), None).await.unwrap();
 
         let mut conn = db.connect().await.unwrap();
         let cnt: CountResult =
@@ -257,10 +342,8 @@ mod tests {
         let temp_db = temp::TempDb::new().unwrap();
         let url = temp_db.database().url();
 
-        let db_args = DbArgs { database_url: url.clone(), ..Default::default() };
-
-        let writer = Db::for_write(db_args.clone()).await.unwrap();
-        let reader = Db::for_read(db_args).await.unwrap();
+        let writer = Db::for_write(url.clone(), DbArgs::default()).await.unwrap();
+        let reader = Db::for_read(url.clone(), DbArgs::default()).await.unwrap();
 
         {
             // Create a table
@@ -297,6 +380,32 @@ mod tests {
             let cnt: CountResult =
                 diesel::sql_query("SELECT COUNT(*) as cnt FROM test_table").get_result(&mut conn).await.unwrap();
             assert_eq!(cnt.cnt, 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_statement_timeout() {
+        let temp_db = temp::TempDb::new().unwrap();
+        let url = temp_db.database().url();
+
+        let reader =
+            Db::for_read(url.clone(), DbArgs { db_statement_timeout_ms: Some(200), ..DbArgs::default() }).await.unwrap();
+
+        {
+            // A simple query should not timeout
+            let mut conn = reader.connect().await.unwrap();
+            let cnt: CountResult = diesel::sql_query("SELECT 1::BIGINT AS cnt").get_result(&mut conn).await.unwrap();
+
+            assert_eq!(cnt.cnt, 1);
+        }
+
+        {
+            // A query that waits a bit, which should cause a timeout
+            let mut conn = reader.connect().await.unwrap();
+            diesel::sql_query("SELECT PG_SLEEP(2), 1::BIGINT AS cnt")
+                .get_result::<CountResult>(&mut conn)
+                .await
+                .expect_err("This request should fail because of a timeout");
         }
     }
 }

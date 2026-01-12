@@ -60,8 +60,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let tx_data = TransactionData::new_programmable(sender, vec![coin.object_ref()], builder, gas_budget, gas_price);
 
     // 4) sign transaction
-    let keystore = FileBasedKeystore::new(&sui_config_dir()?.join(SUI_KEYSTORE_FILENAME))?;
-    let signature = keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction())?;
+    let keystore = FileBasedKeystore::load_or_create(&sui_config_dir()?.join(SUI_KEYSTORE_FILENAME))?;
+    let signature = keystore.sign_secure(&sender, &tx_data, Intent::sui_transaction()).await?;
 
     // 5) execute the transaction
     print!("Executing the transaction...");

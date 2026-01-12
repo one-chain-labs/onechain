@@ -7,15 +7,23 @@ use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn empty_module_no_errors() {
-    BoundsChecker::verify_module(&basic_test_module()).unwrap();
+    BoundsChecker::verify_module(
+        &basic_test_module(),
+        /* deprecate_global_storage_ops */ true,
+    )
+    .unwrap();
 }
 
 #[test]
 fn invalid_default_module() {
-    BoundsChecker::verify_module(&CompiledModule {
-        version: file_format_common::VERSION_MAX,
-        ..Default::default()
-    })
+    BoundsChecker::verify_module(
+        &CompiledModule {
+            version: file_format_common::VERSION_MAX,
+            publishable: true,
+            ..Default::default()
+        },
+        /* deprecate_global_storage_ops */ true,
+    )
     .unwrap_err();
 }
 
@@ -24,7 +32,9 @@ fn invalid_self_module_handle_index() {
     let mut m = basic_test_module();
     m.self_module_handle_idx = ModuleHandleIndex(12);
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -38,7 +48,9 @@ fn invalid_type_param_in_fn_return_() {
     m.signatures.push(Signature(vec![TypeParameter(0)]));
     assert_eq!(m.signatures.len(), 2);
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -51,7 +63,9 @@ fn invalid_type_param_in_fn_parameters() {
     m.function_handles[0].parameters = SignatureIndex(1);
     m.signatures.push(Signature(vec![TypeParameter(0)]));
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -65,7 +79,9 @@ fn invalid_struct_in_fn_return_() {
     m.signatures
         .push(Signature(vec![Datatype(DatatypeHandleIndex::new(1))]));
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -76,10 +92,12 @@ fn invalid_type_param_in_field() {
 
     let mut m = basic_test_module();
     match &mut m.struct_defs[0].field_information {
-        StructFieldInformation::Declared(ref mut fields) => {
+        StructFieldInformation::Declared(fields) => {
             fields[0].signature.0 = TypeParameter(0);
             assert_eq!(
-                BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+                BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                    .unwrap_err()
+                    .major_status(),
                 StatusCode::INDEX_OUT_OF_BOUNDS
             );
         }
@@ -93,10 +111,12 @@ fn invalid_struct_in_field() {
 
     let mut m = basic_test_module();
     match &mut m.struct_defs[0].field_information {
-        StructFieldInformation::Declared(ref mut fields) => {
+        StructFieldInformation::Declared(fields) => {
             fields[0].signature.0 = Datatype(DatatypeHandleIndex::new(3));
             assert_eq!(
-                BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+                BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                    .unwrap_err()
+                    .major_status(),
                 StatusCode::INDEX_OUT_OF_BOUNDS
             );
         }
@@ -110,13 +130,15 @@ fn invalid_struct_with_actuals_in_field() {
 
     let mut m = basic_test_module();
     match &mut m.struct_defs[0].field_information {
-        StructFieldInformation::Declared(ref mut fields) => {
+        StructFieldInformation::Declared(fields) => {
             fields[0].signature.0 = DatatypeInstantiation(Box::new((
                 DatatypeHandleIndex::new(0),
                 vec![TypeParameter(0)],
             )));
             assert_eq!(
-                BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+                BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                    .unwrap_err()
+                    .major_status(),
                 StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH
             );
         }
@@ -136,7 +158,9 @@ fn invalid_locals_id_in_call() {
     let func_inst_idx = FunctionInstantiationIndex(m.function_instantiations.len() as u16 - 1);
     m.function_defs[0].code.as_mut().unwrap().code = vec![CallGeneric(func_inst_idx)];
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -155,7 +179,9 @@ fn invalid_type_param_in_call() {
     let func_inst_idx = FunctionInstantiationIndex(m.function_instantiations.len() as u16 - 1);
     m.function_defs[0].code.as_mut().unwrap().code = vec![CallGeneric(func_inst_idx)];
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -175,7 +201,9 @@ fn invalid_struct_as_type_actual_in_exists() {
     let func_inst_idx = FunctionInstantiationIndex(m.function_instantiations.len() as u16 - 1);
     m.function_defs[0].code.as_mut().unwrap().code = vec![CallGeneric(func_inst_idx)];
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -188,7 +216,9 @@ fn invalid_friend_module_address() {
         name: IdentifierIndex::new(0),
     });
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -201,7 +231,9 @@ fn invalid_friend_module_name() {
         name: IdentifierIndex::new(m.identifiers.len() as TableIndex),
     });
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -225,7 +257,9 @@ fn invalid_signature_for_vector_operation() {
         let mut m = skeleton.clone();
         m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
         assert_eq!(
-            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                .unwrap_err()
+                .major_status(),
             StatusCode::INDEX_OUT_OF_BOUNDS
         );
     }
@@ -254,7 +288,9 @@ fn invalid_struct_for_vector_operation() {
         let mut m = skeleton.clone();
         m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
         assert_eq!(
-            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                .unwrap_err()
+                .major_status(),
             StatusCode::INDEX_OUT_OF_BOUNDS
         );
     }
@@ -281,7 +317,9 @@ fn invalid_type_param_for_vector_operation() {
         let mut m = skeleton.clone();
         m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
         assert_eq!(
-            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                .unwrap_err()
+                .major_status(),
             StatusCode::INDEX_OUT_OF_BOUNDS
         );
     }
@@ -308,7 +346,9 @@ fn invalid_variant_handle_index_for_enum_operation() {
         let mut m = skeleton.clone();
         m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
         assert_eq!(
-            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+                .unwrap_err()
+                .major_status(),
             StatusCode::INDEX_OUT_OF_BOUNDS
         );
     }
@@ -329,7 +369,9 @@ fn invalid_variant_jump_table_index() {
     let mut m = skeleton.clone();
     m.function_defs[0].code.as_mut().unwrap().code = vec![VariantSwitch(jt_index)];
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }
@@ -356,7 +398,9 @@ fn invalid_variant_jump_table_code_offset() {
     let mut m = skeleton.clone();
     m.function_defs[0].code.as_mut().unwrap().code = vec![VariantSwitch(jt_index)];
     assert_eq!(
-        BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+        BoundsChecker::verify_module(&m, /* deprecate_global_storage_ops */ true)
+            .unwrap_err()
+            .major_status(),
         StatusCode::INDEX_OUT_OF_BOUNDS
     );
 }

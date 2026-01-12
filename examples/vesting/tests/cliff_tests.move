@@ -4,11 +4,11 @@
 #[test_only]
 module vesting::cliff_tests;
 
-use vesting::cliff::{Self, new_wallet, Wallet};
-use one::clock::{Self};
-use one::coin::{Self};
-use one::test_scenario as ts;
+use one::clock;
+use one::coin;
 use one::oct::OCT;
+use one::test_scenario as ts;
+use vesting::cliff::{Self, new_wallet, Wallet};
 
 public struct Token has key, store { id: UID }
 

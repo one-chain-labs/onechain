@@ -21,7 +21,9 @@ use crate::{
     workloads::{
         batch_payment::BatchPaymentWorkloadBuilder,
         delegation::DelegationWorkloadBuilder,
+        party::PartyWorkloadBuilder,
         shared_counter::SharedCounterWorkloadBuilder,
+        slow::SlowWorkloadBuilder,
         transfer_object::TransferObjectWorkloadBuilder,
         ExpectedFailureType,
         GroupID,
@@ -41,6 +43,8 @@ pub struct WorkloadWeights {
     pub expected_failure: u32,
     pub randomness: u32,
     pub randomized_transaction: u32,
+    pub slow: u32,
+    pub party: u32,
 }
 
 pub struct WorkloadConfig {
@@ -81,6 +85,8 @@ impl WorkloadConfiguration {
                 expected_failure,
                 randomness,
                 randomized_transaction,
+                slow,
+                party,
                 shared_counter_hotness_factor,
                 num_shared_counters,
                 shared_counter_max_tip,
@@ -112,6 +118,8 @@ impl WorkloadConfiguration {
                             expected_failure: expected_failure[i],
                             randomness: randomness[i],
                             randomized_transaction: randomized_transaction[i],
+                            slow: slow[i],
+                            party: party[i],
                         },
                         adversarial_cfg: AdversarialPayloadCfg::from_str(&adversarial_cfg[i]).unwrap(),
                         expected_failure_cfg: ExpectedFailurePayloadCfg {
@@ -195,7 +203,9 @@ impl WorkloadConfiguration {
             + weights.adversarial
             + weights.randomness
             + weights.expected_failure
-            + weights.randomized_transaction;
+            + weights.randomized_transaction
+            + weights.slow
+            + weights.party;
         let reference_gas_price = system_state_observer.state.borrow().reference_gas_price;
         let mut workload_builders = vec![];
         let shared_workload = SharedCounterWorkloadBuilder::from(
@@ -293,7 +303,24 @@ impl WorkloadConfiguration {
             group,
         );
         workload_builders.push(randomized_transaction_workload);
-
+        let slow_workload = SlowWorkloadBuilder::from(
+            weights.slow as f32 / total_weight as f32,
+            target_qps,
+            num_workers,
+            in_flight_ratio,
+            duration,
+            group,
+        );
+        workload_builders.push(slow_workload);
+        let party_workload = PartyWorkloadBuilder::from(
+            weights.party as f32 / total_weight as f32,
+            target_qps,
+            num_workers,
+            in_flight_ratio,
+            duration,
+            group,
+        );
+        workload_builders.push(party_workload);
         workload_builders
     }
 }

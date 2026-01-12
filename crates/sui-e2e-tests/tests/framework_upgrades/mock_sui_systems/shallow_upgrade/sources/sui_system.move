@@ -96,4 +96,14 @@ module one_system::one_system {
         assert!(sui_system_state_inner::system_state_version(inner) == version, 0);
         inner
     }
+
+    fun store_execution_time_estimates(wrapper: &mut SuiSystemState, estimates_bytes: vector<u8>) {
+        let self = load_system_state_mut(wrapper);
+        sui_system_state_inner::store_execution_time_estimates(self, estimates_bytes)
+    }
+
+    fun store_execution_time_estimates_v2(wrapper: &mut SuiSystemState, estimate_chunks: vector<vector<u8>>) {
+        let self = load_system_state_mut(wrapper);
+        sui_system_state_inner::store_execution_time_estimates_v2(self, estimate_chunks)
+    }
 }

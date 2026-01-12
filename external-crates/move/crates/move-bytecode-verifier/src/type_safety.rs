@@ -7,9 +7,11 @@
 
 use std::{cmp::max, num::NonZeroU64};
 
-use move_abstract_interpreter::{absint::FunctionContext, control_flow_graph::ControlFlowGraph};
+use crate::absint::FunctionContext;
+use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
 use move_abstract_stack::AbstractStack;
 use move_binary_format::{
+    CompiledModule,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         AbilitySet, Bytecode, CodeOffset, DatatypeHandleIndex, EnumDefinition, FieldHandleIndex,
@@ -17,10 +19,11 @@ use move_binary_format::{
         SignatureToken, SignatureToken as ST, StructDefinition, StructDefinitionIndex,
         StructFieldInformation, VariantDefinition, VariantJumpTable,
     },
-    safe_unwrap_err, CompiledModule,
+    safe_assert, safe_unwrap_err,
 };
 use move_bytecode_verifier_meter::{Meter, Scope};
 use move_core_types::vm_status::StatusCode;
+use move_vm_config::verifier::VerifierConfig;
 
 use crate::ability_cache::AbilityCache;
 
@@ -54,6 +57,7 @@ impl<'a> Locals<'a> {
 }
 
 struct TypeSafetyChecker<'env, 'a> {
+    config: &'env VerifierConfig,
     module: &'env CompiledModule,
     function_context: &'a FunctionContext<'env>,
     ability_cache: &'a mut AbilityCache<'env>,
@@ -63,12 +67,14 @@ struct TypeSafetyChecker<'env, 'a> {
 
 impl<'env, 'a> TypeSafetyChecker<'env, 'a> {
     fn new(
+        config: &'env VerifierConfig,
         module: &'env CompiledModule,
         function_context: &'a FunctionContext<'env>,
         ability_cache: &'a mut AbilityCache<'env>,
     ) -> Self {
         let locals = Locals::new(function_context.parameters(), function_context.locals());
         Self {
+            config,
             module,
             function_context,
             ability_cache,
@@ -147,19 +153,21 @@ fn charge_ty(meter: &mut (impl Meter + ?Sized), ty: &SignatureToken) -> PartialV
 }
 
 pub(crate) fn verify<'env>(
+    config: &'env VerifierConfig,
     module: &'env CompiledModule,
     function_context: &FunctionContext<'env>,
     ability_cache: &mut AbilityCache<'env>,
     meter: &mut (impl Meter + ?Sized),
 ) -> PartialVMResult<()> {
-    let mut checker = TypeSafetyChecker::new(module, function_context, ability_cache);
+    let mut checker = TypeSafetyChecker::new(config, module, function_context, ability_cache);
     let verifier = &mut checker;
+    let jump_tables = &verifier.function_context.code().jump_tables;
 
     for block_id in function_context.cfg().blocks() {
-        for offset in function_context.cfg().instr_indexes(block_id) {
-            let code = &verifier.function_context.code();
-            let instr = &code.code[offset as usize];
-            let jump_tables = &code.jump_tables;
+        for (offset, instr) in function_context
+            .cfg()
+            .instructions(&function_context.code().code, block_id)
+        {
             verify_instr(verifier, instr, jump_tables, offset, meter)?
         }
     }
@@ -797,7 +805,7 @@ fn verify_instr(
                 _ => {
                     return Err(
                         verifier.error(StatusCode::WRITEREF_NO_MUTABLE_REFERENCE_ERROR, offset)
-                    )
+                    );
                 }
             };
             if !verifier.abilities(meter, &ref_inner_signature)?.has_drop() {
@@ -898,31 +906,37 @@ fn verify_instr(
         }
 
         Bytecode::MutBorrowGlobalDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             borrow_global(verifier, meter, offset, true, *idx, &Signature(vec![]))?
         }
 
         Bytecode::MutBorrowGlobalGenericDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_inst = verifier.module.struct_instantiation_at(*idx);
             let type_inst = verifier.module.signature_at(struct_inst.type_parameters);
             borrow_global(verifier, meter, offset, true, struct_inst.def, type_inst)?
         }
 
         Bytecode::ImmBorrowGlobalDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             borrow_global(verifier, meter, offset, false, *idx, &Signature(vec![]))?
         }
 
         Bytecode::ImmBorrowGlobalGenericDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_inst = verifier.module.struct_instantiation_at(*idx);
             let type_inst = verifier.module.signature_at(struct_inst.type_parameters);
             borrow_global(verifier, meter, offset, false, struct_inst.def, type_inst)?
         }
 
         Bytecode::ExistsDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_def = verifier.module.struct_def_at(*idx);
             exists(verifier, meter, offset, struct_def, &Signature(vec![]))?
         }
 
         Bytecode::ExistsGenericDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_inst = verifier.module.struct_instantiation_at(*idx);
             let struct_def = verifier.module.struct_def_at(struct_inst.def);
             let type_args = verifier.module.signature_at(struct_inst.type_parameters);
@@ -930,11 +944,13 @@ fn verify_instr(
         }
 
         Bytecode::MoveFromDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_def = verifier.module.struct_def_at(*idx);
             move_from(verifier, meter, offset, struct_def, &Signature(vec![]))?
         }
 
         Bytecode::MoveFromGenericDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_inst = verifier.module.struct_instantiation_at(*idx);
             let struct_def = verifier.module.struct_def_at(struct_inst.def);
             let type_args = verifier.module.signature_at(struct_inst.type_parameters);
@@ -942,11 +958,13 @@ fn verify_instr(
         }
 
         Bytecode::MoveToDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_def = verifier.module.struct_def_at(*idx);
             move_to(verifier, meter, offset, struct_def, &Signature(vec![]))?
         }
 
         Bytecode::MoveToGenericDeprecated(idx) => {
+            safe_assert!(!verifier.config.deprecate_global_storage_ops);
             let struct_inst = verifier.module.struct_instantiation_at(*idx);
             let struct_def = verifier.module.struct_def_at(struct_inst.def);
             let type_args = verifier.module.signature_at(struct_inst.type_parameters);

@@ -25,23 +25,39 @@ impl Drop for GaugeGuard<'_> {
     }
 }
 
-pub trait GaugeGuardFutureExt: Future + Sized {
-    /// Count number of in flight futures running
-    fn count_in_flight(self, g: &IntGauge) -> GaugeGuardFuture<Self>;
-}
+/// Difference vs GaugeGuard: Stores the gauge by value to avoid borrowing issues.
+pub struct InflightGuard(IntGauge);
 
-impl<F: Future> GaugeGuardFutureExt for F {
-    fn count_in_flight(self, g: &IntGauge) -> GaugeGuardFuture<Self> {
-        GaugeGuardFuture { f: Box::pin(self), _guard: GaugeGuard::acquire(g) }
+impl InflightGuard {
+    pub fn acquire(g: IntGauge) -> Self {
+        g.inc();
+        Self(g)
     }
 }
 
-pub struct GaugeGuardFuture<'a, F: Sized> {
-    f: Pin<Box<F>>,
-    _guard: GaugeGuard<'a>,
+impl Drop for InflightGuard {
+    fn drop(&mut self) {
+        self.0.dec();
+    }
 }
 
-impl<F: Future> Future for GaugeGuardFuture<'_, F> {
+pub trait InflightGuardFutureExt: Future + Sized {
+    /// Count number of in flight futures running
+    fn count_in_flight(self, g: IntGauge) -> InflightGuardFuture<Self>;
+}
+
+impl<F: Future> InflightGuardFutureExt for F {
+    fn count_in_flight(self, g: IntGauge) -> InflightGuardFuture<Self> {
+        InflightGuardFuture { f: Box::pin(self), _guard: InflightGuard::acquire(g) }
+    }
+}
+
+pub struct InflightGuardFuture<F: Sized> {
+    f: Pin<Box<F>>,
+    _guard: InflightGuard,
+}
+
+impl<F: Future> Future for InflightGuardFuture<F> {
     type Output = F::Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

@@ -29,8 +29,10 @@ title: Module `one::authenticator_state`
 <b>use</b> <a href="../one/dynamic_field.md#one_dynamic_field">one::dynamic_field</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -222,24 +224,6 @@ Must match the JwkId struct in fastcrypto-zkp
 ## Constants
 
 
-<a name="one_authenticator_state_CurrentVersion"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/authenticator_state.md#one_authenticator_state_CurrentVersion">CurrentVersion</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="one_authenticator_state_EJwksNotSorted"></a>
-
-
-
-<pre><code><b>const</b> <a href="../one/authenticator_state.md#one_authenticator_state_EJwksNotSorted">EJwksNotSorted</a>: u64 = 2;
-</code></pre>
-
-
-
 <a name="one_authenticator_state_ENotSystemAddress"></a>
 
 Sender is not @0x0 the system address.
@@ -255,6 +239,24 @@ Sender is not @0x0 the system address.
 
 
 <pre><code><b>const</b> <a href="../one/authenticator_state.md#one_authenticator_state_EWrongInnerVersion">EWrongInnerVersion</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="one_authenticator_state_EJwksNotSorted"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/authenticator_state.md#one_authenticator_state_EJwksNotSorted">EJwksNotSorted</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="one_authenticator_state_CurrentVersion"></a>
+
+
+
+<pre><code><b>const</b> <a href="../one/authenticator_state.md#one_authenticator_state_CurrentVersion">CurrentVersion</a>: u64 = 1;
 </code></pre>
 
 

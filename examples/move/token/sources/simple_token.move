@@ -5,11 +5,9 @@
 /// actions are allowed as long as the user is not on the denylist.
 module examples::simple_token {
     use examples::denylist_rule::Denylist;
-    use one::{
-        coin::{Self, TreasuryCap},
-        token::{Self, TokenPolicy, TokenPolicyCap},
-        tx_context::sender
-    };
+    use one::coin::{Self, TreasuryCap};
+    use one::token::{Self, TokenPolicy, TokenPolicyCap};
+    use one::tx_context::sender;
 
     /// OTW and the type for the Token.
     public struct SIMPLE_TOKEN has drop {}
@@ -45,6 +43,7 @@ module examples::simple_token {
 
     /// Internal: not necessary, but moving this call to a separate function for
     /// better visibility of the Closed Loop setup in `init`.
+    #[allow(deprecated_usage)]
     fun create_currency<T: drop>(otw: T, ctx: &mut TxContext): TreasuryCap<T> {
         let (treasury_cap, metadata) = coin::create_currency(
             otw,
@@ -66,12 +65,11 @@ module examples::simple_token {
 /// We don't test the currency itself but rather use the same set of regulations
 /// on a test currency.
 module examples::simple_token_tests {
-    use examples::{denylist_rule as denylist, simple_token::set_rules};
-    use one::{
-        coin,
-        token::{Self, TokenPolicy, TokenPolicyCap},
-        token_test_utils::{Self as test, TEST}
-    };
+    use examples::denylist_rule as denylist;
+    use examples::simple_token::set_rules;
+    use one::coin;
+    use one::token::{Self, TokenPolicy, TokenPolicyCap};
+    use one::token_test_utils::{Self as test, TEST};
 
     const ALICE: address = @0x0;
     const BOB: address = @0x1;

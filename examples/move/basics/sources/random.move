@@ -4,7 +4,8 @@
 /// This example demonstrates emitting a random u128 (e.g., for an offchain lottery)
 module basics::random;
 
-use one::{event, random::Random};
+use one::event;
+use one::random::Random;
 
 public struct RandomU128Event has copy, drop {
     value: u128,

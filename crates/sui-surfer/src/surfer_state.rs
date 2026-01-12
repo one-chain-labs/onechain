@@ -5,19 +5,19 @@ use std::{
     collections::{HashMap, HashSet},
     path::Path,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use indexmap::IndexSet;
-use move_binary_format::{file_format::Visibility, normalized::Type};
-use move_core_types::language_storage::StructTag;
+use move_binary_format::{file_format::Visibility, normalized};
+use move_core_types::{identifier::IdentStr, language_storage::StructTag};
+use mysten_common::fatal;
 use rand::rngs::StdRng;
 use sui_json_rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_move_build::BuildConfig;
 use sui_protocol_config::{Chain, ProtocolConfig};
 use sui_types::{
     base_types::{ConsensusObjectSequenceKey, ObjectID, ObjectRef, SuiAddress},
-    execution_config_utils::to_binary_config,
     object::{Object, Owner},
     storage::WriteKind,
     transaction::{CallArg, ObjectArg, TransactionData, TEST_ONLY_GAS_UNIT_FOR_PUBLISH},
@@ -27,6 +27,8 @@ use sui_types::{
 use test_cluster::TestCluster;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
+
+type Type = normalized::Type<normalized::ArcIdentifier>;
 
 #[derive(Debug, Clone)]
 pub struct EntryFunction {
@@ -103,6 +105,7 @@ pub type ImmObjects = Arc<RwLock<HashMap<StructTag, Vec<ObjectRef>>>>;
 pub type SharedObjects = Arc<RwLock<HashMap<StructTag, Vec<ConsensusObjectSequenceKey>>>>;
 
 pub struct SurferState {
+    pub pool: Arc<RwLock<normalized::ArcPool>>,
     pub id: usize,
     pub cluster: Arc<TestCluster>,
     pub rng: StdRng,
@@ -130,6 +133,7 @@ impl SurferState {
         entry_functions: Arc<RwLock<Vec<EntryFunction>>>,
     ) -> Self {
         Self {
+            pool: Arc::new(RwLock::new(normalized::ArcPool::new())),
             id,
             cluster,
             rng,
@@ -165,12 +169,13 @@ impl SurferState {
             rgp,
         )
         .unwrap();
-        let tx = self.cluster.wallet.sign_transaction(&tx_data);
+        let tx = self.cluster.wallet.sign_transaction(&tx_data).await;
         let response = loop {
+            debug!("Executing transaction {:?}", tx.digest());
             match self.cluster.wallet.execute_transaction_may_fail(tx.clone()).await {
                 Ok(effects) => break effects,
                 Err(e) => {
-                    error!("Error executing transaction: {:?}", e);
+                    error!("Error executing transaction {:?}: {e:?}", tx.digest());
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
@@ -219,8 +224,8 @@ impl SurferState {
                 Owner::Shared {
                     initial_shared_version,
                 }
-                // TODO: Implement full support for ConsensusV2 objects in sui-surfer.
-                | Owner::ConsensusV2 {
+                // TODO: Implement full support for ConsensusAddressOwner objects in sui-surfer.
+                | Owner::ConsensusAddressOwner {
                     start_version: initial_shared_version,
                     ..
                 } => {
@@ -247,9 +252,10 @@ impl SurferState {
         let move_package = package.into_inner().data.try_into_package().unwrap();
         let proto_version = self.cluster.highest_protocol_version();
         let config = ProtocolConfig::get_for_version(proto_version, Chain::Unknown);
-        let binary_config = to_binary_config(&config);
+        let binary_config = config.binary_config(None);
+        let pool: &mut normalized::ArcPool = &mut *self.pool.write().await;
         let entry_functions: Vec<_> = move_package
-            .normalize(&binary_config)
+            .normalize(pool, &binary_config, /* include code */ false)
             .unwrap()
             .into_iter()
             .flat_map(|(module_name, module)| {
@@ -269,17 +275,17 @@ impl SurferState {
                         if !func.type_parameters.is_empty() {
                             return None;
                         }
-                        let mut parameters = func.parameters;
-                        if let Some(last_param) = parameters.last().as_ref() {
-                            if is_type_tx_context(last_param) {
-                                parameters.pop();
-                            }
+                        let mut parameters = (*func.parameters).clone();
+                        if let Some(last_param) = parameters.last().as_ref()
+                            && is_type_tx_context(last_param)
+                        {
+                            parameters.pop();
                         }
                         Some(EntryFunction {
                             package: package_id,
                             module: module_name.clone(),
                             function: func_name.to_string(),
-                            parameters,
+                            parameters: parameters.into_iter().map(|rc_ty| (*rc_ty).clone()).collect(),
                         })
                     })
                     .collect::<Vec<_>>()
@@ -303,14 +309,20 @@ impl SurferState {
             TEST_ONLY_GAS_UNIT_FOR_PUBLISH * rgp,
             rgp,
         );
-        let tx = self.cluster.wallet.sign_transaction(&tx_data);
+        let tx = self.cluster.wallet.sign_transaction(&tx_data).await;
+        let tx_digest = *tx.digest();
+        info!(?tx_digest, "Publishing package");
+        let start = Instant::now();
         let response = loop {
             match self.cluster.wallet.execute_transaction_may_fail(tx.clone()).await {
                 Ok(response) => {
                     break response;
                 }
                 Err(err) => {
-                    error!("Failed to publish package: {:?}", err);
+                    if start.elapsed() > Duration::from_secs(120) {
+                        fatal!("Failed to publish package after 120 seconds: {} {}", err, tx.digest());
+                    }
+                    error!(?tx_digest, "Failed to publish package: {}", err);
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
@@ -346,12 +358,12 @@ impl SurferState {
 
 fn is_type_tx_context(ty: &Type) -> bool {
     match ty {
-        Type::Reference(inner) | Type::MutableReference(inner) => match inner.as_ref() {
-            Type::Struct { address, module, name, type_arguments } => {
-                address == &SUI_FRAMEWORK_ADDRESS
-                    && module == &Identifier::new("tx_context").unwrap()
-                    && name == &Identifier::new("TxContext").unwrap()
-                    && type_arguments.is_empty()
+        Type::Reference(_, inner) => match inner.as_ref() {
+            Type::Datatype(dt) => {
+                dt.module.address == SUI_FRAMEWORK_ADDRESS
+                    && dt.module.name.as_ident_str() == IdentStr::new("tx_context").unwrap()
+                    && dt.name.as_ident_str() == IdentStr::new("TxContext").unwrap()
+                    && dt.type_arguments.is_empty()
             }
             _ => false,
         },

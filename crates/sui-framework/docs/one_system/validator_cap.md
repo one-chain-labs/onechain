@@ -9,14 +9,16 @@ title: Module `one_system::validator_cap`
 -  [Function `unverified_operation_cap_address`](#one_system_validator_cap_unverified_operation_cap_address)
 -  [Function `verified_operation_cap_address`](#one_system_validator_cap_verified_operation_cap_address)
 -  [Function `new_unverified_validator_operation_cap_and_transfer`](#one_system_validator_cap_new_unverified_validator_operation_cap_and_transfer)
--  [Function `new_from_unverified`](#one_system_validator_cap_new_from_unverified)
+-  [Function `into_verified`](#one_system_validator_cap_into_verified)
 
 
 <pre><code><b>use</b> <a href="../one/address.md#one_address">one::address</a>;
 <b>use</b> <a href="../one/hex.md#one_hex">one::hex</a>;
 <b>use</b> <a href="../one/object.md#one_object">one::object</a>;
+<b>use</b> <a href="../one/party.md#one_party">one::party</a>;
 <b>use</b> <a href="../one/transfer.md#one_transfer">one::transfer</a>;
 <b>use</b> <a href="../one/tx_context.md#one_tx_context">one::tx_context</a>;
+<b>use</b> <a href="../one/vec_map.md#one_vec_map">one::vec_map</a>;
 <b>use</b> <a href="../std/ascii.md#std_ascii">std::ascii</a>;
 <b>use</b> <a href="../std/bcs.md#std_bcs">std::bcs</a>;
 <b>use</b> <a href="../std/option.md#std_option">std::option</a>;
@@ -110,7 +112,9 @@ This is only constructed after successful verification.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_cap.md#one_system_validator_cap_unverified_operation_cap_address">unverified_operation_cap_address</a>(cap: &<a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">UnverifiedValidatorOperationCap</a>): &<b>address</b> {
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_cap.md#one_system_validator_cap_unverified_operation_cap_address">unverified_operation_cap_address</a>(
+    cap: &<a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">UnverifiedValidatorOperationCap</a>,
+): &<b>address</b> {
     &cap.authorizer_validator_address
 }
 </code></pre>
@@ -183,15 +187,15 @@ or rotating an existing validaotr's <code>operation_cap_id</code>.
 
 </details>
 
-<a name="one_system_validator_cap_new_from_unverified"></a>
+<a name="one_system_validator_cap_into_verified"></a>
 
-## Function `new_from_unverified`
+## Function `into_verified`
 
 Convert an <code><a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">UnverifiedValidatorOperationCap</a></code> to <code><a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">ValidatorOperationCap</a></code>.
 Should only be called by <code><a href="../one_system/validator_set.md#one_system_validator_set">validator_set</a></code> module AFTER verification.
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_cap.md#one_system_validator_cap_new_from_unverified">new_from_unverified</a>(cap: &<a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">one_system::validator_cap::UnverifiedValidatorOperationCap</a>): <a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">one_system::validator_cap::ValidatorOperationCap</a>
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_cap.md#one_system_validator_cap_into_verified">into_verified</a>(cap: &<a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">one_system::validator_cap::UnverifiedValidatorOperationCap</a>): <a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">one_system::validator_cap::ValidatorOperationCap</a>
 </code></pre>
 
 
@@ -200,12 +204,8 @@ Should only be called by <code><a href="../one_system/validator_set.md#one_syste
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_cap.md#one_system_validator_cap_new_from_unverified">new_from_unverified</a>(
-    cap: &<a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">UnverifiedValidatorOperationCap</a>,
-): <a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">ValidatorOperationCap</a> {
-    <a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">ValidatorOperationCap</a> {
-        authorizer_validator_address: cap.authorizer_validator_address
-    }
+<pre><code><b>public</b>(package) <b>fun</b> <a href="../one_system/validator_cap.md#one_system_validator_cap_into_verified">into_verified</a>(cap: &<a href="../one_system/validator_cap.md#one_system_validator_cap_UnverifiedValidatorOperationCap">UnverifiedValidatorOperationCap</a>): <a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">ValidatorOperationCap</a> {
+    <a href="../one_system/validator_cap.md#one_system_validator_cap_ValidatorOperationCap">ValidatorOperationCap</a> { authorizer_validator_address: cap.authorizer_validator_address }
 }
 </code></pre>
 

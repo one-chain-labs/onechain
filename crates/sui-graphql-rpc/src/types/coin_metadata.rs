@@ -295,10 +295,13 @@ impl CoinMetadata {
             return Ok(None);
         };
 
-        let supply =
-            CoinMetadata::query_total_supply(ctx.data_unchecked(), coin_type, self.super_.super_.checkpoint_viewed_at)
-                .await
-                .extend()?;
+        let supply = CoinMetadata::query_total_supply(
+            ctx.data_unchecked(),
+            coin_type.into_owned(),
+            self.super_.super_.checkpoint_viewed_at,
+        )
+        .await
+        .extend()?;
 
         Ok(supply.map(BigInt::from))
     }

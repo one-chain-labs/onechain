@@ -6,6 +6,7 @@
 //# init --addresses test=0x0 --accounts A
 
 //# publish --sender A
+#[allow(deprecated_usage)]
 module test::fake {
     use one::coin;
 
@@ -23,8 +24,10 @@ module test::fake {
 //> 0: one::coin::mint<test::fake::FAKE>(Input(0), Input(1));
 //> TransferObjects([Result(0)], Input(2))
 
-//# programmable --sender A --inputs object(2,0) 2
+//# programmable --sender A --inputs object(2,0) 2 @A
 //> SplitCoins(Input(0), [Input(1)]);
+//> TransferObjects([Result(0)], Input(2))
 
-//# programmable --sender A --inputs 18446744073709551615  --gas-budget 10000000000
-//> SplitCoins(Gas, [Input(0)])
+//# programmable --sender A --inputs 18446744073709551615 @A  --gas-budget 10000000000
+//> SplitCoins(Gas, [Input(0)]);
+//> TransferObjects([Result(0)], Input(1))
