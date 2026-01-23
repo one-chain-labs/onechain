@@ -1,0 +1,61 @@
+[ingestion]
+checkpoint-buffer-size = 5000
+ingest-concurrency = 200
+retry-interval-ms = 200
+streaming-backoff-initial-batch-size = 10
+streaming-backoff-max-batch-size = 10000
+
+[committer]
+write-concurrency = 5
+collect-interval-ms = 500
+watermark-interval-ms = 500
+
+[pruner]
+interval-ms = 300000
+delay-ms = 120000
+retention = 4000000
+max-chunk-size = 2000
+prune-concurrency = 1
+
+[pipeline.sum_displays]
+
+[pipeline.coin_balance_buckets]
+
+[pipeline.obj_info]
+
+[pipeline.cp_sequence_numbers]
+
+[pipeline.ev_emit_mod]
+
+[pipeline.ev_struct_inst]
+
+[pipeline.kv_checkpoints]
+
+[pipeline.kv_epoch_ends]
+
+[pipeline.kv_epoch_starts]
+
+[pipeline.kv_feature_flags]
+
+[pipeline.kv_objects]
+
+[pipeline.kv_packages]
+
+[pipeline.kv_protocol_configs]
+
+[pipeline.kv_transactions]
+
+[pipeline.obj_versions]
+
+[pipeline.tx_affected_addresses]
+
+[pipeline.tx_affected_objects]
+
+[pipeline.tx_balance_changes]
+
+[pipeline.tx_calls]
+
+[pipeline.tx_digests]
+
+[pipeline.tx_kinds]
+
