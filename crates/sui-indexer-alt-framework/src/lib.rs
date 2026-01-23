@@ -77,8 +77,8 @@ pub struct TaskArgs {
     /// Sequential pipelines cannot be attached to a tasked indexer.
     ///
     /// The framework ensures that tasked pipelines never commit checkpoints below the main
-    /// pipeline’s pruner watermark. Requires `--reader-interval-ms`.
-    #[arg(long, requires = "reader-interval-ms")]
+    /// pipeline’s pruner watermark. Requires `--reader_interval_ms`.
+    #[arg(long, requires = "reader_interval_ms")]
     task: Option<String>,
 
     /// The interval in milliseconds at which each of the pipelines on a tasked indexer should
